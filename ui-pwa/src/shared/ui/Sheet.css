@@ -21,6 +21,9 @@
   align-items: end;
   justify-items: stretch;
   padding: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .rpm-sheet-backdrop {
@@ -77,8 +80,8 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  height: min(96dvh, 920px);
-  max-height: min(96dvh, 920px);
+  height: min(92%, 920px);
+  max-height: min(92%, 920px);
   display: flex;
   flex-direction: column;
   min-height: 0;

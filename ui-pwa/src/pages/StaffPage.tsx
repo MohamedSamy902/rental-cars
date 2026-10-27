@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  Button, Sheet, TextField, SelectField, NumberField, MoneyField, SwitchField,
+  Button, Sheet, Fab, TextField, SelectField, NumberField, MoneyField, SwitchField,
   useToast, EmptyState, ErrorState, SkeletonBlock, StatusPill,
   IconPlus, IconShield, IconBadge, IconUsers, IconSearch,
 } from '@/shared/ui'
@@ -373,18 +373,14 @@ export function StaffPage() {
         </div>
       </motion.header>
 
-      <button
-        type="button"
-        className="st-fab"
-        aria-label={tab === 'hr' ? 'موظف موارد بشرية' : tab === 'permissions' ? 'دور جديد' : 'موظف جديد'}
+      <Fab
+        label={tab === 'hr' ? 'موظف موارد بشرية' : tab === 'permissions' ? 'دور جديد' : 'موظف جديد'}
         onClick={() => {
           if (tab === 'hr') setEmployeeSheet(true)
           else if (tab === 'permissions') setRoleSheet(true)
           else openCreateUser()
         }}
-      >
-        <IconPlus size={22} />
-      </button>
+      />
 
       <section className="st-kpis" aria-label="ملخص الموظفين">
         {[

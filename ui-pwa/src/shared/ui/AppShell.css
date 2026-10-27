@@ -508,6 +508,9 @@
   }
   .shell-main {
     padding: 0.65rem 0.85rem calc(5.8rem + var(--safe-bottom));
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
   }
   .shell-credit {
     display: none;

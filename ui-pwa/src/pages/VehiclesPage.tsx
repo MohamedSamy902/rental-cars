@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet,
+  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab, DetailList,
   TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
-  useToast, EmptyState, SkeletonBlock, ErrorState,
+  useToast, EmptyState, SkeletonBlock, ErrorState, IconChevron,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -22,6 +22,11 @@ type Vehicle = {
   default_deposit: number
   status: string
   rental_priority: number
+  tracker_device_number?: string | null
+  tracker_sim_number?: string | null
+  notes?: string | null
+  is_active?: boolean
+  accessories?: { id: number; name: string }[] | null
 }
 
 const statusLabel: Record<string, string> = {
@@ -58,6 +63,8 @@ export function VehiclesPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [detail, setDetail] = useState<Vehicle | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   async function load(nextSearch = search, nextChip = chip) {
     setLoading(true)
@@ -80,6 +87,18 @@ export function VehiclesPage() {
     const t = window.setTimeout(() => load(), 250)
     return () => window.clearTimeout(t)
   }, [search, chip])
+
+  async function openDetail(id: number) {
+    setDetailLoading(true)
+    try {
+      const res = await api<{ data: Vehicle }>(`/vehicles/${id}`)
+      setDetail(res.data)
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   async function onSave() {
     setSaving(true)
@@ -111,13 +130,33 @@ export function VehiclesPage() {
     }
   }
 
+  function VehicleCard({ v }: { v: Vehicle }) {
+    return (
+      <button type="button" className="rpm-card is-clickable" onClick={() => void openDetail(v.id)}>
+        <div className="rpm-card__row">
+          <strong>{v.brand} {v.model}</strong>
+          <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+        </div>
+        <p>{v.code} · {v.plate}</p>
+        <p className="muted">{v.year} · {v.category} · {v.fuel_type}</p>
+        <div className="rpm-card__meta">
+          <span>{formatMoney(v.daily_rate)} / يوم</span>
+          <span>{formatNumber(v.odometer)} كم</span>
+          <IconChevron size={16} className="rpm-card__chev" />
+        </div>
+      </button>
+    )
+  }
+
   return (
     <div className="rpm-stack">
       <PageHeader
         title="المركبات"
         subtitle="أسطول التشغيل — الحالة مشتقة من العقود والصيانة"
         action={<Button onClick={() => setOpen(true)}>إضافة مركبة</Button>}
+        mobileFab
       />
+      <Fab label="إضافة مركبة" onClick={() => setOpen(true)} />
 
       <SummaryStrip
         items={[
@@ -144,26 +183,13 @@ export function VehiclesPage() {
       {!loading && !error && rows.length > 0 ? (
         <>
           <div className="rpm-card-list rpm-mobile-only">
-            {rows.map((v) => (
-              <article key={v.id} className="rpm-card">
-                <div className="rpm-card__row">
-                  <strong>{v.brand} {v.model}</strong>
-                  <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
-                </div>
-                <p>{v.code} · {v.plate}</p>
-                <p className="muted">{v.year} · {v.category} · {v.fuel_type}</p>
-                <div className="rpm-card__meta">
-                  <span>{formatMoney(v.daily_rate)} / يوم</span>
-                  <span>{formatNumber(v.odometer)} كم</span>
-                </div>
-              </article>
-            ))}
+            {rows.map((v) => <VehicleCard key={v.id} v={v} />)}
           </div>
           <div className="rpm-table-wrap rpm-desktop-only">
             <table className="rpm-table">
               <thead>
                 <tr>
-                  <th>الكود</th><th>اللوحة</th><th>المركبة</th><th>الفئة</th><th>الحالة</th><th>العداد</th><th>اليومي</th>
+                  <th>الكود</th><th>اللوحة</th><th>المركبة</th><th>الفئة</th><th>الحالة</th><th>العداد</th><th>اليومي</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -176,6 +202,7 @@ export function VehiclesPage() {
                     <td><StatusPill status={v.status} label={statusLabel[v.status] || v.status} /></td>
                     <td>{formatNumber(v.odometer)}</td>
                     <td>{formatMoney(v.daily_rate)}</td>
+                    <td><Button size="sm" variant="ghost" onClick={() => void openDetail(v.id)}>عرض</Button></td>
                   </tr>
                 ))}
               </tbody>
@@ -212,6 +239,36 @@ export function VehiclesPage() {
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <SwitchField label="نشطة" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
         </div>
+      </Sheet>
+
+      <Sheet
+        open={!!detail || detailLoading}
+        title={detail ? `${detail.brand} ${detail.model}` : 'تفاصيل المركبة'}
+        onClose={() => setDetail(null)}
+        closeLabel="إغلاق"
+      >
+        {detailLoading && !detail ? <SkeletonBlock rows={6} /> : null}
+        {detail ? (
+          <DetailList
+            rows={[
+              { label: 'الحالة', value: <StatusPill status={detail.status} label={statusLabel[detail.status] || detail.status} /> },
+              { label: 'الكود', value: detail.code },
+              { label: 'اللوحة', value: detail.plate },
+              { label: 'الماركة / الموديل', value: `${detail.brand} ${detail.model}` },
+              { label: 'سنة الصنع', value: detail.year },
+              { label: 'الفئة', value: detail.category },
+              { label: 'الوقود', value: detail.fuel_type },
+              { label: 'العداد', value: `${formatNumber(detail.odometer)} كم` },
+              { label: 'الإيجار اليومي', value: formatMoney(detail.daily_rate) },
+              { label: 'التأمين النقدي', value: formatMoney(detail.default_deposit) },
+              { label: 'أولوية التأجير', value: detail.rental_priority },
+              { label: 'جهاز التتبع', value: detail.tracker_device_number || '—' },
+              { label: 'شريحة التتبع', value: detail.tracker_sim_number || '—' },
+              { label: 'نشطة', value: detail.is_active === false ? 'لا' : 'نعم' },
+              { label: 'ملاحظات', value: detail.notes || '—' },
+            ]}
+          />
+        ) : null}
       </Sheet>
     </div>
   )

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet,
+  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab, DetailList,
   TextField, SelectField, NumberField, MoneyField, TextAreaField,
-  useToast, EmptyState, SkeletonBlock, ErrorState,
+  useToast, EmptyState, SkeletonBlock, ErrorState, IconChevron,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -65,10 +65,24 @@ export function BookingsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [action, setAction] = useState<ActionKind>(null)
   const [selected, setSelected] = useState<Contract | null>(null)
+  const [detail, setDetail] = useState<Contract | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [actionForm, setActionForm] = useState({
     odometer_out: '', odometer_in: '', damage_fee: '', reason: '', planned_ends_at: '',
     replacement_vehicle_id: '', method: 'cash', receipt_number: '',
   })
+
+  async function openDetail(id: number) {
+    setDetailLoading(true)
+    try {
+      const res = await api<{ data: Contract }>(`/contracts/${id}`)
+      setDetail(res.data)
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -270,13 +284,47 @@ export function BookingsPage() {
     deposit: 'قبض التأمين النقدي',
   }
 
+  function contractActions(b: Contract) {
+    return (
+      <div className="rpm-card__actions">
+        {b.status === 'pending' ? (
+          <>
+            <Button type="button" size="sm" onClick={() => void approve(b.id)}>اعتماد</Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
+          </>
+        ) : null}
+        {b.status === 'approved' ? (
+          <>
+            <Button type="button" size="sm" onClick={() => void openAction('handover', b)}>تسليم</Button>
+            {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
+            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
+          </>
+        ) : null}
+        {b.status === 'active' ? (
+          <>
+            <Button type="button" size="sm" onClick={() => void openAction('return', b)}>استلام</Button>
+            {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
+            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('swap', b)}>تبديل عطل</Button>
+          </>
+        ) : null}
+        {b.status === 'completed' ? (
+          <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <div className="rpm-stack">
       <PageHeader
         title="العقود والحجوزات"
         subtitle="تمديد = عقد جديد · تبديل عطل = عقد جديد · بلا رصيد دائن"
         action={<Button onClick={openSheet}>إضافة حجز</Button>}
+        mobileFab
       />
+      <Fab label="إضافة حجز" onClick={() => void openSheet()} />
 
       <SummaryStrip
         items={[
@@ -296,7 +344,7 @@ export function BookingsPage() {
       {!loading && !error && rows.length > 0 ? (
         <div className="rpm-card-list">
           {rows.map((b) => (
-            <article key={b.id} className="rpm-card">
+            <button key={b.id} type="button" className="rpm-card is-clickable" onClick={() => void openDetail(b.id)}>
               <div className="rpm-card__row">
                 <strong>{b.number}</strong>
                 <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />
@@ -308,35 +356,9 @@ export function BookingsPage() {
                 <span>{formatMoney(b.frozen_daily_rate)} / يوم</span>
                 {b.final_total ? <span>الإجمالي: {formatMoney(b.final_total)}</span> : null}
                 {b.deposit ? <span>تأمين: {b.deposit.status}</span> : null}
+                <IconChevron size={16} className="rpm-card__chev" />
               </div>
-              <div className="rpm-card__actions">
-                {b.status === 'pending' ? (
-                  <>
-                    <Button type="button" size="sm" onClick={() => void approve(b.id)}>اعتماد</Button>
-                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
-                  </>
-                ) : null}
-                {b.status === 'approved' ? (
-                  <>
-                    <Button type="button" size="sm" onClick={() => void openAction('handover', b)}>تسليم</Button>
-                    {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
-                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
-                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
-                  </>
-                ) : null}
-                {b.status === 'active' ? (
-                  <>
-                    <Button type="button" size="sm" onClick={() => void openAction('return', b)}>استلام</Button>
-                    {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
-                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
-                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('swap', b)}>تبديل عطل</Button>
-                  </>
-                ) : null}
-                {b.status === 'completed' ? (
-                  <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
-                ) : null}
-              </div>
-            </article>
+            </button>
           ))}
         </div>
       ) : null}
@@ -401,6 +423,35 @@ export function BookingsPage() {
           <MoneyField label="التأمين النقدي المتفق" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} />
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} hint="نص حر فقط — لا ينشئ قواعد مالية" />
         </div>
+      </Sheet>
+
+      <Sheet
+        open={!!detail || detailLoading}
+        title={detail ? `عقد ${detail.number}` : 'تفاصيل العقد'}
+        onClose={() => setDetail(null)}
+        closeLabel="إغلاق"
+      >
+        {detailLoading && !detail ? <SkeletonBlock rows={6} /> : null}
+        {detail ? (
+          <>
+            <DetailList
+              rows={[
+                { label: 'الحالة', value: <StatusPill status={detail.status} label={statusLabel[detail.status] || detail.status} /> },
+                { label: 'رقم العقد', value: detail.number },
+                { label: 'العميل', value: detail.customer?.full_name || '—' },
+                { label: 'المركبة', value: detail.vehicle ? `${detail.vehicle.brand} ${detail.vehicle.model} · ${detail.vehicle.plate}` : '—' },
+                { label: 'البداية', value: formatDateTime(detail.starts_at) },
+                { label: 'النهاية المخططة', value: formatDateTime(detail.planned_ends_at) },
+                { label: 'السعر اليومي', value: formatMoney(detail.frozen_daily_rate) },
+                { label: 'التأمين المتفق', value: formatMoney(detail.frozen_agreed_deposit || 0) },
+                { label: 'حالة التأمين', value: detail.deposit?.status || 'غير مقبوض' },
+                { label: 'عداد الخروج', value: detail.odometer_out != null ? `${formatNumber(detail.odometer_out)} كم` : '—' },
+                { label: 'الإجمالي النهائي', value: detail.final_total != null ? formatMoney(detail.final_total) : '—' },
+              ]}
+            />
+            <div className="rpm-detail-actions">{contractActions(detail)}</div>
+          </>
+        ) : null}
       </Sheet>
 
       <Sheet

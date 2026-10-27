@@ -51,4 +51,8 @@
     min-height: 46px;
     border-radius: 14px;
   }
+
+  .rpm-page-header.has-mobile-fab .rpm-page-header__action {
+    display: none;
+  }
 }

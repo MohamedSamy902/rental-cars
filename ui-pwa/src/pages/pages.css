@@ -1,5 +1,18 @@
 /* Minimal shared page styles for non-dashboard screens (logic pages) */
-.rpm-stack { display: grid; gap: 0.75rem; }
+.rpm-stack {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.rpm-detail-actions {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
 
 .rpm-login {
   min-height: 100dvh;
@@ -114,6 +127,24 @@
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+  width: 100%;
+  max-width: 100%;
+  text-align: start;
+  color: inherit;
+}
+
+.rpm-card.is-clickable {
+  cursor: pointer;
+  transition: border-color var(--motion, 200ms) var(--ease, ease), transform var(--motion, 200ms) var(--ease, ease);
+}
+
+.rpm-card.is-clickable:active {
+  transform: scale(0.99);
+}
+
+.rpm-card__chev {
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .rpm-card__row {

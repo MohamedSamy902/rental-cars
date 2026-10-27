@@ -26,13 +26,11 @@ type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'children'> & {
 }
 
 type PanelPos = {
-  top?: number
-  bottom?: number
+  top: number
   left: number
   width: number
   maxHeight: number
   openUp: boolean
-  mobileSheet?: boolean
 }
 
 export function SelectField({
@@ -66,6 +64,7 @@ export function SelectField({
   const [pos, setPos] = useState<PanelPos | null>(null)
   const [uncontrolled, setUncontrolled] = useState(String(defaultValue ?? ''))
   const selectedValue = value !== undefined ? String(value) : uncontrolled
+  const showSearch = searchable && options.length > 6
 
   const selected = useMemo(
     () => options.find((o) => o.value === selectedValue) || null,
@@ -91,29 +90,18 @@ export function SelectField({
     const el = triggerRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    const gap = 8
+    const gap = 6
     const sidePad = 12
-
-    // Phone/fold: native-style bottom picker sheet
-    if (window.innerWidth <= 980) {
-      const width = window.innerWidth - sidePad * 2
-      setPos({
-        left: sidePad,
-        width,
-        bottom: sidePad + (Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')) || 0),
-        maxHeight: Math.min(window.innerHeight * 0.58, 420),
-        openUp: false,
-        mobileSheet: true,
-      })
-      return
-    }
-
-    const preferred = Math.min(320, window.innerHeight * 0.48)
-    const spaceBelow = window.innerHeight - rect.bottom - gap - 12
-    const spaceAbove = rect.top - gap - 12
-    const openUp = spaceBelow < 220 && spaceAbove > spaceBelow
-    const maxHeight = Math.max(160, Math.min(preferred, openUp ? spaceAbove : spaceBelow))
-    const width = Math.min(rect.width, window.innerWidth - sidePad * 2)
+    const vv = window.visualViewport
+    const viewH = vv?.height ?? window.innerHeight
+    const viewTop = vv?.offsetTop ?? 0
+    const viewBottom = viewTop + viewH
+    const preferred = Math.min(280, viewH * 0.42)
+    const spaceBelow = viewBottom - rect.bottom - gap - 10
+    const spaceAbove = rect.top - viewTop - gap - 10
+    const openUp = spaceBelow < 160 && spaceAbove > spaceBelow
+    const maxHeight = Math.max(140, Math.min(preferred, openUp ? spaceAbove : spaceBelow))
+    const width = Math.min(Math.max(rect.width, 200), window.innerWidth - sidePad * 2)
     const left = Math.min(Math.max(sidePad, rect.left), window.innerWidth - width - sidePad)
     setPos({
       top: openUp ? rect.top - gap : rect.bottom + gap,
@@ -128,8 +116,13 @@ export function SelectField({
     if (disabled) return
     setQuery('')
     setOpen(true)
-    const idx = Math.max(0, filtered.findIndex((o) => o.value === selectedValue))
+    const idx = Math.max(0, options.findIndex((o) => o.value === selectedValue))
     setActiveIndex(idx < 0 ? 0 : idx)
+    // Keep the field visible above the keyboard / panel
+    window.setTimeout(() => {
+      triggerRef.current?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+      updatePosition()
+    }, 40)
   }
 
   function closePanel() {
@@ -147,9 +140,9 @@ export function SelectField({
   useEffect(() => {
     if (!open) return
     updatePosition()
-    const t = window.setTimeout(() => searchRef.current?.focus(), 20)
+    // Do NOT autofocus search — that opens the keyboard and shoves the sheet away
     const onWin = () => updatePosition()
-    const onDoc = (e: MouseEvent) => {
+    const onDoc = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node
       if (rootRef.current?.contains(target)) return
       if (listRef.current?.contains(target)) return
@@ -164,13 +157,18 @@ export function SelectField({
     }
     window.addEventListener('resize', onWin)
     window.addEventListener('scroll', onWin, true)
+    window.visualViewport?.addEventListener('resize', onWin)
+    window.visualViewport?.addEventListener('scroll', onWin)
     document.addEventListener('mousedown', onDoc)
+    document.addEventListener('touchstart', onDoc, { passive: true })
     document.addEventListener('keydown', onKey)
     return () => {
-      window.clearTimeout(t)
       window.removeEventListener('resize', onWin)
       window.removeEventListener('scroll', onWin, true)
+      window.visualViewport?.removeEventListener('resize', onWin)
+      window.visualViewport?.removeEventListener('scroll', onWin)
       document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('touchstart', onDoc)
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
@@ -215,64 +213,69 @@ export function SelectField({
 
   const panel = open && pos
     ? createPortal(
-        <div
-          ref={listRef}
-          className={`rpm-select-panel ${pos.openUp ? 'is-up' : 'is-down'} ${pos.mobileSheet ? 'is-mobile-sheet' : ''}`}
-          style={{
-            top: pos.mobileSheet || pos.openUp ? undefined : pos.top,
-            bottom: pos.mobileSheet
-              ? pos.bottom
-              : pos.openUp && pos.top != null
-                ? window.innerHeight - pos.top
-                : undefined,
-            left: pos.left,
-            width: pos.width,
-            maxHeight: pos.maxHeight,
-          }}
-          role="listbox"
-          id={listId}
-          aria-label={label}
-        >
-          {searchable ? (
-            <div className="rpm-select-panel__search">
-              <IconSearch size={15} />
-              <input
-                ref={searchRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={onSearchKey}
-                placeholder={searchPlaceholder}
-                aria-label={searchPlaceholder}
-              />
-            </div>
-          ) : null}
+        <>
+          <button
+            type="button"
+            className="rpm-select-backdrop"
+            aria-label="إغلاق القائمة"
+            onClick={closePanel}
+          />
+          <div
+            ref={listRef}
+            className={`rpm-select-panel ${pos.openUp ? 'is-up' : 'is-down'}`}
+            style={{
+              top: pos.openUp ? undefined : pos.top,
+              bottom: pos.openUp ? window.innerHeight - pos.top : undefined,
+              left: pos.left,
+              width: pos.width,
+              maxHeight: pos.maxHeight,
+            }}
+            role="listbox"
+            id={listId}
+            aria-label={label}
+          >
+            {showSearch ? (
+              <div className="rpm-select-panel__search">
+                <IconSearch size={15} />
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={onSearchKey}
+                  placeholder={searchPlaceholder}
+                  aria-label={searchPlaceholder}
+                  enterKeyHint="search"
+                />
+              </div>
+            ) : null}
 
-          <div className="rpm-select-panel__list">
-            {filtered.length === 0 ? (
-              <div className="rpm-select-panel__empty">لا توجد نتائج</div>
-            ) : (
-              filtered.map((opt, idx) => {
-                const isSelected = opt.value === selectedValue
-                const isActive = idx === activeIndex
-                return (
-                  <button
-                    key={opt.value || `empty-${idx}`}
-                    type="button"
-                    role="option"
-                    data-idx={idx}
-                    aria-selected={isSelected}
-                    className={`rpm-select-panel__option ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''}`}
-                    onMouseEnter={() => setActiveIndex(idx)}
-                    onClick={() => pick(opt)}
-                  >
-                    <span>{opt.label}</span>
-                    {isSelected ? <em aria-hidden>✓</em> : null}
-                  </button>
-                )
-              })
-            )}
+            <div className="rpm-select-panel__list">
+              {filtered.length === 0 ? (
+                <div className="rpm-select-panel__empty">لا توجد نتائج</div>
+              ) : (
+                filtered.map((opt, idx) => {
+                  const isSelected = opt.value === selectedValue
+                  const isActive = idx === activeIndex
+                  return (
+                    <button
+                      key={opt.value || `empty-${idx}`}
+                      type="button"
+                      role="option"
+                      data-idx={idx}
+                      aria-selected={isSelected}
+                      className={`rpm-select-panel__option ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''}`}
+                      onMouseEnter={() => setActiveIndex(idx)}
+                      onClick={() => pick(opt)}
+                    >
+                      <span>{opt.label}</span>
+                      {isSelected ? <em aria-hidden>✓</em> : null}
+                    </button>
+                  )
+                })
+              )}
+            </div>
           </div>
-        </div>,
+        </>,
         document.body,
       )
     : null
@@ -302,7 +305,6 @@ export function SelectField({
         <IconChevron size={16} className="rpm-select-trigger__chev" />
       </button>
 
-      {/* Keep native select for progressive enhancement / form semantics without showing it */}
       <select
         className="rpm-select-native"
         tabIndex={-1}
