@@ -1,0 +1,35 @@
+.rpm-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rpm-pill--success {
+  background: color-mix(in srgb, var(--success) 14%, white);
+  color: var(--success);
+}
+
+.rpm-pill--warning {
+  background: color-mix(in srgb, var(--warning) 16%, white);
+  color: #b45309;
+}
+
+.rpm-pill--brand {
+  background: color-mix(in srgb, var(--brand) 14%, white);
+  color: var(--brand-hover);
+}
+
+.rpm-pill--danger {
+  background: color-mix(in srgb, var(--danger) 12%, white);
+  color: var(--danger);
+}
+
+.rpm-pill--muted {
+  background: var(--bg);
+  color: var(--text-muted);
+}

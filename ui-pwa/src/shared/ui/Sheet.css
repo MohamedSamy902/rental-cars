@@ -1,0 +1,74 @@
+.rpm-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  align-items: end;
+}
+
+.rpm-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(15 23 42 / 45%);
+  border: 0;
+  cursor: pointer;
+  animation: rpm-fade-up calc(var(--motion) * 0.8) var(--ease);
+}
+
+.rpm-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  max-height: min(92dvh, 900px);
+  margin-inline: auto;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -12px 40px rgb(15 23 42 / 18%);
+  animation: rpm-sheet-in var(--motion) var(--ease);
+}
+
+@media (min-width: 900px) {
+  .rpm-sheet-root {
+    align-items: stretch;
+    justify-content: start;
+  }
+
+  .rpm-sheet {
+    height: 100%;
+    max-height: none;
+    margin-inline: 0;
+    margin-inline-start: auto;
+    border-radius: 16px 0 0 16px;
+  }
+}
+
+.rpm-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.rpm-sheet__head h2 {
+  font-size: 1.15rem;
+}
+
+.rpm-sheet__body {
+  padding: 1.1rem;
+  overflow: auto;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.rpm-sheet__foot {
+  padding: 0.9rem 1.1rem calc(0.9rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 0.65rem;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}

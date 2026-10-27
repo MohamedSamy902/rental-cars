@@ -1,0 +1,44 @@
+.rpm-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 700px) {
+  .rpm-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.rpm-summary__item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 0.95rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.rpm-summary__value {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.rpm-summary__label {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.tone-success .rpm-summary__value {
+  color: var(--success);
+}
+
+.tone-warning .rpm-summary__value {
+  color: var(--warning);
+}
+
+.tone-danger .rpm-summary__value {
+  color: var(--danger);
+}

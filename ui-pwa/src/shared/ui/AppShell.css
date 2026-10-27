@@ -1,0 +1,190 @@
+.rpm-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--bg);
+}
+
+.rpm-shell__side {
+  display: none;
+}
+
+.rpm-shell__brand {
+  display: grid;
+  gap: 0.15rem;
+  padding: 1.25rem 1.1rem 1rem;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.rpm-shell__logo {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.04em;
+}
+
+.rpm-shell__tag {
+  color: rgb(255 255 255 / 55%);
+  font-size: 0.85rem;
+}
+
+.rpm-shell__nav {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem 0.7rem;
+}
+
+.rpm-shell__link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-sm);
+  color: rgb(255 255 255 / 72%);
+  font-weight: 600;
+  transition:
+    background-color var(--motion) var(--ease),
+    color var(--motion) var(--ease);
+}
+
+.rpm-shell__link:hover {
+  background: rgb(255 255 255 / 6%);
+  color: #fff;
+}
+
+.rpm-shell__link.is-active {
+  background: color-mix(in srgb, var(--brand) 28%, transparent);
+  color: #fff;
+}
+
+.rpm-shell__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.rpm-shell__top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 56px;
+  padding: 0.65rem 1rem;
+  background: var(--nav);
+  color: #fff;
+}
+
+.rpm-shell__top-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.rpm-shell__top-brand strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+}
+
+.rpm-shell__top-brand span {
+  color: rgb(255 255 255 / 55%);
+  font-size: 0.85rem;
+}
+
+.rpm-shell__icon-btn {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+  font-weight: 600;
+}
+
+.rpm-shell__content {
+  flex: 1;
+  padding: 1rem 1rem calc(var(--bottom-nav-height) + 1.25rem);
+  width: min(1120px, 100%);
+  margin-inline: auto;
+}
+
+.rpm-shell__bottom {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  min-height: var(--bottom-nav-height);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--nav);
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.rpm-shell__tab {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.15rem;
+  color: rgb(255 255 255 / 55%);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.45rem 0.2rem;
+  transition: color var(--motion) var(--ease);
+}
+
+.rpm-shell__tab span:first-child {
+  font-size: 1rem;
+}
+
+.rpm-shell__tab.is-active {
+  color: #5eead4;
+}
+
+@media (min-width: 900px) {
+  .rpm-shell {
+    grid-template-columns: var(--shell-nav-width) 1fr;
+  }
+
+  .rpm-shell__side {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    background: var(--nav);
+    color: #fff;
+  }
+
+  .rpm-shell__top {
+    background: transparent;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, var(--bg) 88%, white);
+  }
+
+  .rpm-shell__top-brand {
+    display: none;
+  }
+
+  .rpm-shell__icon-btn {
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .rpm-shell__bottom {
+    display: none;
+  }
+
+  .rpm-shell__content {
+    padding: 1.35rem 1.5rem 2rem;
+  }
+}

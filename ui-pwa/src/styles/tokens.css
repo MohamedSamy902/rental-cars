@@ -1,0 +1,30 @@
+:root {
+  /* RPM design tokens — defaults; tenant overrides from integrator panel later */
+  --nav: #0b1220;
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --brand: #0d9488;
+  --brand-hover: #0f766e;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --border: #e2e8f0;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
+  --font-display: 'Cairo', 'IBM Plex Sans Arabic', sans-serif;
+  --font-body: 'IBM Plex Sans Arabic', 'Cairo', sans-serif;
+  --shell-nav-width: 248px;
+  --bottom-nav-height: 64px;
+  --motion: 200ms;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0ms;
+  }
+}

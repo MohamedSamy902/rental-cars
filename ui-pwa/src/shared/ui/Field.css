@@ -1,0 +1,127 @@
+.rpm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.rpm-field__label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rpm-field__req {
+  color: var(--danger);
+  margin-inline-start: 0.2rem;
+}
+
+.rpm-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition:
+    border-color var(--motion) var(--ease),
+    box-shadow var(--motion) var(--ease);
+}
+
+.rpm-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+
+.rpm-input:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.rpm-field.has-error .rpm-input {
+  border-color: var(--danger);
+}
+
+.rpm-field__error {
+  font-size: 0.82rem;
+  color: var(--danger);
+}
+
+.rpm-field__hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.rpm-textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.rpm-select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px);
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+  padding-inline-end: 2rem;
+}
+
+[dir='rtl'] .rpm-select {
+  background-position:
+    18px calc(50% - 3px),
+    12px calc(50% - 3px);
+}
+
+.rpm-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.rpm-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rpm-switch__track {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  transition: background-color var(--motion) var(--ease);
+}
+
+.rpm-switch__track::after {
+  content: '';
+  position: absolute;
+  inset-block: 3px;
+  inset-inline-start: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: inset-inline-start var(--motion) var(--ease);
+}
+
+.rpm-switch input:checked + .rpm-switch__track {
+  background: var(--brand);
+}
+
+.rpm-switch input:checked + .rpm-switch__track::after {
+  inset-inline-start: 21px;
+}
+
+.rpm-switch__label {
+  font-weight: 600;
+}
