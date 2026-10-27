@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class TenantSetting extends Model
 {
     protected $fillable = [
-        'center_name', 'logo_path', 'colors', 'multi_branch', 'inventory_mode', 'feature_flags', 'operational',
+        'center_name', 'logo_path', 'print_footer', 'colors', 'multi_branch', 'inventory_mode', 'feature_flags', 'operational',
     ];
 
     protected function casts(): array

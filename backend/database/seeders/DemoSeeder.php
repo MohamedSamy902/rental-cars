@@ -37,7 +37,8 @@ class DemoSeeder extends Seeder
             ],
         );
 
-        TenantSetting::query()->firstOrCreate([], [
+        $tenant = TenantSetting::query()->firstOrCreate([]);
+        $tenant->fill([
             'center_name' => 'مركز آر بي إم للتأجير',
             'multi_branch' => false,
             'inventory_mode' => 'unified',
@@ -56,13 +57,17 @@ class DemoSeeder extends Seeder
                 'evaluations' => true,
                 'hr' => true,
             ],
+            'print_footer' => 'مركز آر بي إم للتأجير — نسخة داخلية',
             'operational' => [
                 'default_daily_km' => 200,
                 'excess_km_rate' => 5,
                 'currency' => 'EGP',
                 'block_expired_license' => true,
+                'block_expired_vehicle_docs' => true,
+                'require_handover_signature' => true,
+                'require_return_signature_always' => false,
             ],
-        ]);
+        ])->save();
 
         app(AccountingService::class)->ensureChartOfAccounts();
 

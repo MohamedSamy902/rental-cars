@@ -17,6 +17,11 @@ import { ReportsPage } from '@/pages/ReportsPage'
 import { AccountsPage } from '@/pages/AccountsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { StaffPage } from '@/pages/StaffPage'
+import { ShowroomPage } from '@/pages/ShowroomPage'
+import { DepartmentNoticePage } from '@/pages/DepartmentNoticePage'
+import { PettyCashPage } from '@/pages/PettyCashPage'
+import { IntegratorPage } from '@/pages/IntegratorPage'
+import { AuditLogsPage } from '@/pages/AuditLogsPage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -59,8 +64,13 @@ export default function App() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
+                <Route path="petty-cash" element={<PettyCashPage />} />
+                <Route path="showroom" element={<ShowroomPage />} />
+                <Route path="department-notice" element={<DepartmentNoticePage />} />
+                <Route path="audit-logs" element={<AuditLogsPage />} />
                 <Route path="staff" element={<StaffPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="integrator" element={<IntegratorPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>

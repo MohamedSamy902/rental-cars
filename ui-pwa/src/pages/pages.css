@@ -277,3 +277,37 @@
     border-radius: 20px;
   }
 }
+
+.rpm-showroom__grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.rpm-showroom__card {
+  min-height: 110px;
+}
+
+.rpm-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  color: var(--brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.rpm-qr-box {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.85rem;
+}

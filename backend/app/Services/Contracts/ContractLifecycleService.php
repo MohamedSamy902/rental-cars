@@ -10,6 +10,7 @@ use App\Models\DepositDeduction;
 use App\Models\Payment;
 use App\Models\TenantSetting;
 use App\Models\Vehicle;
+use App\Models\VehicleDocument;
 use App\Services\Accounting\AccountingService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use DomainException;
@@ -21,6 +22,7 @@ class ContractLifecycleService
         private readonly ContractPricingService $pricing,
         private readonly VehicleAvailabilityService $availability,
         private readonly AccountingService $accounting,
+        private readonly InspectionService $inspections,
     ) {}
 
     /**
@@ -38,7 +40,7 @@ class ContractLifecycleService
             }
 
             $customer = Customer::query()->findOrFail($data['customer_id']);
-            if ($customer->status === 'blacklisted') {
+            if (in_array($customer->status, ['blacklist', 'blacklisted'], true)) {
                 throw new DomainException('العميل في القائمة السوداء.');
             }
 
@@ -123,7 +125,10 @@ class ContractLifecycleService
         return $contract->fresh(['customer', 'vehicle', 'deposit']);
     }
 
-    public function activateOnHandover(Contract $contract, int $odometerOut, ?int $userId = null): Contract
+    /**
+     * @param  array<string, mixed>  $inspection
+     */
+    public function activateOnHandover(Contract $contract, int $odometerOut, ?int $userId = null, array $inspection = []): Contract
     {
         if (! in_array($contract->status, ['approved', 'pending'], true)) {
             throw new DomainException('التسليم يتطلب عقداً معتمداً أو معلّقاً قابلاً للتفعيل.');
@@ -138,22 +143,46 @@ class ContractLifecycleService
             throw new DomainException('عداد الخروج أقل من عداد السيارة المسجّل.');
         }
 
-        $contract->fill([
-            'status' => 'active',
-            'odometer_out' => $odometerOut,
-        ])->save();
+        return DB::transaction(function () use ($contract, $odometerOut, $userId, $inspection) {
+            $this->inspections->record($contract->id, [
+                'type' => 'handover',
+                'odometer' => $odometerOut,
+                'fuel_level' => (int) ($inspection['fuel_level'] ?? 50),
+                'notes' => $inspection['notes'] ?? null,
+                'signature_data' => $inspection['signature_data'] ?? null,
+                'accessories' => $inspection['accessories'] ?? [],
+                'damages' => $inspection['damages'] ?? [],
+            ], $userId);
 
-        Vehicle::query()->whereKey($contract->vehicle_id)->update(['odometer' => $odometerOut]);
+            $contract->fill([
+                'status' => 'active',
+                'odometer_out' => $odometerOut,
+            ])->save();
 
-        return $contract->fresh(['customer', 'vehicle', 'deposit']);
+            Vehicle::query()->whereKey($contract->vehicle_id)->update(['odometer' => $odometerOut]);
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'handover',
+                'record_type' => Contract::class,
+                'record_id' => $contract->id,
+                'after' => ['status' => 'active', 'odometer_out' => $odometerOut],
+            ]);
+
+            return $contract->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
+        });
     }
 
+    /**
+     * @param  array<string, mixed>  $inspection
+     */
     public function completeOnReturn(
         Contract $contract,
         int $odometerIn,
         ?\DateTimeInterface $returnedAt = null,
         ?int $userId = null,
         int $damageFee = 0,
+        array $inspection = [],
     ): Contract {
         if ($contract->status !== 'active') {
             throw new DomainException('الاستلام يتطلب عقداً نشطاً.');
@@ -162,63 +191,76 @@ class ContractLifecycleService
             throw new DomainException('عداد العودة أقل من عداد الخروج.');
         }
 
-        $end = $returnedAt ?? now();
-        $days = $this->pricing->countRentalDays($contract->starts_at, $end);
-        $minDays = (int) ($contract->frozen_min_days ?? $contract->min_days ?? 0);
-        $billableDays = max($days, $minDays);
+        return DB::transaction(function () use ($contract, $odometerIn, $returnedAt, $userId, $damageFee, $inspection) {
+            $this->inspections->record($contract->id, [
+                'type' => 'return',
+                'odometer' => $odometerIn,
+                'fuel_level' => (int) ($inspection['fuel_level'] ?? 50),
+                'notes' => $inspection['notes'] ?? null,
+                'signature_data' => $inspection['signature_data'] ?? null,
+                'accessories' => $inspection['accessories'] ?? [],
+                'damages' => $inspection['damages'] ?? [],
+                'damage_fee' => $damageFee,
+            ], $userId);
 
-        $plannedEnd = $contract->planned_ends_at;
-        $lateDays = 0;
-        if ($end > $plannedEnd) {
-            $lateDays = $this->pricing->countRentalDays($plannedEnd, $end);
-        }
+            $end = $returnedAt ?? now();
+            $days = $this->pricing->countRentalDays($contract->starts_at, $end);
+            $minDays = (int) ($contract->frozen_min_days ?? $contract->min_days ?? 0);
+            $billableDays = max($days, $minDays);
 
-        $periodRent = $billableDays * (int) $contract->frozen_daily_rate;
-        $allowed = $this->pricing->allowedKilometers((int) $contract->frozen_daily_km_allowance, $billableDays);
-        $driven = max(0, $odometerIn - (int) $contract->odometer_out);
-        $excess = max(0, $driven - $allowed);
-        $excessAmount = $excess * (int) $contract->frozen_excess_km_rate;
+            $plannedEnd = $contract->planned_ends_at;
+            $lateDays = 0;
+            if ($end > $plannedEnd) {
+                $lateDays = $this->pricing->countRentalDays($plannedEnd, $end);
+            }
 
-        $final = $this->pricing->finalTotal([
-            'period_rent' => $periodRent,
-            'discount' => (int) $contract->discount,
-            'excess_km_fee' => $excessAmount,
-            'damage_fee' => $damageFee,
-            'operating_insurance_fee' => (int) ($contract->frozen_operating_insurance_fee ?? 0),
-            'other_fees' => (int) $contract->other_fees,
-        ]);
+            $periodRent = $billableDays * (int) $contract->frozen_daily_rate;
+            $allowed = $this->pricing->allowedKilometers((int) $contract->frozen_daily_km_allowance, $billableDays);
+            $driven = max(0, $odometerIn - (int) $contract->odometer_out);
+            $excess = max(0, $driven - $allowed);
+            $excessAmount = $excess * (int) $contract->frozen_excess_km_rate;
 
-        $contract->fill([
-            'status' => 'completed',
-            'actual_ends_at' => $end,
-            'approved_days' => $billableDays,
-            'tagged_late_days' => $lateDays,
-            'odometer_in' => $odometerIn,
-            'allowed_km' => $allowed,
-            'excess_km' => $excess,
-            'excess_km_amount' => $excessAmount,
-            'period_rent' => $periodRent,
-            'damage_fee' => $damageFee,
-            'final_total' => (int) round($final),
-        ])->save();
+            $final = $this->pricing->finalTotal([
+                'period_rent' => $periodRent,
+                'discount' => (int) $contract->discount,
+                'excess_km_fee' => $excessAmount,
+                'damage_fee' => $damageFee,
+                'operating_insurance_fee' => (int) ($contract->frozen_operating_insurance_fee ?? 0),
+                'other_fees' => (int) $contract->other_fees,
+            ]);
 
-        Vehicle::query()->whereKey($contract->vehicle_id)->update(['odometer' => $odometerIn]);
-
-        $this->accounting->postContractClose($contract->fresh(), $userId);
-
-        AuditLog::query()->create([
-            'user_id' => $userId,
-            'action' => 'completed',
-            'record_type' => Contract::class,
-            'record_id' => $contract->id,
-            'after' => [
+            $contract->fill([
+                'status' => 'completed',
+                'actual_ends_at' => $end,
                 'approved_days' => $billableDays,
                 'tagged_late_days' => $lateDays,
-                'final_total' => $contract->final_total,
-            ],
-        ]);
+                'odometer_in' => $odometerIn,
+                'allowed_km' => $allowed,
+                'excess_km' => $excess,
+                'excess_km_amount' => $excessAmount,
+                'period_rent' => $periodRent,
+                'damage_fee' => $damageFee,
+                'final_total' => (int) round($final),
+            ])->save();
 
-        return $contract->fresh(['customer', 'vehicle', 'deposit']);
+            Vehicle::query()->whereKey($contract->vehicle_id)->update(['odometer' => $odometerIn]);
+
+            $this->accounting->postContractClose($contract->fresh(), $userId);
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'completed',
+                'record_type' => Contract::class,
+                'record_id' => $contract->id,
+                'after' => [
+                    'approved_days' => $billableDays,
+                    'tagged_late_days' => $lateDays,
+                    'final_total' => $contract->final_total,
+                ],
+            ]);
+
+            return $contract->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
+        });
     }
 
     public function cancel(Contract $contract, string $reason, ?int $userId = null): Contract
@@ -479,6 +521,7 @@ class ContractLifecycleService
         $settings = TenantSetting::query()->first();
         $ops = $settings?->operational ?? [];
         $blockExpiredLicense = (bool) ($ops['block_expired_license'] ?? true);
+        $blockExpiredVehicleDocs = (bool) ($ops['block_expired_vehicle_docs'] ?? true);
 
         $customer = $contract->customer ?? Customer::query()->find($contract->customer_id);
         if ($blockExpiredLicense && $customer?->license_expires_on && $customer->license_expires_on->isPast()) {
@@ -487,6 +530,26 @@ class ContractLifecycleService
 
         if ($customer?->license_expires_on && $customer->license_expires_on->lt($contract->planned_ends_at)) {
             throw new DomainException('رخصة العميل تنتهي قبل نهاية العقد المخططة.');
+        }
+
+        if ($blockExpiredVehicleDocs) {
+            $expired = VehicleDocument::query()
+                ->where('vehicle_id', $contract->vehicle_id)
+                ->whereNotNull('expires_on')
+                ->whereDate('expires_on', '<', now()->toDateString())
+                ->first();
+            if ($expired) {
+                throw new DomainException('مستند سيارة منتهٍ ('.$expired->type.') — يُمنع الاعتماد.');
+            }
+
+            $endsBeforeContract = VehicleDocument::query()
+                ->where('vehicle_id', $contract->vehicle_id)
+                ->whereNotNull('expires_on')
+                ->whereDate('expires_on', '<', $contract->planned_ends_at->toDateString())
+                ->first();
+            if ($endsBeforeContract) {
+                throw new DomainException('مستند السيارة ('.$endsBeforeContract->type.') ينتهي قبل نهاية العقد المخططة.');
+            }
         }
     }
 

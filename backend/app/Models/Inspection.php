@@ -9,12 +9,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Inspection extends Model
 {
     protected $fillable = [
-        'contract_id', 'type', 'inspected_at', 'odometer', 'fuel_level', 'notes', 'inspector_id', 'signature_path',
+        'contract_id', 'type', 'inspected_at', 'odometer', 'fuel_level', 'notes',
+        'inspector_id', 'signature_path', 'signature_data', 'accessories_json',
     ];
 
     protected function casts(): array
     {
-        return ['inspected_at' => 'datetime'];
+        return [
+            'inspected_at' => 'datetime',
+            'accessories_json' => 'array',
+        ];
     }
 
     public function contract(): BelongsTo

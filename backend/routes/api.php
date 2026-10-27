@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\OperationsController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\StaffController;
@@ -31,11 +32,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
         return response()->json(['data' => $settings]);
     });
+    Route::put('/settings/tenant', [OperationsController::class, 'updateTenant']);
 
     Route::get('/staff', [StaffController::class, 'index']);
     Route::post('/staff', [StaffController::class, 'store']);
     Route::put('/staff/{user}', [StaffController::class, 'update']);
 
+    Route::get('/employees/lookup', [OperationsController::class, 'employeesLookup']);
     Route::get('/employees', [EmployeeController::class, 'index']);
     Route::post('/employees', [EmployeeController::class, 'store']);
     Route::put('/employees/{employee}', [EmployeeController::class, 'update']);
@@ -45,6 +48,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
 
     Route::apiResource('vehicles', VehicleController::class);
+    Route::post('/vehicles/{vehicle}/documents', [OperationsController::class, 'storeVehicleDocument']);
+    Route::post('/vehicles/{vehicle}/accessories', [OperationsController::class, 'storeVehicleAccessory']);
+
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('contracts', ContractController::class)->only(['index', 'store', 'show']);
     Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve']);
@@ -56,6 +62,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/contracts/{contract}/deposit', [ContractController::class, 'receiveDeposit']);
     Route::post('/contracts/{contract}/deposit/deduct', [ContractController::class, 'deductDeposit']);
     Route::post('/contracts/{contract}/deposit/return', [ContractController::class, 'returnDeposit']);
+    Route::get('/contracts/{contract}/print', [ContractController::class, 'printData']);
+
+    Route::get('/showroom', [OperationsController::class, 'showroom']);
+    Route::get('/department-notice', [OperationsController::class, 'departmentNotice']);
+    Route::get('/audit-logs', [OperationsController::class, 'auditLogs']);
+    Route::get('/qr', [OperationsController::class, 'qrPayload']);
+
+    Route::get('/petty-cash', [OperationsController::class, 'pettyCashIndex']);
+    Route::post('/petty-cash', [OperationsController::class, 'pettyCashStore']);
+    Route::post('/petty-cash/{account}/move', [OperationsController::class, 'pettyCashMove']);
 
     Route::get('/accounting/overview', [AccountingController::class, 'overview']);
     Route::post('/accounting/lock-month', [AccountingController::class, 'lockMonth']);

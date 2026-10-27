@@ -69,12 +69,23 @@ class ContractLifecycleTest extends TestCase
             'method' => 'cash',
             'receipt_number' => 'R-1',
         ])->assertCreated();
+        $signature = 'sig-'.str_repeat('client-ok-', 6);
         $this->postJson("/api/contracts/{$id}/handover", [
             'odometer_out' => 10000,
+            'signature_data' => $signature,
+            'fuel_level' => 80,
+            'accessories' => [
+                ['name' => 'مثلث تحذير', 'expected_qty' => 1, 'actual_qty' => 1, 'ok' => true],
+            ],
         ])->assertOk();
         $this->postJson("/api/contracts/{$id}/return", [
             'odometer_in' => 10300,
             'damage_fee' => 100,
+            'signature_data' => $signature,
+            'fuel_level' => 40,
+            'damages' => [
+                ['position' => 'الباب الأمامي', 'description' => 'خدش سطحي'],
+            ],
         ])->assertOk()
             ->assertJsonPath('data.status', 'completed');
 

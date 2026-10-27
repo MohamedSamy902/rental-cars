@@ -4,7 +4,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab, DetailList,
-  TextField, SelectField, NumberField, MoneyField, TextAreaField,
+  TextField, SelectField, NumberField, MoneyField, TextAreaField, SignatureField,
   useToast, EmptyState, SkeletonBlock, ErrorState, IconChevron,
 } from '@/shared/ui'
 import './pages.css'
@@ -70,6 +70,7 @@ export function BookingsPage() {
   const [actionForm, setActionForm] = useState({
     odometer_out: '', odometer_in: '', damage_fee: '', reason: '', planned_ends_at: '',
     replacement_vehicle_id: '', method: 'cash', receipt_number: '',
+    fuel_level: '50', notes: '', signature_data: '', damage_position: '', damage_description: '',
   })
 
   async function openDetail(id: number) {
@@ -149,6 +150,11 @@ export function BookingsPage() {
       replacement_vehicle_id: '',
       method: 'cash',
       receipt_number: `R-${contract.number}`,
+      fuel_level: '50',
+      notes: '',
+      signature_data: '',
+      damage_position: '',
+      damage_description: '',
     })
     if (kind === 'swap' || kind === 'extend') {
       const v = await api<{ data: Vehicle[] }>('/vehicles?per_page=100')
@@ -219,15 +225,27 @@ export function BookingsPage() {
       if (action === 'handover') {
         await api(`/contracts/${selected.id}/handover`, {
           method: 'POST',
-          json: { odometer_out: Number(actionForm.odometer_out) },
+          json: {
+            odometer_out: Number(actionForm.odometer_out),
+            fuel_level: actionForm.fuel_level ? Number(actionForm.fuel_level) : 50,
+            notes: actionForm.notes || undefined,
+            signature_data: actionForm.signature_data || undefined,
+          },
         })
         toast.success('تم التسليم وتفعيل العقد.')
       } else if (action === 'return') {
+        const damages = actionForm.damage_position && actionForm.damage_description
+          ? [{ position: actionForm.damage_position, description: actionForm.damage_description }]
+          : []
         await api(`/contracts/${selected.id}/return`, {
           method: 'POST',
           json: {
             odometer_in: Number(actionForm.odometer_in),
             damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
+            fuel_level: actionForm.fuel_level ? Number(actionForm.fuel_level) : 50,
+            notes: actionForm.notes || undefined,
+            signature_data: actionForm.signature_data || undefined,
+            damages,
           },
         })
         toast.success('تم الاستلام وإقفال الإجمالي.')
@@ -284,6 +302,38 @@ export function BookingsPage() {
     deposit: 'قبض التأمين النقدي',
   }
 
+  async function printContract(id: number) {
+    try {
+      const res = await api<{ data: { tenant: { center_name?: string; print_footer?: string }; contract: any } }>(`/contracts/${id}/print`)
+      const { tenant, contract } = res.data
+      const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700')
+      if (!w) {
+        toast.error('اسمح بالنوافذ المنبثقة للطباعة.')
+        return
+      }
+      w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>عقد ${contract.number}</title>
+        <style>body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a} h1{margin:0 0 4px} .muted{color:#64748b} table{width:100%;border-collapse:collapse;margin-top:16px} td,th{border:1px solid #cbd5e1;padding:8px;text-align:start} .foot{margin-top:24px;color:#64748b;font-size:12px}</style>
+        </head><body>
+        <h1>${tenant.center_name || 'عقد تأجير'}</h1>
+        <p class="muted">عقد رقم ${contract.number} · ${statusLabel[contract.status] || contract.status}</p>
+        <table>
+          <tr><th>العميل</th><td>${contract.customer?.full_name || '—'}</td></tr>
+          <tr><th>المركبة</th><td>${contract.vehicle ? `${contract.vehicle.brand} ${contract.vehicle.model} · ${contract.vehicle.plate}` : '—'}</td></tr>
+          <tr><th>البداية</th><td>${formatDateTime(contract.starts_at)}</td></tr>
+          <tr><th>النهاية المخططة</th><td>${formatDateTime(contract.planned_ends_at)}</td></tr>
+          <tr><th>السعر اليومي</th><td>${formatMoney(contract.frozen_daily_rate)}</td></tr>
+          <tr><th>التأمين النقدي</th><td>${formatMoney(contract.frozen_agreed_deposit || 0)}</td></tr>
+          <tr><th>الإجمالي النهائي</th><td>${contract.final_total != null ? formatMoney(contract.final_total) : '—'}</td></tr>
+        </table>
+        <p class="foot">${tenant.print_footer || ''}</p>
+        <script>window.onload=()=>window.print()<\/script>
+        </body></html>`)
+      w.document.close()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    }
+  }
+
   function contractActions(b: Contract) {
     return (
       <div className="rpm-card__actions">
@@ -312,6 +362,7 @@ export function BookingsPage() {
         {b.status === 'completed' ? (
           <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
         ) : null}
+        <Button type="button" size="sm" variant="secondary" onClick={() => void printContract(b.id)}>طباعة</Button>
       </div>
     )
   }
@@ -472,8 +523,27 @@ export function BookingsPage() {
           {action === 'return' || action === 'swap' ? (
             <NumberField label={action === 'swap' ? 'عداد السيارة القديمة (عودة)' : 'عداد العودة'} required value={actionForm.odometer_in} onChange={(e) => setActionForm({ ...actionForm, odometer_in: e.target.value })} />
           ) : null}
+          {action === 'handover' || action === 'return' ? (
+            <NumberField label="مستوى البنزين %" value={actionForm.fuel_level} onChange={(e) => setActionForm({ ...actionForm, fuel_level: e.target.value })} />
+          ) : null}
           {action === 'return' || action === 'swap' ? (
             <MoneyField label="رسوم أضرار" value={actionForm.damage_fee} onChange={(e) => setActionForm({ ...actionForm, damage_fee: e.target.value })} />
+          ) : null}
+          {action === 'return' ? (
+            <>
+              <TextField label="موضع الضرر (إن وُجد)" value={actionForm.damage_position} onChange={(e) => setActionForm({ ...actionForm, damage_position: e.target.value })} />
+              <TextAreaField label="وصف الضرر" value={actionForm.damage_description} onChange={(e) => setActionForm({ ...actionForm, damage_description: e.target.value })} />
+            </>
+          ) : null}
+          {action === 'handover' || action === 'return' ? (
+            <>
+              <TextAreaField label="ملاحظات الفحص" value={actionForm.notes} onChange={(e) => setActionForm({ ...actionForm, notes: e.target.value })} />
+              <SignatureField
+                required={action === 'handover' || Boolean(actionForm.damage_fee) || Boolean(actionForm.damage_position)}
+                value={actionForm.signature_data}
+                onChange={(signature_data) => setActionForm({ ...actionForm, signature_data })}
+              />
+            </>
           ) : null}
           {action === 'cancel' ? (
             <TextAreaField label="سبب الإلغاء" required value={actionForm.reason} onChange={(e) => setActionForm({ ...actionForm, reason: e.target.value })} />
