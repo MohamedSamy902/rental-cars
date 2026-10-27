@@ -48,7 +48,7 @@ class ReportController extends Controller
                 'active_contracts' => Contract::query()->where('status', 'active')->count(),
                 'completed_contracts' => Contract::query()->where('status', 'completed')->count(),
                 'customers' => Customer::query()->count(),
-                'blacklisted_customers' => Customer::query()->where('status', 'blacklisted')->count(),
+                'blacklisted_customers' => Customer::query()->whereIn('status', ['blacklist', 'blacklisted'])->count(),
                 'open_violations' => Violation::query()->whereNotIn('status', ['confirmed', 'paid'])->count(),
                 'fleet' => $fleet,
                 'rent_by_month' => $rentByMonth,
