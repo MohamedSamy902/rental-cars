@@ -39,7 +39,7 @@ export function Sheet({ open, title, onClose, children, footer }: Props) {
       <div className="rpm-sheet-wrap">
         <button
           type="button"
-          className="rpm-sheet__close"
+          className="rpm-sheet__close rpm-sheet__close--desk"
           aria-label="إغلاق"
           onClick={onClose}
         >
@@ -48,7 +48,11 @@ export function Sheet({ open, title, onClose, children, footer }: Props) {
         <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby="rpm-sheet-title">
           <div className="rpm-sheet__handle" aria-hidden />
           <header className="rpm-sheet__head">
+            <button type="button" className="rpm-sheet__cancel" onClick={onClose}>
+              إلغاء
+            </button>
             <h2 id="rpm-sheet-title">{title}</h2>
+            <span className="rpm-sheet__head-spacer" aria-hidden />
           </header>
           <div className="rpm-sheet__body">{children}</div>
           {footer ? <footer className="rpm-sheet__foot">{footer}</footer> : null}

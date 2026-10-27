@@ -107,3 +107,35 @@
 .rpm-switch__label {
   font-weight: 600;
 }
+
+@media (max-width: 980px) {
+  .rpm-input {
+    min-height: 48px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    border-color: transparent;
+    font-size: 1rem;
+  }
+
+  .rpm-input:focus {
+    background: var(--surface);
+    border-color: var(--brand);
+  }
+
+  .rpm-field.has-error .rpm-input {
+    border-color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 6%, var(--surface));
+  }
+
+  .rpm-textarea {
+    min-height: 110px;
+  }
+
+  .rpm-switch {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0.75rem 0.9rem;
+    border-radius: 14px;
+    background: var(--surface-2);
+  }
+}

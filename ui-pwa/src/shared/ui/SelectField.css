@@ -196,6 +196,20 @@
   font-size: 0.95rem;
 }
 
+@media (max-width: 980px) {
+  .rpm-select-trigger {
+    min-height: 48px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    border-color: transparent;
+    font-size: 1rem;
+  }
+
+  .rpm-select-trigger.is-open {
+    background: var(--surface);
+  }
+}
+
 @keyframes rpm-select-sheet-in {
   from {
     opacity: 0;
