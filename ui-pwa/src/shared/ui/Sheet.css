@@ -54,28 +54,30 @@
   background: var(--surface);
   color: var(--text);
   box-shadow: 0 10px 28px rgb(15 23 42 / 18%);
-  transform: translate(42%, -42%);
+  transform: translate(50%, -50%);
   transition:
     transform var(--motion, 200ms) var(--ease, ease),
     background var(--motion, 200ms) var(--ease, ease),
-    color var(--motion, 200ms) var(--ease, ease);
+    color var(--motion, 200ms) var(--ease, ease),
+    box-shadow var(--motion, 200ms) var(--ease, ease);
 }
 
 [dir='rtl'] .rpm-sheet__close {
-  transform: translate(-42%, -42%);
+  transform: translate(-50%, -50%);
 }
 
 .rpm-sheet__close:hover {
   background: var(--surface-2);
   color: var(--danger, #dc2626);
+  box-shadow: 0 12px 30px rgb(15 23 42 / 22%);
 }
 
 .rpm-sheet__close:active {
-  transform: translate(42%, -42%) scale(0.96);
+  transform: translate(50%, -50%) scale(0.96);
 }
 
 [dir='rtl'] .rpm-sheet__close:active {
-  transform: translate(-42%, -42%) scale(0.96);
+  transform: translate(-50%, -50%) scale(0.96);
 }
 
 .rpm-sheet {
