@@ -28,3 +28,4 @@
 - قاعدة التطوير: MariaDB، قاعدة `rpm`، المستخدم `root` بلا كلمة مرور، مطابقة لـ `backend/.env.example` (`DB_HOST=127.0.0.1`). MariaDB لا تقلع وحدها مع الإقلاع؛ `sudo service mariadb start` يشغّلها. سكربت `start` في البيئة يفعل ذلك ثم `migrate` و`db:seed`.
 - الواجهة: API على http://127.0.0.1:8000 (`php artisan serve`) وPWA على http://127.0.0.1:3847 (`ui-pwa`، `npm run dev`، يمرّر `/api` إلى 8000). الدخول التجريبي: `admin@rpm.local` / `password`.
 - الاختبارات: `cd backend && php artisan test` (sqlite في الذاكرة عبر `phpunit.xml`). فحص الواجهة: `cd ui-pwa && npm run lint && npm run build`.
+- فرع `main` فيه README فقط. إذا غاب `backend/vendor` بعد checkout، ثبّت مرة واحدة: `cd backend && composer install --no-interaction --prefer-dist` ثم `cd ui-pwa && npm ci`، وبعدها شغّل API وPWA كما فوق.
