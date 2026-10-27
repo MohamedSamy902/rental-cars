@@ -89,10 +89,13 @@ export function SelectField({
     const spaceAbove = rect.top - gap - 12
     const openUp = spaceBelow < 220 && spaceAbove > spaceBelow
     const maxHeight = Math.max(160, Math.min(preferred, openUp ? spaceAbove : spaceBelow))
+    const sidePad = 12
+    const width = Math.min(rect.width, window.innerWidth - sidePad * 2)
+    const left = Math.min(Math.max(sidePad, rect.left), window.innerWidth - width - sidePad)
     setPos({
       top: openUp ? rect.top - gap : rect.bottom + gap,
-      left: rect.left,
-      width: rect.width,
+      left,
+      width,
       maxHeight,
       openUp,
     })

@@ -38,13 +38,16 @@
   width: 100%;
   max-width: 100%;
   display: grid;
+  box-sizing: border-box;
+  /* vertical room so the X can sit on the top edge without clipping */
+  padding-block-start: 1.15rem;
 }
 
 .rpm-sheet__close {
   position: absolute;
   z-index: 3;
-  inset-block-start: 0;
-  inset-inline-end: 0;
+  inset-block-start: 1.15rem;
+  inset-inline-end: 1rem;
   width: 40px;
   height: 40px;
   display: grid;
@@ -54,16 +57,13 @@
   background: var(--surface);
   color: var(--text);
   box-shadow: 0 10px 28px rgb(15 23 42 / 18%);
-  transform: translate(50%, -50%);
+  /* mobile/fold: half outside above only — avoids horizontal page shift */
+  transform: translateY(-50%);
   transition:
     transform var(--motion, 200ms) var(--ease, ease),
     background var(--motion, 200ms) var(--ease, ease),
     color var(--motion, 200ms) var(--ease, ease),
     box-shadow var(--motion, 200ms) var(--ease, ease);
-}
-
-[dir='rtl'] .rpm-sheet__close {
-  transform: translate(-50%, -50%);
 }
 
 .rpm-sheet__close:hover {
@@ -73,11 +73,7 @@
 }
 
 .rpm-sheet__close:active {
-  transform: translate(50%, -50%) scale(0.96);
-}
-
-[dir='rtl'] .rpm-sheet__close:active {
-  transform: translate(-50%, -50%) scale(0.96);
+  transform: translateY(-50%) scale(0.96);
 }
 
 .rpm-sheet {
@@ -173,6 +169,8 @@
 
   .rpm-sheet-wrap {
     width: min(560px, calc(100vw - 3rem));
+    padding-block-start: 0;
+    padding-inline: 0;
   }
 
   .rpm-sheet {
@@ -192,6 +190,21 @@
   .rpm-sheet__close {
     width: 42px;
     height: 42px;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    transform: translate(50%, -50%);
+  }
+
+  [dir='rtl'] .rpm-sheet__close {
+    transform: translate(-50%, -50%);
+  }
+
+  .rpm-sheet__close:active {
+    transform: translate(50%, -50%) scale(0.96);
+  }
+
+  [dir='rtl'] .rpm-sheet__close:active {
+    transform: translate(-50%, -50%) scale(0.96);
   }
 
   .rpm-sheet__foot {
