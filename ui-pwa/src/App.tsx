@@ -19,7 +19,13 @@ import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
-  if (loading) return <div style={{ padding: '2rem' }}><SkeletonBlock rows={6} /></div>
+  if (loading) {
+    return (
+      <div style={{ padding: '1.5rem', maxWidth: 720, marginInline: 'auto' }}>
+        <SkeletonBlock rows={6} />
+      </div>
+    )
+  }
   if (!user) return <Navigate to="/login" replace />
   return children
 }

@@ -1,5 +1,7 @@
 export { AppShell } from './AppShell'
 export * from './Icons'
+export { AnimatedNumber } from './AnimatedNumber'
+export { CommandPalette } from './CommandPalette'
 export { Button } from './Button'
 export { TextField, NumberField, MoneyField, TextAreaField, SelectField, SwitchField } from './Field'
 export { StatusPill } from './StatusPill'

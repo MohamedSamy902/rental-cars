@@ -1,25 +1,56 @@
 :root {
-  /* RPM design tokens — defaults; tenant overrides from integrator panel later */
-  --nav: #0b1220;
-  --bg: #f1f5f9;
+  /* RPM «Showroom» — mineral light + ink + sparse brand signal */
+  --ink: #0a0f1a;
+  --ink-soft: #151c2c;
+  --nav: #0a0f1a;
+  --bg: #e7ebf0;
+  --bg-mist: #f3f5f8;
   --surface: #ffffff;
-  --text: #0f172a;
-  --text-muted: #64748b;
+  --surface-2: #f7f8fa;
+  --text: #0a0f1a;
+  --text-muted: #5b6577;
+  --text-faint: #8b95a8;
+
   --brand: #0d9488;
   --brand-hover: #0f766e;
-  --success: #059669;
-  --warning: #d97706;
-  --danger: #dc2626;
-  --border: #e2e8f0;
-  --radius: 10px;
-  --radius-sm: 8px;
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
-  --font-display: 'Cairo', 'IBM Plex Sans Arabic', sans-serif;
-  --font-body: 'IBM Plex Sans Arabic', 'Cairo', sans-serif;
-  --shell-nav-width: 248px;
-  --bottom-nav-height: 64px;
-  --motion: 200ms;
+  --brand-soft: color-mix(in srgb, var(--brand) 12%, white);
+  --brand-ink: #0a5c55;
+
+  --success: #047857;
+  --success-soft: #ecfdf5;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --info: #0369a1;
+  --info-soft: #f0f9ff;
+
+  --border: rgb(10 15 26 / 8%);
+  --border-strong: rgb(10 15 26 / 14%);
+  --hairline: rgb(10 15 26 / 6%);
+
+  --radius-sm: 14px;
+  --radius: 20px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  --shadow-sm: 0 1px 2px rgb(10 15 26 / 4%);
+  --shadow: 0 12px 32px rgb(10 15 26 / 7%);
+  --shadow-lg: 0 28px 64px rgb(10 15 26 / 12%);
+
+  --font-display: 'Tajawal', 'IBM Plex Sans Arabic', sans-serif;
+  --font-body: 'IBM Plex Sans Arabic', 'Tajawal', sans-serif;
+
+  --shell-nav-width: 92px;
+  --shell-nav-expanded: 260px;
+  --bottom-nav-height: 70px;
+  --header-height: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+
+  --motion: 240ms;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
   color-scheme: light;
 }
 

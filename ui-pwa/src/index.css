@@ -18,8 +18,12 @@ body {
   font-size: 15px;
   line-height: 1.55;
   color: var(--text);
-  background: var(--bg);
+  background:
+    radial-gradient(900px 420px at 85% -5%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 55%),
+    radial-gradient(700px 380px at 5% 90%, rgb(15 23 42 / 5%), transparent 50%),
+    linear-gradient(180deg, #eef1f5 0%, var(--bg) 40%, #e4e9ef 100%);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -31,9 +35,10 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   margin: 0;
+  color: var(--text);
 }
 
 button,
@@ -62,44 +67,25 @@ img {
 
 :focus-visible {
   outline: 2px solid var(--brand);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--brand) 28%, white);
+  background: color-mix(in srgb, var(--brand) 26%, white);
 }
 
-@keyframes rpm-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.03em;
 }
 
-@keyframes rpm-sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes rpm-skeleton {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
-}
-
-.rpm-page-enter {
-  animation: rpm-fade-up var(--motion) var(--ease) both;
 }

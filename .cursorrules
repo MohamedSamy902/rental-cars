@@ -1,0 +1,28 @@
+# RPM Project Core UI/UX Rules
+
+1. THE "NO PATCHING" RULE (CRITICAL):
+- NEVER "patch" or add minor CSS classes to existing UI structures.
+- For any UI task, COMPLETELY TEAR DOWN the existing JSX/HTML/CSS presentation layer and build a 100% brand-new, ultra-premium UI from scratch.
+
+2. LOGIC PRESERVATION:
+- Strictly PRESERVE ALL existing React logic, hooks, API calls, routing, state management, and permissions.
+- You are replacing the "View" layer only. Wire the preserved logic into your new UI structures.
+
+3. DESIGN STANDARDS (2026-2027 Masterpiece Level):
+- Aesthetic: Ultra-Premium, calm, modern fintech/automotive SaaS. NO generic Bootstrap/MUI templates.
+- Layout: Bento-grid systems, generous padding, large radii (16-24px), soft layered shadows, real architectural depth.
+- Motion: Use Framer Motion (or equivalent) for fluid, 60fps micro-interactions (springs, staggered lists, number counters).
+
+4. OMNICHANNEL & PWA STRICTNESS:
+- Desktop: Powerful layout with elegant collapsible sidebar and bento-grids.
+- Mobile (Strict PWA): Must feel exactly like a Native App. Use Bottom Navigation Bars. Transform all desktop tables into swipeable Card lists. Transform all Modals into Full-Screen Bottom Sheets with drag handles and swipe-to-dismiss behavior.
+
+5. UNIFIED QUICK ACTIONS:
+- Implement a standardized, identical Quick Actions pattern everywhere.
+- Desktop: Hover-revealed inline action bars or '...' dropdowns.
+- Mobile: Native swipe-to-action on cards (e.g., swipe left to edit).
+
+6. RTL & ARABIC ENFORCEMENT:
+- The app is 100% Arabic and RTL.
+- You MUST use logical CSS properties ONLY (margin-inline, padding-inline, inset-inline, border-start-start-radius, etc.). Never use left/right.
+- Numbers must remain Western digits (0-9).

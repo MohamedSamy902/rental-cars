@@ -67,3 +67,21 @@ export const IconLogout = (p: Props) => (
 export const IconQueue = (p: Props) => (
   <Svg {...p}><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="18" cy="15" r="3" /></Svg>
 )
+export const IconChevron = (p: Props) => (
+  <Svg {...p}><path d="m9 18 6-6-6-6" /></Svg>
+)
+export const IconMenu = (p: Props) => (
+  <Svg {...p}><path d="M4 7h16M4 12h16M4 17h10" /></Svg>
+)
+export const IconSpark = (p: Props) => (
+  <Svg {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" /></Svg>
+)
+export const IconMore = (p: Props) => (
+  <Svg {...p}><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" /></Svg>
+)
+export const IconReturn = (p: Props) => (
+  <Svg {...p}><path d="M9 14 4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-3" /></Svg>
+)
+export const IconTrend = (p: Props) => (
+  <Svg {...p}><path d="M3 17 10 10l4 4 7-7" /><path d="M14 7h6v6" /></Svg>
+)
