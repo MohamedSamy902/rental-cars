@@ -32,8 +32,53 @@
   animation: rpm-fade-up 180ms var(--ease, ease);
 }
 
+.rpm-sheet-wrap {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 100%;
+  display: grid;
+}
+
+.rpm-sheet__close {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 18%);
+  transform: translate(42%, -42%);
+  transition:
+    transform var(--motion, 200ms) var(--ease, ease),
+    background var(--motion, 200ms) var(--ease, ease),
+    color var(--motion, 200ms) var(--ease, ease);
+}
+
+[dir='rtl'] .rpm-sheet__close {
+  transform: translate(-42%, -42%);
+}
+
+.rpm-sheet__close:hover {
+  background: var(--surface-2);
+  color: var(--danger, #dc2626);
+}
+
+.rpm-sheet__close:active {
+  transform: translate(42%, -42%) scale(0.96);
+}
+
+[dir='rtl'] .rpm-sheet__close:active {
+  transform: translate(-42%, -42%) scale(0.96);
+}
+
 .rpm-sheet {
-  --sheet-enter: 100%;
   position: relative;
   z-index: 1;
   width: 100%;
@@ -62,7 +107,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.85rem 1.15rem 0.9rem;
+  padding: 0.95rem 1.15rem 0.95rem;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -70,6 +115,7 @@
 .rpm-sheet__head h2 {
   font-size: 1.15rem;
   line-height: 1.3;
+  padding-inline-end: 0.5rem;
 }
 
 .rpm-sheet__body {
@@ -95,7 +141,6 @@
   flex-wrap: wrap;
 }
 
-/* Shared form stack used inside sheets across pages */
 .rpm-form-grid {
   display: grid;
   gap: 0.95rem;
@@ -121,11 +166,15 @@
   .rpm-sheet-root {
     align-items: center;
     justify-items: center;
-    padding: 1.5rem;
+    padding: 1.75rem;
+  }
+
+  .rpm-sheet-wrap {
+    width: min(560px, calc(100vw - 3rem));
   }
 
   .rpm-sheet {
-    width: min(560px, calc(100vw - 3rem));
+    width: 100%;
     max-height: min(88dvh, 840px);
     height: auto;
     margin: 0;
@@ -136,6 +185,11 @@
 
   .rpm-sheet__handle {
     display: none;
+  }
+
+  .rpm-sheet__close {
+    width: 42px;
+    height: 42px;
   }
 
   .rpm-sheet__foot {

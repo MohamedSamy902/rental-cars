@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Button } from './Button'
+import { IconClose } from './Icons'
 import './Sheet.css'
 
 type Props = {
@@ -36,17 +36,24 @@ export function Sheet({ open, title, onClose, children, footer }: Props) {
         onClick={onClose}
         type="button"
       />
-      <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby="rpm-sheet-title">
-        <div className="rpm-sheet__handle" aria-hidden />
-        <header className="rpm-sheet__head">
-          <h2 id="rpm-sheet-title">{title}</h2>
-          <Button variant="ghost" size="sm" onClick={onClose} type="button">
-            إغلاق
-          </Button>
-        </header>
-        <div className="rpm-sheet__body">{children}</div>
-        {footer ? <footer className="rpm-sheet__foot">{footer}</footer> : null}
-      </aside>
+      <div className="rpm-sheet-wrap">
+        <button
+          type="button"
+          className="rpm-sheet__close"
+          aria-label="إغلاق"
+          onClick={onClose}
+        >
+          <IconClose size={16} />
+        </button>
+        <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby="rpm-sheet-title">
+          <div className="rpm-sheet__handle" aria-hidden />
+          <header className="rpm-sheet__head">
+            <h2 id="rpm-sheet-title">{title}</h2>
+          </header>
+          <div className="rpm-sheet__body">{children}</div>
+          {footer ? <footer className="rpm-sheet__foot">{footer}</footer> : null}
+        </aside>
+      </div>
     </div>,
     document.body,
   )

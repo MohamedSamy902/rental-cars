@@ -97,3 +97,6 @@ export const IconShield = (p: Props) => (
 export const IconBadge = (p: Props) => (
   <Svg {...p}><circle cx="12" cy="8" r="4" /><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></Svg>
 )
+export const IconClose = (p: Props) => (
+  <Svg {...p}><path d="M6 6l12 12M18 6 6 18" /></Svg>
+)
