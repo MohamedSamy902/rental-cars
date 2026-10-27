@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
-import { PageHeader, Button, Sheet, SelectField, TextField, MoneyField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
+import { PageHeader, Button, Sheet, Fab, SelectField, TextField, MoneyField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
 import './pages.css'
 
 type Violation = {
@@ -75,7 +75,9 @@ export function ViolationsPage() {
         title="المخالفات"
         subtitle="متابعة تشغيلية فقط — لا تدخل الحسابات أو إجمالي العقد"
         action={<Button onClick={async () => { setOpen(true); const v = await api<{ data: Vehicle[] }>('/vehicles'); setVehicles(v.data) }}>تسجيل مخالفة</Button>}
+        mobileFab
       />
+      <Fab label="تسجيل مخالفة" onClick={async () => { setOpen(true); const v = await api<{ data: Vehicle[] }>('/vehicles'); setVehicles(v.data) }} />
       {loading ? <SkeletonBlock rows={4} /> : null}
       {!loading && rows.length === 0 ? <EmptyState title="لا توجد مخالفات" /> : null}
       <div className="rpm-card-list">

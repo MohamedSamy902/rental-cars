@@ -91,3 +91,12 @@ export const IconSun = (p: Props) => (
 export const IconMoon = (p: Props) => (
   <Svg {...p}><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a7 7 0 0 0 11.5 11.5z" /></Svg>
 )
+export const IconShield = (p: Props) => (
+  <Svg {...p}><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z" /><path d="m9 12 2 2 4-4" /></Svg>
+)
+export const IconBadge = (p: Props) => (
+  <Svg {...p}><circle cx="12" cy="8" r="4" /><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></Svg>
+)
+export const IconClose = (p: Props) => (
+  <Svg {...p}><path d="M6 6l12 12M18 6 6 18" /></Svg>
+)

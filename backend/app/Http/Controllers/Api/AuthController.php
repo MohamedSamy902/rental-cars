@@ -35,25 +35,35 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role?->label,
-            ],
+            'user' => $this->presentUser($user),
         ]);
     }
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load('role');
+        $user = $request->user()->load('role.permissions');
 
-        return response()->json([
+        return response()->json($this->presentUser($user));
+    }
+
+    /**
+     * @return array{id:int,name:string,email:string,role:?string,role_name:?string,permissions:list<string>,is_integrator:bool}
+     */
+    private function presentUser(User $user): array
+    {
+        $user->loadMissing('role.permissions');
+        $permissions = $user->role?->permissions?->pluck('key')->values()->all() ?? [];
+        $roleName = $user->role?->name;
+
+        return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role?->label,
-        ]);
+            'role_name' => $roleName,
+            'permissions' => $permissions,
+            'is_integrator' => $roleName === 'super_admin',
+        ];
     }
 
     public function logout(Request $request): JsonResponse

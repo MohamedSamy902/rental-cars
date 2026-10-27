@@ -105,7 +105,7 @@ class VehicleController extends Controller
 
     public function show(Vehicle $vehicle): JsonResponse
     {
-        return response()->json(['data' => $this->present($vehicle->load('accessories'))]);
+        return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents']))]);
     }
 
     public function update(Request $request, Vehicle $vehicle): JsonResponse
@@ -167,6 +167,8 @@ class VehicleController extends Controller
             'is_active' => $v->is_active,
             'status' => $status,
             'accessories' => $v->relationLoaded('accessories') ? $v->accessories : null,
+            'documents' => $v->relationLoaded('documents') ? $v->documents : null,
+            'notes' => $v->notes,
         ];
     }
 

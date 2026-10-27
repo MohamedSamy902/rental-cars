@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { api } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
 import { CommandPalette } from './CommandPalette'
 import {
   IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconChevron,
   IconClipboard, IconHome, IconLogout, IconMenu, IconMoon, IconPlus, IconQueue,
-  IconSearch, IconSettings, IconSun, IconUsers, IconWallet, IconWrench,
+  IconSearch, IconSettings, IconShield, IconSun, IconUsers, IconWallet, IconWrench,
 } from './Icons'
 import './AppShell.css'
 
@@ -19,12 +20,17 @@ const railNav: NavItem[] = [
   { to: '/bookings', label: 'العقود', icon: <IconClipboard /> },
   { to: '/calendar', label: 'التقويم', icon: <IconCalendar /> },
   { to: '/waitlist', label: 'الانتظار', icon: <IconQueue /> },
+  { to: '/showroom', label: 'المعرض', icon: <IconCar /> },
   { to: '/maintenance', label: 'الصيانة', icon: <IconWrench /> },
   { to: '/inventory', label: 'المخزون', icon: <IconBox /> },
+  { to: '/petty-cash', label: 'العهدة', icon: <IconWallet /> },
   { to: '/violations', label: 'المخالفات', icon: <IconAlert /> },
   { to: '/customers', label: 'العملاء', icon: <IconUsers /> },
+  { to: '/department-notice', label: 'إخطار القسم', icon: <IconClipboard /> },
   { to: '/accounts', label: 'الحسابات', icon: <IconWallet /> },
   { to: '/reports', label: 'التقارير', icon: <IconChart /> },
+  { to: '/staff', label: 'الموظفون', icon: <IconShield /> },
+  { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconShield /> },
   { to: '/notifications', label: 'الإشعارات', icon: <IconBell /> },
   { to: '/settings', label: 'الإعدادات', icon: <IconSettings /> },
 ]
@@ -47,6 +53,7 @@ export function AppShell() {
   const location = useLocation()
   const [cmdOpen, setCmdOpen] = useState(false)
   const [drawer, setDrawer] = useState(false)
+  const [unread, setUnread] = useState(0)
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(RAIL_KEY) === '1'
@@ -77,6 +84,32 @@ export function AppShell() {
   useEffect(() => {
     setDrawer(false)
   }, [location.pathname])
+
+  useEffect(() => {
+    if (!user) {
+      setUnread(0)
+      return
+    }
+    let alive = true
+    const pull = () => {
+      api<{ unread: number }>('/notifications/unread-count')
+        .then((res) => {
+          if (alive) setUnread(res.unread || 0)
+        })
+        .catch(() => {
+          /* ignore badge errors */
+        })
+    }
+    pull()
+    const t = window.setInterval(pull, 60000)
+    const onFocus = () => pull()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      alive = false
+      window.clearInterval(t)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [user, location.pathname])
 
   return (
     <div className={`shell ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
@@ -175,7 +208,7 @@ export function AppShell() {
               </button>
               <button
                 type="button"
-                className="shell-icon"
+                className="shell-icon shell-icon--desk"
                 aria-label={theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
                 onClick={toggleTheme}
               >
@@ -183,17 +216,22 @@ export function AppShell() {
               </button>
               <button
                 type="button"
-                className="shell-icon"
-                aria-label="إشعارات"
+                className="shell-icon shell-icon--bell"
+                aria-label={unread > 0 ? `إشعارات · ${unread} غير مقروء` : 'إشعارات'}
                 onClick={() => navigate('/notifications')}
               >
                 <IconBell size={18} />
+                {unread > 0 ? (
+                  <span className="shell-badge" aria-hidden>
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                ) : null}
               </button>
-              <button type="button" className="shell-cta" onClick={() => navigate('/bookings?new=1')}>
+              <button type="button" className="shell-cta shell-cta--desk" onClick={() => navigate('/bookings?new=1')}>
                 <IconPlus size={16} />
                 <span>عقد جديد</span>
               </button>
-              <div className="shell-user">
+              <div className="shell-user shell-user--desk">
                 <span className="shell-user__avatar" aria-hidden>
                   {(user?.name || 'م').slice(0, 1)}
                 </span>

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconClipboard,
-  IconHome, IconQueue, IconSearch, IconSettings, IconUsers, IconWallet, IconWrench,
+  IconHome, IconQueue, IconSearch, IconSettings, IconShield, IconUsers, IconWallet, IconWrench,
 } from './Icons'
 import './CommandPalette.css'
 
@@ -15,12 +15,17 @@ const ITEMS: Item[] = [
   { to: '/bookings', label: 'العقود والحجوزات', group: 'التشغيل', icon: <IconClipboard /> },
   { to: '/calendar', label: 'التقويم', group: 'التشغيل', icon: <IconCalendar /> },
   { to: '/waitlist', label: 'قائمة الانتظار', group: 'التشغيل', icon: <IconQueue /> },
+  { to: '/showroom', label: 'وضع عرض المعرض', group: 'التشغيل', icon: <IconCar /> },
+  { to: '/department-notice', label: 'إخطار القسم', group: 'التشغيل', icon: <IconClipboard /> },
   { to: '/maintenance', label: 'أوامر الشغل', group: 'الأسطول', icon: <IconWrench /> },
   { to: '/inventory', label: 'المخزون', group: 'الأسطول', icon: <IconBox /> },
+  { to: '/petty-cash', label: 'العهدة النقدية', group: 'الأسطول', icon: <IconWallet /> },
   { to: '/violations', label: 'المخالفات', group: 'الأسطول', icon: <IconAlert /> },
   { to: '/customers', label: 'العملاء', group: 'المالية', icon: <IconUsers /> },
   { to: '/accounts', label: 'الحسابات', group: 'المالية', icon: <IconWallet /> },
   { to: '/reports', label: 'التقارير', group: 'المالية', icon: <IconChart /> },
+  { to: '/staff', label: 'الموظفون والصلاحيات', group: 'النظام', icon: <IconShield /> },
+  { to: '/audit-logs', label: 'سجل التعديلات', group: 'النظام', icon: <IconShield /> },
   { to: '/notifications', label: 'الإشعارات', group: 'النظام', icon: <IconBell /> },
   { to: '/settings', label: 'الإعدادات', group: 'النظام', icon: <IconSettings /> },
 ]

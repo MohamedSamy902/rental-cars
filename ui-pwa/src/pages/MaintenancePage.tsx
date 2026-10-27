@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  PageHeader, SummaryStrip, Button, Sheet, SelectField, NumberField, MoneyField,
+  PageHeader, SummaryStrip, Button, Sheet, Fab, SelectField, NumberField, MoneyField,
   TextField, SwitchField, StatusPill, useToast, SkeletonBlock, EmptyState,
 } from '@/shared/ui'
 import './pages.css'
@@ -101,7 +101,8 @@ export function MaintenancePage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="أوامر الشغل" subtitle="صرف FIFO أو شراء · تعارض الصيانة مع الحجوزات" action={<Button onClick={openSheet}>أمر شغل</Button>} />
+      <PageHeader title="أوامر الشغل" subtitle="صرف FIFO أو شراء · تعارض الصيانة مع الحجوزات" action={<Button onClick={openSheet}>أمر شغل</Button>} mobileFab />
+      <Fab label="أمر شغل" onClick={openSheet} />
       <SummaryStrip items={[
         { label: 'مفتوحة', value: String(summary.open), tone: 'warning' },
         { label: 'مغلقة', value: String(summary.closed) },

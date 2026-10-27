@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { PageHeader, Button, Sheet, SelectField, TextField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
+import { PageHeader, Button, Sheet, Fab, SelectField, TextField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
 import './pages.css'
 
 type Row = { id: number; category: string; status: string; customer?: { full_name: string; phone: string } }
@@ -39,7 +39,8 @@ export function WaitlistPage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="قائمة الانتظار" subtitle="إشعار عند التوفر — بلا إنشاء عقد تلقائي" action={<Button onClick={async () => { setOpen(true); const c = await api<{ data: Customer[] }>('/customers'); setCustomers(c.data) }}>طلب جديد</Button>} />
+      <PageHeader title="قائمة الانتظار" subtitle="إشعار عند التوفر — بلا إنشاء عقد تلقائي" action={<Button onClick={async () => { setOpen(true); const c = await api<{ data: Customer[] }>('/customers'); setCustomers(c.data) }}>طلب جديد</Button>} mobileFab />
+      <Fab label="طلب جديد" onClick={async () => { setOpen(true); const c = await api<{ data: Customer[] }>('/customers'); setCustomers(c.data) }} />
       {loading ? <SkeletonBlock rows={3} /> : null}
       {!loading && rows.length === 0 ? <EmptyState title="لا توجد طلبات انتظار" /> : null}
       <div className="rpm-card-list">

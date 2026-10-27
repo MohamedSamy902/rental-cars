@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { PageHeader, Button, Sheet, TextField, NumberField, MoneyField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
+import { PageHeader, Button, Sheet, Fab, TextField, NumberField, MoneyField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
 import './pages.css'
 
 type Item = {
@@ -76,7 +76,9 @@ export function InventoryPage() {
             <Button onClick={() => setOpenItem(true)}>صنف جديد</Button>
           </div>
         }
+        mobileFab
       />
+      <Fab label="صنف جديد" onClick={() => setOpenItem(true)} />
       {loading ? <SkeletonBlock rows={5} /> : null}
       {!loading && rows.length === 0 ? <EmptyState title="لا توجد أصناف" /> : null}
       <div className="rpm-card-list">
