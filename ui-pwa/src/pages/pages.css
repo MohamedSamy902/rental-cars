@@ -3,6 +3,163 @@
   gap: 0.25rem;
 }
 
+.rpm-login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 40%),
+    linear-gradient(160deg, #0b1220, #14303a 55%, #0f766e);
+}
+
+.rpm-login__card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.4rem;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 20px 50px rgb(15 23 42 / 25%);
+}
+
+.rpm-login__brand {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.rpm-login__brand strong {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+  color: var(--brand-hover);
+}
+
+.rpm-login__brand span,
+.rpm-login__hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.rpm-login h1 {
+  font-size: 1.25rem;
+}
+
+.rpm-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 900px) {
+  .rpm-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .rpm-metric-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.rpm-metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.rpm-metric__label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.rpm-metric__value {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.rpm-metric__value.is-success { color: var(--success); }
+.rpm-metric__value.is-warning { color: var(--warning); }
+
+.rpm-metric__sub {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.rpm-status-bars {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.rpm-status-bar__meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+  font-size: 0.88rem;
+}
+
+.rpm-status-bar__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.rpm-status-bar__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.fill-available { background: #38bdf8; }
+.fill-rented { background: var(--brand); }
+.fill-reserved { background: var(--warning); }
+.fill-maintenance { background: var(--danger); }
+
+.rpm-two-col {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 960px) {
+  .rpm-two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.rpm-dense-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rpm-dense-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.rpm-dense-row p {
+  margin: 0.15rem 0 0;
+}
+
+.rpm-dense-row__side {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .rpm-kicker {
   margin: 0;
   color: color-mix(in srgb, var(--brand) 80%, white);

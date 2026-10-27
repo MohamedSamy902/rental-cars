@@ -1,40 +1,61 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AppShell } from '@/shared/ui/AppShell'
-import { ToastProvider } from '@/shared/ui'
+import { AuthProvider, useAuth } from '@/shared/auth/AuthContext'
+import { AppShell, ToastProvider, SkeletonBlock } from '@/shared/ui'
+import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { VehiclesPage } from '@/pages/VehiclesPage'
 import { BookingsPage } from '@/pages/BookingsPage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { MaintenancePage } from '@/pages/MaintenancePage'
-import { PlaceholderPage } from '@/pages/PlaceholderPage'
+import { CustomersPage } from '@/pages/CustomersPage'
+import { InventoryPage } from '@/pages/InventoryPage'
+import { ViolationsPage } from '@/pages/ViolationsPage'
+import { WaitlistPage } from '@/pages/WaitlistPage'
+import { NotificationsPage } from '@/pages/NotificationsPage'
+import { ReportsPage } from '@/pages/ReportsPage'
+import { AccountsPage } from '@/pages/AccountsPage'
+import { SettingsPage } from '@/pages/SettingsPage'
+import type { ReactNode } from 'react'
+
+function Protected({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div style={{ padding: '2rem' }}><SkeletonBlock rows={6} /></div>
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
 
 export default function App() {
   return (
     <ToastProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="vehicles" element={<VehiclesPage />} />
-            <Route path="bookings" element={<BookingsPage />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="maintenance" element={<MaintenancePage />} />
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
             <Route
-              path="customers"
-              element={<PlaceholderPage title="العملاء" subtitle="القائمة السوداء والمرفقات حسب RSD" />}
-            />
-            <Route
-              path="accounts"
-              element={<PlaceholderPage title="الحسابات" subtitle="توزيع الشهور وإقفال الشهر" />}
-            />
-            <Route
-              path="settings"
-              element={<PlaceholderPage title="الإعدادات" subtitle="إعدادات التشغيل اليومية للمعرض" />}
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+              element={
+                <Protected>
+                  <AppShell />
+                </Protected>
+              }
+            >
+              <Route index element={<DashboardPage />} />
+              <Route path="vehicles" element={<VehiclesPage />} />
+              <Route path="bookings" element={<BookingsPage />} />
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="maintenance" element={<MaintenancePage />} />
+              <Route path="inventory" element={<InventoryPage />} />
+              <Route path="customers" element={<CustomersPage />} />
+              <Route path="violations" element={<ViolationsPage />} />
+              <Route path="waitlist" element={<WaitlistPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="accounts" element={<AccountsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </ToastProvider>
   )
 }

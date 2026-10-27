@@ -1,0 +1,114 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Contract;
+use App\Models\Customer;
+use App\Models\InventoryItem;
+use App\Models\Notification;
+use App\Models\Vehicle;
+use App\Models\Violation;
+use App\Models\WorkOrder;
+use App\Services\Fleet\VehicleAvailabilityService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class DashboardController extends Controller
+{
+    public function __construct(private readonly VehicleAvailabilityService $availability) {}
+
+    public function __invoke(Request $request): JsonResponse
+    {
+        $vehicles = Vehicle::query()->where('is_active', true)->get();
+        $statusCounts = [
+            'available' => 0,
+            'reserved' => 0,
+            'rented' => 0,
+            'maintenance' => 0,
+            'out_of_service' => 0,
+        ];
+        foreach ($vehicles as $v) {
+            $status = $this->availability->statusOnDate([
+                'manual_status' => $v->manual_status,
+                'has_active_handover' => $v->contracts()->where('status', 'active')->exists(),
+                'has_approved_covering_date' => $v->contracts()
+                    ->where('status', 'approved')
+                    ->where('starts_at', '<=', now())
+                    ->where('planned_ends_at', '>=', now())
+                    ->exists(),
+                'open_work_order_blocks' => $v->manual_status === 'maintenance',
+            ]);
+            if (isset($statusCounts[$status])) {
+                $statusCounts[$status]++;
+            }
+        }
+
+        $active = Contract::query()->where('status', 'active')->count();
+        $returningToday = Contract::query()
+            ->where('status', 'active')
+            ->whereDate('planned_ends_at', today())
+            ->count();
+        $expectedRevenue = (int) Contract::query()
+            ->whereIn('status', ['approved', 'active'])
+            ->get()
+            ->sum(function (Contract $c) {
+                return (int) $c->frozen_daily_rate * max(1, $c->starts_at->diffInDays($c->planned_ends_at));
+            });
+
+        $tasks = Contract::query()
+            ->with(['customer', 'vehicle'])
+            ->whereIn('status', ['pending', 'approved', 'active'])
+            ->orderBy('planned_ends_at')
+            ->limit(8)
+            ->get()
+            ->map(function (Contract $c) {
+                $label = match ($c->status) {
+                    'pending' => 'اعتماد حجز معلّق',
+                    'approved' => 'تسليم',
+                    'active' => 'استلام',
+                    default => $c->status,
+                };
+
+                return [
+                    'id' => $c->id,
+                    'title' => "{$label} {$c->number}",
+                    'subtitle' => trim(($c->customer?->full_name ?? '').' · '.($c->vehicle?->brand ?? '').' '.($c->vehicle?->model ?? '')),
+                    'status' => $c->status,
+                    'at' => $c->status === 'active' ? $c->planned_ends_at : $c->starts_at,
+                ];
+            });
+
+        $lowStock = InventoryItem::query()->get()->filter(function (InventoryItem $item) {
+            return $item->remainingQuantity() <= $item->reorder_level;
+        })->count();
+
+        return response()->json([
+            'center_name' => 'مركز التأجير',
+            'occupancy_pct' => $vehicles->count() ? (int) round(($statusCounts['rented'] / $vehicles->count()) * 100) : 0,
+            'fleet_total' => $vehicles->count(),
+            'fleet_status' => $statusCounts,
+            'kpis' => [
+                'available' => $statusCounts['available'],
+                'rented' => $statusCounts['rented'],
+                'returning_today' => $returningToday,
+                'expected_revenue' => $expectedRevenue,
+                'customers' => Customer::query()->count(),
+                'active_contracts' => $active,
+                'open_work_orders' => WorkOrder::query()->whereIn('status', ['open', 'in_progress'])->count(),
+                'open_violations' => Violation::query()->whereNotIn('status', ['paid', 'confirmed'])->count(),
+                'low_stock' => $lowStock,
+                'unread_notifications' => Notification::query()
+                    ->when($request->user(), fn ($q) => $q->where('user_id', $request->user()->id))
+                    ->whereNull('read_at')
+                    ->count(),
+            ],
+            'tasks' => $tasks,
+            'recent_contracts' => Contract::query()
+                ->with(['customer', 'vehicle'])
+                ->latest('id')
+                ->limit(5)
+                ->get(),
+        ]);
+    }
+}

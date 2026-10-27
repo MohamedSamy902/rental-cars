@@ -1,29 +1,36 @@
-import { useMemo, useState } from 'react'
-import {
-  PageHeader,
-  SummaryStrip,
-  FilterBar,
-  Button,
-  StatusPill,
-  Sheet,
-  TextField,
-  NumberField,
-  MoneyField,
-  SelectField,
-  TextAreaField,
-  SwitchField,
-  useToast,
-  EmptyState,
-} from '@/shared/ui'
+import { useEffect, useState } from 'react'
+import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  categoryOptions,
-  fuelOptions,
-  vehicleStatusLabel,
-  vehicles as seedVehicles,
-  type Vehicle,
-} from '@/shared/lib/mock-data'
+  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet,
+  TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
+  useToast, EmptyState, SkeletonBlock, ErrorState,
+} from '@/shared/ui'
 import './pages.css'
+
+type Vehicle = {
+  id: number
+  code: string
+  plate: string
+  brand: string
+  model: string
+  year: number
+  category: string
+  fuel_type: string
+  odometer: number
+  daily_rate: number
+  default_deposit: number
+  status: string
+  rental_priority: number
+}
+
+const statusLabel: Record<string, string> = {
+  available: 'متاحة',
+  reserved: 'محجوزة',
+  rented: 'مؤجرة',
+  maintenance: 'في صيانة',
+  out_of_service: 'خارج الخدمة',
+}
 
 const chips = [
   { id: 'all', label: 'الكل' },
@@ -33,140 +40,94 @@ const chips = [
   { id: 'maintenance', label: 'صيانة' },
 ]
 
-type FormState = {
-  code: string
-  plate: string
-  brand: string
-  model: string
-  year: string
-  category: string
-  fuel: string
-  odometer: string
-  dailyRate: string
-  deposit: string
-  priority: string
-  trackerDevice: string
-  trackerSim: string
-  notes: string
-  active: boolean
-}
-
-const emptyForm: FormState = {
-  code: '',
-  plate: '',
-  brand: '',
-  model: '',
-  year: '',
-  category: '',
-  fuel: '',
-  odometer: '',
-  dailyRate: '',
-  deposit: '',
-  priority: '50',
-  trackerDevice: '',
-  trackerSim: '',
-  notes: '',
-  active: true,
+const emptyForm = {
+  code: '', plate: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
+  odometer: '', daily_rate: '', default_deposit: '', rental_priority: '50',
+  tracker_device_number: '', tracker_sim_number: '', notes: '', is_active: true,
 }
 
 export function VehiclesPage() {
   const toast = useToast()
-  const [rows, setRows] = useState<Vehicle[]>(seedVehicles)
+  const [rows, setRows] = useState<Vehicle[]>([])
+  const [summary, setSummary] = useState({ total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0 })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useState('all')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<FormState>(emptyForm)
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
+  const [form, setForm] = useState(emptyForm)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const filtered = useMemo(() => {
-    return rows.filter((v) => {
-      const matchesChip = chip === 'all' || v.status === chip
-      const q = search.trim()
-      const matchesSearch =
-        !q ||
-        [v.code, v.plate, v.brand, v.model, v.category].some((x) => x.includes(q))
-      return matchesChip && matchesSearch
-    })
-  }, [rows, chip, search])
-
-  const summary = [
-    { label: 'الإجمالي', value: String(rows.length) },
-    {
-      label: 'متاحة',
-      value: String(rows.filter((v) => v.status === 'available').length),
-      tone: 'success' as const,
-    },
-    {
-      label: 'مؤجرة',
-      value: String(rows.filter((v) => v.status === 'rented').length),
-    },
-    {
-      label: 'صيانة',
-      value: String(rows.filter((v) => v.status === 'maintenance').length),
-      tone: 'danger' as const,
-    },
-  ]
-
-  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }))
-    setErrors((prev) => ({ ...prev, [key]: undefined }))
+  async function load(nextSearch = search, nextChip = chip) {
+    setLoading(true)
+    setError('')
+    try {
+      const qs = new URLSearchParams()
+      if (nextSearch.trim()) qs.set('search', nextSearch.trim())
+      if (nextChip !== 'all') qs.set('status', nextChip)
+      const res = await api<{ data: Vehicle[]; summary: typeof summary }>(`/vehicles?${qs}`)
+      setRows(res.data)
+      setSummary(res.summary)
+    } catch (e) {
+      setError((e as ApiError).message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function validate(): boolean {
-    const next: Partial<Record<keyof FormState, string>> = {}
-    if (!form.code.trim()) next.code = 'الكود الداخلي مطلوب.'
-    if (!form.plate.trim()) next.plate = 'رقم اللوحة مطلوب.'
-    if (!form.brand.trim()) next.brand = 'الماركة مطلوبة.'
-    if (!form.model.trim()) next.model = 'الموديل مطلوب.'
-    if (!form.year.trim()) next.year = 'سنة الصنع مطلوبة.'
-    if (!form.category) next.category = 'الفئة مطلوبة.'
-    if (!form.fuel) next.fuel = 'نوع الوقود مطلوب.'
-    if (!form.odometer.trim()) next.odometer = 'العداد الفعلي مطلوب.'
-    if (!form.dailyRate.trim()) next.dailyRate = 'الإيجار اليومي مطلوب.'
-    if (!form.deposit.trim()) next.deposit = 'التأمين النقدي مطلوب.'
-    setErrors(next)
-    return Object.keys(next).length === 0
-  }
+  useEffect(() => {
+    const t = window.setTimeout(() => load(), 250)
+    return () => window.clearTimeout(t)
+  }, [search, chip])
 
   async function onSave() {
-    if (!validate()) {
-      toast.error('تعذّر الحفظ. راجع الحقول.')
-      return
-    }
     setSaving(true)
-    await new Promise((r) => setTimeout(r, 450))
-    const created: Vehicle = {
-      id: `v-${Date.now()}`,
-      code: form.code.trim(),
-      plate: form.plate.trim(),
-      brand: form.brand.trim(),
-      model: form.model.trim(),
-      year: Number(form.year),
-      category: categoryOptions.find((c) => c.value === form.category)?.label ?? form.category,
-      fuel: fuelOptions.find((c) => c.value === form.fuel)?.label ?? form.fuel,
-      odometer: Number(form.odometer),
-      dailyRate: Number(form.dailyRate),
-      deposit: Number(form.deposit),
-      status: 'available',
-      priority: Number(form.priority || 50),
+    setErrors({})
+    try {
+      await api('/vehicles', {
+        method: 'POST',
+        json: {
+          ...form,
+          year: Number(form.year),
+          odometer: Number(form.odometer),
+          daily_rate: Number(form.daily_rate),
+          default_deposit: Number(form.default_deposit),
+          rental_priority: Number(form.rental_priority || 50),
+        },
+      })
+      toast.success('تم إضافة السيارة.')
+      setOpen(false)
+      setForm(emptyForm)
+      await load()
+    } catch (e) {
+      const err = e as ApiError
+      const next: Record<string, string> = {}
+      if (err.errors) for (const [k, v] of Object.entries(err.errors)) next[k] = v[0]
+      setErrors(next)
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
     }
-    setRows((prev) => [created, ...prev])
-    setSaving(false)
-    setOpen(false)
-    setForm(emptyForm)
-    toast.success('تم إضافة السيارة.')
   }
 
   return (
     <div className="rpm-stack">
       <PageHeader
-        title="السيارات"
-        subtitle="أسطول التشغيل — حالة اليوم وحقول المواصفة"
-        action={<Button onClick={() => setOpen(true)}>إضافة سيارة</Button>}
+        title="المركبات"
+        subtitle="أسطول التشغيل — الحالة مشتقة من العقود والصيانة"
+        action={<Button onClick={() => setOpen(true)}>إضافة مركبة</Button>}
       />
 
-      <SummaryStrip items={summary} />
+      <SummaryStrip
+        items={[
+          { label: 'الإجمالي', value: String(summary.total) },
+          { label: 'متاحة', value: String(summary.available), tone: 'success' },
+          { label: 'مؤجرة', value: String(summary.rented) },
+          { label: 'صيانة', value: String(summary.maintenance), tone: 'danger' },
+        ]}
+      />
+
       <FilterBar
         search={search}
         onSearchChange={setSearch}
@@ -176,99 +137,80 @@ export function VehiclesPage() {
         placeholder="بحث بالكود أو اللوحة أو الموديل…"
       />
 
-      {filtered.length === 0 ? (
-        <EmptyState title="لا توجد سيارات مطابقة" description="جرّب تغيير الفلتر أو أضف سيارة جديدة." />
-      ) : (
+      {loading ? <SkeletonBlock rows={6} /> : null}
+      {!loading && error ? <ErrorState title="تعذّر تحميل المركبات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} /> : null}
+      {!loading && !error && rows.length === 0 ? <EmptyState title="لا توجد مركبات مطابقة" /> : null}
+
+      {!loading && !error && rows.length > 0 ? (
         <>
           <div className="rpm-card-list rpm-mobile-only">
-            {filtered.map((v) => (
+            {rows.map((v) => (
               <article key={v.id} className="rpm-card">
                 <div className="rpm-card__row">
-                  <strong>
-                    {v.brand} {v.model}
-                  </strong>
-                  <StatusPill status={v.status} label={vehicleStatusLabel[v.status]} />
+                  <strong>{v.brand} {v.model}</strong>
+                  <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
                 </div>
-                <p>
-                  {v.code} · {v.plate}
-                </p>
-                <p className="muted">
-                  {v.year} · {v.category} · {v.fuel}
-                </p>
+                <p>{v.code} · {v.plate}</p>
+                <p className="muted">{v.year} · {v.category} · {v.fuel_type}</p>
                 <div className="rpm-card__meta">
-                  <span>{formatMoney(v.dailyRate)} / يوم</span>
+                  <span>{formatMoney(v.daily_rate)} / يوم</span>
                   <span>{formatNumber(v.odometer)} كم</span>
                 </div>
               </article>
             ))}
           </div>
-
           <div className="rpm-table-wrap rpm-desktop-only">
             <table className="rpm-table">
               <thead>
                 <tr>
-                  <th>الكود</th>
-                  <th>اللوحة</th>
-                  <th>السيارة</th>
-                  <th>الفئة</th>
-                  <th>الحالة</th>
-                  <th>العداد</th>
-                  <th>اليومي</th>
+                  <th>الكود</th><th>اللوحة</th><th>المركبة</th><th>الفئة</th><th>الحالة</th><th>العداد</th><th>اليومي</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((v) => (
+                {rows.map((v) => (
                   <tr key={v.id}>
                     <td>{v.code}</td>
                     <td>{v.plate}</td>
-                    <td>
-                      {v.brand} {v.model} {v.year}
-                    </td>
+                    <td>{v.brand} {v.model} {v.year}</td>
                     <td>{v.category}</td>
-                    <td>
-                      <StatusPill status={v.status} label={vehicleStatusLabel[v.status]} />
-                    </td>
+                    <td><StatusPill status={v.status} label={statusLabel[v.status] || v.status} /></td>
                     <td>{formatNumber(v.odometer)}</td>
-                    <td>{formatMoney(v.dailyRate)}</td>
+                    <td>{formatMoney(v.daily_rate)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </>
-      )}
+      ) : null}
 
       <Sheet
         open={open}
-        title="إضافة سيارة"
+        title="إضافة مركبة"
         onClose={() => setOpen(false)}
         footer={
           <>
-            <Button loading={saving} onClick={onSave}>
-              حفظ
-            </Button>
-            <Button variant="secondary" onClick={() => setOpen(false)}>
-              إلغاء
-            </Button>
+            <Button loading={saving} onClick={onSave}>حفظ</Button>
+            <Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button>
           </>
         }
       >
         <div className="rpm-form-grid">
-          <TextField label="الكود الداخلي" required value={form.code} error={errors.code} onChange={(e) => setField('code', e.target.value)} />
-          <TextField label="رقم اللوحة" required value={form.plate} error={errors.plate} onChange={(e) => setField('plate', e.target.value)} />
-          <TextField label="الماركة" required value={form.brand} error={errors.brand} onChange={(e) => setField('brand', e.target.value)} />
-          <TextField label="الموديل" required value={form.model} error={errors.model} onChange={(e) => setField('model', e.target.value)} />
-          <NumberField label="سنة الصنع" required value={form.year} error={errors.year} onChange={(e) => setField('year', e.target.value)} />
-          <SelectField label="الفئة" required options={categoryOptions} value={form.category} error={errors.category} onChange={(e) => setField('category', e.target.value)} />
-          <SelectField label="نوع الوقود" required options={fuelOptions} value={form.fuel} error={errors.fuel} onChange={(e) => setField('fuel', e.target.value)} />
-          <NumberField label="العداد الفعلي" required value={form.odometer} error={errors.odometer} onChange={(e) => setField('odometer', e.target.value)} />
-          <MoneyField label="الإيجار اليومي الافتراضي" required value={form.dailyRate} error={errors.dailyRate} onChange={(e) => setField('dailyRate', e.target.value)} />
-          <MoneyField label="التأمين النقدي الافتراضي" required value={form.deposit} error={errors.deposit} onChange={(e) => setField('deposit', e.target.value)} />
-          <NumberField label="درجة أولوية التأجير" value={form.priority} onChange={(e) => setField('priority', e.target.value)} hint="من ٠ إلى ١٠٠" />
-          <TextField label="رقم جهاز التتبع" value={form.trackerDevice} onChange={(e) => setField('trackerDevice', e.target.value)} />
-          <TextField label="رقم شريحة التتبع" value={form.trackerSim} onChange={(e) => setField('trackerSim', e.target.value)} />
-          <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setField('notes', e.target.value)} />
-          <SwitchField label="نشطة" checked={form.active} onChange={(v) => setField('active', v)} />
+          <TextField label="الكود الداخلي" required value={form.code} error={errors.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+          <TextField label="رقم اللوحة" required value={form.plate} error={errors.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} />
+          <TextField label="الماركة" required value={form.brand} error={errors.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+          <TextField label="الموديل" required value={form.model} error={errors.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+          <NumberField label="سنة الصنع" required value={form.year} error={errors.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
+          <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'SUV', label: 'SUV' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+          <SelectField label="نوع الوقود" required options={[{ value: 'بنزين', label: 'بنزين' }, { value: 'ديزل', label: 'ديزل' }, { value: 'هجين', label: 'هجين' }]} value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} />
+          <NumberField label="العداد الفعلي" required value={form.odometer} error={errors.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
+          <MoneyField label="الإيجار اليومي الافتراضي" required value={form.daily_rate} error={errors.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
+          <MoneyField label="التأمين النقدي الافتراضي" required value={form.default_deposit} error={errors.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
+          <NumberField label="درجة أولوية التأجير" value={form.rental_priority} onChange={(e) => setForm({ ...form, rental_priority: e.target.value })} hint="من ٠ إلى ١٠٠" />
+          <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
+          <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
+          <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <SwitchField label="نشطة" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
         </div>
       </Sheet>
     </div>
