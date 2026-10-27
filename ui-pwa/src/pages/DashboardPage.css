@@ -298,6 +298,31 @@
 .db-pill.is-warn { background: var(--warning-soft); color: var(--warning); }
 .db-pill.is-danger { background: var(--danger-soft); color: var(--danger); }
 
+.db-range {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  padding: 0.25rem;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.db-range__btn {
+  min-height: 34px;
+  padding: 0 0.85rem;
+  border-radius: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.db-range__btn.is-active {
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: var(--shadow-sm);
+}
+
 .db-chart { height: 200px; }
 
 .db-fleet {

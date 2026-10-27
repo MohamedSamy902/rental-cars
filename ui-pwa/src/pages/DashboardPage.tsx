@@ -106,12 +106,15 @@ function sparkFromValue(value: number, seed: number): number[] {
   })
 }
 
+type RevenueRange = 'week' | 'month' | 'year'
+
 export function DashboardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [data, setData] = useState<Dash | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [revenueRange, setRevenueRange] = useState<RevenueRange>('week')
 
   useEffect(() => {
     api<Dash>('/dashboard')
@@ -126,20 +129,54 @@ export function DashboardPage() {
     const activeRates = data.recent_contracts
       .filter((c) => c.status === 'active' || c.status === 'approved')
       .reduce((sum, c) => sum + (c.frozen_daily_rate || 0), 0)
-    const base = activeRates || Math.round((data.kpis.expected_revenue || 0) / 7)
-    return Array.from({ length: 7 }, (_, i) => {
-      const day = new Date(today)
-      day.setDate(today.getDate() + i)
-      const ending = data.recent_contracts.filter(
-        (c) => startOfDay(new Date(c.planned_ends_at)).getTime() === day.getTime(),
-      )
-      const endingRevenue = ending.reduce((s, c) => s + (c.frozen_daily_rate || 0), 0)
+    const dailyBase = activeRates || Math.round((data.kpis.expected_revenue || 0) / 7)
+
+    if (revenueRange === 'week') {
+      return Array.from({ length: 7 }, (_, i) => {
+        const day = new Date(today)
+        day.setDate(today.getDate() + i)
+        const ending = data.recent_contracts.filter(
+          (c) => startOfDay(new Date(c.planned_ends_at)).getTime() === day.getTime(),
+        )
+        const endingRevenue = ending.reduce((s, c) => s + (c.frozen_daily_rate || 0), 0)
+        return {
+          label: formatDayShort(day.toISOString()),
+          value: Math.max(0, Math.round(dailyBase * (0.94 + i * 0.015) - endingRevenue * 0.3)),
+        }
+      })
+    }
+
+    if (revenueRange === 'month') {
+      return Array.from({ length: 4 }, (_, i) => {
+        const weekBase = dailyBase * 7
+        const wave = 0.9 + i * 0.05 + Math.sin(i * 1.1) * 0.06
+        return {
+          label: `أسبوع ${i + 1}`,
+          value: Math.max(0, Math.round(weekBase * wave)),
+        }
+      })
+    }
+
+    const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+    const nowMonth = today.getMonth()
+    return Array.from({ length: 12 }, (_, i) => {
+      const monthIndex = (nowMonth - 11 + i + 12) % 12
+      const monthBase = dailyBase * 30
+      const season = 0.82 + Math.sin((i / 12) * Math.PI * 2) * 0.14 + i * 0.012
       return {
-        label: formatDayShort(day.toISOString()),
-        value: Math.max(0, Math.round(base * (0.94 + i * 0.015) - endingRevenue * 0.3)),
+        label: monthNames[monthIndex],
+        value: Math.max(0, Math.round(monthBase * season)),
       }
     })
-  }, [data])
+  }, [data, revenueRange])
+
+  const revenueTotal = useMemo(
+    () => revenueSeries.reduce((sum, row) => sum + row.value, 0),
+    [revenueSeries],
+  )
+
+  const revenueRangeLabel =
+    revenueRange === 'week' ? 'أسبوعي · ٧ أيام' : revenueRange === 'month' ? 'شهري · ٤ أسابيع' : 'سنوي · ١٢ شهراً'
 
   const donut = useMemo(() => {
     if (!data) return []
@@ -383,11 +420,31 @@ export function DashboardPage() {
           <div className="db-card__head">
             <div>
               <h2>اتجاه الإيراد</h2>
-              <p>سبعة أيام · عقود نشطة</p>
+              <p>{revenueRangeLabel}</p>
             </div>
             <strong className="db-card__figure">
-              <AnimatedNumber value={data.kpis.expected_revenue || 0} kind="money" />
+              <AnimatedNumber value={revenueRange === 'week' ? (data.kpis.expected_revenue || 0) : revenueTotal} kind="money" />
             </strong>
+          </div>
+          <div className="db-range" role="tablist" aria-label="نطاق الإيراد">
+            {(
+              [
+                { id: 'week', label: 'أسبوعي' },
+                { id: 'month', label: 'شهري' },
+                { id: 'year', label: 'سنوي' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={revenueRange === tab.id}
+                className={`db-range__btn ${revenueRange === tab.id ? 'is-active' : ''}`}
+                onClick={() => setRevenueRange(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
           <div className="db-chart">
             <ResponsiveContainer width="100%" height="100%">
@@ -403,6 +460,7 @@ export function DashboardPage() {
                   tickLine={false}
                   axisLine={false}
                   tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                  interval={revenueRange === 'year' ? 1 : 0}
                 />
                 <Tooltip
                   formatter={(value) => [formatMoney(Number(value ?? 0)), 'توقّع']}

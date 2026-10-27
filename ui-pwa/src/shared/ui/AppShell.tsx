@@ -5,9 +5,9 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
 import { CommandPalette } from './CommandPalette'
 import {
-  IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconClipboard,
-  IconHome, IconLogout, IconMenu, IconMoon, IconPlus, IconQueue, IconSearch,
-  IconSettings, IconSun, IconUsers, IconWallet, IconWrench,
+  IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconChevron,
+  IconClipboard, IconHome, IconLogout, IconMenu, IconMoon, IconPlus, IconQueue,
+  IconSearch, IconSettings, IconSun, IconUsers, IconWallet, IconWrench,
 } from './Icons'
 import './AppShell.css'
 
@@ -37,6 +37,9 @@ const mobileNav: NavItem[] = [
   { to: '/maintenance', label: 'صيانة', icon: <IconWrench /> },
 ]
 
+const RAIL_KEY = 'rpm.shell.expanded'
+const WA_URL = 'https://wa.me/201150100104'
+
 export function AppShell() {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -44,6 +47,21 @@ export function AppShell() {
   const location = useLocation()
   const [cmdOpen, setCmdOpen] = useState(false)
   const [drawer, setDrawer] = useState(false)
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(RAIL_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RAIL_KEY, expanded ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }, [expanded])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -61,11 +79,26 @@ export function AppShell() {
   }, [location.pathname])
 
   return (
-    <div className="shell">
+    <div className={`shell ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
       <aside className="shell-rail" aria-label="التنقّل الرئيسي">
         <div className="shell-rail__inner">
-          <div className="shell-rail__brand" title="RPM">
-            <IconCar size={18} />
+          <div className="shell-rail__brand-row">
+            <div className="shell-rail__brand" title="RPM">
+              <IconCar size={18} />
+            </div>
+            <div className="shell-rail__brand-copy">
+              <strong>RPM</strong>
+              <span>إدارة التأجير</span>
+            </div>
+            <button
+              type="button"
+              className="shell-rail__toggle"
+              aria-label={expanded ? 'طي القائمة' : 'فتح القائمة'}
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              <IconChevron size={16} />
+            </button>
           </div>
 
           <nav className="shell-rail__nav">
@@ -77,8 +110,8 @@ export function AppShell() {
                 title={item.label}
                 className={({ isActive }) => `shell-rail__link ${isActive ? 'is-active' : ''}`}
               >
-                {item.icon}
-                <span className="shell-rail__tip">{item.label}</span>
+                <span className="shell-rail__ico">{item.icon}</span>
+                <span className="shell-rail__label">{item.label}</span>
               </NavLink>
             ))}
           </nav>
@@ -91,6 +124,7 @@ export function AppShell() {
               onClick={toggleTheme}
             >
               {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
+              <span>المظهر</span>
             </button>
             <button
               type="button"
@@ -102,6 +136,7 @@ export function AppShell() {
               }}
             >
               <IconLogout size={16} />
+              <span>خروج</span>
             </button>
           </div>
         </div>
@@ -154,10 +189,10 @@ export function AppShell() {
               >
                 <IconBell size={18} />
               </button>
-            <button type="button" className="shell-cta" onClick={() => navigate('/bookings?new=1')}>
-              <IconPlus size={16} />
-              <span>عقد جديد</span>
-            </button>
+              <button type="button" className="shell-cta" onClick={() => navigate('/bookings?new=1')}>
+                <IconPlus size={16} />
+                <span>عقد جديد</span>
+              </button>
               <div className="shell-user">
                 <span className="shell-user__avatar" aria-hidden>
                   {(user?.name || 'م').slice(0, 1)}
@@ -184,6 +219,13 @@ export function AppShell() {
             </motion.div>
           </AnimatePresence>
         </main>
+
+        <footer className="shell-credit">
+          تم الإنشاء بواسطة{' '}
+          <a href={WA_URL} target="_blank" rel="noreferrer noopener">
+            Mohamed Samy
+          </a>
+        </footer>
       </div>
 
       <nav className="shell-dock" aria-label="تنقّل الموبايل">
@@ -234,6 +276,12 @@ export function AppShell() {
                   </NavLink>
                 ))}
               </div>
+              <p className="shell-drawer__credit">
+                تم الإنشاء بواسطة{' '}
+                <a href={WA_URL} target="_blank" rel="noreferrer noopener">
+                  Mohamed Samy
+                </a>
+              </p>
             </motion.div>
           </motion.div>
         ) : null}
