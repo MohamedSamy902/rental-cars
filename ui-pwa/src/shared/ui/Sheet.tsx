@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from './Button'
 import './Sheet.css'
 
@@ -16,20 +17,27 @@ export function Sheet({ open, title, onClose, children, footer }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
+    const prev = document.body.style.overflow
     document.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
+      document.body.style.overflow = prev
     }
   }, [open, onClose])
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div className="rpm-sheet-root" role="presentation">
-      <button className="rpm-sheet-backdrop" aria-label="إغلاق اللوحة" onClick={onClose} type="button" />
+      <button
+        className="rpm-sheet-backdrop"
+        aria-label="إغلاق اللوحة"
+        onClick={onClose}
+        type="button"
+      />
       <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby="rpm-sheet-title">
+        <div className="rpm-sheet__handle" aria-hidden />
         <header className="rpm-sheet__head">
           <h2 id="rpm-sheet-title">{title}</h2>
           <Button variant="ghost" size="sm" onClick={onClose} type="button">
@@ -39,6 +47,7 @@ export function Sheet({ open, title, onClose, children, footer }: Props) {
         <div className="rpm-sheet__body">{children}</div>
         {footer ? <footer className="rpm-sheet__foot">{footer}</footer> : null}
       </aside>
-    </div>
+    </div>,
+    document.body,
   )
 }
