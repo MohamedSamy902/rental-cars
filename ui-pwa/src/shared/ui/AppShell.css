@@ -469,54 +469,83 @@
   }
   .shell-rail { display: none; }
   .shell-icon--mobile { display: grid; }
-  .shell-top__brand-mobile { display: block; }
-  .shell-search { display: none; }
-  .shell-user__meta { display: none; }
-  .shell-cta span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-  }
-  .shell-cta {
-    width: 42px;
-    padding: 0;
-    justify-content: center;
-  }
-  .shell-top { padding-inline: 0.7rem; }
-  .shell-top__bar { gap: 0.35rem; padding-inline: 0.45rem; }
-  .shell-main { padding-inline: 0.75rem; }
-  .shell-credit { padding-inline: 0.75rem; }
+  .shell-icon--desk,
+  .shell-cta--desk,
+  .shell-user--desk { display: none !important; }
 
+  /* Native app top bar */
+  .shell-top {
+    padding: var(--safe-top) 0 0;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(16px) saturate(1.15);
+    border-bottom: 1px solid var(--hairline, var(--border));
+  }
+  .shell-top__bar {
+    min-height: 52px;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .shell-top__brand-mobile {
+    display: block;
+    flex: 1;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 800;
+  }
+  .shell-search { display: none; }
+  .shell-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    box-shadow: none;
+    background: transparent;
+    border-color: transparent;
+  }
+  .shell-main {
+    padding: 0.65rem 0.85rem calc(5.8rem + var(--safe-bottom));
+  }
+  .shell-credit {
+    display: none;
+  }
+
+  /* Native tab bar */
   .shell-dock {
     position: fixed;
-    inset-inline: 0.7rem;
-    inset-block-end: calc(0.55rem + var(--safe-bottom));
+    inset-inline: 0;
+    inset-block-end: 0;
     z-index: 50;
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 0.1rem;
-    padding: 0.4rem;
-    border-radius: 22px;
-    background: var(--surface-glass);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-lg);
-    backdrop-filter: blur(18px);
+    gap: 0;
+    padding: 0.35rem 0.25rem calc(0.35rem + var(--safe-bottom));
+    border-radius: 0;
+    background: var(--surface);
+    border: 0;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 28px rgb(15 23 42 / 08%);
+    backdrop-filter: none;
   }
   .shell-dock__item {
     display: grid;
     justify-items: center;
-    gap: 0.12rem;
-    padding: 0.45rem 0.15rem;
-    border-radius: 16px;
+    gap: 0.15rem;
+    padding: 0.4rem 0.1rem;
+    border-radius: 12px;
     color: var(--text-muted);
-    font-size: 0.66rem;
+    font-size: 0.64rem;
     font-weight: 800;
   }
   .shell-dock__item.is-active {
     color: var(--brand-ink);
-    background: var(--brand-soft);
+    background: transparent;
+  }
+  .shell-dock__item.is-active svg {
+    color: var(--brand);
   }
 }
 

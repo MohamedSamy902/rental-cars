@@ -172,3 +172,37 @@
   font-size: 0.88rem;
   font-weight: 600;
 }
+
+.rpm-select-panel.is-mobile-sheet {
+  border-radius: 22px;
+  box-shadow:
+    0 -8px 40px rgb(15 23 42 / 18%),
+    0 12px 28px rgb(15 23 42 / 10%);
+  animation: rpm-select-sheet-in 220ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+.rpm-select-panel.is-mobile-sheet::before {
+  content: '';
+  width: 42px;
+  height: 4px;
+  margin: 0.55rem auto 0.15rem;
+  border-radius: 999px;
+  background: var(--border-strong, var(--border));
+  display: block;
+}
+
+.rpm-select-panel.is-mobile-sheet .rpm-select-panel__option {
+  min-height: 48px;
+  font-size: 0.95rem;
+}
+
+@keyframes rpm-select-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -25,7 +25,15 @@ type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'children'> & {
   searchPlaceholder?: string
 }
 
-type PanelPos = { top: number; left: number; width: number; maxHeight: number; openUp: boolean }
+type PanelPos = {
+  top?: number
+  bottom?: number
+  left: number
+  width: number
+  maxHeight: number
+  openUp: boolean
+  mobileSheet?: boolean
+}
 
 export function SelectField({
   label,
@@ -84,12 +92,27 @@ export function SelectField({
     if (!el) return
     const rect = el.getBoundingClientRect()
     const gap = 8
+    const sidePad = 12
+
+    // Phone/fold: native-style bottom picker sheet
+    if (window.innerWidth <= 980) {
+      const width = window.innerWidth - sidePad * 2
+      setPos({
+        left: sidePad,
+        width,
+        bottom: sidePad + (Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')) || 0),
+        maxHeight: Math.min(window.innerHeight * 0.58, 420),
+        openUp: false,
+        mobileSheet: true,
+      })
+      return
+    }
+
     const preferred = Math.min(320, window.innerHeight * 0.48)
     const spaceBelow = window.innerHeight - rect.bottom - gap - 12
     const spaceAbove = rect.top - gap - 12
     const openUp = spaceBelow < 220 && spaceAbove > spaceBelow
     const maxHeight = Math.max(160, Math.min(preferred, openUp ? spaceAbove : spaceBelow))
-    const sidePad = 12
     const width = Math.min(rect.width, window.innerWidth - sidePad * 2)
     const left = Math.min(Math.max(sidePad, rect.left), window.innerWidth - width - sidePad)
     setPos({
@@ -194,10 +217,14 @@ export function SelectField({
     ? createPortal(
         <div
           ref={listRef}
-          className={`rpm-select-panel ${pos.openUp ? 'is-up' : 'is-down'}`}
+          className={`rpm-select-panel ${pos.openUp ? 'is-up' : 'is-down'} ${pos.mobileSheet ? 'is-mobile-sheet' : ''}`}
           style={{
-            top: pos.openUp ? undefined : pos.top,
-            bottom: pos.openUp ? window.innerHeight - pos.top : undefined,
+            top: pos.mobileSheet || pos.openUp ? undefined : pos.top,
+            bottom: pos.mobileSheet
+              ? pos.bottom
+              : pos.openUp && pos.top != null
+                ? window.innerHeight - pos.top
+                : undefined,
             left: pos.left,
             width: pos.width,
             maxHeight: pos.maxHeight,

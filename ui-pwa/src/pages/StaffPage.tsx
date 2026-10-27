@@ -355,7 +355,7 @@ export function StaffPage() {
             إدارة حسابات الدخول والأدوار وفق أقل صلاحية لازمة — الصلاحيات الحساسة لا تُمنح ضمناً.
           </p>
         </div>
-        <div className="st-hero__actions">
+        <div className="st-hero__actions st-hero__actions--desk">
           {tab === 'permissions' ? (
             <Button variant="secondary" onClick={() => setRoleSheet(true)}>دور جديد</Button>
           ) : null}
@@ -372,6 +372,19 @@ export function StaffPage() {
           )}
         </div>
       </motion.header>
+
+      <button
+        type="button"
+        className="st-fab"
+        aria-label={tab === 'hr' ? 'موظف موارد بشرية' : tab === 'permissions' ? 'دور جديد' : 'موظف جديد'}
+        onClick={() => {
+          if (tab === 'hr') setEmployeeSheet(true)
+          else if (tab === 'permissions') setRoleSheet(true)
+          else openCreateUser()
+        }}
+      >
+        <IconPlus size={22} />
+      </button>
 
       <section className="st-kpis" aria-label="ملخص الموظفين">
         {[

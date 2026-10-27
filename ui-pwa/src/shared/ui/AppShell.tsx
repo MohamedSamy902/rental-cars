@@ -176,7 +176,7 @@ export function AppShell() {
               </button>
               <button
                 type="button"
-                className="shell-icon"
+                className="shell-icon shell-icon--desk"
                 aria-label={theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
                 onClick={toggleTheme}
               >
@@ -190,11 +190,11 @@ export function AppShell() {
               >
                 <IconBell size={18} />
               </button>
-              <button type="button" className="shell-cta" onClick={() => navigate('/bookings?new=1')}>
+              <button type="button" className="shell-cta shell-cta--desk" onClick={() => navigate('/bookings?new=1')}>
                 <IconPlus size={16} />
                 <span>عقد جديد</span>
               </button>
-              <div className="shell-user">
+              <div className="shell-user shell-user--desk">
                 <span className="shell-user__avatar" aria-hidden>
                   {(user?.name || 'م').slice(0, 1)}
                 </span>
