@@ -8,6 +8,7 @@ import {
 } from '@/shared/ui'
 import './pages.css'
 
+type Deposit = { id: number; original_amount: number; status: string; deductions_total: number }
 type Contract = {
   id: number
   number: string
@@ -15,12 +16,19 @@ type Contract = {
   starts_at: string
   planned_ends_at: string
   frozen_daily_rate: number
+  frozen_agreed_deposit?: number
+  odometer_out?: number
+  final_total?: number
+  vehicle_id?: number
   customer?: { id: number; full_name: string }
-  vehicle?: { id: number; brand: string; model: string; plate: string }
+  vehicle?: { id: number; brand: string; model: string; plate: string; odometer?: number }
+  deposit?: Deposit | null
 }
 
 type Customer = { id: number; full_name: string; phone: string }
-type Vehicle = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number }
+type Vehicle = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number; odometer?: number }
+
+type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposit' | null
 
 const statusLabel: Record<string, string> = {
   pending: 'معلّق', approved: 'معتمد', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغى',
@@ -53,6 +61,12 @@ export function BookingsPage() {
     daily_rate: '', deposit: '', min_days: '', notes: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [action, setAction] = useState<ActionKind>(null)
+  const [selected, setSelected] = useState<Contract | null>(null)
+  const [actionForm, setActionForm] = useState({
+    odometer_out: '', odometer_in: '', damage_fee: '', reason: '', planned_ends_at: '',
+    replacement_vehicle_id: '', method: 'cash', receipt_number: '',
+  })
 
   async function load() {
     setLoading(true)
@@ -84,6 +98,25 @@ export function BookingsPage() {
     ])
     setCustomers(c.data)
     setVehicles(v.data)
+  }
+
+  async function openAction(kind: ActionKind, contract: Contract) {
+    setSelected(contract)
+    setAction(kind)
+    setActionForm({
+      odometer_out: String(contract.vehicle?.odometer ?? contract.odometer_out ?? ''),
+      odometer_in: String(contract.odometer_out ?? contract.vehicle?.odometer ?? ''),
+      damage_fee: '',
+      reason: '',
+      planned_ends_at: '',
+      replacement_vehicle_id: '',
+      method: 'cash',
+      receipt_number: `R-${contract.number}`,
+    })
+    if (kind === 'swap' || kind === 'extend') {
+      const v = await api<{ data: Vehicle[] }>('/vehicles?per_page=100')
+      setVehicles(v.data)
+    }
   }
 
   async function addInlineCustomer() {
@@ -142,6 +175,78 @@ export function BookingsPage() {
     }
   }
 
+  async function runAction() {
+    if (!selected || !action) return
+    setSaving(true)
+    try {
+      if (action === 'handover') {
+        await api(`/contracts/${selected.id}/handover`, {
+          method: 'POST',
+          json: { odometer_out: Number(actionForm.odometer_out) },
+        })
+        toast.success('تم التسليم وتفعيل العقد.')
+      } else if (action === 'return') {
+        await api(`/contracts/${selected.id}/return`, {
+          method: 'POST',
+          json: {
+            odometer_in: Number(actionForm.odometer_in),
+            damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
+          },
+        })
+        toast.success('تم الاستلام وإقفال الإجمالي.')
+      } else if (action === 'cancel') {
+        await api(`/contracts/${selected.id}/cancel`, {
+          method: 'POST',
+          json: { reason: actionForm.reason },
+        })
+        toast.success('تم إلغاء العقد.')
+      } else if (action === 'extend') {
+        await api(`/contracts/${selected.id}/extend`, {
+          method: 'POST',
+          json: { planned_ends_at: actionForm.planned_ends_at },
+        })
+        toast.success('تم إنشاء عقد التمديد.')
+      } else if (action === 'swap') {
+        await api(`/contracts/${selected.id}/swap`, {
+          method: 'POST',
+          json: {
+            replacement_vehicle_id: Number(actionForm.replacement_vehicle_id),
+            odometer_in: Number(actionForm.odometer_in),
+            odometer_out: Number(actionForm.odometer_out),
+            damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
+          },
+        })
+        toast.success('تم التبديل بسبب عطل.')
+      } else if (action === 'deposit') {
+        await api(`/contracts/${selected.id}/deposit`, {
+          method: 'POST',
+          json: {
+            method: actionForm.method,
+            receipt_number: actionForm.receipt_number,
+            amount: selected.frozen_agreed_deposit,
+          },
+        })
+        toast.success('تم قبض التأمين النقدي.')
+      }
+      setAction(null)
+      setSelected(null)
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const actionTitle: Record<Exclude<ActionKind, null>, string> = {
+    handover: 'تسليم السيارة',
+    return: 'استلام وإقفال',
+    cancel: 'إلغاء العقد',
+    extend: 'تمديد (عقد جديد)',
+    swap: 'تبديل بسبب عطل',
+    deposit: 'قبض التأمين النقدي',
+  }
+
   return (
     <div className="rpm-stack">
       <PageHeader
@@ -178,8 +283,34 @@ export function BookingsPage() {
               <p className="muted">{formatDateTime(b.starts_at)} → {formatDateTime(b.planned_ends_at)}</p>
               <div className="rpm-card__meta">
                 <span>{formatMoney(b.frozen_daily_rate)} / يوم</span>
+                {b.final_total ? <span>الإجمالي: {formatMoney(b.final_total)}</span> : null}
+                {b.deposit ? <span>تأمين: {b.deposit.status}</span> : null}
+              </div>
+              <div className="rpm-card__actions">
                 {b.status === 'pending' ? (
-                  <Button size="sm" onClick={() => approve(b.id)}>اعتماد</Button>
+                  <>
+                    <Button type="button" size="sm" onClick={() => void approve(b.id)}>اعتماد</Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
+                  </>
+                ) : null}
+                {b.status === 'approved' ? (
+                  <>
+                    <Button type="button" size="sm" onClick={() => void openAction('handover', b)}>تسليم</Button>
+                    {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
+                  </>
+                ) : null}
+                {b.status === 'active' ? (
+                  <>
+                    <Button type="button" size="sm" onClick={() => void openAction('return', b)}>استلام</Button>
+                    {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('swap', b)}>تبديل عطل</Button>
+                  </>
+                ) : null}
+                {b.status === 'completed' ? (
+                  <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
                 ) : null}
               </div>
             </article>
@@ -246,6 +377,64 @@ export function BookingsPage() {
           <NumberField label="الحد الأدنى للأيام" value={form.min_days} onChange={(e) => setForm({ ...form, min_days: e.target.value })} />
           <MoneyField label="التأمين النقدي المتفق" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} />
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} hint="نص حر فقط — لا ينشئ قواعد مالية" />
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={!!action && !!selected}
+        title={action ? `${actionTitle[action]} · ${selected?.number}` : ''}
+        onClose={() => { setAction(null); setSelected(null) }}
+        footer={
+          <>
+            <Button loading={saving} onClick={runAction}>تأكيد</Button>
+            <Button variant="secondary" onClick={() => { setAction(null); setSelected(null) }}>إغلاق</Button>
+          </>
+        }
+      >
+        <div className="rpm-form-grid">
+          {action === 'handover' || action === 'swap' ? (
+            <NumberField label={action === 'swap' ? 'عداد السيارة البديلة (خروج)' : 'عداد الخروج'} required value={actionForm.odometer_out} onChange={(e) => setActionForm({ ...actionForm, odometer_out: e.target.value })} />
+          ) : null}
+          {action === 'return' || action === 'swap' ? (
+            <NumberField label={action === 'swap' ? 'عداد السيارة القديمة (عودة)' : 'عداد العودة'} required value={actionForm.odometer_in} onChange={(e) => setActionForm({ ...actionForm, odometer_in: e.target.value })} />
+          ) : null}
+          {action === 'return' || action === 'swap' ? (
+            <MoneyField label="رسوم أضرار" value={actionForm.damage_fee} onChange={(e) => setActionForm({ ...actionForm, damage_fee: e.target.value })} />
+          ) : null}
+          {action === 'cancel' ? (
+            <TextAreaField label="سبب الإلغاء" required value={actionForm.reason} onChange={(e) => setActionForm({ ...actionForm, reason: e.target.value })} />
+          ) : null}
+          {action === 'extend' ? (
+            <TextField label="نهاية عقد التمديد" required type="datetime-local" value={actionForm.planned_ends_at} onChange={(e) => setActionForm({ ...actionForm, planned_ends_at: e.target.value })} />
+          ) : null}
+          {action === 'swap' ? (
+            <SelectField
+              label="السيارة البديلة"
+              required
+              options={vehicles
+                .filter((v) => v.id !== selected?.vehicle_id)
+                .map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))}
+              value={actionForm.replacement_vehicle_id}
+              onChange={(e) => setActionForm({ ...actionForm, replacement_vehicle_id: e.target.value })}
+            />
+          ) : null}
+          {action === 'deposit' ? (
+            <>
+              <SelectField
+                label="طريقة التحصيل"
+                required
+                options={[
+                  { value: 'cash', label: 'نقدي' },
+                  { value: 'card', label: 'بطاقة' },
+                  { value: 'transfer', label: 'تحويل' },
+                ]}
+                value={actionForm.method}
+                onChange={(e) => setActionForm({ ...actionForm, method: e.target.value })}
+              />
+              <TextField label="رقم الإيصال" required value={actionForm.receipt_number} onChange={(e) => setActionForm({ ...actionForm, receipt_number: e.target.value })} />
+              <p className="muted">المبلغ: {formatMoney(selected?.frozen_agreed_deposit || 0)} (خارج إجمالي العقد)</p>
+            </>
+          ) : null}
         </div>
       </Sheet>
     </div>

@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\AccountingController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\WorkOrderController;
@@ -33,6 +35,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve']);
     Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover']);
     Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle']);
+    Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel']);
+    Route::post('/contracts/{contract}/extend', [ContractController::class, 'extend']);
+    Route::post('/contracts/{contract}/swap', [ContractController::class, 'swap']);
+    Route::post('/contracts/{contract}/deposit', [ContractController::class, 'receiveDeposit']);
+    Route::post('/contracts/{contract}/deposit/deduct', [ContractController::class, 'deductDeposit']);
+    Route::post('/contracts/{contract}/deposit/return', [ContractController::class, 'returnDeposit']);
+
+    Route::get('/accounting/overview', [AccountingController::class, 'overview']);
+    Route::post('/accounting/lock-month', [AccountingController::class, 'lockMonth']);
+    Route::post('/accounting/reopen-month', [AccountingController::class, 'reopenMonth']);
+    Route::get('/accounting/payments', [AccountingController::class, 'payments']);
+    Route::post('/accounting/payments', [AccountingController::class, 'storePayment']);
+    Route::get('/reports/summary', [ReportController::class, 'summary']);
 
     Route::get('/work-orders', [WorkOrderController::class, 'index']);
     Route::post('/work-orders', [WorkOrderController::class, 'store']);
