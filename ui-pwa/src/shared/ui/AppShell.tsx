@@ -154,10 +154,10 @@ export function AppShell() {
               >
                 <IconBell size={18} />
               </button>
-              <button type="button" className="shell-cta" onClick={() => navigate('/bookings')}>
-                <IconPlus size={16} />
-                <span>عقد جديد</span>
-              </button>
+            <button type="button" className="shell-cta" onClick={() => navigate('/bookings?new=1')}>
+              <IconPlus size={16} />
+              <span>عقد جديد</span>
+            </button>
               <div className="shell-user">
                 <span className="shell-user__avatar" aria-hidden>
                   {(user?.name || 'م').slice(0, 1)}

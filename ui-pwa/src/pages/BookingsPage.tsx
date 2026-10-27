@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
 import {
@@ -44,6 +45,7 @@ const chips = [
 
 export function BookingsPage() {
   const toast = useToast()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Contract[]>([])
   const [summary, setSummary] = useState({ total: 0, pending: 0, approved: 0, active: 0, completed: 0 })
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -99,6 +101,15 @@ export function BookingsPage() {
     setCustomers(c.data)
     setVehicles(v.data)
   }
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return
+    void openSheet()
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once when ?new=1 arrives
+  }, [searchParams])
 
   async function openAction(kind: ActionKind, contract: Contract) {
     setSelected(contract)

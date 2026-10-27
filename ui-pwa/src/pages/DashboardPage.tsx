@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Area,
@@ -74,8 +74,41 @@ function urgencyPill(at: string, status: string) {
   return { label: `${days} يوم`, tone: 'danger' }
 }
 
+function MiniSpark({ values, tone = 'brand' }: { values: number[]; tone?: string }) {
+  const w = 88
+  const h = 32
+  const max = Math.max(...values, 1)
+  const min = Math.min(...values, 0)
+  const span = Math.max(max - min, 1)
+  const points = values
+    .map((v, i) => {
+      const x = (i / Math.max(values.length - 1, 1)) * w
+      const y = h - ((v - min) / span) * (h - 4) - 2
+      return `${x},${y}`
+    })
+    .join(' ')
+  const fillPoints = `0,${h} ${points} ${w},${h}`
+
+  return (
+    <svg className={`db-spark tone-${tone}`} viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden>
+      <polygon points={fillPoints} className="db-spark__fill" />
+      <polyline points={points} className="db-spark__line" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function sparkFromValue(value: number, seed: number): number[] {
+  const base = Math.max(value, 1)
+  return Array.from({ length: 8 }, (_, i) => {
+    const wave = Math.sin((i + seed) * 0.85) * 0.18 + 1
+    const ramp = 0.72 + i * 0.04
+    return Math.max(0, Math.round(base * wave * ramp))
+  })
+}
+
 export function DashboardPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [data, setData] = useState<Dash | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -141,6 +174,7 @@ export function DashboardPage() {
   const openTasks = data.tasks.length
   const ring = Math.PI * 2 * 54
 
+  const revenueSpark = revenueSeries.map((d) => d.value)
   const kpis = [
     {
       label: 'متاحة الآن',
@@ -149,6 +183,7 @@ export function DashboardPage() {
       hint: `من ${formatNumber(data.fleet_total)}`,
       icon: <IconCar size={18} />,
       tone: 'ok',
+      spark: sparkFromValue(data.kpis.available || 1, 1),
     },
     {
       label: 'عقود نشطة',
@@ -157,6 +192,7 @@ export function DashboardPage() {
       hint: 'مؤجّرة حالياً',
       icon: <IconClipboard size={18} />,
       tone: 'brand',
+      spark: sparkFromValue(data.kpis.rented || 1, 2),
     },
     {
       label: 'ترجع اليوم',
@@ -165,6 +201,7 @@ export function DashboardPage() {
       hint: 'تحتاج استلام',
       icon: <IconReturn size={18} />,
       tone: 'warn',
+      spark: sparkFromValue(data.kpis.returning_today || 1, 3),
     },
     {
       label: 'إيراد متوقع',
@@ -173,6 +210,7 @@ export function DashboardPage() {
       hint: 'أفق التشغيل',
       icon: <IconTrend size={18} />,
       tone: 'brand',
+      spark: revenueSpark.length ? revenueSpark : sparkFromValue(data.kpis.expected_revenue || 1, 4),
     },
   ]
 
@@ -192,10 +230,10 @@ export function DashboardPage() {
             ترجع اليوم.
           </p>
         </div>
-        <Link to="/bookings" className="db-cta">
+        <button type="button" className="db-cta" onClick={() => navigate('/bookings?new=1')}>
           <IconPlus size={16} />
           عقد جديد
-        </Link>
+        </button>
       </motion.header>
 
       <section className="db-kpis" aria-label="مؤشرات سريعة">
@@ -211,9 +249,12 @@ export function DashboardPage() {
               <span>{k.label}</span>
               <span className="db-kpi__ico">{k.icon}</span>
             </div>
-            <strong>
-              <AnimatedNumber value={k.value} kind={k.kind} />
-            </strong>
+            <div className="db-kpi__row">
+              <strong>
+                <AnimatedNumber value={k.value} kind={k.kind} />
+              </strong>
+              <MiniSpark values={k.spark} tone={k.tone} />
+            </div>
             <em>{k.hint}</em>
           </motion.article>
         ))}

@@ -23,11 +23,10 @@
   gap: 0.55rem;
   padding: 0.85rem 0.55rem;
   border-radius: 28px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--brand) 12%, var(--nav)) 0%, var(--nav) 38%, #070a10 100%);
-  border: 1px solid rgb(255 255 255 / 6%);
+  background: var(--rail-bg);
+  border: 1px solid var(--rail-border);
   box-shadow: var(--shadow-rail);
-  color: #dbe4f0;
+  color: var(--text);
 }
 
 .shell-rail__brand {
@@ -38,7 +37,7 @@
   border-radius: 16px;
   background: linear-gradient(145deg, var(--brand), var(--brand-hover));
   color: #fff;
-  box-shadow: 0 12px 28px rgb(13 148 136 / 32%);
+  box-shadow: var(--rail-brand-shadow);
 }
 
 .shell-rail__nav {
@@ -64,13 +63,13 @@
   transition: background var(--motion) var(--ease), color var(--motion) var(--ease), transform var(--motion) var(--ease);
 }
 .shell-rail__link:hover {
-  background: rgb(255 255 255 / 7%);
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text);
 }
 .shell-rail__link.is-active {
   background: var(--nav-active-bg);
   color: var(--nav-active);
-  box-shadow: inset 0 0 0 1px rgb(94 234 212 / 18%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nav-active) 22%, transparent);
 }
 
 .shell-rail__tip {
@@ -78,8 +77,9 @@
   inset-inline-end: calc(100% + 10px);
   padding: 0.35rem 0.55rem;
   border-radius: 10px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
@@ -88,11 +88,6 @@
   transform: translateX(-4px);
   transition: opacity var(--motion) var(--ease), transform var(--motion) var(--ease);
   box-shadow: var(--shadow);
-}
-[data-theme='dark'] .shell-rail__tip {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
 }
 .shell-rail__link:hover .shell-rail__tip,
 .shell-rail__link:focus-visible .shell-rail__tip {
@@ -106,7 +101,7 @@
   width: 100%;
   justify-items: center;
   padding-top: 0.45rem;
-  border-top: 1px solid rgb(255 255 255 / 8%);
+  border-top: 1px solid var(--rail-divider);
 }
 
 .shell-rail__theme,
@@ -120,17 +115,17 @@
 }
 
 .shell-rail__theme {
-  color: #cbd5e1;
-  background: rgb(255 255 255 / 6%);
+  color: var(--text-muted);
+  background: var(--rail-theme-bg);
 }
 .shell-rail__theme:hover {
-  color: #fff;
-  background: rgb(255 255 255 / 10%);
+  color: var(--text);
+  background: var(--surface-2);
 }
 
 .shell-rail__quit {
-  color: #f87171;
-  background: rgb(248 113 113 / 10%);
+  color: var(--danger);
+  background: var(--rail-quit-bg);
 }
 
 .shell-stage {

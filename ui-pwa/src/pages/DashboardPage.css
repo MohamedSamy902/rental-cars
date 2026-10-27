@@ -81,6 +81,13 @@
 .db-kpi.tone-warn .db-kpi__ico { background: var(--warning-soft); color: var(--warning); }
 .db-kpi.tone-brand .db-kpi__ico { background: var(--brand-soft); color: var(--brand-ink); }
 
+.db-kpi__row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .db-kpi strong {
   font-family: var(--font-display);
   font-size: clamp(1.35rem, 2vw, 1.7rem);
@@ -92,6 +99,19 @@
   color: var(--text-faint);
   font-size: 0.76rem;
 }
+
+.db-spark {
+  flex-shrink: 0;
+  overflow: visible;
+}
+.db-spark__line { stroke: var(--brand); }
+.db-spark__fill { fill: color-mix(in srgb, var(--brand) 16%, transparent); }
+.db-spark.tone-ok .db-spark__line { stroke: var(--success); }
+.db-spark.tone-ok .db-spark__fill { fill: color-mix(in srgb, var(--success) 16%, transparent); }
+.db-spark.tone-warn .db-spark__line { stroke: var(--warning); }
+.db-spark.tone-warn .db-spark__fill { fill: color-mix(in srgb, var(--warning) 16%, transparent); }
+.db-spark.tone-brand .db-spark__line { stroke: var(--brand); }
+.db-spark.tone-brand .db-spark__fill { fill: color-mix(in srgb, var(--brand) 16%, transparent); }
 
 .db-bento {
   display: grid;
