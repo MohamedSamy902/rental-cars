@@ -1,61 +1,58 @@
 :root {
-  /* RPM «Showroom» — mineral light + ink + sparse brand signal */
-  --ink: #0a0f1a;
-  --ink-soft: #151c2c;
-  --nav: #0a0f1a;
-  --bg: #e7ebf0;
-  --bg-mist: #f3f5f8;
+  /* Merged: TrueTrack airy bento + Ecommerce dark rail — RPM teal brand */
+  --ink: #14181f;
+  --ink-soft: #1c2430;
+  --nav: #151922;
+  --bg: #f3f4f6;
+  --bg-warm: #f7f7f5;
   --surface: #ffffff;
-  --surface-2: #f7f8fa;
-  --text: #0a0f1a;
-  --text-muted: #5b6577;
-  --text-faint: #8b95a8;
+  --surface-2: #f0f2f5;
+  --text: #14181f;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
 
   --brand: #0d9488;
   --brand-hover: #0f766e;
-  --brand-soft: color-mix(in srgb, var(--brand) 12%, white);
+  --brand-soft: #e6f7f5;
   --brand-ink: #0a5c55;
 
-  --success: #047857;
-  --success-soft: #ecfdf5;
-  --warning: #b45309;
-  --warning-soft: #fffbeb;
-  --danger: #b91c1c;
+  --success: #16a34a;
+  --success-soft: #ecfdf3;
+  --warning: #ea580c;
+  --warning-soft: #fff7ed;
+  --danger: #dc2626;
   --danger-soft: #fef2f2;
-  --info: #0369a1;
-  --info-soft: #f0f9ff;
+  --info: #2563eb;
+  --info-soft: #eff6ff;
 
-  --border: rgb(10 15 26 / 8%);
-  --border-strong: rgb(10 15 26 / 14%);
-  --hairline: rgb(10 15 26 / 6%);
+  --border: rgb(20 24 31 / 7%);
+  --border-strong: rgb(20 24 31 / 12%);
+  --hairline: rgb(20 24 31 / 5%);
 
   --radius-sm: 14px;
   --radius: 20px;
   --radius-lg: 24px;
-  --radius-xl: 32px;
+  --radius-xl: 28px;
 
-  --shadow-sm: 0 1px 2px rgb(10 15 26 / 4%);
-  --shadow: 0 12px 32px rgb(10 15 26 / 7%);
-  --shadow-lg: 0 28px 64px rgb(10 15 26 / 12%);
+  --shadow-sm: 0 1px 2px rgb(20 24 31 / 4%);
+  --shadow: 0 10px 30px rgb(20 24 31 / 6%);
+  --shadow-lg: 0 22px 50px rgb(20 24 31 / 10%);
 
   --font-display: 'Tajawal', 'IBM Plex Sans Arabic', sans-serif;
   --font-body: 'IBM Plex Sans Arabic', 'Tajawal', sans-serif;
 
-  --shell-nav-width: 92px;
-  --shell-nav-expanded: 260px;
-  --bottom-nav-height: 70px;
-  --header-height: 64px;
+  --shell-nav-width: 84px;
+  --bottom-nav-height: 72px;
+  --header-height: 72px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 
-  --motion: 240ms;
+  --motion: 220ms;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   color-scheme: light;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root {
-    --motion: 0ms;
-  }
+  :root { --motion: 0ms; }
 }

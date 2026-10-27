@@ -1,19 +1,17 @@
 .rpm-cmd {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 90;
   display: grid;
   place-items: start center;
   padding: calc(12vh + var(--safe-top)) 1rem 1rem;
 }
-
 .rpm-cmd__backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(11 18 32 / 48%);
+  background: rgb(20 24 31 / 45%);
   backdrop-filter: blur(8px);
 }
-
 .rpm-cmd__panel {
   position: relative;
   width: min(560px, 100%);
@@ -23,7 +21,6 @@
   box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
-
 .rpm-cmd__search {
   display: flex;
   align-items: center;
@@ -32,25 +29,20 @@
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
 }
-
 .rpm-cmd__search input {
   flex: 1;
   border: 0;
   outline: none;
   background: transparent;
-  font-size: 1rem;
   min-width: 0;
 }
-
 .rpm-cmd__search kbd {
   font-size: 0.7rem;
   padding: 0.2rem 0.45rem;
   border-radius: 8px;
   border: 1px solid var(--border);
-  color: var(--text-faint);
   background: var(--surface-2);
 }
-
 .rpm-cmd__list {
   list-style: none;
   margin: 0;
@@ -58,7 +50,6 @@
   max-height: min(420px, 52vh);
   overflow: auto;
 }
-
 .rpm-cmd__item {
   width: 100%;
   display: flex;
@@ -67,14 +58,9 @@
   padding: 0.75rem 0.85rem;
   border-radius: var(--radius-sm);
   text-align: start;
-  transition: background var(--motion) var(--ease);
 }
-
 .rpm-cmd__item.is-active,
-.rpm-cmd__item:hover {
-  background: var(--brand-soft);
-}
-
+.rpm-cmd__item:hover { background: var(--brand-soft); }
 .rpm-cmd__icon {
   width: 36px;
   height: 36px;
@@ -82,33 +68,12 @@
   place-items: center;
   border-radius: 12px;
   background: var(--surface-2);
-  color: var(--ink-soft);
   flex-shrink: 0;
 }
-
 .rpm-cmd__item.is-active .rpm-cmd__icon {
   background: var(--brand);
   color: white;
 }
-
-.rpm-cmd__meta {
-  display: grid;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.rpm-cmd__meta strong {
-  font-size: 0.95rem;
-  font-weight: 650;
-}
-
-.rpm-cmd__meta span {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.rpm-cmd__empty {
-  padding: 1.5rem;
-  text-align: center;
-  color: var(--text-muted);
-}
+.rpm-cmd__meta { display: grid; gap: 0.1rem; min-width: 0; }
+.rpm-cmd__meta strong { font-size: 0.95rem; font-weight: 700; }
+.rpm-cmd__meta span { font-size: 0.76rem; color: var(--text-muted); }

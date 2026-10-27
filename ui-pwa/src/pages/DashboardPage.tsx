@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   Area,
   AreaChart,
@@ -12,6 +12,7 @@ import {
   XAxis,
 } from 'recharts'
 import { api } from '@/shared/api/client'
+import { useAuth } from '@/shared/auth/AuthContext'
 import {
   formatDayShort,
   formatMoney,
@@ -21,7 +22,15 @@ import {
 } from '@/shared/lib/format'
 import { AnimatedNumber } from '@/shared/ui/AnimatedNumber'
 import { ErrorState, SkeletonBlock } from '@/shared/ui'
-import { IconClipboard, IconMore, IconPlus, IconReturn, IconWrench } from '@/shared/ui/Icons'
+import {
+  IconCar,
+  IconClipboard,
+  IconPlus,
+  IconReturn,
+  IconTrend,
+  IconUsers,
+  IconWrench,
+} from '@/shared/ui/Icons'
 import './DashboardPage.css'
 
 type Dash = {
@@ -42,35 +51,11 @@ type Dash = {
   }[]
 }
 
-const statusLabel: Record<string, string> = {
-  pending: 'معلّق',
-  approved: 'معتمد',
-  active: 'نشط',
-  completed: 'مكتمل',
-  available: 'متاح',
-  reserved: 'محجوز',
-  rented: 'مؤجّر',
-  maintenance: 'صيانة',
-  out_of_service: 'خارج الخدمة',
-}
-
 const fleetTone: Record<string, string> = {
-  available: '#047857',
+  available: '#16a34a',
   rented: '#0d9488',
-  reserved: '#b45309',
-  maintenance: '#b91c1c',
-  out_of_service: '#8b95a8',
-}
-
-type LaneKey = 'handover' | 'return' | 'approve'
-
-type LaneItem = {
-  id: string
-  title: string
-  subtitle: string
-  at: string
-  status: string
-  href: string
+  reserved: '#ea580c',
+  maintenance: '#dc2626',
 }
 
 function startOfDay(d: Date) {
@@ -79,22 +64,21 @@ function startOfDay(d: Date) {
   return x
 }
 
-function isSameDay(a: Date, b: Date) {
-  return startOfDay(a).getTime() === startOfDay(b).getTime()
-}
-
-function classifyTask(title: string): LaneKey {
-  if (title.includes('اعتماد') || title.includes('معلّق')) return 'approve'
-  if (title.includes('استلام') || title.includes('إرجاع')) return 'return'
-  return 'handover'
+function urgencyPill(at: string, status: string) {
+  if (status === 'completed') return { label: 'مكتمل', tone: 'ok' }
+  const diffH = (new Date(at).getTime() - Date.now()) / 36e5
+  if (diffH < 0) return { label: 'متأخر', tone: 'danger' }
+  if (diffH < 24) return { label: 'اليوم', tone: 'warn' }
+  if (diffH < 48) return { label: 'غداً', tone: 'warn' }
+  const days = Math.ceil(diffH / 24)
+  return { label: `${days} يوم`, tone: 'danger' }
 }
 
 export function DashboardPage() {
+  const { user } = useAuth()
   const [data, setData] = useState<Dash | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [menuId, setMenuId] = useState<string | null>(null)
-  const [lane, setLane] = useState<LaneKey | 'all'>('all')
 
   useEffect(() => {
     api<Dash>('/dashboard')
@@ -103,96 +87,6 @@ export function DashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const todayLabel = useMemo(
-    () =>
-      new Intl.DateTimeFormat('ar-EG', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        numberingSystem: 'latn',
-      }).format(new Date()),
-    [],
-  )
-
-  const lanes = useMemo(() => {
-    const empty: Record<LaneKey, LaneItem[]> = {
-      handover: [],
-      return: [],
-      approve: [],
-    }
-    if (!data) return empty
-
-    for (const task of data.tasks) {
-      const key = classifyTask(task.title)
-      empty[key].push({
-        id: `task-${task.id}`,
-        title: task.title,
-        subtitle: task.subtitle,
-        at: task.at,
-        status: task.status,
-        href: '/bookings',
-      })
-    }
-
-    const today = new Date()
-    for (const c of data.recent_contracts) {
-      if (c.status === 'approved' && isSameDay(new Date(c.starts_at), today)) {
-        empty.handover.push({
-          id: `start-${c.id}`,
-          title: `تسليم ${c.number}`,
-          subtitle: `${c.customer?.full_name || 'عميل'} · ${c.vehicle?.brand || ''} ${c.vehicle?.model || ''}`,
-          at: c.starts_at,
-          status: c.status,
-          href: '/bookings',
-        })
-      }
-      if ((c.status === 'active' || c.status === 'approved') && isSameDay(new Date(c.planned_ends_at), today)) {
-        empty.return.push({
-          id: `end-${c.id}`,
-          title: `استلام ${c.number}`,
-          subtitle: `${c.customer?.full_name || 'عميل'} · ${c.vehicle?.plate || ''}`,
-          at: c.planned_ends_at,
-          status: c.status,
-          href: '/bookings',
-        })
-      }
-      if (c.status === 'pending') {
-        empty.approve.push({
-          id: `pend-${c.id}`,
-          title: `اعتماد ${c.number}`,
-          subtitle: `${c.customer?.full_name || 'عميل'} · ${formatMoney(c.frozen_daily_rate)}/يوم`,
-          at: c.starts_at,
-          status: c.status,
-          href: '/bookings',
-        })
-      }
-    }
-
-    const dedupe = (items: LaneItem[]) => {
-      const seen = new Set<string>()
-      return items
-        .filter((item) => {
-          const key = item.title + item.subtitle
-          if (seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
-        .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
-    }
-
-    return {
-      handover: dedupe(empty.handover),
-      return: dedupe(empty.return),
-      approve: dedupe(empty.approve),
-    }
-  }, [data])
-
-  const activeQueue = useMemo(() => {
-    if (lane === 'all') return [...lanes.handover, ...lanes.return, ...lanes.approve]
-      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
-    return lanes[lane]
-  }, [lanes, lane])
-
   const revenueSeries = useMemo(() => {
     if (!data) return []
     const today = startOfDay(new Date())
@@ -200,7 +94,6 @@ export function DashboardPage() {
       .filter((c) => c.status === 'active' || c.status === 'approved')
       .reduce((sum, c) => sum + (c.frozen_daily_rate || 0), 0)
     const base = activeRates || Math.round((data.kpis.expected_revenue || 0) / 7)
-
     return Array.from({ length: 7 }, (_, i) => {
       const day = new Date(today)
       day.setDate(today.getDate() + i)
@@ -229,26 +122,13 @@ export function DashboardPage() {
     if (!data) return []
     return [...data.recent_contracts]
       .sort((a, b) => new Date(a.planned_ends_at).getTime() - new Date(b.planned_ends_at).getTime())
-      .slice(0, 5)
-  }, [data])
-
-  const fleetSegments = useMemo(() => {
-    if (!data) return []
-    const total = data.fleet_total || 1
-    return [
-      { key: 'available', label: 'متاح', value: data.fleet_status.available || 0 },
-      { key: 'rented', label: 'مؤجّر', value: data.fleet_status.rented || 0 },
-      { key: 'reserved', label: 'محجوز', value: data.fleet_status.reserved || 0 },
-      { key: 'maintenance', label: 'صيانة', value: data.fleet_status.maintenance || 0 },
-    ]
-      .filter((s) => s.value > 0)
-      .map((s) => ({ ...s, pct: Math.round((s.value / total) * 100) }))
+      .slice(0, 4)
   }, [data])
 
   if (loading) {
     return (
-      <div className="dash">
-        <SkeletonBlock rows={9} />
+      <div className="db">
+        <SkeletonBlock rows={10} />
       </div>
     )
   }
@@ -257,179 +137,218 @@ export function DashboardPage() {
     return <ErrorState title="تعذّر تحميل لوحة اليوم" description={error} />
   }
 
-  const laneMeta: { key: LaneKey | 'all'; label: string; count: number }[] = [
-    { key: 'all', label: 'الكل', count: lanes.handover.length + lanes.return.length + lanes.approve.length },
-    { key: 'handover', label: 'تسليم', count: lanes.handover.length },
-    { key: 'return', label: 'استلام', count: lanes.return.length },
-    { key: 'approve', label: 'اعتماد', count: lanes.approve.length },
+  const firstName = (user?.name || 'مستخدم').split(' ')[0]
+  const openTasks = data.tasks.length
+  const ring = Math.PI * 2 * 54
+
+  const kpis = [
+    {
+      label: 'متاحة الآن',
+      value: data.kpis.available || 0,
+      kind: 'number' as const,
+      hint: `من ${formatNumber(data.fleet_total)}`,
+      icon: <IconCar size={18} />,
+      tone: 'ok',
+    },
+    {
+      label: 'عقود نشطة',
+      value: data.kpis.rented || 0,
+      kind: 'number' as const,
+      hint: 'مؤجّرة حالياً',
+      icon: <IconClipboard size={18} />,
+      tone: 'brand',
+    },
+    {
+      label: 'ترجع اليوم',
+      value: data.kpis.returning_today || 0,
+      kind: 'number' as const,
+      hint: 'تحتاج استلام',
+      icon: <IconReturn size={18} />,
+      tone: 'warn',
+    },
+    {
+      label: 'إيراد متوقع',
+      value: data.kpis.expected_revenue || 0,
+      kind: 'money' as const,
+      hint: 'أفق التشغيل',
+      icon: <IconTrend size={18} />,
+      tone: 'brand',
+    },
   ]
 
   return (
-    <div className="dash">
-      {/* فكرة جديدة: لوحة تشغيل اليوم — مش بطل تسويقي ولا صف KPI */}
-      <motion.section
-        className="ops"
-        initial={{ opacity: 0, y: 12 }}
+    <div className="db">
+      <motion.header
+        className="db-welcome"
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        aria-label="لوحة تشغيل اليوم"
+        transition={{ duration: 0.35 }}
       >
-        <header className="ops__head">
-          <div>
-            <p className="ops__date">{todayLabel}</p>
-            <h1>تشغيل اليوم</h1>
-            <p className="ops__lede">
-              صفّ المهام حسب التسليم والاستلام والاعتماد — ابدأ من هنا، مش من نسب عامة.
-            </p>
-          </div>
-          <div className="ops__head-actions">
-            <Link to="/bookings" className="ops-cta">
-              <IconPlus size={16} />
-              عقد جديد
-            </Link>
-            <Link to="/calendar" className="ops-ghost">
-              التقويم
-            </Link>
-          </div>
-        </header>
-
-        <div className="ops__pulse" aria-label="نبض الأسطول">
-          <div className="ops__pulse-meta">
-            <strong>نبض الأسطول</strong>
-            <span>
-              إشغال {formatPercent(data.occupancy_pct)} · {formatNumber(data.fleet_total)} مركبة · إيراد متوقع{' '}
-              {formatMoney(data.kpis.expected_revenue || 0)}
-            </span>
-          </div>
-          <div className="ops__bar" role="img" aria-label="توزيع حالة الأسطول">
-            {fleetSegments.map((seg) => (
-              <span
-                key={seg.key}
-                className={`ops__bar-seg is-${seg.key}`}
-                style={{ flexGrow: seg.value, flexBasis: 0 }}
-                title={`${seg.label}: ${seg.value}`}
-              />
-            ))}
-          </div>
-          <ul className="ops__bar-legend">
-            {fleetSegments.map((seg) => (
-              <li key={seg.key}>
-                <i className={`is-${seg.key}`} />
-                {seg.label}
-                <b className="tabular-nums">{formatNumber(seg.value)}</b>
-              </li>
-            ))}
-            <li>
-              <i className="is-wo" />
-              أوامر شغل
-              <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
-            </li>
-          </ul>
+        <div>
+          <h1>مرحباً، {firstName}</h1>
+          <p>
+            لديك <strong className="tabular-nums">{formatNumber(openTasks)}</strong> مهام تحتاج متابعة
+            و <strong className="tabular-nums">{formatNumber(data.kpis.returning_today || 0)}</strong> مركبة
+            ترجع اليوم.
+          </p>
         </div>
+        <Link to="/bookings" className="db-cta">
+          <IconPlus size={16} />
+          عقد جديد
+        </Link>
+      </motion.header>
 
-        <div className="ops__board">
-          <div className="ops__lanes" role="tablist" aria-label="تصفية مهام اليوم">
-            {laneMeta.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                role="tab"
-                aria-selected={lane === tab.key}
-                className={`ops__lane ${lane === tab.key ? 'is-active' : ''}`}
-                onClick={() => setLane(tab.key)}
-              >
-                <span>{tab.label}</span>
-                <b className="tabular-nums">{formatNumber(tab.count)}</b>
-              </button>
-            ))}
-          </div>
+      <section className="db-kpis" aria-label="مؤشرات سريعة">
+        {kpis.map((k, i) => (
+          <motion.article
+            key={k.label}
+            className={`db-kpi tone-${k.tone}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.04 * i, duration: 0.35 }}
+          >
+            <div className="db-kpi__top">
+              <span>{k.label}</span>
+              <span className="db-kpi__ico">{k.icon}</span>
+            </div>
+            <strong>
+              <AnimatedNumber value={k.value} kind={k.kind} />
+            </strong>
+            <em>{k.hint}</em>
+          </motion.article>
+        ))}
+      </section>
 
-          <ul className="ops__queue">
-            <AnimatePresence mode="popLayout">
-              {activeQueue.length === 0 ? (
-                <motion.li
-                  key="empty"
-                  className="ops__empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  لا مهام في هذا المسار الآن — يوم هادئ.
-                </motion.li>
-              ) : (
-                activeQueue.map((item, index) => (
-                  <motion.li
-                    key={item.id}
-                    layout
-                    className="ops__item"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ delay: Math.min(index * 0.03, 0.2) }}
-                  >
-                    <time dateTime={item.at} className="tabular-nums">
-                      {formatTime(item.at)}
-                    </time>
-                    <div className="ops__item-body">
-                      <strong>{item.title}</strong>
-                      <span>{item.subtitle}</span>
-                    </div>
-                    <em className={`ops-status is-${item.status}`}>
-                      {statusLabel[item.status] || item.status}
-                    </em>
-                    <div className="ops-qa">
-                      <button
-                        type="button"
-                        aria-label="إجراءات سريعة"
-                        aria-expanded={menuId === item.id}
-                        onClick={() => setMenuId(menuId === item.id ? null : item.id)}
-                      >
-                        <IconMore size={16} />
-                      </button>
-                      <AnimatePresence>
-                        {menuId === item.id ? (
-                          <motion.div
-                            className="ops-qa__menu"
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 2 }}
-                          >
-                            <Link to={item.href} onClick={() => setMenuId(null)}>
-                              <IconClipboard size={14} />
-                              فتح العقود
-                            </Link>
-                            <Link to="/maintenance" onClick={() => setMenuId(null)}>
-                              <IconWrench size={14} />
-                              الصيانة
-                            </Link>
-                          </motion.div>
-                        ) : null}
-                      </AnimatePresence>
-                    </div>
-                  </motion.li>
-                ))
-              )}
-            </AnimatePresence>
-          </ul>
-        </div>
-      </motion.section>
-
-      <section className="dash-grid">
+      <section className="db-bento">
+        {/* TrueTrack-style gauge hero card */}
         <motion.article
-          className="dash-panel dash-panel--chart"
+          className="db-card db-card--gauge"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.35 }}
         >
-          <header className="dash-panel__head">
+          <div className="db-card__head">
             <div>
-              <h2>توقّع الإيراد</h2>
-              <p>سبعة أيام من العقود النشطة</p>
+              <h2>صحة الإشغال</h2>
+              <p>قراءة لحظية للأسطول النشط</p>
             </div>
-            <span className="dash-panel__figure tabular-nums">
+            <Link to="/vehicles" className="db-link">
+              الأسطول
+            </Link>
+          </div>
+
+          <div className="db-gauge">
+            <div className="db-gauge__ring" aria-hidden>
+              <svg viewBox="0 0 140 140">
+                <circle cx="70" cy="70" r="54" className="track" />
+                <circle
+                  className="dots"
+                  cx="70"
+                  cy="70"
+                  r="62"
+                  strokeDasharray="2 8"
+                />
+                <motion.circle
+                  cx="70"
+                  cy="70"
+                  r="54"
+                  className="progress"
+                  strokeDasharray={ring}
+                  initial={{ strokeDashoffset: ring }}
+                  animate={{
+                    strokeDashoffset: ring * (1 - Math.min(data.occupancy_pct, 100) / 100),
+                  }}
+                  transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+                />
+              </svg>
+              <div className="db-gauge__center">
+                <AnimatedNumber value={data.occupancy_pct} kind="percent" className="db-gauge__pct" />
+                <span>إشغال</span>
+              </div>
+            </div>
+
+            <ul className="db-gauge__stats">
+              <li>
+                <span>أسطول</span>
+                <b className="tabular-nums">{formatNumber(data.fleet_total)}</b>
+              </li>
+              <li>
+                <span>مؤجّر</span>
+                <b className="tabular-nums">{formatNumber(data.kpis.rented || 0)}</b>
+              </li>
+              <li>
+                <span>صيانة</span>
+                <b className="tabular-nums">{formatNumber(data.fleet_status.maintenance || 0)}</b>
+              </li>
+              <li>
+                <span>أوامر شغل</span>
+                <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
+              </li>
+            </ul>
+          </div>
+        </motion.article>
+
+        {/* TrueTrack reminders */}
+        <motion.article
+          className="db-card db-card--reminders"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.14, duration: 0.35 }}
+        >
+          <div className="db-card__head">
+            <div>
+              <h2>تذكيرات قادمة</h2>
+              <p>ما يحتاج قراراً أولاً</p>
+            </div>
+            <Link to="/bookings" className="db-link">
+              العقود
+            </Link>
+          </div>
+          <ul className="db-reminders">
+            {data.tasks.length === 0 ? (
+              <li className="db-empty">لا تذكيرات معلّقة</li>
+            ) : (
+              data.tasks.map((task, i) => {
+                const pill = urgencyPill(task.at, task.status)
+                return (
+                  <motion.li
+                    key={task.id}
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.04 * i }}
+                  >
+                    <span className="db-reminders__ico" aria-hidden>
+                      <IconClipboard size={16} />
+                    </span>
+                    <div>
+                      <strong>{task.title}</strong>
+                      <span>{task.subtitle}</span>
+                    </div>
+                    <em className={`db-pill is-${pill.tone}`}>{pill.label}</em>
+                  </motion.li>
+                )
+              })
+            )}
+          </ul>
+        </motion.article>
+
+        {/* Ecommerce revenue chart */}
+        <motion.article
+          className="db-card db-card--chart"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.35 }}
+        >
+          <div className="db-card__head">
+            <div>
+              <h2>اتجاه الإيراد</h2>
+              <p>سبعة أيام · عقود نشطة</p>
+            </div>
+            <strong className="db-card__figure">
               <AnimatedNumber value={data.kpis.expected_revenue || 0} kind="money" />
-            </span>
-          </header>
-          <div className="dash-chart">
+            </strong>
+          </div>
+          <div className="db-chart">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={revenueSeries} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                 <defs>
@@ -456,52 +375,53 @@ export function DashboardPage() {
                   type="monotone"
                   dataKey="value"
                   stroke="var(--brand)"
-                  strokeWidth={2.4}
+                  strokeWidth={2.5}
                   fill="url(#revFill)"
-                  animationDuration={800}
+                  animationDuration={850}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </motion.article>
 
+        {/* Fleet donut */}
         <motion.article
-          className="dash-panel dash-panel--fleet"
+          className="db-card db-card--fleet"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.14, duration: 0.35 }}
+          transition={{ delay: 0.22, duration: 0.35 }}
         >
-          <header className="dash-panel__head">
+          <div className="db-card__head">
             <div>
               <h2>حالة الأسطول</h2>
-              <p>توزيع لحظي</p>
+              <p>توزيع المركبات</p>
             </div>
-          </header>
-          <div className="dash-fleet">
-            <div className="dash-fleet__chart">
+          </div>
+          <div className="db-fleet">
+            <div className="db-fleet__chart">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={donut}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius="70%"
+                    innerRadius="68%"
                     outerRadius="92%"
                     paddingAngle={3}
                     strokeWidth={0}
                   >
                     {donut.map((entry) => (
-                      <Cell key={entry.key} fill={fleetTone[entry.key]} />
+                      <Cell key={entry.key} fill={fleetTone[entry.key] || '#94a3b8'} />
                     ))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-              <div className="dash-fleet__center">
+              <div className="db-fleet__center">
                 <strong className="tabular-nums">{formatNumber(data.fleet_total)}</strong>
                 <span>مركبة</span>
               </div>
             </div>
-            <ul className="dash-fleet__legend">
+            <ul className="db-fleet__legend">
               {donut.map((item) => (
                 <li key={item.key}>
                   <i style={{ background: fleetTone[item.key] }} />
@@ -513,57 +433,78 @@ export function DashboardPage() {
           </div>
         </motion.article>
 
+        {/* Low-stock style alerts → returns */}
         <motion.article
-          className="dash-panel dash-panel--returns"
+          className="db-card db-card--alerts"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, duration: 0.35 }}
+          transition={{ delay: 0.26, duration: 0.35 }}
         >
-          <header className="dash-panel__head">
+          <div className="db-card__head">
             <div>
-              <h2>مواعيد الإرجاع القادمة</h2>
-              <p>خط زمني للاستلام</p>
+              <h2>إرجاعات قادمة</h2>
+              <p>تنبيهات الاستلام</p>
             </div>
-            <Link to="/calendar" className="dash-link">
+            <Link to="/calendar" className="db-link">
               التقويم
             </Link>
-          </header>
-          <ol className="dash-returns">
+          </div>
+          <ul className="db-alerts">
             {returns.length === 0 ? (
-              <li className="dash-empty">
+              <li className="db-empty">
                 <IconReturn size={18} />
                 لا إرجاعات مجدولة
               </li>
             ) : (
-              returns.map((c, i) => (
-                <motion.li
-                  key={c.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.03 * i }}
-                >
-                  <time dateTime={c.planned_ends_at}>
-                    <b className="tabular-nums">{formatTime(c.planned_ends_at)}</b>
-                    <span>{formatDayShort(c.planned_ends_at)}</span>
-                  </time>
+              returns.map((c) => (
+                <li key={c.id}>
                   <div>
                     <strong>
                       {c.vehicle?.brand} {c.vehicle?.model}
                     </strong>
-                    <p>
-                      {c.customer?.full_name} · {c.vehicle?.plate} · {c.number}
-                    </p>
+                    <span>
+                      {c.number} · {c.customer?.full_name}
+                    </span>
                   </div>
-                  <aside>
-                    <em className={`ops-status is-${c.status}`}>
-                      {statusLabel[c.status] || c.status}
-                    </em>
-                    <span className="tabular-nums">{formatMoney(c.frozen_daily_rate)}/يوم</span>
-                  </aside>
-                </motion.li>
+                  <em className="db-alerts__meta">
+                    <b className="tabular-nums">{formatTime(c.planned_ends_at)}</b>
+                    <span>{formatDayShort(c.planned_ends_at)}</span>
+                  </em>
+                </li>
               ))
             )}
-          </ol>
+          </ul>
+        </motion.article>
+
+        <motion.article
+          className="db-card db-card--quick"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.35 }}
+        >
+          <div className="db-card__head">
+            <div>
+              <h2>اختصارات</h2>
+              <p>وصول سريع</p>
+            </div>
+          </div>
+          <div className="db-quick">
+            <Link to="/customers">
+              <IconUsers size={18} />
+              العملاء
+              <b className="tabular-nums">{formatNumber(data.kpis.customers || 0)}</b>
+            </Link>
+            <Link to="/maintenance">
+              <IconWrench size={18} />
+              الصيانة
+              <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
+            </Link>
+            <Link to="/vehicles">
+              <IconCar size={18} />
+              المتاح
+              <b className="tabular-nums">{formatPercent(100 - data.occupancy_pct)}</b>
+            </Link>
+          </div>
         </motion.article>
       </section>
     </div>
