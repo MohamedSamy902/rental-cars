@@ -5,8 +5,11 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\WorkOrderController;
@@ -28,6 +31,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
         return response()->json(['data' => $settings]);
     });
+
+    Route::get('/staff', [StaffController::class, 'index']);
+    Route::post('/staff', [StaffController::class, 'store']);
+    Route::put('/staff/{user}', [StaffController::class, 'update']);
+
+    Route::get('/employees', [EmployeeController::class, 'index']);
+    Route::post('/employees', [EmployeeController::class, 'store']);
+    Route::put('/employees/{employee}', [EmployeeController::class, 'update']);
+
+    Route::get('/roles', [RoleController::class, 'index']);
+    Route::post('/roles', [RoleController::class, 'store']);
+    Route::put('/roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
 
     Route::apiResource('vehicles', VehicleController::class);
     Route::apiResource('customers', CustomerController::class);

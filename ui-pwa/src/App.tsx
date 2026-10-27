@@ -16,6 +16,7 @@ import { NotificationsPage } from '@/pages/NotificationsPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { AccountsPage } from '@/pages/AccountsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { StaffPage } from '@/pages/StaffPage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -58,6 +59,7 @@ export default function App() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
+                <Route path="staff" element={<StaffPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>

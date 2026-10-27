@@ -15,6 +15,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleAccessory;
 use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
+use App\Support\PermissionCatalog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -22,15 +23,8 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $adminRole = Role::query()->firstOrCreate(
-            ['name' => 'super_admin'],
-            ['label' => 'مدير أعلى'],
-        );
-        Role::query()->firstOrCreate(['name' => 'ops_manager'], ['label' => 'مدير تشغيل']);
-        Role::query()->firstOrCreate(['name' => 'sales'], ['label' => 'مبيعات']);
-        Role::query()->firstOrCreate(['name' => 'fleet'], ['label' => 'أسطول']);
-        Role::query()->firstOrCreate(['name' => 'maintenance'], ['label' => 'صيانة']);
-        Role::query()->firstOrCreate(['name' => 'accounts'], ['label' => 'حسابات']);
+        PermissionCatalog::ensureSeeded();
+        $adminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
 
         $user = User::query()->updateOrCreate(
             ['email' => 'admin@rpm.local'],

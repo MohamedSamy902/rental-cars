@@ -7,7 +7,7 @@ import { CommandPalette } from './CommandPalette'
 import {
   IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconChevron,
   IconClipboard, IconHome, IconLogout, IconMenu, IconMoon, IconPlus, IconQueue,
-  IconSearch, IconSettings, IconSun, IconUsers, IconWallet, IconWrench,
+  IconSearch, IconSettings, IconShield, IconSun, IconUsers, IconWallet, IconWrench,
 } from './Icons'
 import './AppShell.css'
 
@@ -25,6 +25,7 @@ const railNav: NavItem[] = [
   { to: '/customers', label: 'العملاء', icon: <IconUsers /> },
   { to: '/accounts', label: 'الحسابات', icon: <IconWallet /> },
   { to: '/reports', label: 'التقارير', icon: <IconChart /> },
+  { to: '/staff', label: 'الموظفون', icon: <IconShield /> },
   { to: '/notifications', label: 'الإشعارات', icon: <IconBell /> },
   { to: '/settings', label: 'الإعدادات', icon: <IconSettings /> },
 ]

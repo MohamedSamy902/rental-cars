@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconClipboard,
-  IconHome, IconQueue, IconSearch, IconSettings, IconUsers, IconWallet, IconWrench,
+  IconHome, IconQueue, IconSearch, IconSettings, IconShield, IconUsers, IconWallet, IconWrench,
 } from './Icons'
 import './CommandPalette.css'
 
@@ -21,6 +21,7 @@ const ITEMS: Item[] = [
   { to: '/customers', label: 'العملاء', group: 'المالية', icon: <IconUsers /> },
   { to: '/accounts', label: 'الحسابات', group: 'المالية', icon: <IconWallet /> },
   { to: '/reports', label: 'التقارير', group: 'المالية', icon: <IconChart /> },
+  { to: '/staff', label: 'الموظفون والصلاحيات', group: 'النظام', icon: <IconShield /> },
   { to: '/notifications', label: 'الإشعارات', group: 'النظام', icon: <IconBell /> },
   { to: '/settings', label: 'الإعدادات', group: 'النظام', icon: <IconSettings /> },
 ]
