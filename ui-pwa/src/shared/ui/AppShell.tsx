@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { api } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
 import { CommandPalette } from './CommandPalette'
@@ -48,6 +49,7 @@ export function AppShell() {
   const location = useLocation()
   const [cmdOpen, setCmdOpen] = useState(false)
   const [drawer, setDrawer] = useState(false)
+  const [unread, setUnread] = useState(0)
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(RAIL_KEY) === '1'
@@ -78,6 +80,32 @@ export function AppShell() {
   useEffect(() => {
     setDrawer(false)
   }, [location.pathname])
+
+  useEffect(() => {
+    if (!user) {
+      setUnread(0)
+      return
+    }
+    let alive = true
+    const pull = () => {
+      api<{ unread: number }>('/notifications/unread-count')
+        .then((res) => {
+          if (alive) setUnread(res.unread || 0)
+        })
+        .catch(() => {
+          /* ignore badge errors */
+        })
+    }
+    pull()
+    const t = window.setInterval(pull, 60000)
+    const onFocus = () => pull()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      alive = false
+      window.clearInterval(t)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [user, location.pathname])
 
   return (
     <div className={`shell ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
@@ -184,11 +212,16 @@ export function AppShell() {
               </button>
               <button
                 type="button"
-                className="shell-icon"
-                aria-label="إشعارات"
+                className="shell-icon shell-icon--bell"
+                aria-label={unread > 0 ? `إشعارات · ${unread} غير مقروء` : 'إشعارات'}
                 onClick={() => navigate('/notifications')}
               >
                 <IconBell size={18} />
+                {unread > 0 ? (
+                  <span className="shell-badge" aria-hidden>
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                ) : null}
               </button>
               <button type="button" className="shell-cta shell-cta--desk" onClick={() => navigate('/bookings?new=1')}>
                 <IconPlus size={16} />

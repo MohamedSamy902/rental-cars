@@ -118,9 +118,17 @@ export function SelectField({
     setOpen(true)
     const idx = Math.max(0, options.findIndex((o) => o.value === selectedValue))
     setActiveIndex(idx < 0 ? 0 : idx)
-    // Keep the field visible above the keyboard / panel
+    // Keep the field visible inside its scroll parent (sheet body) — never scroll the page
     window.setTimeout(() => {
-      triggerRef.current?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+      const el = triggerRef.current
+      if (el) {
+        const sheetBody = el.closest('.rpm-sheet__body') as HTMLElement | null
+        if (sheetBody) {
+          const bodyRect = sheetBody.getBoundingClientRect()
+          const elRect = el.getBoundingClientRect()
+          sheetBody.scrollTop += elRect.top - bodyRect.top - bodyRect.height * 0.28
+        }
+      }
       updatePosition()
     }, 40)
   }

@@ -142,6 +142,11 @@
   transform: scale(0.99);
 }
 
+.rpm-card.is-unread {
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
+  background: color-mix(in srgb, var(--brand-soft) 55%, var(--surface));
+}
+
 .rpm-card__chev {
   color: var(--text-muted);
   flex-shrink: 0;

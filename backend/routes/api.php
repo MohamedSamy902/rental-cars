@@ -107,13 +107,20 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::get('/notifications', function (Request $request) {
-        $rows = Notification::query()
-            ->where('user_id', $request->user()->id)
-            ->latest('id')
-            ->limit(50)
-            ->get();
+        $base = Notification::query()->where('user_id', $request->user()->id);
+        $rows = (clone $base)->latest('id')->limit(50)->get();
+        $unread = (clone $base)->whereNull('read_at')->count();
 
-        return response()->json(['data' => $rows]);
+        return response()->json(['data' => $rows, 'unread' => $unread]);
+    });
+
+    Route::get('/notifications/unread-count', function (Request $request) {
+        $unread = Notification::query()
+            ->where('user_id', $request->user()->id)
+            ->whereNull('read_at')
+            ->count();
+
+        return response()->json(['unread' => $unread]);
     });
 
     Route::post('/notifications/{notification}/read', function (Request $request, Notification $notification) {
