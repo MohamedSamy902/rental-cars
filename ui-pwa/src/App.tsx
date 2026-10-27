@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/shared/auth/AuthContext'
+import { ThemeProvider } from '@/shared/theme/ThemeContext'
 import { AppShell, ToastProvider, SkeletonBlock } from '@/shared/ui'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
@@ -32,36 +33,38 @@ function Protected({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route
-              element={
-                <Protected>
-                  <AppShell />
-                </Protected>
-              }
-            >
-              <Route index element={<DashboardPage />} />
-              <Route path="vehicles" element={<VehiclesPage />} />
-              <Route path="bookings" element={<BookingsPage />} />
-              <Route path="calendar" element={<CalendarPage />} />
-              <Route path="maintenance" element={<MaintenancePage />} />
-              <Route path="inventory" element={<InventoryPage />} />
-              <Route path="customers" element={<CustomersPage />} />
-              <Route path="violations" element={<ViolationsPage />} />
-              <Route path="waitlist" element={<WaitlistPage />} />
-              <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="accounts" element={<AccountsPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route
+                element={
+                  <Protected>
+                    <AppShell />
+                  </Protected>
+                }
+              >
+                <Route index element={<DashboardPage />} />
+                <Route path="vehicles" element={<VehiclesPage />} />
+                <Route path="bookings" element={<BookingsPage />} />
+                <Route path="calendar" element={<CalendarPage />} />
+                <Route path="maintenance" element={<MaintenancePage />} />
+                <Route path="inventory" element={<InventoryPage />} />
+                <Route path="customers" element={<CustomersPage />} />
+                <Route path="violations" element={<ViolationsPage />} />
+                <Route path="waitlist" element={<WaitlistPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="accounts" element={<AccountsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   )
 }

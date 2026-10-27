@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
+import { useTheme } from '@/shared/theme/ThemeContext'
 import { CommandPalette } from './CommandPalette'
 import {
   IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconClipboard,
-  IconHome, IconLogout, IconMenu, IconPlus, IconQueue, IconSearch, IconSettings,
-  IconUsers, IconWallet, IconWrench,
+  IconHome, IconLogout, IconMenu, IconMoon, IconPlus, IconQueue, IconSearch,
+  IconSettings, IconSun, IconUsers, IconWallet, IconWrench,
 } from './Icons'
 import './AppShell.css'
 
@@ -38,6 +39,7 @@ const mobileNav: NavItem[] = [
 
 export function AppShell() {
   const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
   const [cmdOpen, setCmdOpen] = useState(false)
@@ -54,66 +56,117 @@ export function AppShell() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  useEffect(() => { setDrawer(false) }, [location.pathname])
+  useEffect(() => {
+    setDrawer(false)
+  }, [location.pathname])
 
   return (
     <div className="shell">
       <aside className="shell-rail" aria-label="التنقّل الرئيسي">
-        <div className="shell-rail__brand" title="RPM">
-          <IconCar size={18} />
-        </div>
-        <nav className="shell-rail__nav">
-          {railNav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              title={item.label}
-              className={({ isActive }) => `shell-rail__link ${isActive ? 'is-active' : ''}`}
+        <div className="shell-rail__inner">
+          <div className="shell-rail__brand" title="RPM">
+            <IconCar size={18} />
+          </div>
+
+          <nav className="shell-rail__nav">
+            {railNav.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                title={item.label}
+                className={({ isActive }) => `shell-rail__link ${isActive ? 'is-active' : ''}`}
+              >
+                {item.icon}
+                <span className="shell-rail__tip">{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="shell-rail__foot">
+            <button
+              type="button"
+              className="shell-rail__theme"
+              aria-label={theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
+              onClick={toggleTheme}
             >
-              {item.icon}
-            </NavLink>
-          ))}
-        </nav>
-        <button
-          type="button"
-          className="shell-rail__quit"
-          aria-label="تسجيل الخروج"
-          onClick={async () => { await logout(); navigate('/login') }}
-        >
-          <IconLogout size={16} />
-        </button>
+              {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
+            </button>
+            <button
+              type="button"
+              className="shell-rail__quit"
+              aria-label="تسجيل الخروج"
+              onClick={async () => {
+                await logout()
+                navigate('/login')
+              }}
+            >
+              <IconLogout size={16} />
+            </button>
+          </div>
+        </div>
       </aside>
 
       <div className="shell-stage">
         <header className="shell-top">
-          <button type="button" className="shell-icon shell-icon--mobile" aria-label="القائمة" onClick={() => setDrawer(true)}>
-            <IconMenu size={18} />
-          </button>
+          <div className="shell-top__bar">
+            <button
+              type="button"
+              className="shell-icon shell-icon--mobile"
+              aria-label="القائمة"
+              onClick={() => setDrawer(true)}
+            >
+              <IconMenu size={18} />
+            </button>
 
-          <button type="button" className="shell-search" onClick={() => setCmdOpen(true)}>
-            <IconSearch size={16} />
-            <span>بحث أو انتقال سريع…</span>
-            <kbd>⌘K</kbd>
-          </button>
+            <div className="shell-top__brand-mobile">
+              <strong>RPM</strong>
+            </div>
 
-          <div className="shell-top__end">
-            <button type="button" className="shell-icon shell-icon--mobile" aria-label="بحث" onClick={() => setCmdOpen(true)}>
-              <IconSearch size={18} />
+            <button type="button" className="shell-search" onClick={() => setCmdOpen(true)}>
+              <IconSearch size={16} />
+              <span>بحث أو انتقال سريع…</span>
+              <kbd>⌘K</kbd>
             </button>
-            <button type="button" className="shell-icon" aria-label="إشعارات" onClick={() => navigate('/notifications')}>
-              <IconBell size={18} />
-            </button>
-            <button type="button" className="shell-cta" onClick={() => navigate('/bookings')}>
-              <IconPlus size={16} />
-              <span>عقد جديد</span>
-            </button>
-            <div className="shell-user">
-              <span className="shell-user__avatar" aria-hidden>{(user?.name || 'م').slice(0, 1)}</span>
-              <span className="shell-user__meta">
-                <strong>{user?.name}</strong>
-                <em>{user?.role || 'مستخدم'}</em>
-              </span>
+
+            <div className="shell-top__end">
+              <button
+                type="button"
+                className="shell-icon shell-icon--mobile"
+                aria-label="بحث"
+                onClick={() => setCmdOpen(true)}
+              >
+                <IconSearch size={18} />
+              </button>
+              <button
+                type="button"
+                className="shell-icon"
+                aria-label={theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
+                onClick={toggleTheme}
+              >
+                {theme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+              </button>
+              <button
+                type="button"
+                className="shell-icon"
+                aria-label="إشعارات"
+                onClick={() => navigate('/notifications')}
+              >
+                <IconBell size={18} />
+              </button>
+              <button type="button" className="shell-cta" onClick={() => navigate('/bookings')}>
+                <IconPlus size={16} />
+                <span>عقد جديد</span>
+              </button>
+              <div className="shell-user">
+                <span className="shell-user__avatar" aria-hidden>
+                  {(user?.name || 'م').slice(0, 1)}
+                </span>
+                <span className="shell-user__meta">
+                  <strong>{user?.name}</strong>
+                  <em>{user?.role || 'مستخدم'}</em>
+                </span>
+              </div>
             </div>
           </div>
         </header>
@@ -161,10 +214,21 @@ export function AppShell() {
               aria-label="كل الأقسام"
             >
               <div className="shell-drawer__handle" aria-hidden />
-              <strong className="shell-drawer__title">RPM</strong>
+              <div className="shell-drawer__head">
+                <strong>RPM</strong>
+                <button type="button" className="shell-icon" onClick={toggleTheme} aria-label="تبديل المظهر">
+                  {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
+                </button>
+              </div>
               <div className="shell-drawer__grid">
                 {railNav.map((item) => (
-                  <NavLink key={item.to} to={item.to} end={item.end} className="shell-drawer__link" onClick={() => setDrawer(false)}>
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className="shell-drawer__link"
+                    onClick={() => setDrawer(false)}
+                  >
                     {item.icon}
                     {item.label}
                   </NavLink>

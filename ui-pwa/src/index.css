@@ -2,7 +2,9 @@
 
 *,
 *::before,
-*::after { box-sizing: border-box; }
+*::after {
+  box-sizing: border-box;
+}
 
 html {
   direction: rtl;
@@ -16,13 +18,25 @@ body {
   font-size: 15px;
   line-height: 1.55;
   color: var(--text);
-  background: var(--bg);
+  background:
+    radial-gradient(980px 520px at 88% -8%, var(--bg-mesh-1), transparent 58%),
+    radial-gradient(820px 460px at 4% 100%, var(--bg-mesh-2), transparent 52%),
+    radial-gradient(640px 360px at 55% 35%, var(--bg-mesh-3), transparent 55%),
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg) 48%, var(--bg) 100%);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
 }
 
-#root { min-height: 100dvh; }
+#root {
+  min-height: 100dvh;
+}
 
-h1, h2, h3, h4 {
+h1,
+h2,
+h3,
+h4 {
   font-family: var(--font-display);
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -30,12 +44,18 @@ h1, h2, h3, h4 {
   color: var(--text);
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
 
-a { color: inherit; text-decoration: none; }
+a {
+  color: inherit;
+  text-decoration: none;
+}
 
 button {
   cursor: pointer;
@@ -43,7 +63,10 @@ button {
   background: none;
 }
 
-img { max-width: 100%; display: block; }
+img {
+  max-width: 100%;
+  display: block;
+}
 
 :focus-visible {
   outline: 2px solid var(--brand);
@@ -51,7 +74,7 @@ img { max-width: 100%; display: block; }
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--brand) 24%, white);
+  background: color-mix(in srgb, var(--brand) 28%, transparent);
 }
 
 .tabular-nums {
@@ -61,7 +84,9 @@ img { max-width: 100%; display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
