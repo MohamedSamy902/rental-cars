@@ -49,9 +49,14 @@ function overlapsDay(c: Contract, day: Date) {
   return t >= start.getTime() && t <= end.getTime()
 }
 
+function shortLabel(c: Contract) {
+  const who = c.customer?.full_name?.split(/\s+/)[0] || c.number
+  const car = c.vehicle?.model || c.vehicle?.brand || ''
+  return car ? `${who} · ${car}` : who
+}
+
 function buildMonthCells(month: Date) {
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
-  // JS: 0=Sun … 6=Sat. We want Saturday-first → shift
   const jsDay = first.getDay()
   const offset = (jsDay + 1) % 7 // Sat=0
   const start = new Date(first)
@@ -68,6 +73,7 @@ export function CalendarPage() {
   const [loading, setLoading] = useState(true)
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selected, setSelected] = useState(() => startOfDay(new Date()))
+  const [focusId, setFocusId] = useState<number | null>(null)
 
   useEffect(() => {
     api<{ data: Contract[] }>('/contracts?per_page=100')
@@ -92,14 +98,23 @@ export function CalendarPage() {
   }, [cells, rows])
 
   const selectedEvents = byDay.get(selectedKey) || []
+  const focused = focusId ? rows.find((r) => r.id === focusId) || null : null
 
   function shiftMonth(delta: number) {
     setMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1))
   }
 
+  function pickDay(day: Date, contractId?: number) {
+    setSelected(startOfDay(day))
+    setFocusId(contractId ?? null)
+    if (day.getMonth() !== month.getMonth()) {
+      setMonth(new Date(day.getFullYear(), day.getMonth(), 1))
+    }
+  }
+
   return (
     <div className="cal">
-      <PageHeader title="التقويم" subtitle="عرض شهري للحجوزات المعتمدة والنشطة والمعلّقة" />
+      <PageHeader title="التقويم" subtitle="الحجوزات ظاهرة على الأيام مباشرة — اضغط حجزًا للتفاصيل" />
 
       <div className="cal-toolbar">
         <button type="button" className="cal-nav" aria-label="الشهر السابق" onClick={() => shiftMonth(-1)}>
@@ -128,31 +143,48 @@ export function CalendarPage() {
               const key = toKey(day)
               const events = byDay.get(key) || []
               const inMonth = day.getMonth() === month.getMonth()
+              const extra = Math.max(0, events.length - 2)
               return (
-                <button
+                <div
                   key={key}
-                  type="button"
                   role="gridcell"
                   className={[
                     'cal-cell',
                     inMonth ? '' : 'is-muted',
                     key === todayKey ? 'is-today' : '',
                     key === selectedKey ? 'is-selected' : '',
+                    events.length ? 'has-events' : '',
                   ].join(' ')}
-                  aria-label={`${dayFormatter.format(day)}${events.length ? ` · ${events.length} حجز` : ''}`}
-                  aria-selected={key === selectedKey}
-                  onClick={() => {
-                    setSelected(startOfDay(day))
-                    if (!inMonth) setMonth(new Date(day.getFullYear(), day.getMonth(), 1))
-                  }}
                 >
-                  <span className="cal-cell__num">{day.getDate()}</span>
-                  <span className="cal-cell__dots" aria-hidden>
-                    {events.slice(0, 3).map((e) => (
-                      <i key={e.id} className={`cal-dot is-${e.status}`} />
+                  <button
+                    type="button"
+                    className="cal-cell__daybtn"
+                    aria-label={dayFormatter.format(day)}
+                    aria-selected={key === selectedKey}
+                    onClick={() => pickDay(day)}
+                  >
+                    <span className="cal-cell__num">{day.getDate()}</span>
+                  </button>
+
+                  <div className="cal-cell__events">
+                    {events.slice(0, 2).map((e) => (
+                      <button
+                        key={e.id}
+                        type="button"
+                        className={`cal-chip is-${e.status} ${focusId === e.id ? 'is-focus' : ''}`}
+                        title={`${e.number} · ${e.customer?.full_name || ''} · ${statusLabel[e.status] || e.status}`}
+                        onClick={() => pickDay(day, e.id)}
+                      >
+                        <span className="cal-chip__text">{shortLabel(e)}</span>
+                      </button>
                     ))}
-                  </span>
-                </button>
+                    {extra > 0 ? (
+                      <button type="button" className="cal-chip is-more" onClick={() => pickDay(day)}>
+                        +{extra}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
               )
             })}
           </div>
@@ -170,18 +202,33 @@ export function CalendarPage() {
           <h2>{dayFormatter.format(selected)}</h2>
           <span>{selectedEvents.length} حجز</span>
         </div>
-        {!loading && selectedEvents.length === 0 ? <EmptyState title="لا حجوزات في هذا اليوم" /> : null}
-        {selectedEvents.map((b) => (
-          <article key={b.id} className="cal-event">
+
+        {focused ? (
+          <article className="cal-event is-featured">
             <div className="cal-event__top">
-              <strong>{b.number}</strong>
-              <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />
+              <strong>{focused.number}</strong>
+              <StatusPill status={focused.status} label={statusLabel[focused.status] || focused.status} />
             </div>
-            <p>{b.customer?.full_name}</p>
-            <p className="muted">{b.vehicle?.brand} {b.vehicle?.model} · {b.vehicle?.plate}</p>
-            <p className="muted">{formatDateTime(b.starts_at)} → {formatDateTime(b.planned_ends_at)}</p>
+            <p>{focused.customer?.full_name}</p>
+            <p className="muted">{focused.vehicle?.brand} {focused.vehicle?.model} · {focused.vehicle?.plate}</p>
+            <p className="muted">{formatDateTime(focused.starts_at)} → {formatDateTime(focused.planned_ends_at)}</p>
           </article>
-        ))}
+        ) : null}
+
+        {!loading && selectedEvents.length === 0 ? <EmptyState title="لا حجوزات في هذا اليوم" /> : null}
+        {selectedEvents
+          .filter((b) => b.id !== focusId)
+          .map((b) => (
+            <button key={b.id} type="button" className="cal-event" onClick={() => setFocusId(b.id)}>
+              <div className="cal-event__top">
+                <strong>{b.number}</strong>
+                <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />
+              </div>
+              <p>{b.customer?.full_name}</p>
+              <p className="muted">{b.vehicle?.brand} {b.vehicle?.model} · {b.vehicle?.plate}</p>
+              <p className="muted">{formatDateTime(b.starts_at)} → {formatDateTime(b.planned_ends_at)}</p>
+            </button>
+          ))}
       </section>
     </div>
   )

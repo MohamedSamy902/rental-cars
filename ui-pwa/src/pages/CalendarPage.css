@@ -56,12 +56,13 @@
   border-radius: 18px;
   padding: 0.75rem;
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .cal-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.25rem;
+  gap: 0.3rem;
   margin-bottom: 0.35rem;
 }
 
@@ -76,26 +77,24 @@
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 
 .cal-cell {
-  aspect-ratio: 1;
-  min-height: 0;
+  min-height: 92px;
   display: grid;
-  grid-template-rows: auto 1fr;
-  justify-items: center;
-  gap: 0.15rem;
-  padding: 0.3rem 0.15rem 0.35rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 0.2rem;
+  padding: 0.3rem;
   border-radius: 12px;
-  background: transparent;
-  color: var(--text);
+  background: var(--surface-2);
   border: 1px solid transparent;
+  min-width: 0;
 }
 
 .cal-cell.is-muted {
-  color: var(--text-faint, var(--text-muted));
-  opacity: 0.55;
+  opacity: 0.45;
 }
 
 .cal-cell.is-today {
@@ -104,23 +103,73 @@
 }
 
 .cal-cell.is-selected {
-  background: color-mix(in srgb, var(--brand) 18%, var(--surface));
   border-color: color-mix(in srgb, var(--brand) 45%, transparent);
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface));
+}
+
+.cal-cell.has-events {
+  background: color-mix(in srgb, var(--surface) 70%, var(--surface-2));
+}
+
+.cal-cell__daybtn {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 0;
+  min-height: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
 }
 
 .cal-cell__num {
   font-weight: 800;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   line-height: 1.2;
 }
 
-.cal-cell__dots {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 3px;
-  min-height: 8px;
+.cal-cell__events {
+  display: grid;
+  gap: 0.18rem;
   align-content: start;
+  min-width: 0;
+  width: 100%;
+}
+
+.cal-chip {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0.18rem 0.28rem;
+  border-radius: 7px;
+  border: 0;
+  text-align: start;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #fff;
+  background: var(--brand);
+}
+
+.cal-chip__text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-chip.is-active { background: var(--success, #16a34a); }
+.cal-chip.is-approved { background: var(--brand); }
+.cal-chip.is-pending { background: var(--warning, #d97706); color: #1a1208; }
+.cal-chip.is-more {
+  background: var(--surface);
+  color: var(--text-muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  text-align: center;
+}
+.cal-chip.is-focus {
+  outline: 2px solid color-mix(in srgb, #fff 55%, transparent);
+  outline-offset: 1px;
 }
 
 .cal-dot {
@@ -128,6 +177,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--brand);
+  display: inline-block;
 }
 
 .cal-dot.is-active { background: var(--success, #16a34a); }
@@ -181,6 +231,12 @@
   border: 1px solid var(--border);
   text-align: start;
   width: 100%;
+  color: inherit;
+}
+
+.cal-event.is-featured {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--border));
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
 .cal-event__top {
@@ -190,25 +246,58 @@
   gap: 0.65rem;
 }
 
+@media (min-width: 981px) {
+  .cal-cell {
+    min-height: 118px;
+    padding: 0.4rem;
+  }
+
+  .cal-chip {
+    font-size: 0.7rem;
+    padding: 0.22rem 0.35rem;
+  }
+}
+
 @media (max-width: 980px) {
   .cal-board {
-    padding: 0.55rem;
+    padding: 0.45rem;
     border-radius: 16px;
     box-shadow: none;
   }
 
+  .cal-grid {
+    gap: 0.22rem;
+  }
+
   .cal-cell {
+    min-height: 78px;
     border-radius: 10px;
-    padding: 0.25rem 0.1rem 0.3rem;
+    padding: 0.22rem;
   }
 
   .cal-cell__num {
-    font-size: 0.8rem;
+    font-size: 0.74rem;
+  }
+
+  .cal-chip {
+    font-size: 0.58rem;
+    border-radius: 6px;
+    padding: 0.14rem 0.22rem;
   }
 
   .cal-nav {
     width: 40px;
     height: 40px;
     border-radius: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .cal-cell {
+    min-height: 72px;
+  }
+
+  .cal-chip__text {
+    letter-spacing: -0.01em;
   }
 }
