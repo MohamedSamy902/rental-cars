@@ -9,8 +9,8 @@
 }
 
 @keyframes rpm-sheet-in-desktop {
-  from { transform: translateX(var(--sheet-enter, 100%)); opacity: 0.85; }
-  to { transform: translateX(0); opacity: 1; }
+  from { transform: translateY(12px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 .rpm-sheet-root {
@@ -119,27 +119,19 @@
 
 @media (min-width: 900px) {
   .rpm-sheet-root {
-    align-items: stretch;
-    justify-items: start; /* RTL: from the right (nav side), above the rail */
+    align-items: center;
+    justify-items: center;
+    padding: 1.5rem;
   }
 
   .rpm-sheet {
-    --sheet-enter: -28px; /* LTR: docked inline-start (left) */
-    width: min(520px, calc(100vw - 2rem));
-    height: 100dvh;
-    max-height: none;
+    width: min(560px, calc(100vw - 3rem));
+    max-height: min(88dvh, 840px);
+    height: auto;
     margin: 0;
-    border-start-end-radius: 22px;
-    border-end-end-radius: 22px;
-    border-start-start-radius: 0;
-    border-end-start-radius: 0;
-    box-shadow: 18px 0 48px rgb(15 23 42 / 18%);
-    animation: rpm-sheet-in-desktop 280ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
-  }
-
-  [dir='rtl'] .rpm-sheet {
-    --sheet-enter: 28px; /* RTL: docked inline-start (right) */
-    box-shadow: -18px 0 48px rgb(15 23 42 / 18%);
+    border-radius: 22px;
+    box-shadow: 0 28px 64px rgb(15 23 42 / 22%);
+    animation: rpm-sheet-in-desktop 260ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
   }
 
   .rpm-sheet__handle {
@@ -148,5 +140,6 @@
 
   .rpm-sheet__foot {
     padding-bottom: 1.1rem;
+    border-radius: 0 0 22px 22px;
   }
 }
