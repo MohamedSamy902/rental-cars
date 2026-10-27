@@ -63,15 +63,15 @@ export function AppShell() {
       <aside className="rpm-shell__side" aria-label="التنقّل الرئيسي">
         <div className="rpm-shell__brand">
           <div className="rpm-shell__logo-mark" aria-hidden>
-            <IconCar size={20} />
+            <IconCar size={18} />
           </div>
-          <div>
+          <div className="rpm-shell__brand-text">
             <span className="rpm-shell__logo">RPM</span>
             <span className="rpm-shell__tag">إدارة التأجير</span>
           </div>
         </div>
 
-        <nav className="rpm-shell__nav">
+        <nav className="rpm-shell__nav rpm-scroll">
           {groups.map((group) => (
             <div key={group.title} className="rpm-shell__group">
               <div className="rpm-shell__group-title">{group.title}</div>
@@ -83,7 +83,7 @@ export function AppShell() {
                   className={({ isActive }) => `rpm-shell__link ${isActive ? 'is-active' : ''}`}
                 >
                   <span className="rpm-shell__link-icon">{item.icon}</span>
-                  {item.label}
+                  <span className="rpm-shell__link-label">{item.label}</span>
                 </NavLink>
               ))}
             </div>
@@ -91,13 +91,16 @@ export function AppShell() {
         </nav>
 
         <div className="rpm-shell__user">
-          <div>
+          <div className="rpm-shell__avatar" aria-hidden>
+            {(user?.name || 'م').trim().charAt(0)}
+          </div>
+          <div className="rpm-shell__user-meta">
             <strong>{user?.name}</strong>
             <span>{user?.role || 'مستخدم'}</span>
           </div>
           <button
             type="button"
-            className="rpm-shell__icon-btn"
+            className="rpm-shell__icon-btn rpm-shell__icon-btn--ghost"
             aria-label="تسجيل الخروج"
             onClick={async () => {
               await logout()
@@ -112,16 +115,28 @@ export function AppShell() {
       <div className="rpm-shell__main">
         <header className="rpm-shell__top">
           <div className="rpm-shell__top-brand">
-            <strong>RPM</strong>
-            <span>مركز التأجير</span>
+            <div className="rpm-shell__logo-mark rpm-shell__logo-mark--sm" aria-hidden>
+              <IconCar size={16} />
+            </div>
+            <div>
+              <strong>RPM</strong>
+              <span>مركز التأجير</span>
+            </div>
           </div>
           <label className="rpm-shell__search">
             <IconSearch size={16} />
             <input type="search" placeholder="بحث سريع في العقود والسيارات والعملاء…" />
+            <kbd className="rpm-shell__kbd">⌘K</kbd>
           </label>
           <div className="rpm-shell__top-actions">
-            <button type="button" className="rpm-shell__icon-btn" aria-label="إشعارات" onClick={() => navigate('/notifications')}>
+            <button
+              type="button"
+              className="rpm-shell__icon-btn"
+              aria-label="إشعارات"
+              onClick={() => navigate('/notifications')}
+            >
               <IconBell size={18} />
+              <span className="rpm-shell__dot" aria-hidden />
             </button>
           </div>
         </header>
