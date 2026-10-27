@@ -28,7 +28,7 @@ export function Sheet({ open, title, onClose, children, footer }: Props) {
 
   return (
     <div className="rpm-sheet-root" role="presentation">
-      <button className="rpm-sheet-backdrop" aria-label="إغلاق" onClick={onClose} type="button" />
+      <button className="rpm-sheet-backdrop" aria-label="إغلاق اللوحة" onClick={onClose} type="button" />
       <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby="rpm-sheet-title">
         <header className="rpm-sheet__head">
           <h2 id="rpm-sheet-title">{title}</h2>
