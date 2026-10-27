@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Contract;
 use App\Services\Contracts\ContractLifecycleService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +15,7 @@ class ContractController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = Contract::query()->with(['customer', 'vehicle'])->latest('id');
+        $q = Contract::query()->with(['customer', 'vehicle', 'deposit'])->latest('id');
         if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);
         }
@@ -40,6 +41,7 @@ class ContractController extends Controller
                 'approved' => Contract::query()->where('status', 'approved')->count(),
                 'active' => Contract::query()->where('status', 'active')->count(),
                 'completed' => Contract::query()->where('status', 'completed')->count(),
+                'cancelled' => Contract::query()->where('status', 'cancelled')->count(),
             ],
         ]);
     }
@@ -71,19 +73,27 @@ class ContractController extends Controller
             'planned_ends_at' => 'وقت النهاية المخطط',
         ]);
 
-        $contract = $this->lifecycle->create($data, $request->user()?->id);
+        try {
+            $contract = $this->lifecycle->create($data, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['data' => $contract, 'message' => 'تم إنشاء العقد.'], 201);
     }
 
     public function show(Contract $contract): JsonResponse
     {
-        return response()->json(['data' => $contract->load(['customer', 'vehicle', 'deposit', 'inspections'])]);
+        return response()->json(['data' => $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections'])]);
     }
 
     public function approve(Request $request, Contract $contract): JsonResponse
     {
-        $contract = $this->lifecycle->approve($contract, $request->user()?->id);
+        try {
+            $contract = $this->lifecycle->approve($contract, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['data' => $contract, 'message' => 'تم اعتماد العقد وتثبيت الأسعار.']);
     }
@@ -94,7 +104,11 @@ class ContractController extends Controller
             'odometer_out' => ['required', 'integer', 'min:0'],
         ], [], ['odometer_out' => 'عداد الخروج']);
 
-        $contract = $this->lifecycle->activateOnHandover($contract, (int) $data['odometer_out'], $request->user()?->id);
+        try {
+            $contract = $this->lifecycle->activateOnHandover($contract, (int) $data['odometer_out'], $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['data' => $contract, 'message' => 'تم التسليم وتفعيل العقد.']);
     }
@@ -104,16 +118,143 @@ class ContractController extends Controller
         $data = $request->validate([
             'odometer_in' => ['required', 'integer', 'min:0'],
             'returned_at' => ['nullable', 'date'],
+            'damage_fee' => ['nullable', 'integer', 'min:0'],
         ], [], ['odometer_in' => 'عداد العودة']);
 
         $returnedAt = isset($data['returned_at']) ? new \DateTimeImmutable($data['returned_at']) : null;
-        $contract = $this->lifecycle->completeOnReturn(
-            $contract,
-            (int) $data['odometer_in'],
-            $returnedAt,
-            $request->user()?->id,
-        );
+
+        try {
+            $contract = $this->lifecycle->completeOnReturn(
+                $contract,
+                (int) $data['odometer_in'],
+                $returnedAt,
+                $request->user()?->id,
+                (int) ($data['damage_fee'] ?? 0),
+            );
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['data' => $contract, 'message' => 'تم الاستلام وإقفال الإجمالي.']);
+    }
+
+    public function cancel(Request $request, Contract $contract): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3'],
+        ], [], ['reason' => 'سبب الإلغاء']);
+
+        try {
+            $contract = $this->lifecycle->cancel($contract, $data['reason'], $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $contract, 'message' => 'تم إلغاء العقد.']);
+    }
+
+    public function extend(Request $request, Contract $contract): JsonResponse
+    {
+        $data = $request->validate([
+            'planned_ends_at' => ['required', 'date'],
+            'starts_at' => ['nullable', 'date'],
+        ], [], ['planned_ends_at' => 'نهاية التمديد']);
+
+        try {
+            $created = $this->lifecycle->extend($contract, $data, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $created, 'message' => 'تم إنشاء عقد التمديد.'], 201);
+    }
+
+    public function swap(Request $request, Contract $contract): JsonResponse
+    {
+        $data = $request->validate([
+            'replacement_vehicle_id' => ['required', 'exists:vehicles,id'],
+            'odometer_in' => ['required', 'integer', 'min:0'],
+            'odometer_out' => ['required', 'integer', 'min:0'],
+            'planned_ends_at' => ['nullable', 'date'],
+            'damage_fee' => ['nullable', 'integer', 'min:0'],
+        ], [], [
+            'replacement_vehicle_id' => 'السيارة البديلة',
+            'odometer_in' => 'عداد السيارة القديمة',
+            'odometer_out' => 'عداد السيارة البديلة',
+        ]);
+
+        try {
+            $result = $this->lifecycle->swapDueToFault($contract, $data, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => $result,
+            'message' => 'تم التبديل بسبب عطل: أُغلق العقد القديم وأنشئ عقد جديد.',
+        ]);
+    }
+
+    public function receiveDeposit(Request $request, Contract $contract): JsonResponse
+    {
+        $data = $request->validate([
+            'amount' => ['nullable', 'integer', 'min:1'],
+            'method' => ['required', 'string'],
+            'receipt_number' => ['required', 'string'],
+            'collection_ref' => ['nullable', 'string'],
+        ], [], [
+            'method' => 'طريقة التحصيل',
+            'receipt_number' => 'رقم الإيصال',
+        ]);
+
+        try {
+            $deposit = $this->lifecycle->receiveDeposit($contract, $data, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $deposit, 'message' => 'تم قبض التأمين النقدي.'], 201);
+    }
+
+    public function deductDeposit(Request $request, Contract $contract): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string'],
+            'amount' => ['required', 'integer', 'min:1'],
+        ], [], ['reason' => 'سبب الخصم', 'amount' => 'المبلغ']);
+
+        $deposit = $contract->deposit;
+        if (! $deposit) {
+            return response()->json(['message' => 'لا يوجد تأمين نقدي على العقد.'], 422);
+        }
+
+        try {
+            $deposit = $this->lifecycle->deductDeposit($deposit, $data, (int) $request->user()->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $deposit, 'message' => 'تم خصم المبلغ من التأمين.']);
+    }
+
+    public function returnDeposit(Request $request, Contract $contract): JsonResponse
+    {
+        $data = $request->validate([
+            'method' => ['required', 'string'],
+            'receipt_number' => ['required', 'string'],
+        ], [], ['method' => 'طريقة الرد', 'receipt_number' => 'رقم إيصال الرد']);
+
+        $deposit = $contract->deposit;
+        if (! $deposit) {
+            return response()->json(['message' => 'لا يوجد تأمين نقدي على العقد.'], 422);
+        }
+
+        try {
+            $deposit = $this->lifecycle->returnDeposit($deposit, $data['method'], $data['receipt_number'], $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $deposit, 'message' => 'تم رد متبقي التأمين النقدي.']);
     }
 }

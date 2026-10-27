@@ -306,6 +306,13 @@
   gap: 0.75rem;
 }
 
+.rpm-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
 .rpm-card__meta {
   display: flex;
   justify-content: space-between;

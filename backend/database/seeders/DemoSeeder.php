@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleAccessory;
 use App\Models\WorkOrder;
+use App\Services\Accounting\AccountingService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -65,8 +66,11 @@ class DemoSeeder extends Seeder
                 'default_daily_km' => 200,
                 'excess_km_rate' => 5,
                 'currency' => 'EGP',
+                'block_expired_license' => true,
             ],
         ]);
+
+        app(AccountingService::class)->ensureChartOfAccounts();
 
         $vehicles = [
             ['code' => 'C-101', 'plate' => 'أ ب ج 1234', 'brand' => 'هيونداي', 'model' => 'إلنترا', 'year' => 2023, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين', 'odometer' => 41200, 'daily_rate' => 900, 'default_deposit' => 3000, 'rental_priority' => 80],
