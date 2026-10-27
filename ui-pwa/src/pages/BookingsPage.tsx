@@ -92,8 +92,10 @@ export function BookingsPage() {
     return () => window.clearTimeout(t)
   }, [search, chip])
 
-  async function openSheet() {
-    setOpen(true)
+  const wantNew = searchParams.get('new') === '1'
+  const sheetOpen = open || wantNew
+
+  async function loadLookups() {
     const [c, v] = await Promise.all([
       api<{ data: Customer[] }>('/customers?per_page=100'),
       api<{ data: Vehicle[] }>('/vehicles?per_page=100'),
@@ -102,14 +104,24 @@ export function BookingsPage() {
     setVehicles(v.data)
   }
 
-  useEffect(() => {
-    if (searchParams.get('new') !== '1') return
-    void openSheet()
+  async function openSheet() {
+    setOpen(true)
+    await loadLookups()
+  }
+
+  function closeSheet() {
+    setOpen(false)
+    if (!wantNew) return
     const next = new URLSearchParams(searchParams)
     next.delete('new')
     setSearchParams(next, { replace: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once when ?new=1 arrives
-  }, [searchParams])
+  }
+
+  // Keep ?new=1 until the sheet closes so StrictMode remounts still see the intent.
+  useEffect(() => {
+    if (!wantNew) return
+    void loadLookups()
+  }, [wantNew])
 
   async function openAction(kind: ActionKind, contract: Contract) {
     setSelected(contract)
@@ -163,7 +175,7 @@ export function BookingsPage() {
         },
       })
       toast.success('تم إنشاء العقد.')
-      setOpen(false)
+      closeSheet()
       await load()
     } catch (e) {
       const err = e as ApiError
@@ -330,13 +342,13 @@ export function BookingsPage() {
       ) : null}
 
       <Sheet
-        open={open}
+        open={sheetOpen}
         title="إضافة حجز / عقد"
-        onClose={() => setOpen(false)}
+        onClose={closeSheet}
         footer={
           <>
             <Button loading={saving} onClick={onSave}>حفظ</Button>
-            <Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button>
+            <Button variant="secondary" onClick={closeSheet}>إلغاء</Button>
           </>
         }
       >

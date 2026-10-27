@@ -38,9 +38,15 @@
 .shell-rail__brand-row {
   width: 100%;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.15rem 0.25rem;
+}
+.shell.is-expanded .shell-rail__brand-row {
+  flex-direction: row;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.15rem 0.25rem;
 }
 
 .shell-rail__brand {
@@ -212,7 +218,7 @@
   min-width: 0;
   min-height: 100dvh;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
 }
 
 /* Floating navbar bar */
