@@ -1,25 +1,38 @@
 :root {
-  /* RPM design tokens — defaults; tenant overrides from integrator panel later */
+  /* RPM design tokens — Ostolak dense + Keynetic; tenant overrides later */
   --nav: #0b1220;
+  --nav-elevated: #111827;
   --bg: #f1f5f9;
+  --bg-soft: #e8eef5;
   --surface: #ffffff;
   --text: #0f172a;
   --text-muted: #64748b;
   --brand: #0d9488;
   --brand-hover: #0f766e;
+  --brand-soft: color-mix(in srgb, var(--brand) 14%, white);
   --success: #059669;
   --warning: #d97706;
   --danger: #dc2626;
+  --info: #0284c7;
   --border: #e2e8f0;
-  --radius: 10px;
+  --border-strong: #cbd5e1;
+  --radius: 12px;
   --radius-sm: 8px;
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 5%);
+  --shadow-md: 0 8px 24px rgb(15 23 42 / 7%);
+  --shadow-sheet: -12px 0 40px rgb(15 23 42 / 16%);
   --font-display: 'Cairo', 'IBM Plex Sans Arabic', sans-serif;
   --font-body: 'IBM Plex Sans Arabic', 'Cairo', sans-serif;
-  --shell-nav-width: 248px;
+  --shell-nav-width: 268px;
   --bottom-nav-height: 64px;
-  --motion: 200ms;
+  --topbar-height: 64px;
+  --motion: 220ms;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --scroll-size: 8px;
+  --scroll-thumb: #94a3b8;
+  --scroll-thumb-hover: #64748b;
+  --scroll-track: transparent;
   color-scheme: light;
 }
 

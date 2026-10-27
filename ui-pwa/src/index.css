@@ -9,6 +9,8 @@
 html {
   direction: rtl;
   -webkit-text-size-adjust: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 body {
@@ -18,7 +20,9 @@ body {
   font-size: 15px;
   line-height: 1.55;
   color: var(--text);
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 480px at 100% -10%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 55%),
+    var(--bg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -69,6 +73,45 @@ img {
   background: color-mix(in srgb, var(--brand) 28%, white);
 }
 
+/* Thin modern scrollbar — Firefox + WebKit */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+*::-webkit-scrollbar {
+  width: var(--scroll-size);
+  height: var(--scroll-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--scroll-thumb) 85%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.rpm-scroll {
+  scrollbar-gutter: stable;
+}
+
+.rpm-shell__nav,
+.rpm-shell__side {
+  --scroll-thumb: rgb(148 163 184 / 55%);
+  --scroll-thumb-hover: rgb(226 232 240 / 70%);
+  --scroll-track: transparent;
+}
+
 @keyframes rpm-fade-up {
   from {
     opacity: 0;
@@ -83,11 +126,24 @@ img {
 @keyframes rpm-sheet-in {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateX(-18px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 899px) {
+  @keyframes rpm-sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 
@@ -97,6 +153,22 @@ img {
   }
   100% {
     background-position: -100% 0;
+  }
+}
+
+@keyframes rpm-ring-draw {
+  from {
+    stroke-dashoffset: 220;
+  }
+}
+
+@keyframes rpm-pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
   }
 }
 

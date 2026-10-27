@@ -67,3 +67,15 @@ export const IconLogout = (p: Props) => (
 export const IconQueue = (p: Props) => (
   <Svg {...p}><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="18" cy="15" r="3" /></Svg>
 )
+export const IconX = (p: Props) => (
+  <Svg {...p}><path d="M18 6 6 18M6 6l12 12" /></Svg>
+)
+export const IconArrowLeft = (p: Props) => (
+  <Svg {...p}><path d="M19 12H5M12 19l-7-7 7-7" /></Svg>
+)
+export const IconCheck = (p: Props) => (
+  <Svg {...p}><path d="M20 6 9 17l-5-5" /></Svg>
+)
+export const IconSpark = (p: Props) => (
+  <Svg {...p}><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" /></Svg>
+)

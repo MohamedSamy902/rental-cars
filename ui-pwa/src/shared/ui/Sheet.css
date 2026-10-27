@@ -9,7 +9,7 @@
 .rpm-sheet-backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(15 23 42 / 45%);
+  background: rgb(11 18 32 / 48%);
   border: 0;
   cursor: pointer;
   animation: rpm-fade-up calc(var(--motion) * 0.8) var(--ease);
@@ -25,7 +25,8 @@
   border-radius: 16px 16px 0 0;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 -12px 40px rgb(15 23 42 / 18%);
+  min-height: 0;
+  box-shadow: var(--shadow-sheet);
   animation: rpm-sheet-in var(--motion) var(--ease);
 }
 
@@ -44,31 +45,69 @@
   }
 }
 
+.rpm-sheet__close {
+  position: absolute;
+  top: 0.85rem;
+  inset-inline-end: 0.85rem;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  transition:
+    background-color var(--motion) var(--ease),
+    color var(--motion) var(--ease),
+    border-color var(--motion) var(--ease),
+    transform var(--motion) var(--ease);
+}
+
+.rpm-sheet__close:hover {
+  background: #fff;
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  color: var(--danger);
+  transform: scale(1.04);
+}
+
 .rpm-sheet__head {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.1rem;
+  padding: 1.05rem 1.15rem;
+  padding-inline-end: 3.4rem;
   border-bottom: 1px solid var(--border);
 }
 
 .rpm-sheet__head h2 {
-  font-size: 1.15rem;
+  font-size: 1.12rem;
+  line-height: 1.35;
+  padding-inline-end: 0.25rem;
 }
 
 .rpm-sheet__body {
-  padding: 1.1rem;
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 1.1rem 1.15rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
   gap: 0.9rem;
+  align-content: start;
+  -webkit-overflow-scrolling: touch;
 }
 
 .rpm-sheet__foot {
-  padding: 0.9rem 1.1rem calc(0.9rem + env(safe-area-inset-bottom));
+  flex-shrink: 0;
+  padding: 0.9rem 1.15rem calc(0.9rem + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
   display: flex;
   gap: 0.65rem;
   justify-content: flex-start;
   flex-wrap: wrap;
+  background: color-mix(in srgb, var(--bg) 55%, white);
 }

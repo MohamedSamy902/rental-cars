@@ -15,6 +15,7 @@ import { NotificationsPage } from '@/pages/NotificationsPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { AccountsPage } from '@/pages/AccountsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { StyleGuidePage } from '@/pages/StyleGuidePage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -31,6 +32,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/style-guide" element={<StyleGuidePage />} />
             <Route
               element={
                 <Protected>
