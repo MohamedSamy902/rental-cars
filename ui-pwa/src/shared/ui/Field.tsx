@@ -1,5 +1,7 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 import './Field.css'
+
+export { SelectField } from './SelectField'
 
 type FieldShellProps = {
   label: string
@@ -62,40 +64,6 @@ export function TextAreaField({ label, error, hint, required, id, className = ''
   return (
     <FieldShell label={label} required={required} error={error} hint={hint} htmlFor={fieldId}>
       <textarea id={fieldId} className={`rpm-input rpm-textarea ${className}`.trim()} required={required} {...rest} />
-    </FieldShell>
-  )
-}
-
-type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
-  label: string
-  error?: string
-  hint?: string
-  options: { value: string; label: string }[]
-  placeholder?: string
-}
-
-export function SelectField({
-  label,
-  error,
-  hint,
-  required,
-  id,
-  options,
-  placeholder = 'اختر…',
-  className = '',
-  ...rest
-}: SelectProps) {
-  const fieldId = id ?? rest.name
-  return (
-    <FieldShell label={label} required={required} error={error} hint={hint} htmlFor={fieldId}>
-      <select id={fieldId} className={`rpm-input rpm-select ${className}`.trim()} required={required} {...rest}>
-        <option value="">{placeholder}</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
     </FieldShell>
   )
 }

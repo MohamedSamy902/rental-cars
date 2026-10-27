@@ -1,4 +1,5 @@
 .rpm-field {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -56,24 +57,6 @@
 .rpm-textarea {
   min-height: 96px;
   resize: vertical;
-}
-
-.rpm-select {
-  appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
-    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
-  background-position:
-    calc(100% - 1.15rem) calc(50% - 3px),
-    calc(100% - 0.75rem) calc(50% - 3px);
-  background-size: 6px 6px, 6px 6px;
-  background-repeat: no-repeat;
-  padding-inline-end: 2.1rem;
-}
-
-[dir='rtl'] .rpm-select {
-  background-position:
-    0.75rem calc(50% - 3px),
-    1.15rem calc(50% - 3px);
 }
 
 .rpm-switch {
