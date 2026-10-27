@@ -1,6 +1,14 @@
 .dash {
   display: grid;
   gap: 1rem;
+  /* allow hero to bleed to stage edges */
+  margin-inline: calc(-1 * clamp(0.9rem, 2vw, 1.35rem));
+  margin-block-start: calc(-1 * 1.1rem);
+}
+
+.dash-strip,
+.dash-grid {
+  margin-inline: clamp(0.9rem, 2vw, 1.35rem);
 }
 
 /* ========== HERO — full-bleed photographic plane ========== */
@@ -8,10 +16,9 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: clamp(340px, 52vh, 520px);
-  border-radius: clamp(20px, 2.5vw, 32px);
+  min-height: clamp(380px, 58vh, 560px);
+  border-radius: 0;
   color: #f8fafc;
-  box-shadow: 0 28px 60px rgb(10 15 26 / 18%);
 }
 
 .dash-hero__photo {
@@ -19,9 +26,15 @@
   inset: 0;
   z-index: 0;
   background:
-    linear-gradient(105deg, rgb(6 10 18 / 88%) 0%, rgb(6 10 18 / 55%) 42%, rgb(6 10 18 / 28%) 100%),
-    url('/hero-fleet.jpg') center / cover no-repeat;
-  transform: scale(1.02);
+    linear-gradient(
+      100deg,
+      rgb(6 10 18 / 78%) 0%,
+      rgb(6 10 18 / 42%) 38%,
+      rgb(6 10 18 / 18%) 62%,
+      rgb(6 10 18 / 35%) 100%
+    ),
+    url('/hero-fleet.jpg') 30% center / cover no-repeat;
+  transform: scale(1.04);
 }
 
 .dash-hero__grain {
@@ -520,7 +533,9 @@
 
 @media (max-width: 520px) {
   .dash-hero {
-    min-height: 70dvh;
+    min-height: 72dvh;
+    border-end-start-radius: 28px;
+    border-end-end-radius: 28px;
   }
 
   .dash-hero__foot {
