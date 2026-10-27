@@ -289,28 +289,28 @@ export function BookingsPage() {
               <div className="rpm-card__actions">
                 {b.status === 'pending' ? (
                   <>
-                    <Button size="sm" onClick={() => approve(b.id)}>اعتماد</Button>
-                    <Button size="sm" variant="secondary" onClick={() => openAction('cancel', b)}>إلغاء</Button>
+                    <Button type="button" size="sm" onClick={() => void approve(b.id)}>اعتماد</Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
                   </>
                 ) : null}
                 {b.status === 'approved' ? (
                   <>
-                    <Button size="sm" onClick={() => openAction('handover', b)}>تسليم</Button>
-                    {!b.deposit ? <Button size="sm" variant="secondary" onClick={() => openAction('deposit', b)}>قبض تأمين</Button> : null}
-                    <Button size="sm" variant="secondary" onClick={() => openAction('cancel', b)}>إلغاء</Button>
-                    <Button size="sm" variant="secondary" onClick={() => openAction('extend', b)}>تمديد</Button>
+                    <Button type="button" size="sm" onClick={() => void openAction('handover', b)}>تسليم</Button>
+                    {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
                   </>
                 ) : null}
                 {b.status === 'active' ? (
                   <>
-                    <Button size="sm" onClick={() => openAction('return', b)}>استلام</Button>
-                    {!b.deposit ? <Button size="sm" variant="secondary" onClick={() => openAction('deposit', b)}>قبض تأمين</Button> : null}
-                    <Button size="sm" variant="secondary" onClick={() => openAction('extend', b)}>تمديد</Button>
-                    <Button size="sm" variant="secondary" onClick={() => openAction('swap', b)}>تبديل عطل</Button>
+                    <Button type="button" size="sm" onClick={() => void openAction('return', b)}>استلام</Button>
+                    {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('swap', b)}>تبديل عطل</Button>
                   </>
                 ) : null}
                 {b.status === 'completed' ? (
-                  <Button size="sm" variant="secondary" onClick={() => openAction('extend', b)}>تمديد</Button>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
                 ) : null}
               </div>
             </article>
