@@ -251,7 +251,9 @@ export function AppShell() {
                 ) : null}
               </button>
               <button type="button" className="shell-cta shell-cta--desk" onClick={() => navigate('/bookings?new=1')}>
-                <IconPlus size={16} />
+                <span className="shell-cta__icon" aria-hidden>
+                  <IconPlus size={16} />
+                </span>
                 <span>عقد جديد</span>
               </button>
               <div className="shell-user shell-user--desk">

@@ -343,33 +343,29 @@
 .shell-icon--mobile { display: none; }
 
 .shell-cta {
-  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   min-height: 2.25rem;
   padding: 0.5rem 1rem;
-  padding-inline-start: 1.15rem;
   border-radius: 0.5rem;
   background: #18181b;
   color: #fff;
-  border: 1px solid rgb(255 255 255 / 10%);
+  border: none;
+  box-shadow: none;
   font-family: var(--font-body);
   font-weight: 500;
   font-size: 0.875rem;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 10%),
-    0 1px 2px rgb(24 24 27 / 12%);
-  transition: background 150ms ease, transform 150ms ease;
+  transition: background-color 150ms ease, transform 150ms ease;
 }
-.shell-cta::before {
-  content: '';
-  position: absolute;
-  inset-block: 0.35rem;
-  inset-inline-start: 0.35rem;
-  width: 0.2rem;
-  border-radius: 999px;
-  background: #dc2626;
+.shell-cta__icon {
+  display: inline-flex;
+  color: #dc2626;
+  flex-shrink: 0;
+}
+.shell-cta__icon svg {
+  width: 1rem;
+  height: 1rem;
 }
 .shell-cta:hover {
   background: #27272a;

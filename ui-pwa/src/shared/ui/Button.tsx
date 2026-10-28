@@ -19,7 +19,7 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   iconStart?: ReactNode
   /** Trailing icon */
   iconEnd?: ReactNode
-  /** Thin crimson brand mark on the inline-start edge (use with primary) */
+  /** Color the leading icon crimson (use with primary — chrome stays zinc) */
   brandMark?: boolean
   children: ReactNode
 }

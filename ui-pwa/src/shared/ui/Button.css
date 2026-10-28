@@ -86,14 +86,12 @@
   border-radius: 0.625rem;
 }
 
-/* Primary — solid zinc */
+/* Primary — solid zinc, clean (no red outline) */
 .rpm-btn--primary {
   background: #18181b;
   color: #fff;
-  border-color: rgb(255 255 255 / 10%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 10%),
-    0 1px 2px rgb(24 24 27 / 12%);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .rpm-btn--primary:hover:not(:disabled) {
@@ -104,21 +102,9 @@
   outline-color: #18181b;
 }
 
-/* Elegant crimson brand indicator (not a full red/destructive fill) */
-.rpm-btn--brand-mark::before {
-  content: '';
-  position: absolute;
-  inset-block: 0.35rem;
-  inset-inline-start: 0.35rem;
-  width: 0.2rem;
-  border-radius: 999px;
-  background: #dc2626;
-  box-shadow: 0 0 0 1px rgb(220 38 38 / 25%);
-  pointer-events: none;
-}
-
-.rpm-btn--brand-mark {
-  padding-inline-start: 1.15rem;
+/* Brand accent lives on the leading icon only — not the button chrome */
+.rpm-btn--brand-mark .rpm-btn__icon {
+  color: #dc2626;
 }
 
 /* Secondary / outline */

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Area,
@@ -23,14 +23,12 @@ import {
 } from '@/shared/lib/format'
 import { AnimatedNumber } from '@/shared/ui/AnimatedNumber'
 import { Badge, type BadgeTone } from '@/shared/ui/Badge'
-import { Button } from '@/shared/ui/Button'
 import { Card, CardContent, CardHeader } from '@/shared/ui/Card'
 import { ErrorState, SkeletonBlock } from '@/shared/ui'
 import {
   IconCar,
   IconClipboard,
   IconMore,
-  IconPlus,
   IconReturn,
   IconTrend,
   IconUsers,
@@ -160,7 +158,6 @@ function CardMenuButton({ label }: { label: string }) {
 
 export function DashboardPage() {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [data, setData] = useState<Dash | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -346,15 +343,6 @@ export function DashboardPage() {
             مركبة ترجع اليوم.
           </p>
         </div>
-        <Button
-          variant="primary"
-          brandMark
-          size="md"
-          iconStart={<IconPlus size={16} />}
-          onClick={() => navigate('/bookings?new=1')}
-        >
-          عقد جديد
-        </Button>
       </motion.header>
 
       <section className="db-kpis" aria-label="مؤشرات سريعة">
