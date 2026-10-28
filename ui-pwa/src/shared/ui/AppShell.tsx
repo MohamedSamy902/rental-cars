@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
+import { BrandLogo } from './BrandLogo'
 import { CommandPalette } from './CommandPalette'
+import { useSheetDrag } from './useSheetDrag'
 import {
   IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconChevron,
   IconClipboard, IconHome, IconLogout, IconMenu, IconMoon, IconPlus, IconQueue,
   IconSearch, IconSettings, IconShield, IconSun, IconUsers, IconWallet, IconWrench,
 } from './Icons'
+import './Button.css'
 import './AppShell.css'
 
 type NavItem = {
@@ -108,6 +111,18 @@ export function AppShell() {
     setDrawer(false)
   }, [location.pathname])
 
+  const closeDrawer = useCallback(() => setDrawer(false), [])
+  const { startDrag: startDrawerDrag, dragProps: drawerDragProps } = useSheetDrag(closeDrawer, true)
+
+  useEffect(() => {
+    if (!drawer) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDrawer()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [drawer, closeDrawer])
+
   useEffect(() => {
     if (!user) {
       setUnread(0)
@@ -139,13 +154,9 @@ export function AppShell() {
       <aside className="shell-rail" aria-label="التنقّل الرئيسي">
         <div className="shell-rail__inner">
           <div className="shell-rail__brand-row">
-            <div className="shell-rail__brand" title="RPM">
-              <IconCar size={18} />
-            </div>
-            <div className="shell-rail__brand-copy">
-              <strong>RPM</strong>
-              <span>إدارة التأجير</span>
-            </div>
+            <NavLink to="/" className="shell-rail__brand" title="RPM Rent A Car" aria-label="لوحة اليوم">
+              <BrandLogo variant={expanded ? 'full' : 'mark'} />
+            </NavLink>
             <button
               type="button"
               className="shell-rail__toggle"
@@ -210,9 +221,9 @@ export function AppShell() {
               <IconMenu size={18} />
             </button>
 
-            <div className="shell-top__brand-mobile">
-              <strong>RPM</strong>
-            </div>
+            <NavLink to="/" className="shell-top__brand-mobile" aria-label="لوحة اليوم">
+              <BrandLogo variant="mark" />
+            </NavLink>
 
             <button type="button" className="shell-search" onClick={() => setCmdOpen(true)}>
               <IconSearch size={16} />
@@ -250,11 +261,15 @@ export function AppShell() {
                   </span>
                 ) : null}
               </button>
-              <button type="button" className="shell-cta shell-cta--desk" onClick={() => navigate('/bookings?new=1')}>
-                <span className="shell-cta__icon" aria-hidden>
+              <button
+                type="button"
+                className="rpm-btn rpm-btn--primary rpm-btn--md shell-cta--desk"
+                onClick={() => navigate('/bookings?new=1')}
+              >
+                <span className="rpm-btn__icon" aria-hidden>
                   <IconPlus size={16} />
                 </span>
-                <span>عقد جديد</span>
+                <span className="rpm-btn__label">عقد جديد</span>
               </button>
               <div className="shell-user shell-user--desk">
                 <span className="shell-user__avatar" aria-hidden>
@@ -308,22 +323,27 @@ export function AppShell() {
       <AnimatePresence>
         {drawer ? (
           <motion.div className="shell-drawer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <button type="button" className="shell-drawer__scrim" aria-label="إغلاق" onClick={() => setDrawer(false)} />
+            <button type="button" className="shell-drawer__scrim" aria-label="إغلاق" onClick={closeDrawer} />
             <motion.div
               className="shell-drawer__sheet"
               initial={{ y: '110%' }}
               animate={{ y: 0 }}
               exit={{ y: '110%' }}
-              transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 38 }}
               role="dialog"
+              aria-modal="true"
               aria-label="كل الأقسام"
+              {...drawerDragProps}
             >
-              <div className="shell-drawer__handle" aria-hidden />
-              <div className="shell-drawer__head">
-                <strong>RPM</strong>
-                <button type="button" className="shell-icon" onClick={toggleTheme} aria-label="تبديل المظهر">
-                  {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
-                </button>
+              <div className="shell-drawer__grab" onPointerDown={startDrawerDrag}>
+                <div className="shell-drawer__handle" aria-hidden />
+                <div className="shell-drawer__head">
+                  <BrandLogo variant="mark" />
+                  <span className="shell-drawer__title">كل الأقسام</span>
+                  <button type="button" className="shell-icon" onClick={toggleTheme} aria-label="تبديل المظهر">
+                    {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
+                  </button>
+                </div>
               </div>
               <div className="shell-drawer__grid">
                 {visibleRail.map((item) => (
@@ -331,11 +351,11 @@ export function AppShell() {
                     key={item.to}
                     to={item.to}
                     end={item.end}
-                    className="shell-drawer__link"
-                    onClick={() => setDrawer(false)}
+                    className={({ isActive }) => `shell-drawer__link ${isActive ? 'is-active' : ''}`}
+                    onClick={closeDrawer}
                   >
-                    {item.icon}
-                    {item.label}
+                    <span className="shell-drawer__ico">{item.icon}</span>
+                    <span>{item.label}</span>
                   </NavLink>
                 ))}
               </div>

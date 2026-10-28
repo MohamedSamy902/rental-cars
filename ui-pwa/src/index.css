@@ -9,7 +9,11 @@
 html {
   direction: rtl;
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
   overflow-x: clip;
+  /* Installed PWA: no browser pull-to-refresh / overscroll reload */
+  overscroll-behavior-y: none;
+  background: var(--bg);
 }
 
 body {
@@ -17,6 +21,7 @@ body {
   min-height: 100dvh;
   max-width: 100%;
   overflow-x: clip;
+  overscroll-behavior-y: none;
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.55;
@@ -67,6 +72,16 @@ button {
   background: none;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
+}
+
+hr {
+  border: 0;
+  border-block-start: 1px solid var(--border);
+}
+
 img {
   max-width: 100%;
   display: block;
@@ -79,6 +94,17 @@ img {
 
 ::selection {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+@keyframes rpm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tabular-nums {

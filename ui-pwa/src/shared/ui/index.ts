@@ -1,4 +1,6 @@
 export { AppShell } from './AppShell'
+export { BrandLogo } from './BrandLogo'
+export { useIsMobile, useSheetDrag } from './useSheetDrag'
 export * from './Icons'
 export { AnimatedNumber } from './AnimatedNumber'
 export { CommandPalette } from './CommandPalette'

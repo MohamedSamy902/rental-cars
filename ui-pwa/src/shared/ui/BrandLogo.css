@@ -1,0 +1,26 @@
+/* The artwork ships on black, so the tile is black in both themes */
+.rpm-logo {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--logo-tile);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 6%);
+}
+
+.rpm-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.rpm-logo--full {
+  aspect-ratio: 640 / 305;
+}
+
+.rpm-logo--mark {
+  aspect-ratio: 320 / 120;
+}
