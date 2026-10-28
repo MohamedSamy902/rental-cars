@@ -100,19 +100,103 @@
 .rpm-dense-row p,
 .muted { margin: 0.15rem 0 0; color: var(--text-muted); font-size: 0.8rem; }
 
-.rpm-table-wrap { overflow: auto; }
+.rpm-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: none;
+}
+
 .rpm-table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.9rem;
+  background: var(--bg);
 }
-.rpm-table th,
-.rpm-table td {
-  padding: 0.7rem 0.55rem;
-  border-bottom: 1px solid var(--hairline);
+
+.rpm-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.75rem 0.9rem;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   text-align: start;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-strong);
 }
-.rpm-table th { color: var(--text-muted); font-size: 0.78rem; }
+
+.rpm-table tbody td {
+  padding: 0.8rem 0.9rem;
+  text-align: start;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  background: var(--bg);
+}
+
+.rpm-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+}
+
+.rpm-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rpm-table tbody tr.is-clickable {
+  cursor: pointer;
+}
+
+.rpm-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--brand-soft) 40%, var(--bg));
+}
+
+.rpm-table td .rpm-btn {
+  white-space: nowrap;
+}
+
+.rpm-table th:last-child,
+.rpm-table td:last-child {
+  text-align: end;
+}
+
+.rpm-table--compact {
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.rpm-table--compact thead th,
+.rpm-table--compact tbody td {
+  padding: 0.55rem 0.7rem;
+}
+
+.rpm-table__code {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.rpm-table__primary {
+  display: block;
+  font-weight: 700;
+}
+
+.rpm-table__sub {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
 
 .rpm-card-list {
   display: grid;
@@ -126,7 +210,7 @@
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   width: 100%;
   max-width: 100%;
   text-align: start;
@@ -317,4 +401,130 @@
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: #fff;
+}
+
+.rpm-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.rpm-dossier-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.rpm-dossier-qr {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.rpm-dossier-qr h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.rpm-dossier-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.rpm-dossier-split h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.rpm-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.65rem;
+}
+
+.rpm-media-chip {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: inherit;
+  text-decoration: none;
+}
+
+.rpm-media-chip:hover {
+  border-color: var(--border-strong);
+}
+
+.rpm-print-only { display: none; }
+
+@media (max-width: 900px) {
+  .rpm-dossier-hero,
+  .rpm-dossier-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .rpm-no-print,
+  .shell-sidebar,
+  .shell-topbar,
+  .shell-bottom-nav,
+  .rpm-fab,
+  .rpm-page-header__action {
+    display: none !important;
+  }
+
+  .rpm-print-only { display: block !important; }
+
+  .rpm-print-brand {
+    display: flex !important;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #0f172a;
+    font-size: 1rem;
+  }
+
+  body,
+  .rpm-stack,
+  .rpm-panel,
+  .rpm-table-wrap,
+  .rpm-table,
+  .rpm-table tbody td {
+    background: #fff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+  }
+
+  .rpm-panel {
+    break-inside: avoid;
+    border: 1px solid #cbd5e1 !important;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem !important;
+  }
+
+  .rpm-table {
+    min-width: 0 !important;
+    font-size: 11pt;
+  }
+
+  .rpm-vehicle-dossier {
+    padding: 0 !important;
+  }
+
+  .rpm-dossier-hero {
+    grid-template-columns: 1fr 180px;
+  }
 }
