@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\OperationsController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ReportController;
@@ -29,6 +30,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/dashboard', DashboardController::class);
+
+    Route::post('/media', [MediaController::class, 'store']);
+    Route::get('/media/{medium}', [MediaController::class, 'show']);
+    Route::get('/media/{medium}/file', [MediaController::class, 'file']);
+    Route::delete('/media/{medium}', [MediaController::class, 'destroy']);
 
     Route::get('/settings/tenant', function () {
         return response()->json(['data' => TenantSetting::query()->first()]);

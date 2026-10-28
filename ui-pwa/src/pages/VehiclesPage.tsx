@@ -3,13 +3,13 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab, DetailList,
-  TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
+  TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField, MediaUpload,
   useToast, EmptyState, SkeletonBlock, ErrorState, IconChevron,
 } from '@/shared/ui'
 import './pages.css'
 
 type Accessory = { id: number; name: string; default_qty?: number }
-type Document = { id: number; type: string; expires_on?: string | null; issued_on?: string | null; notes?: string | null }
+type Document = { id: number; type: string; file_path?: string | null; expires_on?: string | null; issued_on?: string | null; notes?: string | null }
 
 type Vehicle = {
   id: number
@@ -70,7 +70,7 @@ export function VehiclesPage() {
   const [detail, setDetail] = useState<Vehicle | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '' })
+  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '' })
   const [accName, setAccName] = useState('')
   const [qrLabel, setQrLabel] = useState('')
   const [qrImage, setQrImage] = useState('')
@@ -195,13 +195,14 @@ export function VehiclesPage() {
         method: 'POST',
         json: {
           type: docForm.type,
+          file_path: docForm.file_path || undefined,
           expires_on: docForm.expires_on || undefined,
           issued_on: docForm.issued_on || undefined,
           notes: docForm.notes || undefined,
         },
       })
       toast.success('تم تسجيل المستند.')
-      setDocForm({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '' })
+      setDocForm({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '' })
       await openDetail(detail.id)
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -445,7 +446,7 @@ export function VehiclesPage() {
                   <div key={d.id} className="rpm-dense-row">
                     <div>
                       <strong>{d.type}</strong>
-                      <p className="muted">ينتهي {d.expires_on || '—'} · صدر {d.issued_on || '—'}</p>
+                      <p className="muted">ينتهي {d.expires_on || '—'} · صدر {d.issued_on || '—'}{d.file_path ? ' · مرفق' : ''}</p>
                     </div>
                   </div>
                 ))}
@@ -464,6 +465,16 @@ export function VehiclesPage() {
                 />
                 <TextField label="تاريخ الإصدار" type="date" value={docForm.issued_on} onChange={(e) => setDocForm({ ...docForm, issued_on: e.target.value })} />
                 <TextField label="تاريخ الانتهاء" type="date" value={docForm.expires_on} onChange={(e) => setDocForm({ ...docForm, expires_on: e.target.value })} />
+                <MediaUpload
+                  label="ملف المستند (صورة أو فيديو)"
+                  value={docForm.file_path || null}
+                  collection="vehicle_docs"
+                  purpose="document"
+                  accept="both"
+                  attachableType="vehicle"
+                  attachableId={detail.id}
+                  onChange={(path) => setDocForm({ ...docForm, file_path: path || '' })}
+                />
                 <Button size="sm" loading={saving} onClick={() => void addDocument()}>إضافة مستند</Button>
               </div>
             </section>

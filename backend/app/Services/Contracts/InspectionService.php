@@ -17,7 +17,7 @@ class InspectionService
      *   notes?: string|null,
      *   signature_data?: string|null,
      *   accessories?: array<int, array{accessory_id?: int, name: string, expected_qty?: int, actual_qty?: int, ok?: bool}>,
-     *   damages?: array<int, array{position: string, description: string, present_at_checkout?: bool}>
+     *   damages?: array<int, array{position: string, description: string, photo_path?: string|null, present_at_checkout?: bool}>
      * }  $payload
      */
     public function record(int $contractId, array $payload, ?int $inspectorId = null): Inspection

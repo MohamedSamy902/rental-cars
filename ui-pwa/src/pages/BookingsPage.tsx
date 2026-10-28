@@ -4,7 +4,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab, DetailList,
-  TextField, SelectField, NumberField, MoneyField, TextAreaField, SignatureField,
+  TextField, SelectField, NumberField, MoneyField, TextAreaField, SignatureField, MediaUpload,
   useToast, EmptyState, SkeletonBlock, ErrorState, IconChevron,
 } from '@/shared/ui'
 import './pages.css'
@@ -71,7 +71,7 @@ export function BookingsPage() {
     odometer_out: '', odometer_in: '', damage_fee: '', reason: '', planned_ends_at: '',
     replacement_vehicle_id: '', method: 'cash', receipt_number: '',
     fuel_level: '50', notes: '', signature_data: '', damage_position: '', damage_description: '',
-    deduct_amount: '', deduct_reason: '',
+    damage_photo_path: '', deduct_amount: '', deduct_reason: '',
   })
 
   async function openDetail(id: number) {
@@ -156,6 +156,7 @@ export function BookingsPage() {
       signature_data: '',
       damage_position: '',
       damage_description: '',
+      damage_photo_path: '',
       deduct_amount: '',
       deduct_reason: '',
     })
@@ -238,7 +239,11 @@ export function BookingsPage() {
         toast.success('تم التسليم وتفعيل العقد.')
       } else if (action === 'return') {
         const damages = actionForm.damage_position && actionForm.damage_description
-          ? [{ position: actionForm.damage_position, description: actionForm.damage_description }]
+          ? [{
+              position: actionForm.damage_position,
+              description: actionForm.damage_description,
+              photo_path: actionForm.damage_photo_path || undefined,
+            }]
           : []
         await api(`/contracts/${selected.id}/return`, {
           method: 'POST',
@@ -571,6 +576,17 @@ export function BookingsPage() {
             <>
               <TextField label="موضع الضرر (إن وُجد)" value={actionForm.damage_position} onChange={(e) => setActionForm({ ...actionForm, damage_position: e.target.value })} />
               <TextAreaField label="وصف الضرر" value={actionForm.damage_description} onChange={(e) => setActionForm({ ...actionForm, damage_description: e.target.value })} />
+              <MediaUpload
+                label="صورة / فيديو الضرر"
+                value={actionForm.damage_photo_path || null}
+                collection="inspection_damage"
+                purpose="damage"
+                accept="both"
+                attachableType="contract"
+                attachableId={selected?.id}
+                onChange={(path) => setActionForm({ ...actionForm, damage_photo_path: path || '' })}
+                hint="اختياري — يُحفظ محلياً مع سجل الفحص"
+              />
             </>
           ) : null}
           {action === 'handover' || action === 'return' ? (

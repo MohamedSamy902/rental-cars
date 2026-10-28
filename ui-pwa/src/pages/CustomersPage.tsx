@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, TextField, TextAreaField,
-  useToast, EmptyState, SkeletonBlock, IconChevron,
+  MediaUpload, useToast, EmptyState, SkeletonBlock, IconChevron,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -16,6 +16,8 @@ type Customer = {
   license_expires_on: string
   birth_date?: string
   national_id?: string | null
+  national_id_image_path?: string | null
+  license_image_path?: string | null
   status: string
   notes?: string | null
   blacklist_reason?: string | null
@@ -74,8 +76,8 @@ export function CustomersPage() {
         license_expires_on: res.data.license_expires_on,
         national_id: res.data.national_id || '',
         notes: res.data.notes || '',
-        national_id_image_path: (res.data as any).national_id_image_path || '',
-        license_image_path: (res.data as any).license_image_path || '',
+        national_id_image_path: res.data.national_id_image_path || '',
+        license_image_path: res.data.license_image_path || '',
       })
       setBlacklistReason(res.data.blacklist_reason || '')
     } catch (e) {
@@ -149,8 +151,26 @@ export function CustomersPage() {
       <TextField label="رقم الرخصة" required value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
       <TextField label="انتهاء الرخصة" required type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-      <TextField label="مسار صورة البطاقة (محلي)" value={(form as any).national_id_image_path || ''} onChange={(e) => setForm({ ...form, national_id_image_path: e.target.value } as any)} hint="يُحفظ محلياً — بلا إرسال لخدمة خارجية" />
-      <TextField label="مسار صورة الرخصة (محلي)" value={(form as any).license_image_path || ''} onChange={(e) => setForm({ ...form, license_image_path: e.target.value } as any)} />
+      <MediaUpload
+        label="صورة البطاقة"
+        value={form.national_id_image_path || null}
+        collection="customers_id"
+        purpose="national_id"
+        accept="image"
+        attachableType={editing && detail ? 'customer' : undefined}
+        attachableId={editing && detail ? detail.id : undefined}
+        onChange={(path) => setForm({ ...form, national_id_image_path: path || '' })}
+      />
+      <MediaUpload
+        label="صورة الرخصة"
+        value={form.license_image_path || null}
+        collection="customers_id"
+        purpose="license"
+        accept="image"
+        attachableType={editing && detail ? 'customer' : undefined}
+        attachableId={editing && detail ? detail.id : undefined}
+        onChange={(path) => setForm({ ...form, license_image_path: path || '' })}
+      />
     </div>
   )
 
@@ -233,10 +253,38 @@ export function CustomersPage() {
                 { label: 'تاريخ الميلاد', value: detail.birth_date || '—' },
                 { label: 'رقم الرخصة', value: detail.license_number },
                 { label: 'انتهاء الرخصة', value: detail.license_expires_on },
+                { label: 'صورة البطاقة', value: detail.national_id_image_path ? 'مرفوعة' : '—' },
+                { label: 'صورة الرخصة', value: detail.license_image_path ? 'مرفوعة' : '—' },
                 { label: 'سبب القائمة السوداء', value: detail.blacklist_reason || '—' },
                 { label: 'ملاحظات', value: detail.notes || '—' },
               ]}
             />
+            {(detail.national_id_image_path || detail.license_image_path) ? (
+              <div className="rpm-form-grid" style={{ marginTop: '0.75rem' }}>
+                {detail.national_id_image_path ? (
+                  <MediaUpload
+                    label="صورة البطاقة"
+                    value={detail.national_id_image_path}
+                    collection="customers_id"
+                    purpose="national_id"
+                    disabled
+                    onChange={() => undefined}
+                    hint="للمعاينة فقط — عدّل من وضع التعديل"
+                  />
+                ) : null}
+                {detail.license_image_path ? (
+                  <MediaUpload
+                    label="صورة الرخصة"
+                    value={detail.license_image_path}
+                    collection="customers_id"
+                    purpose="license"
+                    disabled
+                    onChange={() => undefined}
+                    hint="للمعاينة فقط — عدّل من وضع التعديل"
+                  />
+                ) : null}
+              </div>
+            ) : null}
             {detail.status !== 'blacklist' ? (
               <div className="rpm-form-grid" style={{ marginTop: '0.75rem' }}>
                 <TextAreaField label="سبب الإدراج في القائمة السوداء" value={blacklistReason} onChange={(e) => setBlacklistReason(e.target.value)} />

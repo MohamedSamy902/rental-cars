@@ -236,7 +236,9 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 **POST Body**
 `full_name`, `phone`, `birth_date`, `license_number`, `license_expires_on`  
-اختياري: `phone_alt`, `email`, `national_id`, `national_id_expires_on`, `passport_number`, `passport_expires_on`, `address`, `notes`
+اختياري: `phone_alt`, `email`, `national_id`, `national_id_expires_on`, `passport_number`, `passport_expires_on`, `address`, `notes`, `national_id_image_path`, `license_image_path`
+
+> مسارات الصور تُملأ عادةً من `POST /media` (مثل `/media/{id}/file`) — التخزين محلي خاص بلا CDN خارجي.
 
 **PUT قائمة سوداء**
 ```json
@@ -514,7 +516,45 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ---
 
-## ١٤) قائمة الانتظار · الإشعارات
+## ١٤) الوسائط (صور وفيديو)
+
+رفع محلي على قرص `local` الخاص (`storage/app/private`) — مناسب لـ cPanel · بلا S3/CDN خارجي افتراضياً.
+
+| Method | Path | الوصف |
+|--------|------|--------|
+| POST | `/media` | رفع ملف (`multipart/form-data`) |
+| GET | `/media/{id}` | بيانات الملف |
+| GET | `/media/{id}/file` | بث الملف (مصادق · inline) |
+| DELETE | `/media/{id}` | حذف ناعم + إزالة من التخزين |
+
+**POST حقول**
+- `file` (مطلوب) — صورة: jpeg/png/webp/gif ≤ ٥ ميجا · فيديو: mp4/webm/mov ≤ ٥٠ ميجا
+- `collection` — مثل `customers_id` · `vehicle_docs` · `inspection_damage` · `general`
+- `purpose` — `national_id` · `license` · `document` · `damage` · …
+- `attachable_type` — `customer` · `vehicle` · `contract` · `inspection`
+- `attachable_id` — رقم الكيان (اختياري)
+
+**استجابة مختصرة**
+```json
+{
+  "data": {
+    "id": 1,
+    "kind": "image",
+    "mime_type": "image/jpeg",
+    "path": "media/customers_id/….jpg",
+    "url": "https://…/api/media/1/file",
+    "collection": "customers_id",
+    "purpose": "national_id"
+  },
+  "message": "تم رفع الملف."
+}
+```
+
+صور الهوية (`purpose` = national_id/license أو `collection` = customers_id) تتطلب صلاحية عرض عملاء / حسّاس.
+
+---
+
+## ١٥) قائمة الانتظار · الإشعارات
 
 ### Waitlist
 | Method | Path |
@@ -533,7 +573,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ---
 
-## ١٥) خريطة الوحدات ↔ المسارات
+## ١٦) خريطة الوحدات ↔ المسارات
 
 | وحدة RSD | مسارات API | واجهة PWA |
 |----------|------------|-----------|
@@ -558,10 +598,11 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | مُدمج | نفس settings + flags | `/integrator` |
 | سجل | `/audit-logs` | `/audit-logs` |
 | إشعارات | `/notifications*` | `/notifications` |
+| وسائط | `/media*` | رفع في العملاء/المركبات/الأضرار |
 
 ---
 
-## ١٦) أخطاء بيزنس شائعة (`422`)
+## ١٧) أخطاء بيزنس شائعة (`422`)
 
 | رسالة (مثال) | السبب |
 |---------------|--------|
@@ -577,7 +618,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ---
 
-## ١٧) بيانات تجريبية
+## ١٨) بيانات تجريبية
 
 ```
 POST /login
@@ -592,7 +633,7 @@ password: password
 
 ---
 
-## ١٨) إضافات إغلاق الفجوات (٢٫٠)
+## ١٩) إضافات إغلاق الفجوات (٢٫٠)
 
 | Method | Path | صلاحية / ملاحظة |
 |--------|------|------------------|
