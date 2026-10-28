@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  PageHeader, Button, StatusPill, Sheet, DetailList,
+  Button, StatusPill, Sheet,
   TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField, MediaUpload,
-  useToast, EmptyState, SkeletonBlock, ErrorState,
+  useToast, SkeletonBlock, ErrorState,
 } from '@/shared/ui'
+import './VehicleDetailPage.css'
 import './pages.css'
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
@@ -117,6 +118,8 @@ type Dossier = {
   }
 }
 
+type TabId = 'overview' | 'bookings' | 'maintenance' | 'expenses' | 'docs' | 'owner'
+
 const statusLabel: Record<string, string> = {
   available: 'متاحة',
   reserved: 'محجوزة',
@@ -170,6 +173,19 @@ function shortDate(value?: string | null) {
   return value.slice(0, 10)
 }
 
+function Fact({ label, value, wide }: { label: string; value: ReactNode; wide?: boolean }) {
+  return (
+    <div className={`vd-fact${wide ? ' vd-fact--wide' : ''}`}>
+      <span>{label}</span>
+      <strong>{value ?? '—'}</strong>
+    </div>
+  )
+}
+
+function Empty({ children }: { children: ReactNode }) {
+  return <div className="vd-empty">{children}</div>
+}
+
 export function VehicleDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -179,6 +195,7 @@ export function VehicleDetailPage() {
   const [dossier, setDossier] = useState<Dossier | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [tab, setTab] = useState<TabId>('overview')
   const [editing, setEditing] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -318,8 +335,10 @@ export function VehicleDetailPage() {
     try {
       const res = await api<{ data: { estimated: number } }>(`/vehicles/${dossier.vehicle.id}/estimated-odometer`)
       setEstimatedKm(res.data.estimated)
+      toast.success('تم حساب العداد التقديري.')
     } catch {
       setEstimatedKm(null)
+      toast.error('تعذّر حساب العداد التقديري.')
     }
   }
 
@@ -362,144 +381,111 @@ export function VehicleDetailPage() {
 
   if (loading) {
     return (
-      <div className="rpm-stack">
-        <PageHeader title="ملف المركبة" subtitle="جارٍ التحميل…" />
-        <SkeletonBlock rows={8} />
+      <div className="vd">
+        <SkeletonBlock rows={10} />
       </div>
     )
   }
 
   if (error || !dossier) {
     return (
-      <div className="rpm-stack">
-        <PageHeader
-          title="ملف المركبة"
-          action={<Button variant="secondary" onClick={() => navigate('/vehicles')}>رجوع للأسطول</Button>}
-        />
+      <div className="vd">
         <ErrorState
           title="تعذّر تحميل ملف المركبة"
           description={error || 'لا توجد بيانات'}
-          action={<Button onClick={() => void load()}>إعادة المحاولة</Button>}
+          action={
+            <div className="rpm-actions-row">
+              <Button variant="secondary" onClick={() => navigate('/vehicles')}>رجوع للأسطول</Button>
+              <Button onClick={() => load()}>إعادة المحاولة</Button>
+            </div>
+          }
         />
       </div>
     )
   }
 
   const v = dossier.vehicle
+  const ownerInitial = (v.owner?.full_name || 'م').trim().charAt(0)
+  const tabs: Array<{ id: TabId; label: string; count?: number }> = [
+    { id: 'overview', label: 'نظرة عامة' },
+    { id: 'bookings', label: 'الحجوزات', count: dossier.totals.contracts },
+    { id: 'maintenance', label: 'الصيانة', count: dossier.totals.work_orders },
+    { id: 'expenses', label: 'المصروفات', count: dossier.expenses.length },
+    { id: 'docs', label: 'المستندات', count: (v.documents?.length || 0) + dossier.totals.media },
+    { id: 'owner', label: 'المالك' },
+  ]
 
-  return (
-    <div className="rpm-stack rpm-vehicle-dossier">
-      <div className="rpm-print-only rpm-print-brand">
-        <strong>ملف مركبة</strong>
-        <span>{v.brand} {v.model} · {v.plate}</span>
+  const overviewPanel = (
+    <section className="vd-panel" key="overview">
+      <div className="vd-panel__head">
+        <h2>بيانات التشغيل</h2>
+        <p>المواصفات · التتبع · التأمين</p>
       </div>
+      <div className="vd-facts">
+        <Fact label="الكود الداخلي" value={v.code} />
+        <Fact label="سنة الصنع" value={v.year} />
+        <Fact label="الفئة" value={v.category} />
+        <Fact label="الوقود" value={v.fuel_type} />
+        <Fact label="العداد الفعلي" value={`${formatNumber(v.odometer)} كم`} />
+        <Fact label="أولوية التأجير" value={v.rental_priority} />
+        <Fact label="التأمين النقدي" value={formatMoney(v.default_deposit)} />
+        <Fact label="نشطة" value={v.is_active === false ? 'لا' : 'نعم'} />
+        <Fact label="جهاز التتبع" value={v.tracker_device_number || '—'} />
+        <Fact label="شريحة التتبع" value={v.tracker_sim_number || '—'} />
+        <Fact label="ملاحظات" value={v.notes || '—'} wide />
+      </div>
+      {estimatedKm != null ? (
+        <p className="vd-note">العداد التقديري أثناء التأجير: {formatNumber(estimatedKm)} كم</p>
+      ) : null}
 
-      <PageHeader
-        title={`${v.brand} ${v.model}`}
-        subtitle={`${v.code} · ${v.plate} · ${v.year}`}
-        action={
-          <div className="rpm-actions-row rpm-no-print">
-            <Button variant="secondary" onClick={() => navigate('/vehicles')}>رجوع</Button>
-            <Button variant="secondary" onClick={() => void loadEstimated()}>عداد تقديري</Button>
-            <Button variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
-            <Button onClick={() => window.print()}>طباعة</Button>
-          </div>
-        }
-      />
-
-      <section className="rpm-panel rpm-dossier-hero">
-        <div className="rpm-dossier-hero__main">
-          <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
-          <DetailList
-            rows={[
-              { label: 'الكود', value: v.code },
-              { label: 'اللوحة', value: v.plate },
-              { label: 'الفئة / الوقود', value: `${v.category} · ${v.fuel_type}` },
-              { label: 'العداد', value: `${formatNumber(v.odometer)} كم` },
-              { label: 'الإيجار اليومي', value: formatMoney(v.daily_rate) },
-              { label: 'التأمين النقدي', value: formatMoney(v.default_deposit) },
-              { label: 'أولوية التأجير', value: v.rental_priority },
-              { label: 'جهاز التتبع', value: v.tracker_device_number || '—' },
-              { label: 'شريحة التتبع', value: v.tracker_sim_number || '—' },
-              { label: 'نشطة', value: v.is_active === false ? 'لا' : 'نعم' },
-              { label: 'ملاحظات', value: v.notes || '—' },
-            ]}
-          />
-          {estimatedKm != null ? (
-            <p className="muted">العداد التقديري أثناء التأجير: {formatNumber(estimatedKm)} كم</p>
-          ) : null}
+      <div className="vd-panel__head" style={{ marginTop: '0.5rem' }}>
+        <h2>المستلزمات</h2>
+        <p>{(v.accessories || []).length} عنصر</p>
+      </div>
+      {(v.accessories || []).length === 0 ? <Empty>لا مستلزمات مسجّلة</Empty> : (
+        <div className="vd-chips">
+          {(v.accessories || []).map((a) => (
+            <span key={a.id} className="vd-chip">{a.name}<span className="muted">×{a.default_qty ?? 1}</span></span>
+          ))}
         </div>
-        <aside className="rpm-dossier-qr">
-          <h3>رمز QR</h3>
-          {qrImage ? <img className="rpm-qr-img" src={qrImage} alt="رمز QR للمركبة" width={180} height={180} /> : null}
-          <pre className="rpm-qr-box">{dossier.qr.label}{'\n'}{dossier.qr.payload}</pre>
-        </aside>
-      </section>
-
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>المالك الأساسي</h3></div>
-        {v.owner ? (
-          <DetailList
-            rows={[
-              { label: 'الاسم', value: v.owner.full_name },
-              { label: 'الهاتف', value: v.owner.phone || '—' },
-              { label: 'المبلغ الشهري', value: formatMoney(v.owner_monthly_amount || 0) },
-              { label: 'تاريخ الربط', value: v.owner_since || '—' },
-              {
-                label: 'صفحة المالك',
-                value: <Link className="rpm-no-print" to="/owners">عرض الملاك</Link>,
-              },
-            ]}
-          />
-        ) : (
-          <p className="muted">ملك المركز — لا يوجد مالك خارجي مرتبط.</p>
-        )}
-        {dossier.owner_dues.length > 0 || dossier.owner_payouts.length > 0 ? (
-          <div className="rpm-dossier-split">
-            <div>
-              <h4>المستحقات الشهرية</h4>
-              {dossier.owner_dues.length === 0 ? <p className="muted">لا مستحقات</p> : (
-                <div className="rpm-table-wrap">
-                  <table className="rpm-table rpm-table--compact">
-                    <thead><tr><th>الشهر</th><th>المبلغ</th></tr></thead>
-                    <tbody>
-                      {dossier.owner_dues.map((d) => (
-                        <tr key={d.id}><td>{d.year_month}</td><td>{formatMoney(d.amount)}</td></tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            <div>
-              <h4>المدفوعات للمالك</h4>
-              {dossier.owner_payouts.length === 0 ? <p className="muted">لا مدفوعات</p> : (
-                <div className="rpm-table-wrap">
-                  <table className="rpm-table rpm-table--compact">
-                    <thead><tr><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th></tr></thead>
-                    <tbody>
-                      {dossier.owner_payouts.map((p) => (
-                        <tr key={p.id}>
-                          <td>{p.paid_on || '—'}</td>
-                          <td>{formatMoney(p.amount)}</td>
-                          <td>{p.payment_method || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="rpm-panel">
-        <div className="rpm-panel__head">
-          <h3>سجل الحجز / العقود ({dossier.totals.contracts})</h3>
+      )}
+      <div className="vd-form-block vd-no-print">
+        <div className="rpm-form-grid">
+          <TextField label="اسم المستلزم" value={accName} onChange={(e) => setAccName(e.target.value)} />
+          <Button size="sm" loading={saving} onClick={() => addAccessory()}>إضافة مستلزم</Button>
         </div>
-        {dossier.contracts.length === 0 ? <EmptyState title="لا حجوزات لهذه المركبة" /> : (
-          <div className="rpm-table-wrap">
+      </div>
+    </section>
+  )
+
+  const bookingsPanel = (
+    <section className="vd-panel" key="bookings">
+      <div className="vd-panel__head">
+        <h2>سجل الحجز والعقود</h2>
+        <p>{dossier.totals.contracts} عقد</p>
+      </div>
+      {dossier.contracts.length === 0 ? <Empty>لا حجوزات لهذه المركبة بعد</Empty> : (
+        <>
+          <div className="vd-timeline rpm-mobile-only">
+            {dossier.contracts.map((c) => (
+              <div key={c.id} className="vd-tl">
+                <span className="vd-tl__dot" aria-hidden />
+                <div className="vd-tl__body">
+                  <div className="vd-tl__row">
+                    <strong>{c.number}</strong>
+                    <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
+                  </div>
+                  <div className="vd-tl__meta">
+                    {c.customer?.full_name || '—'} · {shortDate(c.starts_at)} → {shortDate(c.actual_ends_at || c.planned_ends_at)}
+                  </div>
+                  <div className="vd-tl__meta">
+                    {c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : '—')}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="rpm-table-wrap rpm-desktop-only">
             <table className="rpm-table">
               <thead>
                 <tr>
@@ -509,7 +495,7 @@ export function VehicleDetailPage() {
               <tbody>
                 {dossier.contracts.map((c) => (
                   <tr key={c.id}>
-                    <td>{c.number}</td>
+                    <td><span className="rpm-table__code">{c.number}</span></td>
                     <td>{c.customer?.full_name || '—'}</td>
                     <td><StatusPill status={c.status} label={statusLabel[c.status] || c.status} /></td>
                     <td>{shortDate(c.starts_at)}</td>
@@ -520,15 +506,40 @@ export function VehicleDetailPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </>
+      )}
+    </section>
+  )
 
-      <section className="rpm-panel">
-        <div className="rpm-panel__head">
-          <h3>الصيانات / أوامر الشغل ({dossier.totals.work_orders})</h3>
-        </div>
-        {dossier.work_orders.length === 0 ? <EmptyState title="لا صيانات مسجّلة" /> : (
-          <div className="rpm-table-wrap">
+  const maintenancePanel = (
+    <section className="vd-panel" key="maintenance">
+      <div className="vd-panel__head">
+        <h2>الصيانات وأوامر الشغل</h2>
+        <p>{dossier.totals.work_orders} أمر</p>
+      </div>
+      {dossier.work_orders.length === 0 ? <Empty>لا صيانات مسجّلة</Empty> : (
+        <>
+          <div className="vd-timeline rpm-mobile-only">
+            {dossier.work_orders.map((w) => (
+              <div key={w.id} className="vd-tl">
+                <span className="vd-tl__dot" aria-hidden />
+                <div className="vd-tl__body">
+                  <div className="vd-tl__row">
+                    <strong>#{w.id} · {w.workshop || 'ورشة'}</strong>
+                    <StatusPill status={w.status} label={statusLabel[w.status] || w.status} />
+                  </div>
+                  <div className="vd-tl__meta">
+                    {w.opened_on || '—'} → {w.closed_on || 'مفتوح'} · عداد {w.odometer != null ? formatNumber(w.odometer) : '—'}
+                  </div>
+                  <div className="vd-tl__meta">
+                    قطع {formatMoney(w.parts_cost || 0)} · عمالة {formatMoney(w.labor_cost || 0)}
+                    {w.lines.length > 0 ? ` · ${w.lines.map((l) => l.description).join('، ')}` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="rpm-table-wrap rpm-desktop-only">
             <table className="rpm-table">
               <thead>
                 <tr>
@@ -546,109 +557,90 @@ export function VehicleDetailPage() {
                     <td>{w.odometer != null ? formatNumber(w.odometer) : '—'}</td>
                     <td>
                       {formatMoney(w.parts_cost || 0)} / {formatMoney(w.labor_cost || 0)}
-                      {w.lines.length > 0 ? (
-                        <p className="muted">{w.lines.map((l) => l.description).join(' · ')}</p>
-                      ) : null}
+                      {w.lines.length > 0 ? <p className="muted">{w.lines.map((l) => l.description).join(' · ')}</p> : null}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </>
+      )}
 
-      <section className="rpm-panel">
-        <div className="rpm-panel__head">
-          <h3>المصروفات ({formatMoney(dossier.totals.expenses_amount)})</h3>
+      <div className="vd-panel__head" style={{ marginTop: '0.35rem' }}>
+        <h2>المخالفات</h2>
+        <p>{dossier.totals.violations}</p>
+      </div>
+      {dossier.violations.length === 0 ? <Empty>لا مخالفات</Empty> : (
+        <div className="rpm-table-wrap">
+          <table className="rpm-table rpm-table--compact">
+            <thead><tr><th>التاريخ</th><th>الموقع</th><th>المبلغ</th><th>العميل</th><th>الحالة</th></tr></thead>
+            <tbody>
+              {dossier.violations.map((x) => (
+                <tr key={x.id}>
+                  <td>{shortDate(x.occurred_at)}</td>
+                  <td>{x.location || '—'}</td>
+                  <td>{x.amount != null ? formatMoney(x.amount) : '—'}</td>
+                  <td>{x.customer?.full_name || '—'}</td>
+                  <td>{x.status || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        {dossier.expenses.length === 0 ? <EmptyState title="لا مصروفات مرتبطة" /> : (
-          <div className="rpm-table-wrap">
-            <table className="rpm-table">
-              <thead>
-                <tr><th>العنوان</th><th>التصنيف</th><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th></tr>
-              </thead>
-              <tbody>
-                {dossier.expenses.map((e) => (
-                  <tr key={e.id}>
-                    <td>{e.title}</td>
-                    <td>{e.category || '—'}</td>
-                    <td>{e.spent_on || '—'}</td>
-                    <td>{formatMoney(e.amount)}</td>
-                    <td>{e.payment_method || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      )}
+    </section>
+  )
 
-      <section className="rpm-panel">
-        <div className="rpm-panel__head">
-          <h3>المخالفات ({dossier.totals.violations})</h3>
+  const expensesPanel = (
+    <section className="vd-panel" key="expenses">
+      <div className="vd-panel__head">
+        <h2>المصروفات</h2>
+        <p>الإجمالي {formatMoney(dossier.totals.expenses_amount)}</p>
+      </div>
+      {dossier.expenses.length === 0 ? <Empty>لا مصروفات مرتبطة بالمركبة</Empty> : (
+        <div className="rpm-table-wrap">
+          <table className="rpm-table">
+            <thead>
+              <tr><th>العنوان</th><th>التصنيف</th><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th></tr>
+            </thead>
+            <tbody>
+              {dossier.expenses.map((e) => (
+                <tr key={e.id}>
+                  <td><strong className="rpm-table__primary">{e.title}</strong></td>
+                  <td>{e.category || '—'}</td>
+                  <td>{e.spent_on || '—'}</td>
+                  <td>{formatMoney(e.amount)}</td>
+                  <td>{e.payment_method || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        {dossier.violations.length === 0 ? <p className="muted">لا مخالفات</p> : (
-          <div className="rpm-table-wrap">
-            <table className="rpm-table rpm-table--compact">
-              <thead><tr><th>التاريخ</th><th>الموقع</th><th>المبلغ</th><th>العميل</th><th>الحالة</th></tr></thead>
-              <tbody>
-                {dossier.violations.map((x) => (
-                  <tr key={x.id}>
-                    <td>{shortDate(x.occurred_at)}</td>
-                    <td>{x.location || '—'}</td>
-                    <td>{x.amount != null ? formatMoney(x.amount) : '—'}</td>
-                    <td>{x.customer?.full_name || '—'}</td>
-                    <td>{x.status || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      )}
+    </section>
+  )
 
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>المرفقات والوسائط ({dossier.totals.media})</h3></div>
-        {dossier.media.length === 0 ? <p className="muted">لا مرفقات مرفوعة على المركبة</p> : (
-          <div className="rpm-media-grid">
-            {dossier.media.map((m) => (
-              <a key={m.id} className="rpm-media-chip" href={m.url} target="_blank" rel="noreferrer">
-                <strong>{m.original_name}</strong>
-                <span className="muted">{m.kind} · {m.purpose || m.collection || '—'}</span>
-              </a>
-            ))}
-          </div>
-        )}
-        <div className="rpm-no-print" style={{ marginTop: '0.75rem' }}>
-          <MediaUpload
-            label="رفع مرفق للمركبة"
-            value={null}
-            collection="vehicle_docs"
-            purpose="document"
-            accept="both"
-            attachableType="vehicle"
-            attachableId={v.id}
-            onChange={() => { void load() }}
-          />
-        </div>
-      </section>
-
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>المستندات الرسمية</h3></div>
-        {(v.documents || []).length === 0 ? <p className="muted">لا مستندات بعد</p> : (
-          <div className="rpm-dense-list">
-            {(v.documents || []).map((d) => (
-              <div key={d.id} className="rpm-dense-row">
-                <div>
-                  <strong>{d.type}</strong>
-                  <p className="muted">ينتهي {d.expires_on || '—'} · صدر {d.issued_on || '—'}{d.file_path ? ' · مرفق' : ''}</p>
-                </div>
+  const docsPanel = (
+    <section className="vd-panel" key="docs">
+      <div className="vd-panel__head">
+        <h2>المستندات الرسمية</h2>
+        <p>{(v.documents || []).length} مستند</p>
+      </div>
+      {(v.documents || []).length === 0 ? <Empty>لا مستندات بعد</Empty> : (
+        <div className="vd-docs">
+          {(v.documents || []).map((d) => (
+            <div key={d.id} className="vd-doc">
+              <div>
+                <strong>{d.type}</strong>
+                <div><span>صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}{d.file_path ? ' · مرفق' : ''}</span></div>
               </div>
-            ))}
-          </div>
-        )}
-        <div className="rpm-form-grid rpm-no-print" style={{ marginTop: '0.75rem' }}>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="vd-form-block vd-no-print">
+        <div className="rpm-form-grid">
           <SelectField
             label="نوع المستند"
             value={docForm.type}
@@ -674,22 +666,216 @@ export function VehicleDetailPage() {
           />
           <Button size="sm" loading={saving} onClick={() => addDocument()}>إضافة مستند</Button>
         </div>
-      </section>
+      </div>
 
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>المستلزمات</h3></div>
-        <div className="rpm-dense-list">
-          {(v.accessories || []).map((a) => (
-            <div key={a.id} className="rpm-dense-row">
-              <div><strong>{a.name}</strong><p className="muted">كمية افتراضية {a.default_qty ?? 1}</p></div>
-            </div>
+      <div className="vd-panel__head" style={{ marginTop: '0.5rem' }}>
+        <h2>المرفقات والوسائط</h2>
+        <p>{dossier.totals.media} ملف</p>
+      </div>
+      {dossier.media.length === 0 ? <Empty>لا مرفقات مرفوعة</Empty> : (
+        <div className="vd-media">
+          {dossier.media.map((m) => (
+            <a key={m.id} href={m.url} target="_blank" rel="noreferrer">
+              <strong>{m.original_name}</strong>
+              <span>{m.kind} · {m.purpose || m.collection || '—'}</span>
+            </a>
           ))}
         </div>
-        <div className="rpm-form-grid rpm-no-print" style={{ marginTop: '0.75rem' }}>
-          <TextField label="اسم المستلزم" value={accName} onChange={(e) => setAccName(e.target.value)} />
-          <Button size="sm" loading={saving} onClick={() => addAccessory()}>إضافة مستلزم</Button>
+      )}
+      <div className="vd-form-block vd-no-print">
+        <MediaUpload
+          label="رفع مرفق للمركبة"
+          value={null}
+          collection="vehicle_docs"
+          purpose="document"
+          accept="both"
+          attachableType="vehicle"
+          attachableId={v.id}
+          onChange={() => { void load() }}
+        />
+      </div>
+    </section>
+  )
+
+  const ownerPanel = (
+    <section className="vd-panel" key="owner">
+      <div className="vd-panel__head">
+        <h2>المالك الأساسي</h2>
+        <p>{v.owner ? 'عربيات الغير' : 'ملك المركز'}</p>
+      </div>
+      {v.owner ? (
+        <div className="vd-owner">
+          <div className="vd-owner__row">
+            <div className="vd-owner__avatar" aria-hidden>{ownerInitial}</div>
+            <div className="vd-owner__meta">
+              <strong>{v.owner.full_name}</strong>
+              <span>{v.owner.phone || 'بدون هاتف'} · شهري {formatMoney(v.owner_monthly_amount || 0)}</span>
+              <span>ربط منذ {v.owner_since || '—'}</span>
+            </div>
+          </div>
+          <Link className="vd-no-print rpm-link-btn" to="/owners">صفحة الملاك</Link>
         </div>
-      </section>
+      ) : (
+        <Empty>هذه المركبة ملك المركز — لا يوجد مالك خارجي مرتبط.</Empty>
+      )}
+
+      {(dossier.owner_dues.length > 0 || dossier.owner_payouts.length > 0) ? (
+        <div className="vd-split">
+          <div>
+            <h3>المستحقات الشهرية</h3>
+            {dossier.owner_dues.length === 0 ? <Empty>لا مستحقات</Empty> : (
+              <div className="rpm-table-wrap">
+                <table className="rpm-table rpm-table--compact">
+                  <thead><tr><th>الشهر</th><th>المبلغ</th></tr></thead>
+                  <tbody>
+                    {dossier.owner_dues.map((d) => (
+                      <tr key={d.id}><td>{d.year_month}</td><td>{formatMoney(d.amount)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div>
+            <h3>المدفوعات</h3>
+            {dossier.owner_payouts.length === 0 ? <Empty>لا مدفوعات</Empty> : (
+              <div className="rpm-table-wrap">
+                <table className="rpm-table rpm-table--compact">
+                  <thead><tr><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th></tr></thead>
+                  <tbody>
+                    {dossier.owner_payouts.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.paid_on || '—'}</td>
+                        <td>{formatMoney(p.amount)}</td>
+                        <td>{p.payment_method || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="vd-panel__head" style={{ marginTop: '0.35rem' }}>
+        <h2>رمز QR للطباعة</h2>
+        <p>جاهز للعرض على المركبة</p>
+      </div>
+      <div className="vd-qr" style={{ maxWidth: 220, justifySelf: 'start' }}>
+        {qrImage ? <img src={qrImage} alt="رمز QR للمركبة" width={160} height={160} /> : null}
+        <p className="vd-qr__label">{dossier.qr.label}{'\n'}{dossier.qr.payload}</p>
+      </div>
+    </section>
+  )
+
+  const panelByTab: Record<TabId, ReactNode> = {
+    overview: overviewPanel,
+    bookings: bookingsPanel,
+    maintenance: maintenancePanel,
+    expenses: expensesPanel,
+    docs: docsPanel,
+    owner: ownerPanel,
+  }
+
+  return (
+    <div className="vd">
+      <div className="vd-print-head">
+        <strong>ملف مركبة — RPM</strong>
+        <span>{v.brand} {v.model} · {v.plate}</span>
+      </div>
+
+      <header className="vd-hero">
+        <div className="vd-hero__top">
+          <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>
+            ← الأسطول
+          </button>
+          <div className="vd-hero__actions vd-no-print">
+            <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
+            <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
+            <Button size="sm" onClick={() => window.print()}>طباعة</Button>
+          </div>
+        </div>
+
+        <div className="vd-hero__body">
+          <div className="vd-identity">
+            <div className="vd-identity__status">
+              <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+              <span className="vd-code">{v.code}</span>
+            </div>
+            <div className="vd-plate" aria-label={`لوحة ${v.plate}`}>
+              <div className="vd-plate__band">EGYPT · RPM</div>
+              <p className="vd-plate__num">{v.plate}</p>
+            </div>
+            <h1 className="vd-title">{v.brand} {v.model}</h1>
+            <p className="vd-sub">{v.year} · ملف تشغيلي كامل جاهز للطباعة</p>
+            <div className="vd-tags">
+              <span className="vd-tag">{v.category}</span>
+              <span className="vd-tag">{v.fuel_type}</span>
+              <span className="vd-tag">{formatNumber(v.odometer)} كم</span>
+              {v.owner ? <span className="vd-tag">مالك: {v.owner.full_name}</span> : <span className="vd-tag">ملك المركز</span>}
+            </div>
+          </div>
+
+          <aside className="vd-hero__side">
+            <div className="vd-rate">
+              <span>الإيجار اليومي</span>
+              <strong>{formatMoney(v.daily_rate)}</strong>
+            </div>
+            <div className="vd-qr">
+              {qrImage ? <img src={qrImage} alt="QR" width={132} height={132} /> : null}
+              <p className="vd-qr__label">امسح للوصول السريع</p>
+            </div>
+          </aside>
+        </div>
+      </header>
+
+      <div className="vd-kpis">
+        <div className="vd-kpi">
+          <span>الحجوزات</span>
+          <strong>{dossier.totals.contracts}</strong>
+        </div>
+        <div className="vd-kpi">
+          <span>أوامر الصيانة</span>
+          <strong>{dossier.totals.work_orders}</strong>
+        </div>
+        <div className="vd-kpi">
+          <span>المصروفات</span>
+          <strong>{formatMoney(dossier.totals.expenses_amount)}</strong>
+        </div>
+        <div className="vd-kpi">
+          <span>المخالفات</span>
+          <strong>{dossier.totals.violations}</strong>
+          <em>{dossier.totals.media} مرفق</em>
+        </div>
+      </div>
+
+      <nav className="vd-tabs vd-no-print" aria-label="أقسام ملف المركبة">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`vd-tab${tab === t.id ? ' is-active' : ''}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+            {t.count != null ? <span className="vd-tab__count">{t.count}</span> : null}
+          </button>
+        ))}
+      </nav>
+
+      <div className="vd-no-print">
+        {panelByTab[tab]}
+      </div>
+
+      <div className="vd-print-all">
+        {overviewPanel}
+        {bookingsPanel}
+        {maintenancePanel}
+        {expensesPanel}
+        {docsPanel}
+        {ownerPanel}
+      </div>
 
       <Sheet
         open={editOpen}
