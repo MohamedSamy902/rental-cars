@@ -58,7 +58,7 @@ const mobileNav: NavItem[] = [
   { to: '/maintenance', label: 'صيانة', icon: <IconWrench /> },
 ]
 
-const RAIL_KEY = 'rpm.shell.expanded'
+const RAIL_KEY = 'rpm.shell.rail'
 const WA_URL = 'https://wa.me/201150100104'
 
 export function AppShell() {
@@ -83,15 +83,15 @@ export function AppShell() {
   })
   const [expanded, setExpanded] = useState(() => {
     try {
-      return localStorage.getItem(RAIL_KEY) === '1'
+      return localStorage.getItem(RAIL_KEY) !== 'collapsed'
     } catch {
-      return false
+      return true
     }
   })
 
   useEffect(() => {
     try {
-      localStorage.setItem(RAIL_KEY, expanded ? '1' : '0')
+      localStorage.setItem(RAIL_KEY, expanded ? 'expanded' : 'collapsed')
     } catch {
       /* ignore */
     }
