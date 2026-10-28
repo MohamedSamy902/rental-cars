@@ -1,7 +1,16 @@
 /* One button system. Every variant shares the header «عقد جديد» interaction:
-   150ms color transition · clear hover · 0.98 press · visible focus ring. */
+   150ms transitions · clear hover · 0.98 press · visible focus ring.
+   Icons sit on logical sides through flex order + gap, so RTL needs no margins. */
 
 .rpm-btn {
+  --btn-bg: transparent;
+  --btn-fg: var(--text);
+  --btn-border: transparent;
+  --btn-bg-hover: var(--surface-hover);
+  --btn-fg-hover: var(--text);
+  --btn-border-hover: var(--btn-border);
+  --btn-shadow: none;
+
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -10,14 +19,18 @@
   min-height: 2.25rem;
   padding-block: 0.5rem;
   padding-inline: 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid transparent;
+  border-radius: 0.625rem;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  box-shadow: var(--btn-shadow);
   font-family: var(--font-body);
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25;
   white-space: nowrap;
   text-decoration: none;
+  cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
@@ -30,13 +43,19 @@
     opacity var(--motion-fast) ease;
 }
 
-.rpm-btn:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
+.rpm-btn:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+  color: var(--btn-fg-hover);
+  border-color: var(--btn-border-hover);
 }
 
 .rpm-btn:active:not(:disabled) {
   transform: scale(0.98);
+}
+
+.rpm-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--btn-shadow), 0 0 0 2px var(--bg), 0 0 0 4px var(--ring-strong, var(--ring));
 }
 
 .rpm-btn:disabled {
@@ -74,7 +93,7 @@
   padding-block: 0.375rem;
   padding-inline: 0.75rem;
   font-size: 0.8125rem;
-  border-radius: 0.425rem;
+  border-radius: 0.5rem;
 }
 
 .rpm-btn--md {
@@ -86,22 +105,18 @@
   padding-block: 0.625rem;
   padding-inline: 1.25rem;
   font-size: 0.9375rem;
-  border-radius: 0.625rem;
+  border-radius: 0.75rem;
 }
 
-/* Primary — zinc at rest, deep crimson on hover */
+/* Primary — zinc at rest, deep crimson on hover (both themes) */
 .rpm-btn--primary {
-  background: var(--action);
-  color: var(--on-action);
-}
-
-.rpm-btn--primary:hover:not(:disabled) {
-  background: var(--action-hover);
-  color: var(--on-action-hover);
-}
-
-.rpm-btn--primary:hover:focus-visible {
-  outline-color: var(--action-hover);
+  --btn-bg: var(--action);
+  --btn-fg: var(--on-action);
+  --btn-border: var(--action-border);
+  --btn-bg-hover: var(--action-hover);
+  --btn-fg-hover: var(--on-action-hover);
+  --btn-border-hover: var(--action-hover);
+  --btn-shadow: var(--shadow-xs);
 }
 
 .rpm-btn--brand-mark .rpm-btn__icon {
@@ -112,59 +127,76 @@
   color: currentColor;
 }
 
-/* Secondary — outline */
+/* Secondary — outline on the current surface */
 .rpm-btn--secondary {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--border);
-  box-shadow: var(--shadow-xs);
-}
-
-.rpm-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
+  --btn-bg: var(--surface);
+  --btn-fg: var(--text);
+  --btn-border: var(--border);
+  --btn-bg-hover: var(--surface-hover);
+  --btn-border-hover: var(--border-strong);
+  --btn-shadow: var(--shadow-xs);
 }
 
 /* Accent — solid crimson for the one critical CTA */
 .rpm-btn--accent {
-  background: var(--accent-solid);
-  color: var(--on-accent);
-}
-
-.rpm-btn--accent:hover:not(:disabled) {
-  background: var(--accent-solid-hover);
-}
-
-.rpm-btn--accent:focus-visible {
-  outline-color: var(--accent-solid);
+  --btn-bg: var(--accent-solid);
+  --btn-fg: var(--on-accent);
+  --btn-border: var(--accent-solid);
+  --btn-bg-hover: var(--accent-solid-hover);
+  --btn-fg-hover: var(--on-accent);
+  --btn-border-hover: var(--accent-solid-hover);
 }
 
 /* Danger — soft at rest, solid crimson on hover so destructive intent is explicit */
 .rpm-btn--danger {
-  background: var(--danger-soft);
-  color: var(--danger-ink);
-  border-color: color-mix(in srgb, var(--danger) 22%, transparent);
+  --btn-bg: var(--danger-soft);
+  --btn-fg: var(--danger-ink);
+  --btn-border: color-mix(in srgb, var(--danger) 24%, transparent);
+  --btn-bg-hover: var(--accent-solid);
+  --btn-fg-hover: var(--on-accent);
+  --btn-border-hover: var(--accent-solid);
 }
 
-.rpm-btn--danger:hover:not(:disabled) {
-  background: var(--accent-solid);
-  border-color: var(--accent-solid);
-  color: #ffffff;
-}
-
-.rpm-btn--danger:focus-visible {
-  outline-color: var(--accent-solid);
-}
-
-/* Ghost */
+/* Ghost — no chrome until hover */
 .rpm-btn--ghost {
+  --btn-fg: var(--text-muted);
+  --btn-bg-hover: var(--surface-hover);
+  --btn-fg-hover: var(--text);
+}
+
+/* Icon-only square button (row actions, toolbars) */
+.rpm-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
-.rpm-btn--ghost:hover:not(:disabled) {
+.rpm-icon-btn:hover,
+.rpm-icon-btn[aria-expanded='true'] {
   background: var(--surface-hover);
+  border-color: var(--border);
   color: var(--text);
+}
+
+.rpm-icon-btn:active {
+  transform: scale(0.94);
+}
+
+.rpm-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring-strong, var(--ring));
 }
 
 /* Spinner inherits the variant's text color */

@@ -108,12 +108,11 @@
 }
 
 .rpm-switch input:checked + .rpm-switch__track {
-  background: var(--action);
+  background: var(--control-on);
 }
 
 .rpm-switch input:checked + .rpm-switch__track::after {
   inset-inline-start: 21px;
-  background: var(--on-action);
 }
 
 .rpm-switch input:focus-visible + .rpm-switch__track {
