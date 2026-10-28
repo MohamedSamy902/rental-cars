@@ -1,6 +1,6 @@
 :root,
 [data-theme='light'] {
-  /* Cool comfortable light — no warm cream */
+  /* خلفية الصفحة بيضاء · أسطح المحتوى بلون الخلفية السابق (#F1F5F9) */
   --ink: #0f172a;
   --ink-soft: #1e293b;
   --nav: #ffffff;
@@ -8,11 +8,11 @@
   --nav-active: #0f766e;
   --nav-active-bg: #ccfbf1;
 
-  --bg: #f1f5f9;
-  --bg-elev: #f8fafc;
-  --surface: #ffffff;
-  --surface-2: #eef2f7;
-  --surface-glass: color-mix(in srgb, #ffffff 88%, transparent);
+  --bg: #ffffff;
+  --bg-elev: #ffffff;
+  --surface: #f1f5f9;
+  --surface-2: #e8eef5;
+  --surface-glass: color-mix(in srgb, #ffffff 92%, transparent);
 
   --text: #0f172a;
   --text-muted: #64748b;
@@ -20,7 +20,7 @@
 
   --brand: #0d9488;
   --brand-hover: #0f766e;
-  --brand-soft: #f0fdfa;
+  --brand-soft: #e6f7f5;
   --brand-ink: #0f766e;
 
   --success: #159a57;
@@ -32,18 +32,18 @@
   --info: #2563eb;
   --info-soft: #eff6ff;
 
-  --border: rgb(15 23 42 / 8%);
-  --border-strong: rgb(15 23 42 / 14%);
-  --hairline: rgb(15 23 42 / 6%);
+  --border: rgb(15 23 42 / 10%);
+  --border-strong: rgb(15 23 42 / 16%);
+  --hairline: rgb(15 23 42 / 8%);
 
   --shadow-sm: 0 1px 2px rgb(15 23 42 / 4%);
   --shadow: 0 10px 28px rgb(15 23 42 / 6%);
   --shadow-lg: 0 22px 48px rgb(15 23 42 / 10%);
   --shadow-rail: 0 12px 32px rgb(15 23 42 / 8%);
 
-  --bg-mesh-1: rgb(13 148 136 / 7%);
-  --bg-mesh-2: rgb(37 99 235 / 5%);
-  --bg-mesh-3: rgb(14 165 233 / 4%);
+  --bg-mesh-1: rgb(13 148 136 / 4%);
+  --bg-mesh-2: rgb(37 99 235 / 3%);
+  --bg-mesh-3: rgb(14 165 233 / 2%);
 
   --rail-bg: #ffffff;
   --rail-border: rgb(15 23 42 / 8%);

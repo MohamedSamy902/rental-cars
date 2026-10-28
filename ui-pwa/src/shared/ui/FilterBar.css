@@ -46,8 +46,8 @@
 }
 
 .rpm-chip.is-active {
-  background: color-mix(in srgb, var(--brand) 12%, white);
-  border-color: color-mix(in srgb, var(--brand) 40%, white);
+  background: var(--brand-soft);
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
   color: var(--brand-hover);
 }
 

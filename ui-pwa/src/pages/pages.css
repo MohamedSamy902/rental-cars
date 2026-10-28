@@ -100,19 +100,67 @@
 .rpm-dense-row p,
 .muted { margin: 0.15rem 0 0; color: var(--text-muted); font-size: 0.8rem; }
 
-.rpm-table-wrap { overflow: auto; }
+.rpm-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
 .rpm-table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.9rem;
+  background: transparent;
 }
-.rpm-table th,
-.rpm-table td {
-  padding: 0.7rem 0.55rem;
-  border-bottom: 1px solid var(--hairline);
+
+.rpm-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.85rem 0.75rem;
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface));
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
   text-align: start;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-strong);
 }
-.rpm-table th { color: var(--text-muted); font-size: 0.78rem; }
+
+.rpm-table tbody td {
+  padding: 0.85rem 0.75rem;
+  text-align: start;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text);
+  background: transparent;
+}
+
+.rpm-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rpm-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--brand-soft) 55%, transparent);
+}
+
+.rpm-table td .rpm-btn {
+  white-space: nowrap;
+}
+
+.rpm-table th:last-child,
+.rpm-table td:last-child {
+  text-align: end;
+}
 
 .rpm-card-list {
   display: grid;
@@ -126,7 +174,7 @@
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   width: 100%;
   max-width: 100%;
   text-align: start;
