@@ -108,7 +108,7 @@
   max-width: 100%;
   border-radius: 14px;
   border: 2px solid var(--ink);
-  background: #fff;
+  background: var(--plate-bg);
   color: #0f172a;
   overflow: hidden;
   box-shadow: var(--shadow);
@@ -211,24 +211,41 @@
 }
 
 .vd-rate {
+  position: relative;
   display: grid;
-  gap: 0.15rem;
-  padding: 0.85rem 1rem;
+  gap: 0.2rem;
+  padding-block: 0.9rem;
+  padding-inline: 1.1rem;
   border-radius: 16px;
-  background: var(--action);
-  color: var(--on-action);
-  box-shadow: var(--rail-brand-shadow);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+.vd-rate::before {
+  content: '';
+  position: absolute;
+  inset-block: 0.85rem;
+  inset-inline-start: 0;
+  width: 3px;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  background: var(--accent);
 }
 
 .vd-rate span {
+  color: var(--text-muted);
   font-size: 0.78rem;
-  opacity: 0.88;
+  font-weight: 600;
 }
 
 .vd-rate strong {
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 /* KPI strip */

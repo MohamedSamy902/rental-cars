@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
-import { PageHeader, Button, Sheet, Fab, SelectField, TextField, MoneyField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
+import {
+  PageHeader, Button, Sheet, Fab, SelectField, TextField, MoneyField, StatusPill, useToast, DataTable, IconCheck,
+  type DataColumn,
+} from '@/shared/ui'
 import './pages.css'
 
 type Violation = {
@@ -19,6 +22,32 @@ type Vehicle = { id: number; brand: string; model: string; plate: string }
 const statusLabel: Record<string, string> = {
   new: 'جديدة', assigned: 'مسندة', confirmed: 'مؤكّد السداد', paid: 'مدفوعة للجهة',
 }
+
+const columns: DataColumn<Violation>[] = [
+  {
+    id: 'vehicle',
+    header: 'المركبة',
+    cell: (r) => (
+      <>
+        <strong className="rpm-table__primary">{r.vehicle?.brand} {r.vehicle?.model}</strong>
+        <span className="rpm-table__sub">{r.vehicle?.plate}</span>
+      </>
+    ),
+    sortValue: (r) => `${r.vehicle?.brand ?? ''} ${r.vehicle?.model ?? ''}`,
+    mobile: 'title',
+  },
+  { id: 'customer', header: 'العميل', cell: (r) => r.customer?.full_name || 'بلا إسناد بعد', sortValue: (r) => r.customer?.full_name, mobile: 'subtitle' },
+  { id: 'date', header: 'الوقت', cell: (r) => formatDateTime(r.occurred_at), sortValue: (r) => r.occurred_at },
+  { id: 'location', header: 'المكان', cell: (r) => r.location || '—', sortValue: (r) => r.location },
+  { id: 'amount', header: 'المبلغ', cell: (r) => formatMoney(r.amount), sortValue: (r) => Number(r.amount) },
+  {
+    id: 'status',
+    header: 'الحالة',
+    cell: (r) => <StatusPill status={r.status === 'confirmed' ? 'completed' : 'pending'} label={statusLabel[r.status] || r.status} />,
+    sortValue: (r) => r.status,
+    mobile: 'badge',
+  },
+]
 
 export function ViolationsPage() {
   const toast = useToast()
@@ -78,21 +107,22 @@ export function ViolationsPage() {
         mobileFab
       />
       <Fab label="تسجيل مخالفة" onClick={async () => { setOpen(true); const v = await api<{ data: Vehicle[] }>('/vehicles'); setVehicles(v.data) }} />
-      {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا توجد مخالفات" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((r) => (
-          <article key={r.id} className="rpm-card">
-            <div className="rpm-card__row">
-              <strong>{r.vehicle?.brand} {r.vehicle?.model}</strong>
-              <StatusPill status={r.status === 'confirmed' ? 'completed' : 'pending'} label={statusLabel[r.status] || r.status} />
-            </div>
-            <p>{r.customer?.full_name || 'بلا إسناد بعد'}</p>
-            <p className="muted">{formatDateTime(r.occurred_at)} · {formatMoney(r.amount)}</p>
-            {r.status !== 'confirmed' ? <Button size="sm" variant="secondary" onClick={() => confirm(r.id)}>تأكيد السداد</Button> : null}
-          </article>
-        ))}
-      </div>
+      <DataTable
+        label="المخالفات"
+        rows={rows}
+        columns={columns}
+        rowKey={(r) => r.id}
+        rowLabel={(r) => `مخالفة · ${r.vehicle?.plate ?? ''}`}
+        loading={loading}
+        defaultSort={{ id: 'date', dir: 'desc' }}
+        rowActions={(r) =>
+          r.status !== 'confirmed'
+            ? [{ id: 'confirm', label: 'تأكيد السداد', icon: <IconCheck size={16} />, onSelect: () => void confirm(r.id) }]
+            : []
+        }
+        emptyTitle="لا توجد مخالفات"
+        emptyDescription="المخالفات المسجّلة للمتابعة التشغيلية تظهر هنا."
+      />
       <Sheet open={open} title="مخالفة جديدة" onClose={() => setOpen(false)} footer={<><Button onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
           <SelectField label="السيارة" required options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))} value={form.vehicle_id} onChange={(e) => setForm({ ...form, vehicle_id: e.target.value })} />

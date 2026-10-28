@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
   PageHeader, Button, Sheet, Fab, NumberField, MoneyField, SelectField, TextAreaField,
-  useToast, EmptyState, SkeletonBlock, DetailList,
+  useToast, DataTable, IconWallet, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -17,6 +17,19 @@ type Account = {
 }
 
 type Employee = { id: number; name: string; job_title?: string }
+
+const columns: DataColumn<Account>[] = [
+  {
+    id: 'employee',
+    header: 'الموظف',
+    cell: (a) => <strong className="rpm-table__primary">{a.employee?.name || `موظف #${a.employee_id}`}</strong>,
+    sortValue: (a) => a.employee?.name,
+    mobile: 'title',
+  },
+  { id: 'job', header: 'الوظيفة', cell: (a) => a.employee?.job_title || '—', sortValue: (a) => a.employee?.job_title, mobile: 'subtitle' },
+  { id: 'balance', header: 'الرصيد', cell: (a) => <strong>{formatMoney(a.balance)}</strong>, sortValue: (a) => Number(a.balance) },
+  { id: 'limit', header: 'حد العهدة', cell: (a) => formatMoney(a.limit_amount), sortValue: (a) => Number(a.limit_amount) },
+]
 
 export function PettyCashPage() {
   const toast = useToast()
@@ -107,27 +120,20 @@ export function PettyCashPage() {
         mobileFab
       />
       <Fab label="عهدة جديدة" onClick={() => void openCreate()} />
-      {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا توجد عهد مسجّلة" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((a) => (
-          <article key={a.id} className="rpm-card">
-            <div className="rpm-card__row">
-              <strong>{a.employee?.name || `موظف #${a.employee_id}`}</strong>
-              <span className="muted">{a.employee?.job_title || ''}</span>
-            </div>
-            <DetailList
-              rows={[
-                { label: 'الرصيد', value: formatMoney(a.balance) },
-                { label: 'حد العهدة', value: formatMoney(a.limit_amount) },
-              ]}
-            />
-            <div className="rpm-card__actions">
-              <Button size="sm" onClick={() => setMoveOpen(a)}>حركة</Button>
-            </div>
-          </article>
-        ))}
-      </div>
+      <DataTable
+        label="العهد"
+        rows={rows}
+        columns={columns}
+        rowKey={(a) => a.id}
+        rowLabel={(a) => `عهدة ${a.employee?.name ?? ''}`}
+        loading={loading}
+        onRowClick={(a) => setMoveOpen(a)}
+        rowActions={(a) => [
+          { id: 'move', label: 'تسجيل حركة', icon: <IconWallet size={16} />, onSelect: () => setMoveOpen(a) },
+        ]}
+        emptyTitle="لا توجد عهد مسجّلة"
+        emptyDescription="سجّل عهدة لموظف لتتبع التسليم والاستخدام والمرتجع."
+      />
 
       <Sheet
         open={open}

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, SummaryStrip, Button, Sheet, Fab, SelectField, NumberField, MoneyField,
-  TextField, SwitchField, StatusPill, useToast, SkeletonBlock, EmptyState,
+  PageHeader, SummaryStrip, Button, Sheet, Fab, SelectField, NumberField, MoneyField, DataTable,
+  TextField, SwitchField, StatusPill, useToast, IconCheck, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -99,6 +100,31 @@ export function MaintenancePage() {
     }
   }
 
+  const columns: DataColumn<WorkOrder>[] = [
+    {
+      id: 'vehicle',
+      header: 'المركبة',
+      cell: (r) => (
+        <>
+          <strong className="rpm-table__primary">{r.vehicle?.brand} {r.vehicle?.model}</strong>
+          <span className="rpm-table__sub">{r.vehicle?.plate}</span>
+        </>
+      ),
+      sortValue: (r) => `${r.vehicle?.brand ?? ''} ${r.vehicle?.model ?? ''}`,
+      mobile: 'title',
+    },
+    { id: 'workshop', header: 'الورشة', cell: (r) => r.workshop || '—', sortValue: (r) => r.workshop, mobile: 'subtitle' },
+    { id: 'parts', header: 'القطع', cell: (r) => formatMoney(r.parts_cost), sortValue: (r) => Number(r.parts_cost) },
+    { id: 'labor', header: 'العمالة', cell: (r) => formatMoney(r.labor_cost), sortValue: (r) => Number(r.labor_cost) },
+    {
+      id: 'status',
+      header: 'الحالة',
+      cell: (r) => <StatusPill status={r.status === 'closed' ? 'completed' : 'maintenance'} label={statusLabel[r.status] || r.status} />,
+      sortValue: (r) => r.status,
+      mobile: 'badge',
+    },
+  ]
+
   return (
     <div className="rpm-stack">
       <PageHeader title="أوامر الشغل" subtitle="صرف FIFO أو شراء · تعارض الصيانة مع الحجوزات" action={<Button onClick={openSheet}>أمر شغل</Button>} mobileFab />
@@ -107,24 +133,21 @@ export function MaintenancePage() {
         { label: 'مفتوحة', value: String(summary.open), tone: 'warning' },
         { label: 'مغلقة', value: String(summary.closed) },
       ]} />
-      {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا توجد أوامر شغل" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((r) => (
-          <article key={r.id} className="rpm-card">
-            <div className="rpm-card__row">
-              <strong>{r.vehicle?.brand} {r.vehicle?.model} · {r.vehicle?.plate}</strong>
-              <StatusPill status={r.status === 'closed' ? 'completed' : 'maintenance'} label={statusLabel[r.status] || r.status} />
-            </div>
-            <p className="muted">{r.workshop || '—'}</p>
-            <div className="rpm-card__meta">
-              <span>قطع: {r.parts_cost} ج.م</span>
-              <span>عمالة: {r.labor_cost} ج.م</span>
-            </div>
-            {r.status !== 'closed' ? <Button size="sm" variant="secondary" onClick={() => closeOrder(r.id)}>إغلاق</Button> : null}
-          </article>
-        ))}
-      </div>
+      <DataTable
+        label="أوامر الشغل"
+        rows={rows}
+        columns={columns}
+        rowKey={(r) => r.id}
+        rowLabel={(r) => `أمر شغل · ${r.vehicle?.plate ?? ''}`}
+        loading={loading}
+        rowActions={(r) =>
+          r.status !== 'closed'
+            ? [{ id: 'close', label: 'إغلاق أمر الشغل', icon: <IconCheck size={16} />, onSelect: () => void closeOrder(r.id) }]
+            : []
+        }
+        emptyTitle="لا توجد أوامر شغل"
+        emptyDescription="افتح أمر شغل لصرف قطع من المخزون أو تسجيل شراء."
+      />
 
       <Sheet open={open} title="أمر شغل" onClose={() => setOpen(false)} footer={<><Button onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">

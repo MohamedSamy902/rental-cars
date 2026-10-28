@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { PageHeader, Button, Sheet, Fab, TextField, NumberField, MoneyField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
+import {
+  PageHeader, Button, Sheet, Fab, TextField, NumberField, MoneyField, SelectField, StatusPill, useToast, DataTable, IconBox,
+  type DataColumn,
+} from '@/shared/ui'
 import './pages.css'
 
 type Item = {
@@ -13,6 +16,27 @@ type Item = {
   reorder_level: number
   is_low: boolean
 }
+
+const columns: DataColumn<Item>[] = [
+  {
+    id: 'name',
+    header: 'الصنف',
+    cell: (i) => <strong className="rpm-table__primary">{i.name}</strong>,
+    sortValue: (i) => i.name,
+    mobile: 'title',
+  },
+  { id: 'code', header: 'الكود', cell: (i) => <span className="rpm-table__code">{i.code}</span>, sortValue: (i) => i.code, mobile: 'subtitle' },
+  { id: 'category', header: 'الفئة', cell: (i) => i.category, sortValue: (i) => i.category },
+  { id: 'remaining', header: 'المتبقي', cell: (i) => `${i.remaining} ${i.unit}`, sortValue: (i) => Number(i.remaining) },
+  { id: 'reorder', header: 'حد التنبيه', cell: (i) => i.reorder_level, sortValue: (i) => Number(i.reorder_level) },
+  {
+    id: 'status',
+    header: 'الحالة',
+    cell: (i) => (i.is_low ? <StatusPill status="maintenance" label="تحت حد التنبيه" /> : <StatusPill status="available" label="رصيد كافٍ" />),
+    sortValue: (i) => (i.is_low ? 0 : 1),
+    mobile: 'badge',
+  },
+]
 
 export function InventoryPage() {
   const toast = useToast()
@@ -79,23 +103,27 @@ export function InventoryPage() {
         mobileFab
       />
       <Fab label="صنف جديد" onClick={() => setOpenItem(true)} />
-      {loading ? <SkeletonBlock rows={5} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا توجد أصناف" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((item) => (
-          <article key={item.id} className="rpm-card">
-            <div className="rpm-card__row">
-              <strong>{item.name}</strong>
-              {item.is_low ? <StatusPill status="maintenance" label="تحت حد التنبيه" /> : <StatusPill status="available" label="رصيد كافٍ" />}
-            </div>
-            <p className="muted">{item.code} · {item.category} · {item.unit}</p>
-            <div className="rpm-card__meta">
-              <span>المتبقي: {item.remaining}</span>
-              <span>حد التنبيه: {item.reorder_level}</span>
-            </div>
-          </article>
-        ))}
-      </div>
+      <DataTable
+        label="أصناف المخزون"
+        rows={rows}
+        columns={columns}
+        rowKey={(i) => i.id}
+        rowLabel={(i) => i.name}
+        loading={loading}
+        rowActions={(i) => [
+          {
+            id: 'batch',
+            label: 'إدخال دفعة لهذا الصنف',
+            icon: <IconBox size={16} />,
+            onSelect: () => {
+              setBatchForm((f) => ({ ...f, inventory_item_id: String(i.id) }))
+              setOpenBatch(true)
+            },
+          },
+        ]}
+        emptyTitle="لا أصناف بعد"
+        emptyDescription="أضف صنفاً ثم أدخل أول دفعة لبدء الصرف بالأقدم أولاً."
+      />
 
       <Sheet open={openItem} title="صنف مخزون" onClose={() => setOpenItem(false)} footer={<><Button onClick={saveItem}>حفظ</Button><Button variant="secondary" onClick={() => setOpenItem(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
@@ -109,7 +137,13 @@ export function InventoryPage() {
 
       <Sheet open={openBatch} title="دفعة إدخال" onClose={() => setOpenBatch(false)} footer={<><Button onClick={saveBatch}>حفظ</Button><Button variant="secondary" onClick={() => setOpenBatch(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
-          <TextField label="معرّف الصنف" required value={batchForm.inventory_item_id} onChange={(e) => setBatchForm({ ...batchForm, inventory_item_id: e.target.value })} hint="من قائمة الأصناف" />
+          <SelectField
+            label="الصنف"
+            required
+            options={rows.map((i) => ({ value: String(i.id), label: `${i.code} · ${i.name}` }))}
+            value={batchForm.inventory_item_id}
+            onChange={(e) => setBatchForm({ ...batchForm, inventory_item_id: e.target.value })}
+          />
           <TextField label="التاريخ" required type="date" value={batchForm.received_on} onChange={(e) => setBatchForm({ ...batchForm, received_on: e.target.value })} />
           <NumberField label="الكمية" required value={batchForm.quantity} onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })} />
           <MoneyField label="سعر الوحدة" required value={batchForm.unit_cost} onChange={(e) => setBatchForm({ ...batchForm, unit_cost: e.target.value })} />

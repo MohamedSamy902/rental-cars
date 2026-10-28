@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, TextField, TextAreaField,
-  MediaUpload, useToast, EmptyState, SkeletonBlock, IconChevron,
+  PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
+  MediaUpload, useToast, SkeletonBlock, IconEye, IconEdit, IconClipboard,
+  type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -142,6 +143,51 @@ export function CustomersPage() {
     }
   }
 
+  async function openEdit(id: number) {
+    await openDetail(id)
+    setEditing(true)
+  }
+
+  const statusPill = (c: Customer) => (
+    <StatusPill
+      status={c.status === 'blacklist' ? 'cancelled' : 'active'}
+      tone={c.status === 'blacklist' ? 'danger' : 'success'}
+      label={c.status === 'blacklist' ? 'قائمة سوداء' : 'نشط'}
+    />
+  )
+
+  const columns: DataColumn<Customer>[] = [
+    {
+      id: 'name',
+      header: 'العميل',
+      cell: (c) => <strong className="rpm-table__primary">{c.full_name}</strong>,
+      sortValue: (c) => c.full_name,
+      mobile: 'title',
+    },
+    { id: 'phone', header: 'الهاتف', cell: (c) => <span dir="ltr">{c.phone}</span>, sortValue: (c) => c.phone, mobile: 'subtitle' },
+    { id: 'license', header: 'رقم الرخصة', cell: (c) => c.license_number, sortValue: (c) => c.license_number },
+    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => c.license_expires_on, sortValue: (c) => c.license_expires_on },
+    { id: 'status', header: 'الحالة', cell: statusPill, sortValue: (c) => c.status, mobile: 'badge' },
+  ]
+
+  function customerMenu(c: Customer): MenuItem[] {
+    return [
+      { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: () => void openDetail(c.id) },
+      { id: 'edit', label: 'تعديل البيانات', icon: <IconEdit size={16} />, onSelect: () => void openEdit(c.id) },
+      {
+        id: 'copy',
+        label: 'نسخ رقم الهاتف',
+        icon: <IconClipboard size={16} />,
+        onSelect: () => {
+          void navigator.clipboard?.writeText(c.phone).then(
+            () => toast.success('تم نسخ الرقم.'),
+            () => toast.error('تعذّر النسخ.'),
+          )
+        },
+      },
+    ]
+  }
+
   const formFields = (
     <div className="rpm-form-grid">
       <TextField label="الاسم الكامل" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
@@ -195,23 +241,18 @@ export function CustomersPage() {
         onChipChange={setChip}
         placeholder="بحث بالاسم أو الهاتف…"
       />
-      {loading ? <SkeletonBlock rows={5} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا يوجد عملاء" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((c) => (
-          <button key={c.id} type="button" className="rpm-card is-clickable" onClick={() => void openDetail(c.id)}>
-            <div className="rpm-card__row">
-              <strong>{c.full_name}</strong>
-              <StatusPill status={c.status === 'blacklist' ? 'cancelled' : 'active'} label={c.status === 'blacklist' ? 'قائمة سوداء' : 'نشط'} />
-            </div>
-            <p>{c.phone}</p>
-            <div className="rpm-card__meta">
-              <span className="muted">رخصة {c.license_number} · تنتهي {c.license_expires_on}</span>
-              <IconChevron size={16} className="rpm-card__chev" />
-            </div>
-          </button>
-        ))}
-      </div>
+      <DataTable
+        label="العملاء"
+        rows={rows}
+        columns={columns}
+        rowKey={(c) => c.id}
+        rowLabel={(c) => c.full_name}
+        loading={loading}
+        onRowClick={(c) => void openDetail(c.id)}
+        rowActions={customerMenu}
+        emptyTitle="لا يوجد عملاء"
+        emptyDescription="أضف أول عميل أو غيّر كلمة البحث."
+      />
       <Sheet open={open} title="إضافة عميل" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         {formFields}
       </Sheet>
@@ -244,9 +285,8 @@ export function CustomersPage() {
           <>
             <DetailList
               rows={[
-                { label: 'الحالة', value: <StatusPill status={detail.status === 'blacklist' ? 'cancelled' : 'active'} label={detail.status === 'blacklist' ? 'قائمة سوداء' : 'نشط'} /> },
-                { label: 'الاسم', value: detail.full_name },
-                { label: 'الهاتف', value: detail.phone },
+                { label: 'الحالة', value: statusPill(detail) },
+                { label: 'الهاتف', value: <span dir="ltr">{detail.phone}</span> },
                 { label: 'هاتف بديل', value: detail.phone_alt || '—' },
                 { label: 'البريد', value: detail.email || '—' },
                 { label: 'الرقم القومي', value: detail.national_id || '—' },
@@ -255,8 +295,8 @@ export function CustomersPage() {
                 { label: 'انتهاء الرخصة', value: detail.license_expires_on },
                 { label: 'صورة البطاقة', value: detail.national_id_image_path ? 'مرفوعة' : '—' },
                 { label: 'صورة الرخصة', value: detail.license_image_path ? 'مرفوعة' : '—' },
-                { label: 'سبب القائمة السوداء', value: detail.blacklist_reason || '—' },
-                { label: 'ملاحظات', value: detail.notes || '—' },
+                { label: 'سبب القائمة السوداء', value: detail.blacklist_reason || '—', wide: true },
+                { label: 'ملاحظات', value: detail.notes || '—', wide: true },
               ]}
             />
             {(detail.national_id_image_path || detail.license_image_path) ? (

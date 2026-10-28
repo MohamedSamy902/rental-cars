@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
   PageHeader, Button, Sheet, Fab, TextField, MoneyField, SelectField, TextAreaField,
-  useToast, EmptyState, SkeletonBlock,
+  useToast, DataTable, Badge, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -17,6 +17,32 @@ type Expense = {
   from_petty_cash: boolean
   notes?: string | null
 }
+
+const methodLabel: Record<string, string> = { cash: 'نقدي', transfer: 'تحويل', card: 'بطاقة' }
+
+const columns: DataColumn<Expense>[] = [
+  {
+    id: 'title',
+    header: 'البند',
+    cell: (r) => (
+      <>
+        <strong className="rpm-table__primary">{r.title}</strong>
+        {r.notes ? <span className="rpm-table__sub">{r.notes}</span> : null}
+      </>
+    ),
+    sortValue: (r) => r.title,
+    mobile: 'title',
+  },
+  { id: 'date', header: 'التاريخ', cell: (r) => r.spent_on, sortValue: (r) => r.spent_on, mobile: 'subtitle' },
+  { id: 'category', header: 'التصنيف', cell: (r) => <Badge tone="muted" dot={false}>{r.category}</Badge>, sortValue: (r) => r.category },
+  {
+    id: 'method',
+    header: 'الدفع',
+    cell: (r) => (r.from_petty_cash ? 'من العهدة' : methodLabel[r.payment_method] || r.payment_method),
+    sortValue: (r) => r.payment_method,
+  },
+  { id: 'amount', header: 'المبلغ', cell: (r) => <strong>{formatMoney(r.amount)}</strong>, sortValue: (r) => Number(r.amount), mobile: 'badge' },
+]
 
 export function ExpensesPage() {
   const toast = useToast()
@@ -67,16 +93,16 @@ export function ExpensesPage() {
     <div className="rpm-stack">
       <PageHeader title="المصروفات" subtitle="تشغيل · صيانة · أخرى مع ترحيل محاسبي" action={<Button onClick={() => setOpen(true)}>مصروف جديد</Button>} mobileFab />
       <Fab label="مصروف جديد" onClick={() => setOpen(true)} />
-      {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا مصروفات بعد" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((r) => (
-          <article key={r.id} className="rpm-card">
-            <div className="rpm-card__row"><strong>{r.title}</strong><span>{formatMoney(r.amount)}</span></div>
-            <p className="muted">{r.category} · {r.spent_on} · {r.payment_method}</p>
-          </article>
-        ))}
-      </div>
+      <DataTable
+        label="المصروفات"
+        rows={rows}
+        columns={columns}
+        rowKey={(r) => r.id}
+        loading={loading}
+        defaultSort={{ id: 'date', dir: 'desc' }}
+        emptyTitle="لا مصروفات بعد"
+        emptyDescription="سجّل أول مصروف ليظهر هنا مع ترحيله المحاسبي."
+      />
       <Sheet open={open} title="تسجيل مصروف" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void save()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
           <TextField label="العنوان" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />

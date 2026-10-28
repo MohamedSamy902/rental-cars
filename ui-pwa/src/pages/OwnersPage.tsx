@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, DetailList, TextField, MoneyField,
-  SelectField, TextAreaField, StatusPill, useToast, EmptyState, SkeletonBlock, IconChevron,
+  PageHeader, FilterBar, Button, Sheet, Fab, DetailList, DataTable, TextField, MoneyField,
+  SelectField, TextAreaField, StatusPill, useToast, SkeletonBlock, IconEye,
+  type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -187,6 +188,37 @@ export function OwnersPage() {
     </div>
   )
 
+  const ownerColumns: DataColumn<Owner>[] = [
+    {
+      id: 'name',
+      header: 'المالك',
+      cell: (o) => <strong className="rpm-table__primary">{o.full_name}</strong>,
+      sortValue: (o) => o.full_name,
+      mobile: 'title',
+    },
+    { id: 'phone', header: 'الهاتف', cell: (o) => <span dir="ltr">{o.phone || '—'}</span>, sortValue: (o) => o.phone, mobile: 'subtitle' },
+    { id: 'vehicles', header: 'العربيات', cell: (o) => o.vehicles_count ?? 0, sortValue: (o) => o.vehicles_count ?? 0 },
+    {
+      id: 'monthly',
+      header: 'الشهري',
+      cell: (o) => formatMoney(o.balance?.vehicles_monthly_total || 0),
+      sortValue: (o) => Number(o.balance?.vehicles_monthly_total || 0),
+    },
+    {
+      id: 'remaining',
+      header: 'المتبقي',
+      cell: (o) => formatMoney(o.balance?.remaining || 0),
+      sortValue: (o) => Number(o.balance?.remaining || 0),
+    },
+    {
+      id: 'status',
+      header: 'الحالة',
+      cell: (o) => <StatusPill status={o.is_active ? 'active' : 'cancelled'} tone={o.is_active ? 'success' : 'muted'} label={o.is_active ? 'نشط' : 'موقوف'} />,
+      sortValue: (o) => (o.is_active ? 1 : 0),
+      mobile: 'badge',
+    },
+  ]
+
   const bal = detail?.balance
 
   return (
@@ -199,25 +231,20 @@ export function OwnersPage() {
       />
       <Fab label="إضافة مالك" onClick={() => setOpen(true)} />
       <FilterBar search={search} onSearchChange={setSearch} placeholder="بحث بالاسم أو الهاتف…" chips={[]} activeChip="" onChipChange={() => undefined} />
-      {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا ملاك بعد" description="أضف مالكاً ثم اربطه من شاشة المركبات مع المبلغ الشهري" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((o) => (
-          <button key={o.id} type="button" className="rpm-card is-clickable" onClick={() => void openDetail(o.id)}>
-            <div className="rpm-card__row">
-              <strong>{o.full_name}</strong>
-              <StatusPill status={o.is_active ? 'active' : 'cancelled'} label={o.is_active ? 'نشط' : 'موقوف'} />
-            </div>
-            <p>{o.phone || '—'} · {(o.vehicles_count ?? 0)} عربية</p>
-            <div className="rpm-card__meta">
-              <span className="muted">
-                شهري {formatMoney(o.balance?.vehicles_monthly_total || 0)} · متبقي {formatMoney(o.balance?.remaining || 0)}
-              </span>
-              <IconChevron size={16} className="rpm-card__chev" />
-            </div>
-          </button>
-        ))}
-      </div>
+      <DataTable
+        label="الملاك"
+        rows={rows}
+        columns={ownerColumns}
+        rowKey={(o) => o.id}
+        rowLabel={(o) => o.full_name}
+        loading={loading}
+        onRowClick={(o) => void openDetail(o.id)}
+        rowActions={(o) => [
+          { id: 'view', label: 'كشف الحساب', icon: <IconEye size={16} />, onSelect: () => void openDetail(o.id) },
+        ]}
+        emptyTitle="لا ملاك بعد"
+        emptyDescription="أضف مالكاً ثم اربطه من شاشة المركبات مع المبلغ الشهري"
+      />
 
       <Sheet open={open} title="إضافة مالك" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         {formFields}

@@ -3,9 +3,11 @@ import { useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab, DetailList,
+  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable,
   TextField, SelectField, NumberField, MoneyField, TextAreaField, SignatureField, MediaUpload,
-  useToast, EmptyState, SkeletonBlock, ErrorState, IconChevron,
+  useToast, SkeletonBlock, ErrorState, IconEye, IconCheck, IconKey, IconReturn, IconCash,
+  IconCalendar, IconCar, IconBan, IconPrinter, IconWallet,
+  type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -33,6 +35,19 @@ type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposi
 
 const statusLabel: Record<string, string> = {
   pending: 'معلّق', approved: 'معتمد', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغى',
+}
+
+const depositLabel: Record<string, { label: string; tone: 'success' | 'warning' | 'steel' | 'muted' | 'danger' }> = {
+  received: { label: 'مقبوض', tone: 'success' },
+  partial: { label: 'مخصوم جزئياً', tone: 'warning' },
+  settled: { label: 'مستهلك بالخصم', tone: 'steel' },
+  returned: { label: 'مردود', tone: 'muted' },
+}
+
+function DepositBadge({ deposit }: { deposit?: Deposit | null }) {
+  if (!deposit) return <StatusPill status="none" tone="danger" label="غير مقبوض" />
+  const meta = depositLabel[deposit.status] ?? { label: deposit.status, tone: 'muted' as const }
+  return <StatusPill status={deposit.status} tone={meta.tone} label={meta.label} />
 }
 
 const chips = [
@@ -377,14 +392,14 @@ export function BookingsPage() {
         {b.status === 'pending' ? (
           <>
             <Button type="button" size="sm" onClick={() => void approve(b.id)}>اعتماد</Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
+            <Button type="button" size="sm" variant="danger" onClick={() => void openAction('cancel', b)}>إلغاء العقد</Button>
           </>
         ) : null}
         {b.status === 'approved' ? (
           <>
             <Button type="button" size="sm" onClick={() => void openAction('handover', b)}>تسليم</Button>
             {!b.deposit ? <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deposit', b)}>قبض تأمين</Button> : null}
-            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('cancel', b)}>إلغاء</Button>
+            <Button type="button" size="sm" variant="danger" onClick={() => void openAction('cancel', b)}>إلغاء العقد</Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
           </>
         ) : null}
@@ -410,6 +425,106 @@ export function BookingsPage() {
     )
   }
 
+  function contractMenu(b: Contract): MenuItem[] {
+    const items: MenuItem[] = [
+      { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: () => void openDetail(b.id) },
+      { id: 'sep-1', separator: true },
+    ]
+    if (b.status === 'pending') {
+      items.push({ id: 'approve', label: 'اعتماد', icon: <IconCheck size={16} />, onSelect: () => void approve(b.id) })
+    }
+    if (b.status === 'approved') {
+      items.push({ id: 'handover', label: 'تسليم', icon: <IconKey size={16} />, onSelect: () => void openAction('handover', b) })
+    }
+    if (b.status === 'active') {
+      items.push({ id: 'return', label: 'استلام وإقفال', icon: <IconReturn size={16} />, onSelect: () => void openAction('return', b) })
+    }
+    if ((b.status === 'approved' || b.status === 'active') && !b.deposit) {
+      items.push({ id: 'deposit', label: 'قبض تأمين', icon: <IconCash size={16} />, onSelect: () => void openAction('deposit', b) })
+    }
+    if (b.status === 'approved' || b.status === 'active' || b.status === 'completed') {
+      items.push({ id: 'extend', label: 'تمديد', icon: <IconCalendar size={16} />, onSelect: () => void openAction('extend', b) })
+    }
+    if (b.status === 'active') {
+      items.push({ id: 'swap', label: 'تبديل عطل', icon: <IconCar size={16} />, onSelect: () => void openAction('swap', b) })
+    }
+    if (b.deposit && b.deposit.status !== 'returned') {
+      items.push(
+        { id: 'deduct', label: 'خصم تأمين', icon: <IconWallet size={16} />, onSelect: () => void openAction('deduct', b) },
+        { id: 'refund', label: 'رد تأمين', icon: <IconReturn size={16} />, onSelect: () => void openAction('refund', b) },
+      )
+    }
+    items.push({ id: 'print', label: 'طباعة', icon: <IconPrinter size={16} />, onSelect: () => void printContract(b.id) })
+    if (b.status === 'pending' || b.status === 'approved') {
+      items.push(
+        { id: 'sep-2', separator: true },
+        { id: 'cancel', label: 'إلغاء العقد', icon: <IconBan size={16} />, tone: 'danger', onSelect: () => void openAction('cancel', b) },
+      )
+    }
+    return items
+  }
+
+  const columns: DataColumn<Contract>[] = [
+    {
+      id: 'number',
+      header: 'رقم العقد',
+      cell: (b) => <span className="rpm-table__code">{b.number}</span>,
+      sortValue: (b) => b.number,
+      mobile: 'title',
+    },
+    {
+      id: 'customer',
+      header: 'العميل',
+      cell: (b) => <strong className="rpm-table__primary">{b.customer?.full_name || '—'}</strong>,
+      sortValue: (b) => b.customer?.full_name,
+      mobile: 'subtitle',
+    },
+    {
+      id: 'vehicle',
+      header: 'المركبة',
+      cell: (b) =>
+        b.vehicle ? (
+          <>
+            <span className="rpm-table__primary">{b.vehicle.brand} {b.vehicle.model}</span>
+            <span className="rpm-table__sub">{b.vehicle.plate}</span>
+          </>
+        ) : '—',
+      sortValue: (b) => (b.vehicle ? `${b.vehicle.brand} ${b.vehicle.model}` : null),
+      wide: true,
+    },
+    {
+      id: 'period',
+      header: 'الفترة',
+      cell: (b) => (
+        <>
+          <span className="rpm-table__primary">{formatDateTime(b.starts_at)}</span>
+          <span className="rpm-table__sub">حتى {formatDateTime(b.planned_ends_at)}</span>
+        </>
+      ),
+      sortValue: (b) => b.starts_at,
+      wide: true,
+    },
+    {
+      id: 'rate',
+      header: 'اليومي',
+      cell: (b) => formatMoney(b.frozen_daily_rate),
+      sortValue: (b) => Number(b.frozen_daily_rate),
+    },
+    {
+      id: 'deposit',
+      header: 'التأمين',
+      cell: (b) => <DepositBadge deposit={b.deposit} />,
+      sortValue: (b) => b.deposit?.status ?? '',
+    },
+    {
+      id: 'status',
+      header: 'الحالة',
+      cell: (b) => <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />,
+      sortValue: (b) => b.status,
+      mobile: 'badge',
+    },
+  ]
+
   return (
     <div className="rpm-stack">
       <PageHeader
@@ -431,31 +546,22 @@ export function BookingsPage() {
 
       <FilterBar search={search} onSearchChange={setSearch} chips={chips} activeChip={chip} onChipChange={setChip} placeholder="بحث برقم العقد أو العميل…" />
 
-      {loading ? <SkeletonBlock rows={6} /> : null}
-      {!loading && error ? <ErrorState title="تعذّر تحميل العقود" description={error} /> : null}
-      {!loading && !error && rows.length === 0 ? <EmptyState title="لا توجد عقود مطابقة" /> : null}
-
-      {!loading && !error && rows.length > 0 ? (
-        <div className="rpm-card-list">
-          {rows.map((b) => (
-            <button key={b.id} type="button" className="rpm-card is-clickable" onClick={() => void openDetail(b.id)}>
-              <div className="rpm-card__row">
-                <strong>{b.number}</strong>
-                <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />
-              </div>
-              <p>{b.customer?.full_name}</p>
-              <p className="muted">{b.vehicle?.brand} {b.vehicle?.model} · {b.vehicle?.plate}</p>
-              <p className="muted">{formatDateTime(b.starts_at)} → {formatDateTime(b.planned_ends_at)}</p>
-              <div className="rpm-card__meta">
-                <span>{formatMoney(b.frozen_daily_rate)} / يوم</span>
-                {b.final_total ? <span>الإجمالي: {formatMoney(b.final_total)}</span> : null}
-                {b.deposit ? <span>تأمين: {b.deposit.status}</span> : null}
-                <IconChevron size={16} className="rpm-card__chev" />
-              </div>
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {error ? (
+        <ErrorState title="تعذّر تحميل العقود" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
+      ) : (
+        <DataTable
+          label="العقود"
+          rows={rows}
+          columns={columns}
+          rowKey={(b) => b.id}
+          rowLabel={(b) => `عقد ${b.number}`}
+          loading={loading}
+          onRowClick={(b) => void openDetail(b.id)}
+          rowActions={contractMenu}
+          emptyTitle="لا توجد عقود مطابقة"
+          emptyDescription="غيّر البحث أو الفلتر، أو أضف حجزاً جديداً."
+        />
+      )}
 
       <Sheet
         open={sheetOpen}
@@ -531,14 +637,13 @@ export function BookingsPage() {
             <DetailList
               rows={[
                 { label: 'الحالة', value: <StatusPill status={detail.status} label={statusLabel[detail.status] || detail.status} /> },
-                { label: 'رقم العقد', value: detail.number },
-                { label: 'العميل', value: detail.customer?.full_name || '—' },
-                { label: 'المركبة', value: detail.vehicle ? `${detail.vehicle.brand} ${detail.vehicle.model} · ${detail.vehicle.plate}` : '—' },
+                { label: 'حالة التأمين', value: <DepositBadge deposit={detail.deposit} /> },
+                { label: 'العميل', value: detail.customer?.full_name || '—', wide: true },
+                { label: 'المركبة', value: detail.vehicle ? `${detail.vehicle.brand} ${detail.vehicle.model} · ${detail.vehicle.plate}` : '—', wide: true },
                 { label: 'البداية', value: formatDateTime(detail.starts_at) },
                 { label: 'النهاية المخططة', value: formatDateTime(detail.planned_ends_at) },
                 { label: 'السعر اليومي', value: formatMoney(detail.frozen_daily_rate) },
                 { label: 'التأمين المتفق', value: formatMoney(detail.frozen_agreed_deposit || 0) },
-                { label: 'حالة التأمين', value: detail.deposit?.status || 'غير مقبوض' },
                 { label: 'عداد الخروج', value: detail.odometer_out != null ? `${formatNumber(detail.odometer_out)} كم` : '—' },
                 { label: 'الإجمالي النهائي', value: detail.final_total != null ? formatMoney(detail.final_total) : '—' },
               ]}
