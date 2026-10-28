@@ -86,6 +86,12 @@ class VehicleController extends Controller
             'tracker_sim_number' => ['nullable', 'string', 'max:100'],
             'color' => ['nullable', 'string', 'max:50'],
             'transmission' => ['nullable', 'string', 'max:50'],
+            'chassis_number' => ['nullable', 'string', 'max:100'],
+            'engine_number' => ['nullable', 'string', 'max:100'],
+            'engine_capacity' => ['nullable', 'string', 'max:50'],
+            'seats' => ['nullable', 'integer', 'min:1', 'max:60'],
+            'target_monthly_income' => ['nullable', 'integer', 'min:0'],
+            'purchase_value_estimate' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'owner_id' => ['nullable', 'integer', 'exists:vehicle_owners,id'],
@@ -260,6 +266,38 @@ class VehicleController extends Controller
         $qr = url('/showroom?vehicle='.$vehicle->id);
         $qrLabel = trim($vehicle->brand.' '.$vehicle->model.' · '.$vehicle->plate);
 
+        $contractStatus = $contracts->groupBy('status')->map(fn ($rows, $status) => [
+            'status' => $status,
+            'label' => $status,
+            'count' => $rows->count(),
+        ])->values();
+
+        $months = collect(range(0, 11))->map(fn ($i) => now()->startOfMonth()->subMonths(11 - $i)->format('Y-m'));
+
+        $expensesByMonth = $months->map(function (string $ym) use ($expenses) {
+            $sum = $expenses->filter(fn ($e) => is_string($e['spent_on'] ?? null) && str_starts_with((string) $e['spent_on'], $ym))
+                ->sum('amount');
+
+            return ['month' => $ym, 'amount' => (int) $sum];
+        });
+
+        $maintenanceByMonth = $months->map(function (string $ym) use ($workOrders) {
+            $rows = $workOrders->filter(fn ($w) => is_string($w['opened_on'] ?? null) && str_starts_with((string) $w['opened_on'], $ym));
+            $cost = $rows->sum(fn ($w) => (int) ($w['parts_cost'] ?? 0) + (int) ($w['labor_cost'] ?? 0));
+
+            return ['month' => $ym, 'amount' => (int) $cost, 'count' => $rows->count()];
+        });
+
+        $revenueByMonth = $months->map(function (string $ym) use ($contracts) {
+            $sum = $contracts->filter(function ($c) use ($ym) {
+                $start = is_string($c['starts_at'] ?? null) ? substr((string) $c['starts_at'], 0, 7) : null;
+
+                return $start === $ym && in_array($c['status'], ['active', 'completed', 'approved'], true);
+            })->sum(fn ($c) => (int) ($c['final_total'] ?? $c['period_rent'] ?? 0));
+
+            return ['month' => $ym, 'amount' => (int) $sum];
+        });
+
         return response()->json([
             'data' => [
                 'vehicle' => $this->present($vehicle),
@@ -274,12 +312,24 @@ class VehicleController extends Controller
                     'payload' => $qr,
                     'label' => $qrLabel,
                 ],
+                'charts' => [
+                    'contracts_by_status' => $contractStatus,
+                    'expenses_by_month' => $expensesByMonth->values(),
+                    'maintenance_by_month' => $maintenanceByMonth->values(),
+                    'revenue_by_month' => $revenueByMonth->values(),
+                ],
                 'totals' => [
                     'contracts' => $contracts->count(),
                     'work_orders' => $workOrders->count(),
                     'expenses_amount' => $expenses->sum('amount'),
                     'violations' => $violations->count(),
                     'media' => $media->count(),
+                    'maintenance_cost' => $workOrders->sum(fn ($w) => (int) ($w['parts_cost'] ?? 0) + (int) ($w['labor_cost'] ?? 0)),
+                    'revenue_amount' => $contracts
+                        ->filter(fn ($c) => in_array($c['status'], ['active', 'completed', 'approved'], true))
+                        ->sum(fn ($c) => (int) ($c['final_total'] ?? $c['period_rent'] ?? 0)),
+                    'accessories' => $vehicle->accessories->count(),
+                    'documents' => $vehicle->documents->count(),
                 ],
             ],
         ]);
@@ -301,6 +351,14 @@ class VehicleController extends Controller
             'rental_priority' => ['nullable', 'integer', 'min:0', 'max:100'],
             'tracker_device_number' => ['nullable', 'string', 'max:100'],
             'tracker_sim_number' => ['nullable', 'string', 'max:100'],
+            'color' => ['nullable', 'string', 'max:50'],
+            'transmission' => ['nullable', 'string', 'max:50'],
+            'chassis_number' => ['nullable', 'string', 'max:100'],
+            'engine_number' => ['nullable', 'string', 'max:100'],
+            'engine_capacity' => ['nullable', 'string', 'max:50'],
+            'seats' => ['nullable', 'integer', 'min:1', 'max:60'],
+            'target_monthly_income' => ['nullable', 'integer', 'min:0'],
+            'purchase_value_estimate' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'owner_id' => ['nullable', 'integer', 'exists:vehicle_owners,id'],
@@ -353,12 +411,22 @@ class VehicleController extends Controller
             'year' => $v->year,
             'category' => $v->category,
             'fuel_type' => $v->fuel_type,
+            'color' => $v->color,
+            'transmission' => $v->transmission,
+            'chassis_number' => $v->chassis_number,
+            'engine_number' => $v->engine_number,
+            'engine_capacity' => $v->engine_capacity,
+            'seats' => $v->seats,
             'odometer' => $v->odometer,
+            'odometer_source' => $v->odometer_source,
             'daily_rate' => $v->daily_rate,
             'default_deposit' => $v->default_deposit,
+            'target_monthly_income' => $v->target_monthly_income,
+            'purchase_value_estimate' => $v->purchase_value_estimate,
             'rental_priority' => $v->rental_priority,
             'tracker_device_number' => $v->tracker_device_number,
             'tracker_sim_number' => $v->tracker_sim_number,
+            'manual_status' => $v->manual_status,
             'is_active' => $v->is_active,
             'status' => $status,
             'owner_id' => $v->owner_id,
@@ -372,6 +440,8 @@ class VehicleController extends Controller
             'accessories' => $v->relationLoaded('accessories') ? $v->accessories : null,
             'documents' => $v->relationLoaded('documents') ? $v->documents : null,
             'notes' => $v->notes,
+            'created_at' => $v->created_at?->toIso8601String(),
+            'updated_at' => $v->updated_at?->toIso8601String(),
         ];
     }
 

@@ -281,18 +281,72 @@ class OperationsController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
-            'default_qty' => ['nullable', 'integer', 'min:1'],
+            'default_qty' => ['nullable', 'integer', 'min:1', 'max:999'],
             'required_each_rental' => ['nullable', 'boolean'],
-        ], [], ['name' => 'اسم المستلزم']);
+            'is_active' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+        ], [], ['name' => 'اسم المستلزم', 'default_qty' => 'الكمية']);
 
         $row = $vehicle->accessories()->create([
             'name' => $data['name'],
             'default_qty' => $data['default_qty'] ?? 1,
             'required_each_rental' => $data['required_each_rental'] ?? true,
-            'is_active' => true,
+            'is_active' => $data['is_active'] ?? true,
+            'notes' => $data['notes'] ?? null,
+            'sort_order' => $data['sort_order'] ?? 0,
         ]);
 
         return response()->json(['data' => $row, 'message' => 'تم إضافة المستلزم.'], 201);
+    }
+
+    public function updateVehicleAccessory(Request $request, Vehicle $vehicle, int $accessory): JsonResponse
+    {
+        $row = $vehicle->accessories()->whereKey($accessory)->firstOrFail();
+        $data = $request->validate([
+            'name' => ['sometimes', 'string', 'max:120'],
+            'default_qty' => ['nullable', 'integer', 'min:1', 'max:999'],
+            'required_each_rental' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+        ], [], ['name' => 'اسم المستلزم', 'default_qty' => 'الكمية']);
+
+        $row->update($data);
+
+        return response()->json(['data' => $row->fresh(), 'message' => 'تم تحديث المستلزم.']);
+    }
+
+    public function destroyVehicleAccessory(Vehicle $vehicle, int $accessory): JsonResponse
+    {
+        $row = $vehicle->accessories()->whereKey($accessory)->firstOrFail();
+        $row->delete();
+
+        return response()->json(['message' => 'تم حذف المستلزم.']);
+    }
+
+    public function updateVehicleDocument(Request $request, Vehicle $vehicle, int $document): JsonResponse
+    {
+        $row = $vehicle->documents()->whereKey($document)->firstOrFail();
+        $data = $request->validate([
+            'type' => ['sometimes', 'string', 'max:100'],
+            'file_path' => ['nullable', 'string', 'max:500'],
+            'issued_on' => ['nullable', 'date'],
+            'expires_on' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string'],
+        ], [], ['type' => 'نوع المستند']);
+
+        $row->update($data);
+
+        return response()->json(['data' => $row->fresh(), 'message' => 'تم تحديث المستند.']);
+    }
+
+    public function destroyVehicleDocument(Vehicle $vehicle, int $document): JsonResponse
+    {
+        $row = $vehicle->documents()->whereKey($document)->firstOrFail();
+        $row->delete();
+
+        return response()->json(['message' => 'تم حذف المستند.']);
     }
 
     public function qrPayload(Request $request): JsonResponse

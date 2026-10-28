@@ -83,7 +83,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->middleware('permission:vehicles.archive');
     Route::post('/vehicles/{vehicle}/documents', [OperationsController::class, 'storeVehicleDocument'])
         ->middleware('permission:vehicles.update');
+    Route::put('/vehicles/{vehicle}/documents/{document}', [OperationsController::class, 'updateVehicleDocument'])
+        ->middleware('permission:vehicles.update');
+    Route::delete('/vehicles/{vehicle}/documents/{document}', [OperationsController::class, 'destroyVehicleDocument'])
+        ->middleware('permission:vehicles.update');
     Route::post('/vehicles/{vehicle}/accessories', [OperationsController::class, 'storeVehicleAccessory'])
+        ->middleware('permission:vehicles.update');
+    Route::put('/vehicles/{vehicle}/accessories/{accessory}', [OperationsController::class, 'updateVehicleAccessory'])
+        ->middleware('permission:vehicles.update');
+    Route::delete('/vehicles/{vehicle}/accessories/{accessory}', [OperationsController::class, 'destroyVehicleAccessory'])
         ->middleware('permission:vehicles.update');
     Route::get('/vehicles/{vehicle}/estimated-odometer', [OperationsController::class, 'estimatedOdometer'])
         ->middleware('permission:vehicles.view');
