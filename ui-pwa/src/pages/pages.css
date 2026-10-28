@@ -20,10 +20,7 @@
   display: grid;
   place-items: center;
   padding: 1.25rem;
-  background:
-    radial-gradient(900px 520px at 100% 0%, rgb(220 38 38 / 22%), transparent 60%),
-    radial-gradient(700px 420px at 0% 100%, rgb(255 255 255 / 5%), transparent 55%),
-    linear-gradient(160deg, #09090b, #18181b 60%, #0c0c0e);
+  background: #09090b;
 }
 
 .rpm-login__card {

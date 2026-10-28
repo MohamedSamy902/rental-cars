@@ -258,7 +258,7 @@
 
 .cal-event.is-featured {
   border-color: color-mix(in srgb, var(--brand) 40%, var(--border));
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--brand) 12%, transparent);
+  box-shadow: var(--shadow-sm);
 }
 
 .cal-event__top {

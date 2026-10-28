@@ -44,9 +44,12 @@
   --on-action: var(--on-brand);
   --on-action-hover: #ffffff;
   /* Floating action + "on" controls need a solid, high-contrast fill */
-  --fab-bg: #18181b;
+  --fab-bg: #dc2626;
   --fab-hover: #b91c1c;
   --control-on: #18181b;
+  /* Bottom nav: transparent items, color-only active state */
+  --dock-idle: #71717a;
+  --dock-active: #dc2626;
 
   --success: #059669;
   --success-soft: #ecfdf5;
@@ -71,6 +74,7 @@
 
   --shadow-xs: 0 1px 2px rgb(24 24 27 / 4%);
   --shadow-sm: 0 1px 3px rgb(24 24 27 / 7%), 0 1px 2px rgb(24 24 27 / 4%);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
   --shadow: 0 10px 28px rgb(24 24 27 / 7%);
   --shadow-lg: 0 22px 48px rgb(24 24 27 / 12%);
   --shadow-rail: 0 12px 32px rgb(24 24 27 / 8%);
@@ -85,13 +89,8 @@
   --tooltip-bg: #18181b;
   --tooltip-text: #fafafa;
 
-  --bg-mesh-1: rgb(220 38 38 / 3.5%);
-  --bg-mesh-2: rgb(24 24 27 / 3%);
-  --bg-mesh-3: rgb(113 113 122 / 2.5%);
-
   --rail-bg: #ffffff;
   --rail-border: var(--border);
-  --rail-brand-shadow: 0 10px 24px rgb(24 24 27 / 18%);
   --rail-divider: var(--hairline);
   --rail-quit-bg: #fef2f2;
   --rail-theme-bg: #f4f4f5;
@@ -163,6 +162,8 @@
   --fab-bg: #dc2626;
   --fab-hover: #b91c1c;
   --control-on: #dc2626;
+  --dock-idle: #71717a;
+  --dock-active: #dc2626;
 
   --success: #34d399;
   --success-soft: rgb(52 211 153 / 12%);
@@ -187,6 +188,7 @@
 
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%);
   --shadow-sm: 0 1px 3px rgb(0 0 0 / 45%);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 40%), 0 2px 4px -2px rgb(0 0 0 / 40%);
   --shadow: 0 14px 36px rgb(0 0 0 / 45%);
   --shadow-lg: 0 28px 60px rgb(0 0 0 / 55%);
   --shadow-rail: 0 18px 40px rgb(0 0 0 / 50%);
@@ -201,13 +203,8 @@
   --tooltip-bg: #fafafa;
   --tooltip-text: #18181b;
 
-  --bg-mesh-1: rgb(239 68 68 / 7%);
-  --bg-mesh-2: rgb(161 161 170 / 4%);
-  --bg-mesh-3: rgb(250 250 250 / 2%);
-
   --rail-bg: #111113;
   --rail-border: #1f1f23;
-  --rail-brand-shadow: 0 12px 28px rgb(0 0 0 / 40%);
   --rail-divider: #1f1f23;
   --rail-quit-bg: rgb(248 113 113 / 10%);
   --rail-theme-bg: rgb(255 255 255 / 5%);

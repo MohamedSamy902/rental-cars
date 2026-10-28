@@ -17,7 +17,7 @@
   white-space: nowrap;
   background: var(--badge-bg);
   color: var(--badge-fg);
-  border: 1px solid color-mix(in srgb, var(--badge-dot) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-dot) 22%, var(--border));
 }
 
 .rpm-badge__dot {
@@ -26,7 +26,6 @@
   border-radius: 999px;
   flex-shrink: 0;
   background: var(--badge-dot);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--badge-dot) 22%, transparent);
 }
 
 .rpm-badge--success {

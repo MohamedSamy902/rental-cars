@@ -27,10 +27,7 @@
   overflow: hidden;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background:
-    radial-gradient(120% 80% at 100% 0%, var(--bg-mesh-1), transparent 55%),
-    radial-gradient(90% 70% at 0% 100%, var(--bg-mesh-2), transparent 50%),
-    linear-gradient(165deg, var(--surface) 0%, var(--bg) 58%, var(--surface-2) 100%);
+  background: var(--surface);
   padding: var(--vd-pad);
 }
 
@@ -502,7 +499,6 @@
   margin-block-start: 0.35rem;
   border-radius: 50%;
   background: var(--brand);
-  box-shadow: 0 0 0 4px var(--brand-soft);
   justify-self: center;
 }
 

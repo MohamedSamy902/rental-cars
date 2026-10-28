@@ -22,36 +22,34 @@
     border-radius: 999px;
     border: 0;
     background: var(--fab-bg);
-    color: var(--on-accent);
-    box-shadow:
-      0 10px 24px -6px color-mix(in srgb, var(--fab-bg) 55%, transparent),
-      var(--shadow-lg);
+    color: #ffffff;
+    box-shadow: var(--shadow-md);
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
     transition:
       transform var(--motion-fast) ease,
-      background-color var(--motion-fast) ease,
-      box-shadow var(--motion-fast) ease;
+      background-color var(--motion-fast) ease;
   }
 
-  .rpm-fab:hover {
+  .rpm-fab:hover,
+  .rpm-fab:active {
     background: var(--fab-hover);
   }
 
   .rpm-fab:active {
-    transform: scale(0.94);
-    background: var(--fab-hover);
+    transform: scale(0.98);
   }
 
   .rpm-fab:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ring-strong);
+    outline: 2px solid var(--ring-strong);
+    outline-offset: 3px;
   }
 
   .rpm-fab:disabled {
     opacity: 0.6;
   }
 
-  /* Leave room so the last card is never trapped under the FAB */
+  /* The FAB's top edge sits ~8.4rem up; keep the last card fully clear of it */
   .shell-main:has(.rpm-fab-dock) {
     padding-block-end: calc(var(--bottom-nav-height) + 5.5rem + var(--safe-bottom));
   }

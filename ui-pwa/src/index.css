@@ -31,11 +31,7 @@ body {
   font-size: 15px;
   line-height: 1.55;
   color: var(--text);
-  background:
-    radial-gradient(980px 520px at 88% -8%, var(--bg-mesh-1), transparent 58%),
-    radial-gradient(820px 460px at 4% 100%, var(--bg-mesh-2), transparent 52%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background var(--motion) var(--ease), color var(--motion) var(--ease);

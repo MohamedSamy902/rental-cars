@@ -46,10 +46,8 @@
 
 .rpm-toast--success::before {
   background: var(--success);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent);
 }
 
 .rpm-toast--error::before {
   background: var(--danger);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 25%, transparent);
 }

@@ -582,13 +582,6 @@ export function DashboardPage() {
               <div className="db-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={revenueSeries} margin={{ top: 6, right: 2, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={palette.line} stopOpacity={0.22} />
-                        <stop offset="45%" stopColor={palette.line} stopOpacity={0.08} />
-                        <stop offset="100%" stopColor={palette.line} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
                     <XAxis
                       dataKey="label"
                       tickLine={false}
@@ -607,7 +600,8 @@ export function DashboardPage() {
                       dataKey="value"
                       stroke={palette.line}
                       strokeWidth={2.5}
-                      fill="url(#revFill)"
+                      fill={palette.line}
+                      fillOpacity={0.08}
                       animationDuration={850}
                       activeDot={{ r: 4, fill: palette.dot, stroke: palette.dotRing, strokeWidth: 2 }}
                     />

@@ -314,8 +314,8 @@ export function AppShell() {
             end={item.end}
             className={({ isActive }) => `shell-dock__item ${isActive ? 'is-active' : ''}`}
           >
-            {item.icon}
-            <span>{item.label}</span>
+            <span className="shell-dock__icon" aria-hidden="true">{item.icon}</span>
+            <span className="shell-dock__label">{item.label}</span>
           </NavLink>
         ))}
       </nav>

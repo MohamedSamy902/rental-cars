@@ -654,17 +654,11 @@ export function VehicleDetailPage() {
           <div className="vd-chart-card__body">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={revenueSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="vdRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="var(--brand)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} width={48} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
                 <Tooltip formatter={(value) => [formatMoney(Number(value ?? 0)), 'الإيراد']} contentStyle={{ borderRadius: 12, border: '1px solid var(--border)' }} />
-                <Area type="monotone" dataKey="amount" stroke="var(--brand)" strokeWidth={2.4} fill="url(#vdRev)" />
+                <Area type="monotone" dataKey="amount" stroke="var(--brand)" strokeWidth={2.4} fill="var(--brand)" fillOpacity={0.08} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
