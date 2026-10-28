@@ -7,6 +7,7 @@ use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\InventoryItem;
 use App\Models\Notification;
+use App\Models\TenantSetting;
 use App\Models\Vehicle;
 use App\Models\Violation;
 use App\Models\WorkOrder;
@@ -20,7 +21,15 @@ class DashboardController extends Controller
 
     public function __invoke(Request $request): JsonResponse
     {
-        $vehicles = Vehicle::query()->where('is_active', true)->get();
+        $vehicles = Vehicle::query()->where('is_active', true)->get(['id', 'manual_status']);
+        $activeIds = Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip();
+        $reservedIds = Contract::query()
+            ->where('status', 'approved')
+            ->where('starts_at', '<=', now())
+            ->where('planned_ends_at', '>=', now())
+            ->pluck('vehicle_id')
+            ->flip();
+
         $statusCounts = [
             'available' => 0,
             'reserved' => 0,
@@ -31,12 +40,8 @@ class DashboardController extends Controller
         foreach ($vehicles as $v) {
             $status = $this->availability->statusOnDate([
                 'manual_status' => $v->manual_status,
-                'has_active_handover' => $v->contracts()->where('status', 'active')->exists(),
-                'has_approved_covering_date' => $v->contracts()
-                    ->where('status', 'approved')
-                    ->where('starts_at', '<=', now())
-                    ->where('planned_ends_at', '>=', now())
-                    ->exists(),
+                'has_active_handover' => $activeIds->has($v->id),
+                'has_approved_covering_date' => $reservedIds->has($v->id),
                 'open_work_order_blocks' => $v->manual_status === 'maintenance',
             ]);
             if (isset($statusCounts[$status])) {
@@ -44,20 +49,20 @@ class DashboardController extends Controller
             }
         }
 
-        $active = Contract::query()->where('status', 'active')->count();
+        $active = $activeIds->count();
         $returningToday = Contract::query()
             ->where('status', 'active')
             ->whereDate('planned_ends_at', today())
             ->count();
         $expectedRevenue = (int) Contract::query()
             ->whereIn('status', ['approved', 'active'])
-            ->get()
+            ->get(['frozen_daily_rate', 'starts_at', 'planned_ends_at'])
             ->sum(function (Contract $c) {
                 return (int) $c->frozen_daily_rate * max(1, $c->starts_at->diffInDays($c->planned_ends_at));
             });
 
         $tasks = Contract::query()
-            ->with(['customer', 'vehicle'])
+            ->with(['customer:id,full_name', 'vehicle:id,brand,model'])
             ->whereIn('status', ['pending', 'approved', 'active'])
             ->orderBy('planned_ends_at')
             ->limit(8)
@@ -79,12 +84,14 @@ class DashboardController extends Controller
                 ];
             });
 
-        $lowStock = InventoryItem::query()->get()->filter(function (InventoryItem $item) {
-            return $item->remainingQuantity() <= $item->reorder_level;
-        })->count();
+        $lowStock = InventoryItem::query()->withSum('batches as remaining_sum', 'remaining')->get()
+            ->filter(fn (InventoryItem $item) => (int) ($item->remaining_sum ?? 0) <= (int) $item->reorder_level)
+            ->count();
+
+        $center = TenantSetting::query()->value('center_name') ?: 'مركز التأجير';
 
         return response()->json([
-            'center_name' => 'مركز التأجير',
+            'center_name' => $center,
             'occupancy_pct' => $vehicles->count() ? (int) round(($statusCounts['rented'] / $vehicles->count()) * 100) : 0,
             'fleet_total' => $vehicles->count(),
             'fleet_status' => $statusCounts,
@@ -105,7 +112,7 @@ class DashboardController extends Controller
             ],
             'tasks' => $tasks,
             'recent_contracts' => Contract::query()
-                ->with(['customer', 'vehicle'])
+                ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
                 ->latest('id')
                 ->limit(5)
                 ->get(),

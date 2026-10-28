@@ -3,29 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\InventoryBatch;
-use App\Models\InventoryItem;
+use App\Services\Inventory\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class InventoryController extends Controller
 {
+    public function __construct(private readonly InventoryService $inventory) {}
+
     public function index(Request $request): JsonResponse
     {
-        $items = InventoryItem::query()->with('batches')->latest('id')->get()->map(function (InventoryItem $item) {
-            return [
-                'id' => $item->id,
-                'code' => $item->code,
-                'name' => $item->name,
-                'category' => $item->category,
-                'unit' => $item->unit,
-                'reorder_level' => $item->reorder_level,
-                'remaining' => $item->remainingQuantity(),
-                'is_low' => $item->remainingQuantity() <= $item->reorder_level,
-            ];
-        });
-
-        return response()->json(['data' => $items]);
+        return response()->json(['data' => $this->inventory->catalog()]);
     }
 
     public function storeItem(Request $request): JsonResponse
@@ -46,7 +34,7 @@ class InventoryController extends Controller
             'reorder_level' => 'حد التنبيه',
         ]);
 
-        $item = InventoryItem::query()->create($data);
+        $item = $this->inventory->storeItem($data);
 
         return response()->json(['data' => $item, 'message' => 'تم إضافة الصنف.'], 201);
     }
@@ -69,12 +57,7 @@ class InventoryController extends Controller
             'unit_cost' => 'سعر الوحدة',
         ]);
 
-        $batch = InventoryBatch::query()->create([
-            ...$data,
-            'remaining' => $data['quantity'],
-            'recorded_by' => $request->user()?->id,
-            'from_petty_cash' => (bool) ($data['from_petty_cash'] ?? false),
-        ]);
+        $batch = $this->inventory->receiveBatch($data, $request->user()?->id);
 
         return response()->json(['data' => $batch, 'message' => 'تم إدخال دفعة المخزون.'], 201);
     }

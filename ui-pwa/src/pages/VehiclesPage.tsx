@@ -73,6 +73,8 @@ export function VehiclesPage() {
   const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '' })
   const [accName, setAccName] = useState('')
   const [qrLabel, setQrLabel] = useState('')
+  const [qrImage, setQrImage] = useState('')
+  const [estimatedKm, setEstimatedKm] = useState<number | null>(null)
 
   async function load(nextSearch = search, nextChip = chip) {
     setLoading(true)
@@ -100,6 +102,8 @@ export function VehiclesPage() {
     setDetailLoading(true)
     setEditing(false)
     setQrLabel('')
+    setQrImage('')
+    setEstimatedKm(null)
     try {
       const res = await api<{ data: Vehicle }>(`/vehicles/${id}`)
       setDetail(res.data)
@@ -224,14 +228,51 @@ export function VehiclesPage() {
     }
   }
 
+  function buildQrDataUrl(text: string) {
+    const canvas = document.createElement('canvas')
+    const size = 180
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return ''
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, size, size)
+    ctx.fillStyle = '#0f172a'
+    // نمط شبكة بسيط مشتق من النص (رمز مرئي داخلي — ليس معيار QR خارجي)
+    let h = 0
+    for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0
+    const cells = 21
+    const cell = Math.floor(size / cells)
+    for (let y = 0; y < cells; y += 1) {
+      for (let x = 0; x < cells; x += 1) {
+        const bit = ((h >> ((x + y) % 24)) ^ (x * 7 + y * 13 + text.length)) & 1
+        if (bit || (x < 3 && y < 3) || (x > cells - 4 && y < 3) || (x < 3 && y > cells - 4)) {
+          ctx.fillRect(x * cell, y * cell, cell - 1, cell - 1)
+        }
+      }
+    }
+    return canvas.toDataURL('image/png')
+  }
+
   async function showQr() {
     if (!detail) return
     try {
       const res = await api<{ data: { qr: string; label: string } }>(`/qr?type=vehicle&id=${detail.id}`)
       setQrLabel(`${res.data.label}\n${res.data.qr}`)
+      setQrImage(buildQrDataUrl(res.data.qr))
       toast.success('تم تجهيز رمز QR.')
     } catch (e) {
       toast.error((e as ApiError).message)
+    }
+  }
+
+  async function loadEstimated() {
+    if (!detail) return
+    try {
+      const res = await api<{ data: { estimated: number } }>(`/vehicles/${detail.id}/estimated-odometer`)
+      setEstimatedKm(res.data.estimated)
+    } catch {
+      setEstimatedKm(null)
     }
   }
 
@@ -364,6 +405,7 @@ export function VehiclesPage() {
                 <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
               )}
               <Button variant="secondary" onClick={() => void showQr()}>QR</Button>
+              <Button variant="secondary" onClick={() => void loadEstimated()}>عداد تقديري</Button>
             </>
           ) : null
         }
@@ -391,7 +433,9 @@ export function VehiclesPage() {
                 { label: 'ملاحظات', value: detail.notes || '—' },
               ]}
             />
+            {estimatedKm != null ? <p className="muted">العداد التقديري أثناء التأجير: {formatNumber(estimatedKm)} كم</p> : null}
             {qrLabel ? <pre className="rpm-qr-box">{qrLabel}</pre> : null}
+            {qrImage ? <img className="rpm-qr-img" src={qrImage} alt="رمز QR" width={180} height={180} /> : null}
 
             <section className="rpm-panel" style={{ marginTop: '0.75rem' }}>
               <div className="rpm-panel__head"><h3>المستندات</h3></div>

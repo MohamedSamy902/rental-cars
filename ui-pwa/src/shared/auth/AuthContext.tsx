@@ -9,6 +9,7 @@ export type AuthUser = {
   role_name?: string | null
   permissions?: string[]
   is_integrator?: boolean
+  feature_flags?: Record<string, boolean>
 }
 
 type AuthApi = {
@@ -17,7 +18,9 @@ type AuthApi = {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   can: (permission: string) => boolean
+  featureEnabled: (flag: string) => boolean
   isIntegrator: boolean
+  featureFlags: Record<string, boolean>
 }
 
 const AuthContext = createContext<AuthApi | null>(null)
@@ -41,14 +44,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthApi>(() => {
     const isIntegrator = Boolean(user?.is_integrator || user?.role_name === 'super_admin')
     const perms = user?.permissions || []
+    const featureFlags = user?.feature_flags || {}
     return {
       user,
       loading,
       isIntegrator,
+      featureFlags,
       can(permission: string) {
         if (!user) return false
         if (isIntegrator) return true
         return perms.includes(permission)
+      },
+      featureEnabled(flag: string) {
+        if (!(flag in featureFlags)) return true
+        return Boolean(featureFlags[flag])
       },
       async login(email, password) {
         const res = await api<{ token: string; user: AuthUser }>('/login', {

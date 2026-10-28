@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\Api\AccountingController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CollaborationController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\OperationsController;
+use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\StaffController;
@@ -16,7 +19,7 @@ use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\WorkOrderController;
 use App\Models\Notification;
 use App\Models\TenantSetting;
-use App\Models\WaitlistRequest;
+use App\Services\Operations\WaitlistService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -28,77 +31,120 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', DashboardController::class);
 
     Route::get('/settings/tenant', function () {
-        $settings = TenantSetting::query()->first();
+        return response()->json(['data' => TenantSetting::query()->first()]);
+    })->middleware('permission:settings.view');
 
-        return response()->json(['data' => $settings]);
+    Route::put('/settings/operational', [OperationsController::class, 'updateOperational'])
+        ->middleware('permission:settings.update');
+    Route::put('/settings/tenant', [OperationsController::class, 'updateOperational'])
+        ->middleware('permission:settings.update');
+    Route::put('/integrator/tenant', [OperationsController::class, 'updateIntegrator'])
+        ->middleware('integrator');
+
+    Route::middleware('permission:staff.view')->group(function () {
+        Route::get('/staff', [StaffController::class, 'index']);
+        Route::get('/roles', [RoleController::class, 'index']);
     });
-    Route::put('/settings/tenant', [OperationsController::class, 'updateTenant']);
-
-    Route::get('/staff', [StaffController::class, 'index']);
-    Route::post('/staff', [StaffController::class, 'store']);
-    Route::put('/staff/{user}', [StaffController::class, 'update']);
-
-    Route::get('/employees/lookup', [OperationsController::class, 'employeesLookup']);
-    Route::get('/employees', [EmployeeController::class, 'index']);
-    Route::post('/employees', [EmployeeController::class, 'store']);
-    Route::put('/employees/{employee}', [EmployeeController::class, 'update']);
-
-    Route::get('/roles', [RoleController::class, 'index']);
-    Route::post('/roles', [RoleController::class, 'store']);
-    Route::put('/roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
-
-    Route::apiResource('vehicles', VehicleController::class);
-    Route::post('/vehicles/{vehicle}/documents', [OperationsController::class, 'storeVehicleDocument']);
-    Route::post('/vehicles/{vehicle}/accessories', [OperationsController::class, 'storeVehicleAccessory']);
-
-    Route::apiResource('customers', CustomerController::class);
-    Route::apiResource('contracts', ContractController::class)->only(['index', 'store', 'show']);
-    Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve']);
-    Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover']);
-    Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle']);
-    Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel']);
-    Route::post('/contracts/{contract}/extend', [ContractController::class, 'extend']);
-    Route::post('/contracts/{contract}/swap', [ContractController::class, 'swap']);
-    Route::post('/contracts/{contract}/deposit', [ContractController::class, 'receiveDeposit']);
-    Route::post('/contracts/{contract}/deposit/deduct', [ContractController::class, 'deductDeposit']);
-    Route::post('/contracts/{contract}/deposit/return', [ContractController::class, 'returnDeposit']);
-    Route::get('/contracts/{contract}/print', [ContractController::class, 'printData']);
-
-    Route::get('/showroom', [OperationsController::class, 'showroom']);
-    Route::get('/department-notice', [OperationsController::class, 'departmentNotice']);
-    Route::get('/audit-logs', [OperationsController::class, 'auditLogs']);
-    Route::get('/qr', [OperationsController::class, 'qrPayload']);
-
-    Route::get('/petty-cash', [OperationsController::class, 'pettyCashIndex']);
-    Route::post('/petty-cash', [OperationsController::class, 'pettyCashStore']);
-    Route::post('/petty-cash/{account}/move', [OperationsController::class, 'pettyCashMove']);
-
-    Route::get('/accounting/overview', [AccountingController::class, 'overview']);
-    Route::post('/accounting/lock-month', [AccountingController::class, 'lockMonth']);
-    Route::post('/accounting/reopen-month', [AccountingController::class, 'reopenMonth']);
-    Route::get('/accounting/payments', [AccountingController::class, 'payments']);
-    Route::post('/accounting/payments', [AccountingController::class, 'storePayment']);
-    Route::get('/reports/summary', [ReportController::class, 'summary']);
-
-    Route::get('/work-orders', [WorkOrderController::class, 'index']);
-    Route::post('/work-orders', [WorkOrderController::class, 'store']);
-    Route::post('/work-orders/{workOrder}/close', [WorkOrderController::class, 'close']);
-
-    Route::get('/inventory', [InventoryController::class, 'index']);
-    Route::post('/inventory/items', [InventoryController::class, 'storeItem']);
-    Route::post('/inventory/batches', [InventoryController::class, 'receiveBatch']);
-
-    Route::get('/violations', [ViolationController::class, 'index']);
-    Route::post('/violations', [ViolationController::class, 'store']);
-    Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment']);
-
-    Route::get('/waitlist', function () {
-        return response()->json([
-            'data' => WaitlistRequest::query()->with('customer')->latest('id')->get(),
-        ]);
+    Route::middleware('permission:staff.manage')->group(function () {
+        Route::post('/staff', [StaffController::class, 'store']);
+        Route::put('/staff/{user}', [StaffController::class, 'update']);
+        Route::post('/roles', [RoleController::class, 'store']);
+        Route::put('/roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
     });
 
-    Route::post('/waitlist', function (Request $request) {
+    Route::get('/employees/lookup', [OperationsController::class, 'employeesLookup'])
+        ->middleware('permission:hr.view,petty_cash.view,petty_cash.manage,maintenance.view');
+    Route::middleware('permission:hr.view')->group(function () {
+        Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::get('/payroll', [PayrollController::class, 'index']);
+    });
+    Route::middleware('permission:hr.create')->group(function () {
+        Route::post('/employees', [EmployeeController::class, 'store']);
+        Route::post('/payroll/draft', [PayrollController::class, 'draft']);
+    });
+    Route::put('/employees/{employee}', [EmployeeController::class, 'update'])
+        ->middleware('permission:hr.update');
+    Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve'])
+        ->middleware('permission:hr.payroll_approve');
+
+    Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
+    Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
+    Route::get('/vehicles/{vehicle}', [VehicleController::class, 'show'])->middleware('permission:vehicles.view');
+    Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->middleware('permission:vehicles.update');
+    Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->middleware('permission:vehicles.archive');
+    Route::post('/vehicles/{vehicle}/documents', [OperationsController::class, 'storeVehicleDocument'])
+        ->middleware('permission:vehicles.update');
+    Route::post('/vehicles/{vehicle}/accessories', [OperationsController::class, 'storeVehicleAccessory'])
+        ->middleware('permission:vehicles.update');
+    Route::get('/vehicles/{vehicle}/estimated-odometer', [OperationsController::class, 'estimatedOdometer'])
+        ->middleware('permission:vehicles.view');
+
+    Route::get('/customers', [CustomerController::class, 'index'])->middleware('permission:customers.view');
+    Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.create');
+    Route::get('/customers/{customer}', [CustomerController::class, 'show'])->middleware('permission:customers.view');
+    Route::put('/customers/{customer}', [CustomerController::class, 'update'])
+        ->middleware('permission:customers.update,blacklist.manage');
+    Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->middleware('permission:customers.update');
+
+    Route::get('/contracts', [ContractController::class, 'index'])->middleware('permission:contracts.view');
+    Route::post('/contracts', [ContractController::class, 'store'])->middleware('permission:contracts.create');
+    Route::get('/contracts/{contract}', [ContractController::class, 'show'])->middleware('permission:contracts.view');
+    Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve'])->middleware('permission:contracts.approve');
+    Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover'])->middleware('permission:contracts.update');
+    Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle'])->middleware('permission:contracts.update');
+    Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->middleware('permission:contracts_cancel.approve');
+    Route::post('/contracts/{contract}/extend', [ContractController::class, 'extend'])->middleware('permission:contracts_extend.execute');
+    Route::post('/contracts/{contract}/swap', [ContractController::class, 'swap'])->middleware('permission:contracts_swap.execute');
+    Route::post('/contracts/{contract}/deposit', [ContractController::class, 'receiveDeposit'])->middleware('permission:deposits.collect');
+    Route::post('/contracts/{contract}/deposit/deduct', [ContractController::class, 'deductDeposit'])->middleware('permission:deposits.settle');
+    Route::post('/contracts/{contract}/deposit/return', [ContractController::class, 'returnDeposit'])->middleware('permission:deposits.settle');
+    Route::get('/contracts/{contract}/print', [ContractController::class, 'printData'])->middleware('permission:contracts.print');
+
+    Route::get('/showroom', [OperationsController::class, 'showroom'])
+        ->middleware(['feature:showroom', 'permission:showroom.run']);
+    Route::get('/department-notice', [OperationsController::class, 'departmentNotice'])
+        ->middleware(['feature:department_notice', 'permission:department_notice.print']);
+    Route::get('/audit-logs', [OperationsController::class, 'auditLogs'])->middleware('permission:audit.view');
+    Route::get('/qr', [OperationsController::class, 'qrPayload'])->middleware('permission:vehicles.view,customers.view');
+    Route::post('/print-snapshots', [OperationsController::class, 'storePrintSnapshot'])
+        ->middleware('permission:contracts.print,department_notice.print');
+
+    Route::middleware(['feature:petty_cash', 'permission:petty_cash.view'])->group(function () {
+        Route::get('/petty-cash', [OperationsController::class, 'pettyCashIndex']);
+    });
+    Route::middleware(['feature:petty_cash', 'permission:petty_cash.manage'])->group(function () {
+        Route::post('/petty-cash', [OperationsController::class, 'pettyCashStore']);
+        Route::post('/petty-cash/{account}/move', [OperationsController::class, 'pettyCashMove']);
+    });
+
+    Route::middleware(['feature:inventory', 'permission:inventory.view'])->get('/inventory', [InventoryController::class, 'index']);
+    Route::middleware(['feature:inventory', 'permission:inventory.create'])->group(function () {
+        Route::post('/inventory/items', [InventoryController::class, 'storeItem']);
+        Route::post('/inventory/batches', [InventoryController::class, 'receiveBatch']);
+    });
+
+    Route::middleware('permission:expenses.view')->get('/expenses', [ExpenseController::class, 'index']);
+    Route::middleware('permission:expenses.create')->post('/expenses', [ExpenseController::class, 'store']);
+
+    Route::get('/accounting/overview', [AccountingController::class, 'overview'])->middleware('permission:accounting.view');
+    Route::post('/accounting/lock-month', [AccountingController::class, 'lockMonth'])->middleware('permission:accounting.lock_month');
+    Route::post('/accounting/reopen-month', [AccountingController::class, 'reopenMonth'])->middleware('permission:accounting.reopen_month');
+    Route::get('/accounting/payments', [AccountingController::class, 'payments'])->middleware('permission:payments.view');
+    Route::post('/accounting/payments', [AccountingController::class, 'storePayment'])->middleware('permission:payments.create');
+    Route::get('/reports/summary', [ReportController::class, 'summary'])->middleware('permission:reports.view');
+
+    Route::get('/work-orders', [WorkOrderController::class, 'index'])->middleware('permission:maintenance.view');
+    Route::post('/work-orders', [WorkOrderController::class, 'store'])->middleware('permission:maintenance.create');
+    Route::post('/work-orders/{workOrder}/close', [WorkOrderController::class, 'close'])->middleware('permission:maintenance.close');
+
+    Route::get('/violations', [ViolationController::class, 'index'])->middleware('permission:violations.view');
+    Route::post('/violations', [ViolationController::class, 'store'])->middleware('permission:violations.create');
+    Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment'])->middleware('permission:violations.update');
+
+    Route::middleware(['feature:waitlist', 'permission:waitlist.view'])->get('/waitlist', function (WaitlistService $service) {
+        return response()->json(['data' => $service->list()]);
+    });
+    Route::middleware(['feature:waitlist', 'permission:waitlist.create'])->post('/waitlist', function (Request $request, WaitlistService $service) {
         $data = $request->validate([
             'customer_id' => ['required', 'exists:customers,id'],
             'category' => ['required', 'string'],
@@ -112,37 +158,42 @@ Route::middleware('auth:sanctum')->group(function () {
             'category' => 'الفئة المطلوبة',
         ]);
 
-        $row = WaitlistRequest::query()->create([
-            ...$data,
-            'status' => 'waiting',
-            'created_by' => $request->user()->id,
-            'expires_at' => now()->addDays(7),
-        ]);
+        $row = $service->create($data, (int) $request->user()->id);
 
-        return response()->json(['data' => $row->load('customer'), 'message' => 'تم إضافة طلب الانتظار.'], 201);
+        return response()->json(['data' => $row, 'message' => 'تم إضافة طلب الانتظار.'], 201);
     });
 
-    Route::get('/notifications', function (Request $request) {
-        $base = Notification::query()->where('user_id', $request->user()->id);
-        $rows = (clone $base)->latest('id')->limit(50)->get();
-        $unread = (clone $base)->whereNull('read_at')->count();
-
-        return response()->json(['data' => $rows, 'unread' => $unread]);
+    Route::middleware(['feature:chat'])->group(function () {
+        Route::get('/chat', [CollaborationController::class, 'chatIndex']);
+        Route::post('/chat', [CollaborationController::class, 'chatStore']);
     });
+    Route::middleware(['feature:evaluations', 'permission:hr.view'])->get('/evaluations', [CollaborationController::class, 'evaluationsIndex']);
+    Route::middleware(['feature:evaluations', 'permission:hr.create'])->post('/evaluations', [CollaborationController::class, 'evaluationsStore']);
 
-    Route::get('/notifications/unread-count', function (Request $request) {
-        $unread = Notification::query()
-            ->where('user_id', $request->user()->id)
-            ->whereNull('read_at')
-            ->count();
+    Route::post('/ocr/review', [CollaborationController::class, 'ocrReview'])
+        ->middleware('permission:customers.create,customers.update');
 
-        return response()->json(['unread' => $unread]);
-    });
+    Route::middleware('permission:notifications.view')->group(function () {
+        Route::get('/notifications', function (Request $request) {
+            $base = Notification::query()->where('user_id', $request->user()->id);
+            $rows = (clone $base)->latest('id')->limit(50)->get();
+            $unread = (clone $base)->whereNull('read_at')->count();
 
-    Route::post('/notifications/{notification}/read', function (Request $request, Notification $notification) {
-        abort_unless($notification->user_id === $request->user()->id, 403);
-        $notification->update(['read_at' => now()]);
+            return response()->json(['data' => $rows, 'unread' => $unread]);
+        });
+        Route::get('/notifications/unread-count', function (Request $request) {
+            $unread = Notification::query()
+                ->where('user_id', $request->user()->id)
+                ->whereNull('read_at')
+                ->count();
 
-        return response()->json(['data' => $notification]);
+            return response()->json(['unread' => $unread]);
+        });
+        Route::post('/notifications/{notification}/read', function (Request $request, Notification $notification) {
+            abort_unless($notification->user_id === $request->user()->id, 403);
+            $notification->update(['read_at' => now()]);
+
+            return response()->json(['data' => $notification]);
+        });
     });
 });

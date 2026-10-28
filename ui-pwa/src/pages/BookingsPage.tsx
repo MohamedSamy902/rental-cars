@@ -29,7 +29,7 @@ type Contract = {
 type Customer = { id: number; full_name: string; phone: string }
 type Vehicle = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number; odometer?: number }
 
-type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposit' | null
+type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposit' | 'deduct' | 'refund' | null
 
 const statusLabel: Record<string, string> = {
   pending: 'معلّق', approved: 'معتمد', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغى',
@@ -71,6 +71,7 @@ export function BookingsPage() {
     odometer_out: '', odometer_in: '', damage_fee: '', reason: '', planned_ends_at: '',
     replacement_vehicle_id: '', method: 'cash', receipt_number: '',
     fuel_level: '50', notes: '', signature_data: '', damage_position: '', damage_description: '',
+    deduct_amount: '', deduct_reason: '',
   })
 
   async function openDetail(id: number) {
@@ -155,6 +156,8 @@ export function BookingsPage() {
       signature_data: '',
       damage_position: '',
       damage_description: '',
+      deduct_amount: '',
+      deduct_reason: '',
     })
     if (kind === 'swap' || kind === 'extend') {
       const v = await api<{ data: Vehicle[] }>('/vehicles?per_page=100')
@@ -282,6 +285,24 @@ export function BookingsPage() {
           },
         })
         toast.success('تم قبض التأمين النقدي.')
+      } else if (action === 'deduct') {
+        await api(`/contracts/${selected.id}/deposit/deduct`, {
+          method: 'POST',
+          json: {
+            amount: Number(actionForm.deduct_amount),
+            reason: actionForm.deduct_reason,
+          },
+        })
+        toast.success('تم خصم المبلغ من التأمين.')
+      } else if (action === 'refund') {
+        await api(`/contracts/${selected.id}/deposit/return`, {
+          method: 'POST',
+          json: {
+            method: actionForm.method,
+            receipt_number: actionForm.receipt_number,
+          },
+        })
+        toast.success('تم رد متبقي التأمين.')
       }
       setAction(null)
       setSelected(null)
@@ -300,12 +321,23 @@ export function BookingsPage() {
     extend: 'تمديد (عقد جديد)',
     swap: 'تبديل بسبب عطل',
     deposit: 'قبض التأمين النقدي',
+    deduct: 'خصم من التأمين',
+    refund: 'رد متبقي التأمين',
   }
 
   async function printContract(id: number) {
     try {
       const res = await api<{ data: { tenant: { center_name?: string; print_footer?: string }; contract: any } }>(`/contracts/${id}/print`)
       const { tenant, contract } = res.data
+      await api('/print-snapshots', {
+        method: 'POST',
+        json: {
+          type: 'contract',
+          record_type: 'contract',
+          record_id: id,
+          payload: { tenant, contract },
+        },
+      }).catch(() => undefined)
       const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700')
       if (!w) {
         toast.error('اسمح بالنوافذ المنبثقة للطباعة.')
@@ -361,6 +393,12 @@ export function BookingsPage() {
         ) : null}
         {b.status === 'completed' ? (
           <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('extend', b)}>تمديد</Button>
+        ) : null}
+        {b.deposit && b.deposit.status !== 'returned' ? (
+          <>
+            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('deduct', b)}>خصم تأمين</Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => void openAction('refund', b)}>رد تأمين</Button>
+          </>
         ) : null}
         <Button type="button" size="sm" variant="secondary" onClick={() => void printContract(b.id)}>طباعة</Button>
       </div>
@@ -562,10 +600,10 @@ export function BookingsPage() {
               onChange={(e) => setActionForm({ ...actionForm, replacement_vehicle_id: e.target.value })}
             />
           ) : null}
-          {action === 'deposit' ? (
+          {action === 'deposit' || action === 'refund' ? (
             <>
               <SelectField
-                label="طريقة التحصيل"
+                label={action === 'refund' ? 'طريقة الرد' : 'طريقة التحصيل'}
                 required
                 options={[
                   { value: 'cash', label: 'نقدي' },
@@ -576,7 +614,13 @@ export function BookingsPage() {
                 onChange={(e) => setActionForm({ ...actionForm, method: e.target.value })}
               />
               <TextField label="رقم الإيصال" required value={actionForm.receipt_number} onChange={(e) => setActionForm({ ...actionForm, receipt_number: e.target.value })} />
-              <p className="muted">المبلغ: {formatMoney(selected?.frozen_agreed_deposit || 0)} (خارج إجمالي العقد)</p>
+              {action === 'deposit' ? <p className="muted">المبلغ: {formatMoney(selected?.frozen_agreed_deposit || 0)} (خارج إجمالي العقد)</p> : null}
+            </>
+          ) : null}
+          {action === 'deduct' ? (
+            <>
+              <MoneyField label="مبلغ الخصم" required value={actionForm.deduct_amount} onChange={(e) => setActionForm({ ...actionForm, deduct_amount: e.target.value })} />
+              <TextAreaField label="سبب الخصم" required value={actionForm.deduct_reason} onChange={(e) => setActionForm({ ...actionForm, deduct_reason: e.target.value })} />
             </>
           ) : null}
         </div>

@@ -50,7 +50,7 @@ export function SettingsPage() {
     }
     setSaving(true)
     try {
-      const res = await api<{ data: any; message: string }>('/settings/tenant', {
+      const res = await api<{ data: any; message: string }>('/settings/operational', {
         method: 'PUT',
         json: {
           center_name: centerName,

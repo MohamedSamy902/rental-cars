@@ -11,8 +11,10 @@ type CustomerRow = {
   full_name: string
   phone: string
   national_id?: string | null
+  national_id_image_path?: string | null
   license_number?: string | null
   license_expires_on?: string | null
+  license_image_path?: string | null
   birth_date?: string | null
   status: string
 }
@@ -137,6 +139,7 @@ export function DepartmentNoticePage() {
               <strong>{c.full_name}</strong>
               <p>{c.phone}</p>
               <p className="muted">قومي {c.national_id || '—'} · رخصة {c.license_number || '—'}</p>
+              <p className="muted">صورة بطاقة: {c.national_id_image_path || '—'} · صورة رخصة: {c.license_image_path || '—'}</p>
             </article>
           ))}
         </div>

@@ -30,3 +30,4 @@ backend/bootstrap/cache/*.php
 # SQLite local
 backend/database/*.sqlite
 backend/database/*.sqlite-journal
+backend/composer.phar

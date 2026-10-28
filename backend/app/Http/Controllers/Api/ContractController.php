@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreContractRequest;
 use App\Models\Contract;
 use App\Services\Contracts\ContractLifecycleService;
 use DomainException;
@@ -46,35 +47,10 @@ class ContractController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreContractRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'customer_id' => ['required', 'exists:customers,id'],
-            'vehicle_id' => ['required', 'exists:vehicles,id'],
-            'guarantor_customer_id' => ['nullable', 'exists:customers,id'],
-            'starts_at' => ['required', 'date'],
-            'planned_ends_at' => ['required', 'date', 'after:starts_at'],
-            'daily_rate' => ['nullable', 'integer', 'min:0'],
-            'daily_km_allowance' => ['nullable', 'integer', 'min:0'],
-            'excess_km_rate' => ['nullable', 'integer', 'min:0'],
-            'deposit' => ['nullable', 'integer', 'min:0'],
-            'min_days' => ['nullable', 'integer', 'min:0'],
-            'discount' => ['nullable', 'integer', 'min:0'],
-            'other_fees' => ['nullable', 'integer', 'min:0'],
-            'other_fees_description' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'extended_from_contract_id' => ['nullable', 'exists:contracts,id'],
-            'swapped_from_contract_id' => ['nullable', 'exists:contracts,id'],
-            'swap_reason' => ['nullable', 'string'],
-        ], [], [
-            'customer_id' => 'العميل',
-            'vehicle_id' => 'السيارة',
-            'starts_at' => 'وقت البداية',
-            'planned_ends_at' => 'وقت النهاية المخطط',
-        ]);
-
         try {
-            $contract = $this->lifecycle->create($data, $request->user()?->id);
+            $contract = $this->lifecycle->create($request->validated(), $request->user()?->id);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
