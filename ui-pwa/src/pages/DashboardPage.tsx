@@ -80,6 +80,7 @@ function contractStatusPill(status: string) {
   const map: Record<string, { label: string; tone: string }> = {
     active: { label: 'نشط', tone: 'steel' },
     approved: { label: 'معتمد', tone: 'ok' },
+    pending: { label: 'معلّق', tone: 'warn' },
     draft: { label: 'مسودة', tone: 'muted' },
     completed: { label: 'مكتمل', tone: 'ok' },
     cancelled: { label: 'ملغى', tone: 'danger' },
