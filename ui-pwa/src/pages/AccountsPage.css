@@ -1,0 +1,85 @@
+.ac-months {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ac-month {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 1rem;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.ac-month__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.ac-month__head h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.ac-month__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.ac-month__metrics div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.ac-month__metrics dt {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.ac-month__metrics dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.ac-month__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+@media (max-width: 980px) {
+  .ac-month__metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ac-month__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ac-month__actions .rpm-btn {
+    width: 100%;
+    min-height: 42px;
+  }
+}
+
+@media (min-width: 981px) {
+  .ac-months {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

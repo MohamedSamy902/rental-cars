@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatMoney } from '@/shared/lib/format'
+import { formatMoney, formatDateTime } from '@/shared/lib/format'
 import {
-  PageHeader, Button, Sheet, Fab, TextField, MoneyField, SelectField, TextAreaField,
-  useToast, DataTable, Badge, type DataColumn,
+  PageHeader, Button, Fab, MetricCardGrid, useToast, DataTable, Badge,
+  IconReceipt, IconCalendar, IconWallet, IconChart, type DataColumn,
 } from '@/shared/ui'
+import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import './pages.css'
 
 type Expense = {
@@ -33,7 +34,7 @@ const columns: DataColumn<Expense>[] = [
     sortValue: (r) => r.title,
     mobile: 'title',
   },
-  { id: 'date', header: 'التاريخ', cell: (r) => r.spent_on, sortValue: (r) => r.spent_on, mobile: 'subtitle' },
+  { id: 'date', header: 'التاريخ', cell: (r) => formatDateTime(r.spent_on).split('،')[0] || r.spent_on.slice(0, 10), sortValue: (r) => r.spent_on, mobile: 'subtitle' },
   { id: 'category', header: 'التصنيف', cell: (r) => <Badge tone="muted" dot={false}>{r.category}</Badge>, sortValue: (r) => r.category },
   {
     id: 'method',
@@ -49,11 +50,6 @@ export function ExpensesPage() {
   const [rows, setRows] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    title: '', category: 'تشغيل', amount: '', spent_on: new Date().toISOString().slice(0, 10),
-    payment_method: 'cash', notes: '',
-  })
 
   async function load() {
     setLoading(true)
@@ -69,30 +65,39 @@ export function ExpensesPage() {
 
   useEffect(() => { void load() }, [])
 
-  async function save() {
-    setSaving(true)
-    try {
-      await api('/expenses', {
-        method: 'POST',
-        json: {
-          ...form,
-          amount: Number(form.amount),
-        },
-      })
-      toast.success('تم تسجيل المصروف.')
-      setOpen(false)
-      await load()
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setSaving(false)
+  const stats = useMemo(() => {
+    const ym = new Date().toISOString().slice(0, 7)
+    const month = rows.filter((r) => r.spent_on?.startsWith(ym))
+    const byCategory = new Map<string, number>()
+    for (const r of rows) byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + Number(r.amount))
+    const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0]
+    return {
+      monthTotal: month.reduce((s, r) => s + Number(r.amount), 0),
+      monthCount: month.length,
+      total: rows.reduce((s, r) => s + Number(r.amount), 0),
+      petty: rows.filter((r) => r.from_petty_cash).reduce((s, r) => s + Number(r.amount), 0),
+      top,
     }
-  }
+  }, [rows])
 
   return (
     <div className="rpm-stack">
       <PageHeader title="المصروفات" subtitle="تشغيل · صيانة · أخرى مع ترحيل محاسبي" action={<Button onClick={() => setOpen(true)}>مصروف جديد</Button>} mobileFab />
       <Fab label="مصروف جديد" onClick={() => setOpen(true)} />
+
+      <MetricCardGrid
+        label="ملخص المصروفات"
+        items={[
+          { id: 'month', label: 'مصروفات هذا الشهر', value: stats.monthTotal, format: 'money', tone: 'warning', icon: <IconCalendar size={16} />, hint: `${stats.monthCount} حركة` },
+          { id: 'total', label: 'إجمالي المسجّل', value: stats.total, format: 'money', icon: <IconReceipt size={16} />, hint: `${rows.length} بند` },
+          { id: 'petty', label: 'من العهدة', value: stats.petty, format: 'money', tone: 'info', icon: <IconWallet size={16} /> },
+          {
+            id: 'top', label: 'أعلى تصنيف', value: stats.top ? stats.top[0] : '—', icon: <IconChart size={16} />,
+            hint: stats.top ? formatMoney(stats.top[1]) : undefined,
+          },
+        ]}
+      />
+
       <DataTable
         label="المصروفات"
         rows={rows}
@@ -103,16 +108,7 @@ export function ExpensesPage() {
         emptyTitle="لا مصروفات بعد"
         emptyDescription="سجّل أول مصروف ليظهر هنا مع ترحيله المحاسبي."
       />
-      <Sheet open={open} title="تسجيل مصروف" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void save()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
-        <div className="rpm-form-grid">
-          <TextField label="العنوان" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          <SelectField label="التصنيف" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={[{ value: 'تشغيل', label: 'تشغيل' }, { value: 'صيانة', label: 'صيانة' }, { value: 'أخرى', label: 'أخرى' }]} />
-          <MoneyField label="المبلغ" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-          <TextField label="التاريخ" type="date" required value={form.spent_on} onChange={(e) => setForm({ ...form, spent_on: e.target.value })} />
-          <SelectField label="طريقة الدفع" value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value })} options={[{ value: 'cash', label: 'نقدي' }, { value: 'transfer', label: 'تحويل' }, { value: 'card', label: 'بطاقة' }]} />
-          <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-        </div>
-      </Sheet>
+      <ExpenseSheet open={open} onClose={() => setOpen(false)} onSaved={() => void load()} />
     </div>
   )
 }

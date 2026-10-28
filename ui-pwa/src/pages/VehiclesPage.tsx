@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab, DataTable,
+  PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Sheet, Fab, DataTable,
   TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
-  useToast, ErrorState, IconEye, IconCalendar, IconClipboard,
+  useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
@@ -253,12 +253,20 @@ export function VehiclesPage() {
       />
       <Fab label="إضافة مركبة" onClick={() => setOpen(true)} />
 
-      <SummaryStrip
+      <MetricCardGrid
+        label="ملخص الأسطول"
         items={[
-          { label: 'الإجمالي', value: String(summary.total) },
-          { label: 'متاحة', value: String(summary.available), tone: 'success' },
-          { label: 'مؤجرة', value: String(summary.rented) },
-          { label: 'صيانة', value: String(summary.maintenance), tone: 'danger' },
+          { id: 'total', label: 'إجمالي الأسطول', value: summary.total, icon: <IconCar size={16} /> },
+          {
+            id: 'available', label: 'متاحة', value: summary.available, tone: 'success', icon: <IconCheck size={16} />,
+            hint: summary.total ? `${Math.round((summary.available / summary.total) * 100)}% من الأسطول` : undefined,
+          },
+          {
+            id: 'rented', label: 'مؤجرة', value: summary.rented, tone: 'info', icon: <IconKey size={16} />,
+            hint: summary.total ? `إشغال ${Math.round((summary.rented / summary.total) * 100)}%` : undefined,
+          },
+          { id: 'reserved', label: 'محجوزة', value: summary.reserved, tone: 'warning', icon: <IconCalendar size={16} /> },
+          { id: 'maintenance', label: 'في الصيانة', value: summary.maintenance, tone: 'danger', icon: <IconWrench size={16} /> },
         ]}
       />
 

@@ -178,7 +178,11 @@ export function AppShell() {
                 to={item.to}
                 end={item.end}
                 title={item.label}
-                className={({ isActive }) => `shell-rail__link ${isActive ? 'is-active' : ''}`}
+                className={({ isActive }) => {
+                  const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
+                  const onMonth = item.to === '/accounts' && location.pathname.startsWith('/accounts/months/')
+                  return `shell-rail__link ${isActive || onContracts || onMonth ? 'is-active' : ''}`
+                }}
               >
                 <span className="shell-rail__ico">{item.icon}</span>
                 <span className="shell-rail__label">{item.label}</span>
@@ -259,7 +263,7 @@ export function AppShell() {
               <button
                 type="button"
                 className="rpm-btn rpm-btn--primary rpm-btn--md shell-cta--desk"
-                onClick={openNewContract}
+                onClick={() => openNewContract()}
               >
                 <span className="rpm-btn__icon" aria-hidden>
                   <IconPlus size={16} />
@@ -307,7 +311,10 @@ export function AppShell() {
             key={item.to}
             to={item.to}
             end={item.end}
-            className={({ isActive }) => `shell-dock__item ${isActive ? 'is-active' : ''}`}
+            className={({ isActive }) => {
+              const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
+              return `shell-dock__item ${isActive || onContracts ? 'is-active' : ''}`
+            }}
           >
             <span className="shell-dock__icon" aria-hidden="true">{item.icon}</span>
             <span className="shell-dock__label">{item.label}</span>
@@ -343,7 +350,11 @@ export function AppShell() {
                     key={item.to}
                     to={item.to}
                     end={item.end}
-                    className={({ isActive }) => `shell-drawer__link ${isActive ? 'is-active' : ''}`}
+                    className={({ isActive }) => {
+                      const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
+                      const onMonth = item.to === '/accounts' && location.pathname.startsWith('/accounts/months/')
+                      return `shell-drawer__link ${isActive || onContracts || onMonth ? 'is-active' : ''}`
+                    }}
                     onClick={closeDrawer}
                   >
                     <span className="shell-drawer__ico">{item.icon}</span>

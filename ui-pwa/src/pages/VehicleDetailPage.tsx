@@ -11,6 +11,9 @@ import {
   TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField, MediaUpload,
   useToast, SkeletonBlock, ErrorState, QrCode,
 } from '@/shared/ui'
+import { useNewContract } from '@/shared/contracts/newContractContext'
+import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
+import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import './VehicleDetailPage.css'
 import './pages.css'
 
@@ -203,6 +206,7 @@ export function VehicleDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const { openNewContract } = useNewContract()
   const vehicleId = Number(id)
 
   const [dossier, setDossier] = useState<Dossier | null>(null)
@@ -220,6 +224,8 @@ export function VehicleDetailPage() {
   const [accEdit, setAccEdit] = useState<Accessory | null>(null)
   const [accForm, setAccForm] = useState(emptyAcc)
   const [estimatedKm, setEstimatedKm] = useState<number | null>(null)
+  const [woOpen, setWoOpen] = useState(false)
+  const [expOpen, setExpOpen] = useState(false)
 
 
   const revenueSeries = useMemo(
@@ -1043,8 +1049,11 @@ export function VehicleDetailPage() {
 
       <header className="vd-hero">
         <div className="vd-hero__top">
-          <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>← الأسطول</button>
+          <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>رجوع للأسطول</button>
           <div className="vd-hero__actions vd-no-print">
+            <Button size="sm" onClick={() => openNewContract({ vehicleId: v.id })}>إنشاء حجز</Button>
+            <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>إضافة صيانة</Button>
+            <Button size="sm" variant="secondary" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
             <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
             <Button size="sm" onClick={() => window.print()}>طباعة</Button>
@@ -1141,6 +1150,18 @@ export function VehicleDetailPage() {
         </div>
       </Sheet>
 
+      <WorkOrderSheet
+        open={woOpen}
+        onClose={() => setWoOpen(false)}
+        onSaved={() => void load()}
+        vehicle={{ id: v.id, label: `${v.brand} ${v.model} · ${v.plate}`, odometer: v.odometer }}
+      />
+      <ExpenseSheet
+        open={expOpen}
+        onClose={() => setExpOpen(false)}
+        onSaved={() => void load()}
+        vehicle={{ id: v.id, label: `${v.brand} ${v.model} · ${v.plate}` }}
+      />
       <Sheet
         open={!!docEdit}
         title="تعديل مستند"

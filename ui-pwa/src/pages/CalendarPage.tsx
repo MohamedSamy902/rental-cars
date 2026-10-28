@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '@/shared/api/client'
-import { formatDateTime } from '@/shared/lib/format'
+import { formatTime } from '@/shared/lib/format'
 import { PageHeader, StatusPill, SkeletonBlock, IconChevron } from '@/shared/ui'
 import { useIsMobile } from '@/shared/ui/useSheetDrag'
 import './CalendarPage.css'
@@ -77,11 +77,18 @@ export function CalendarPage() {
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selected, setSelected] = useState(() => startOfDay(new Date()))
   const [focusId, setFocusId] = useState<number | null>(null)
+  const [fleetSize, setFleetSize] = useState(0)
   const mobile = useIsMobile()
 
   useEffect(() => {
-    api<{ data: Contract[] }>('/contracts?per_page=100')
-      .then((res) => setRows(res.data.filter((c) => ['pending', 'approved', 'active'].includes(c.status))))
+    Promise.all([
+      api<{ data: Contract[]; meta?: { total?: number } }>('/contracts?per_page=200'),
+      api<{ summary?: { total?: number } }>('/vehicles?per_page=1'),
+    ])
+      .then(([res, fleet]) => {
+        setRows(res.data.filter((c) => ['pending', 'approved', 'active'].includes(c.status)))
+        setFleetSize(fleet.summary?.total ?? 0)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -151,6 +158,8 @@ export function CalendarPage() {
               const inMonth = day.getMonth() === month.getMonth()
               const extra = Math.max(0, events.length - 2)
               const dots = events.slice(0, 3)
+              const uniqueCars = new Set(events.map((e) => e.vehicle?.plate || e.id)).size
+              const loadPct = fleetSize ? Math.round((uniqueCars / fleetSize) * 100) : events.length
               const label = `${dayFormatter.format(day)}${events.length ? ` · ${events.length} حجز` : ''}`
               return (
                 <div
@@ -172,12 +181,16 @@ export function CalendarPage() {
                     onClick={() => pickDay(day)}
                   >
                     <span className="cal-cell__num tabular-nums">{day.getDate()}</span>
-                    {mobile && dots.length ? (
-                      <span className="cal-cell__dots" aria-hidden>
-                        {dots.map((e) => (
-                          <i key={e.id} className={`cal-dot is-${e.status}`} />
-                        ))}
-                      </span>
+                    {mobile && events.length ? (
+                      fleetSize ? (
+                        <span className="cal-cell__load" aria-hidden>{loadPct}%</span>
+                      ) : (
+                        <span className="cal-cell__dots" aria-hidden>
+                          {dots.map((e) => (
+                            <i key={e.id} className={`cal-dot is-${e.status}`} />
+                          ))}
+                        </span>
+                      )
                     ) : null}
                   </button>
 
@@ -252,8 +265,8 @@ export function CalendarPage() {
                     <dd>{b.vehicle?.brand} {b.vehicle?.model} · {b.vehicle?.plate}</dd>
                   </div>
                   <div>
-                    <dt>الفترة</dt>
-                    <dd className="tabular-nums">{formatDateTime(b.starts_at)} ← {formatDateTime(b.planned_ends_at)}</dd>
+                    <dt>الاستلام / التسليم</dt>
+                    <dd className="tabular-nums">{formatTime(b.starts_at)} – {formatTime(b.planned_ends_at)}</dd>
                   </div>
                 </dl>
               </button>

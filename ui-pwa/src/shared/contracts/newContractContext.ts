@@ -1,8 +1,12 @@
 import { createContext, useContext } from 'react'
 
+export type NewContractOptions = {
+  vehicleId?: number
+}
+
 export type NewContractApi = {
   /** Opens the create-contract sheet over the current page (no navigation) */
-  openNewContract: () => void
+  openNewContract: (opts?: NewContractOptions) => void
   /** Bumps after every successful create so list screens can reload */
   createdVersion: number
 }

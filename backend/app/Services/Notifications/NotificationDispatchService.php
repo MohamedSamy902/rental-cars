@@ -77,6 +77,7 @@ class NotificationDispatchService
             if ($report->isSuccess()) {
                 $sent++;
                 PushSubscription::query()->where('endpoint', $endpoint)->update(['last_used_at' => now()]);
+
                 continue;
             }
 
@@ -127,10 +128,11 @@ class NotificationDispatchService
     private function pathFor(?string $linkType, ?int $linkId): string
     {
         return match ($linkType) {
-            'contract' => $linkId ? '/bookings?id='.$linkId : '/bookings',
-            'vehicle' => $linkId ? '/vehicles' : '/vehicles',
+            'contract' => $linkId ? '/contracts/'.$linkId : '/bookings',
+            'vehicle' => $linkId ? '/vehicles/'.$linkId : '/vehicles',
             'customer' => '/customers',
             'owner' => '/owners',
+            'payroll' => '/hr',
             default => '/notifications',
         };
     }

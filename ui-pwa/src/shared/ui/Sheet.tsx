@@ -23,10 +23,13 @@ function resetPageScroll() {
   document.documentElement.scrollTop = 0
   document.body.scrollTop = 0
   if (main) main.scrollTop = 0
-  // iOS sometimes leaves visualViewport offset after keyboard
   if (window.visualViewport && window.visualViewport.offsetTop > 0) {
     window.scrollTo(0, 0)
   }
+}
+
+function isField(el: HTMLElement) {
+  return el.matches('input, textarea, select, [contenteditable="true"]')
 }
 
 export function Sheet(props: Props) {
@@ -38,6 +41,7 @@ export function Sheet(props: Props) {
 
 function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء' }: Omit<Props, 'open'>) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const savedScroll = useRef(0)
   const onCloseRef = useRef(onClose)
@@ -59,7 +63,6 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
     const prevTop = document.body.style.top
     const prevWidth = document.body.style.width
     document.addEventListener('keydown', onKey)
-    // Lock body without losing layout; avoid iOS scroll jump
     document.body.style.overflow = 'hidden'
     document.body.style.position = 'fixed'
     document.body.style.top = `-${savedScroll.current}px`
@@ -70,24 +73,28 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
       document.body.style.position = prevPos
       document.body.style.top = prevTop
       document.body.style.width = prevWidth
-      // Restore then snap to a clean readable position
       window.scrollTo(0, savedScroll.current)
       window.setTimeout(() => resetPageScroll(), 0)
     }
   }, [close])
 
-  // Keep sheet inside the visual viewport so the iOS keyboard doesn't shove the UI away
+  // Pin the overlay to the visual viewport and pad the sticky footer by the keyboard inset.
   useEffect(() => {
     const root = rootRef.current
+    const wrap = wrapRef.current
     const vv = window.visualViewport
     if (!root) return
 
     const sync = () => {
-      const height = vv?.height ?? window.innerHeight
+      const layoutH = window.innerHeight
+      const height = vv?.height ?? layoutH
       const offsetTop = vv?.offsetTop ?? 0
+      const keyboard = Math.max(0, Math.round(layoutH - height - offsetTop))
       root.style.height = `${Math.round(height)}px`
       root.style.top = `${Math.round(offsetTop)}px`
       root.style.bottom = 'auto'
+      root.style.setProperty('--kb-inset', `${keyboard}px`)
+      wrap?.style.setProperty('--kb-inset', `${keyboard}px`)
     }
 
     sync()
@@ -101,23 +108,30 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
       root.style.height = ''
       root.style.top = ''
       root.style.bottom = ''
+      root.style.removeProperty('--kb-inset')
     }
   }, [])
 
-  // Scroll focused inputs inside the sheet body only (never the page)
+  // Scroll the focused field into the sheet body — never the page.
   useEffect(() => {
     const body = bodyRef.current
     if (!body) return
-    const onFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement | null
-      if (!target || !body.contains(target)) return
+    const reveal = (target: HTMLElement) => {
       window.setTimeout(() => {
         const bodyRect = body.getBoundingClientRect()
         const targetRect = target.getBoundingClientRect()
-        const delta =
-          targetRect.top - bodyRect.top - body.clientHeight / 2 + targetRect.height / 2
-        body.scrollTop += delta
-      }, 60)
+        const pad = 24
+        if (targetRect.bottom > bodyRect.bottom - pad) {
+          body.scrollTop += targetRect.bottom - bodyRect.bottom + pad
+        } else if (targetRect.top < bodyRect.top + pad) {
+          body.scrollTop -= bodyRect.top + pad - targetRect.top
+        }
+      }, 280)
+    }
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null
+      if (!target || !body.contains(target) || !isField(target)) return
+      reveal(target)
     }
     body.addEventListener('focusin', onFocusIn)
     return () => body.removeEventListener('focusin', onFocusIn)
@@ -143,7 +157,13 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
       />
-      <motion.div className="rpm-sheet-wrap" {...motionIn} transition={sheetSpring} {...dragProps}>
+      <motion.div
+        className="rpm-sheet-wrap"
+        ref={wrapRef}
+        {...motionIn}
+        transition={sheetSpring}
+        {...dragProps}
+      >
         <button
           type="button"
           className="rpm-sheet__close rpm-sheet__close--desk"

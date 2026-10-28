@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import {
   Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, useToast,
 } from '@/shared/ui'
-import { NewContractContext } from './newContractContext'
+import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
 type Vehicle = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number }
@@ -26,8 +26,12 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const openNewContract = useCallback(() => {
+  const openNewContract = useCallback((opts?: NewContractOptions) => {
     setOpen(true)
+    setForm({
+      ...emptyForm,
+      vehicle_id: opts?.vehicleId ? String(opts.vehicleId) : '',
+    })
     Promise.all([
       api<{ data: Customer[] }>('/customers?per_page=100'),
       api<{ data: Vehicle[] }>('/vehicles?per_page=100'),
@@ -35,6 +39,17 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       .then(([c, v]) => {
         setCustomers(c.data)
         setVehicles(v.data)
+        if (opts?.vehicleId) {
+          const picked = v.data.find((x) => x.id === opts.vehicleId)
+          if (picked) {
+            setForm((f) => ({
+              ...f,
+              vehicle_id: String(picked.id),
+              daily_rate: String(picked.daily_rate),
+              deposit: String(picked.default_deposit),
+            }))
+          }
+        }
       })
       .catch((e) => toast.error((e as ApiError).message))
   }, [toast])

@@ -1,6 +1,6 @@
-/* Flex (not an auto-sized grid row) so the sheet height resolves against the
-   viewport, never against its own content — tall forms used to push the whole
-   sheet below the fold, leaving only the backdrop visible. */
+/* Flex overlay pinned to the visual viewport. The wrap sizes to its content
+   and caps at 92% so short forms have no empty void; tall forms scroll inside
+   the body. Keyboard inset is --kb-inset from visualViewport. */
 .rpm-sheet-root {
   position: fixed;
   inset: 0;
@@ -27,10 +27,11 @@
 .rpm-sheet-wrap {
   position: relative;
   z-index: 1;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   width: 100%;
   max-width: 100%;
-  height: min(92%, 920px);
+  height: auto;
+  max-height: min(92%, 920px);
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -157,10 +158,12 @@
 .rpm-sheet__body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
   padding-block: 1.05rem;
   padding-inline: 1.1rem;
+  padding-block-end: calc(1.05rem + var(--kb-inset, 0px));
   display: grid;
   align-content: start;
   gap: 0.95rem;
@@ -168,8 +171,11 @@
 }
 
 .rpm-sheet__foot {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 2;
   flex-shrink: 0;
-  padding-block: 0.85rem calc(0.95rem + var(--safe-bottom));
+  padding-block: 0.85rem calc(0.95rem + var(--safe-bottom) + var(--kb-inset, 0px));
   padding-inline: 1rem;
   border-block-start: 1px solid var(--border);
   background: var(--surface-2);
