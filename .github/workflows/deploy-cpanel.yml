@@ -1,0 +1,94 @@
+name: Deploy · cPanel
+
+# نشر يدوي أو تلقائي بعد نجاح الدفع على main
+# المطلوب في GitHub → Settings → Secrets and variables → Actions:
+#   CPANEL_FTP_HOST       مثال: ftp.yourdomain.com
+#   CPANEL_FTP_USER
+#   CPANEL_FTP_PASSWORD
+#   CPANEL_FTP_REMOTE_DIR مثال: /public_html   أو /home/USER/public_html
+# اختياري:
+#   CPANEL_FTP_PORT       افتراضي 21
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'اكتب deploy للتأكيد'
+        required: true
+        type: string
+  # فعّل النشر التلقائي بإلغاء التعليق:
+  # push:
+  #   branches: [main]
+
+concurrency:
+  group: deploy-cpanel
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Confirm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require confirm on manual runs
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm != 'deploy'
+        run: |
+          echo "اكتب deploy في خانة confirm قبل التشغيل."
+          exit 1
+
+  build:
+    name: Build bundle
+    needs: [guard]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui-pwa/package-lock.json
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, fileinfo, tokenizer, xml, curl
+          coverage: none
+          tools: composer
+
+      - name: Build production package
+        run: bash scripts/build-production.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm-cpanel-bundle
+          path: dist/cpanel
+          retention-days: 7
+
+  deploy:
+    name: FTP upload to cPanel
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: rpm-cpanel-bundle
+          path: deploy
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.CPANEL_FTP_HOST }}
+          username: ${{ secrets.CPANEL_FTP_USER }}
+          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          port: ${{ secrets.CPANEL_FTP_PORT || 21 }}
+          local-dir: ./deploy/
+          server-dir: ${{ secrets.CPANEL_FTP_REMOTE_DIR || '/public_html/' }}
+          dangerous-clean-slate: false
+          exclude: |
+            **/.env
+            **/storage/logs/**
+            **/storage/app/private/**
+            **/storage/framework/sessions/**
+            **/.git*
+            **/node_modules/**

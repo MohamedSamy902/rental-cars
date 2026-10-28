@@ -1,6 +1,7 @@
 # Dependencies / build
 node_modules/
 ui-pwa/dist/
+dist/
 backend/vendor/
 backend/node_modules/
 
