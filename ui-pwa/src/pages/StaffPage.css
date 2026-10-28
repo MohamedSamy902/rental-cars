@@ -60,10 +60,6 @@
   transform: scale(0.98);
 }
 
-.st-fab {
-  display: none;
-}
-
 .st-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -601,28 +597,6 @@
     border-radius: 16px;
     background: var(--surface);
     border: 1px solid var(--border);
-  }
-
-  /* Floating action button */
-  .st-fab {
-    display: grid;
-    place-items: center;
-    position: fixed;
-    inset-inline-end: 1rem;
-    inset-block-end: calc(4.6rem + var(--safe-bottom));
-    z-index: 45;
-    width: 56px;
-    height: 56px;
-    border-radius: 18px;
-    background: var(--action);
-    color: var(--on-action);
-    box-shadow: var(--shadow-lg);
-    transition: background-color var(--motion-fast) ease, transform var(--motion-fast) ease;
-  }
-  .st-fab:active {
-    background: var(--action-hover);
-    color: var(--on-action-hover);
-    transform: scale(0.94);
   }
 }
 

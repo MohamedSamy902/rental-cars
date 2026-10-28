@@ -100,3 +100,33 @@ export const IconBadge = (p: Props) => (
 export const IconClose = (p: Props) => (
   <Svg {...p}><path d="M6 6l12 12M18 6 6 18" /></Svg>
 )
+export const IconCheck = (p: Props) => (
+  <Svg {...p}><path d="m5 12.5 4.5 4.5L19 7.5" /></Svg>
+)
+export const IconSortNone = (p: Props) => (
+  <Svg {...p}><path d="m8 9 4-4 4 4M8 15l4 4 4-4" /></Svg>
+)
+export const IconSortAsc = (p: Props) => (
+  <Svg {...p}><path d="M12 19V5M6 11l6-6 6 6" /></Svg>
+)
+export const IconSortDesc = (p: Props) => (
+  <Svg {...p}><path d="M12 5v14M6 13l6 6 6-6" /></Svg>
+)
+export const IconEye = (p: Props) => (
+  <Svg {...p}><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></Svg>
+)
+export const IconEdit = (p: Props) => (
+  <Svg {...p}><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></Svg>
+)
+export const IconPrinter = (p: Props) => (
+  <Svg {...p}><path d="M7 9V3h10v6" /><rect x="3" y="9" width="18" height="8" rx="2" /><path d="M7 14h10v7H7z" /></Svg>
+)
+export const IconBan = (p: Props) => (
+  <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></Svg>
+)
+export const IconCash = (p: Props) => (
+  <Svg {...p}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></Svg>
+)
+export const IconKey = (p: Props) => (
+  <Svg {...p}><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9.2-9.2M17 6l3 3M15 8l2 2" /></Svg>
+)

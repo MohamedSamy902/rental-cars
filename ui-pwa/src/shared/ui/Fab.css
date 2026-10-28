@@ -1,35 +1,58 @@
-.rpm-fab {
+/* Phone-only primary action: a 48px circle in its own floating dock above the bottom nav */
+.rpm-fab-dock {
   display: none;
 }
 
 @media (max-width: 980px) {
+  .rpm-fab-dock {
+    position: fixed;
+    z-index: 45;
+    inset-inline-end: 1rem;
+    inset-block-end: calc(var(--bottom-nav-height) + 0.875rem + var(--safe-bottom));
+    display: block;
+    pointer-events: none;
+  }
+
   .rpm-fab {
+    pointer-events: auto;
     display: grid;
     place-items: center;
-    position: fixed;
-    inset-inline-end: 1rem;
-    inset-block-end: calc(4.6rem + var(--safe-bottom));
-    z-index: 45;
-    width: 56px;
-    height: 56px;
-    border-radius: 18px;
-    background: var(--action);
-    color: var(--on-action);
-    border: 1px solid color-mix(in srgb, var(--on-action) 10%, transparent);
-    box-shadow: var(--shadow-lg);
+    width: 3rem;
+    height: 3rem;
+    border-radius: 999px;
+    border: 0;
+    background: var(--fab-bg);
+    color: var(--on-accent);
+    box-shadow:
+      0 10px 24px -6px color-mix(in srgb, var(--fab-bg) 55%, transparent),
+      var(--shadow-lg);
+    cursor: pointer;
     transition:
       transform var(--motion-fast) ease,
       background-color var(--motion-fast) ease,
-      color var(--motion-fast) ease;
+      box-shadow var(--motion-fast) ease;
   }
 
-  .rpm-fab:hover,
-  .rpm-fab:active {
-    background: var(--action-hover);
-    color: var(--on-action-hover);
+  .rpm-fab:hover {
+    background: var(--fab-hover);
   }
 
   .rpm-fab:active {
     transform: scale(0.94);
+    background: var(--fab-hover);
+  }
+
+  .rpm-fab:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ring-strong);
+  }
+
+  .rpm-fab:disabled {
+    opacity: 0.6;
+  }
+
+  /* Leave room so the last card is never trapped under the FAB */
+  .shell-main:has(.rpm-fab-dock) {
+    padding-block-end: calc(var(--bottom-nav-height) + 5.5rem + var(--safe-bottom));
   }
 }

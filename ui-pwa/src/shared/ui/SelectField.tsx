@@ -9,7 +9,8 @@ import {
   type SelectHTMLAttributes,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { IconChevron, IconSearch } from './Icons'
+import { AnimatePresence, motion } from 'framer-motion'
+import { IconCheck, IconChevron, IconSearch } from './Icons'
 import './Field.css'
 import './SelectField.css'
 
@@ -219,74 +220,89 @@ export function SelectField({
     }
   }
 
-  const panel = open && pos
-    ? createPortal(
-        <>
-          <button
-            type="button"
-            className="rpm-select-backdrop"
-            aria-label="إغلاق القائمة"
-            onClick={closePanel}
-          />
-          <div
-            ref={listRef}
-            className={`rpm-select-panel ${pos.openUp ? 'is-up' : 'is-down'}`}
-            style={{
-              top: pos.openUp ? undefined : pos.top,
-              bottom: pos.openUp ? window.innerHeight - pos.top : undefined,
-              left: pos.left,
-              width: pos.width,
-              maxHeight: pos.maxHeight,
-            }}
-            role="listbox"
-            id={listId}
-            aria-label={label}
-          >
-            {showSearch ? (
-              <div className="rpm-select-panel__search">
-                <IconSearch size={15} />
-                <input
-                  ref={searchRef}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={onSearchKey}
-                  placeholder={searchPlaceholder}
-                  aria-label={searchPlaceholder}
-                  enterKeyHint="search"
-                />
-              </div>
-            ) : null}
-
-            <div className="rpm-select-panel__list">
-              {filtered.length === 0 ? (
-                <div className="rpm-select-panel__empty">لا توجد نتائج</div>
-              ) : (
-                filtered.map((opt, idx) => {
-                  const isSelected = opt.value === selectedValue
-                  const isActive = idx === activeIndex
-                  return (
-                    <button
-                      key={opt.value || `empty-${idx}`}
-                      type="button"
-                      role="option"
-                      data-idx={idx}
-                      aria-selected={isSelected}
-                      className={`rpm-select-panel__option ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''}`}
-                      onMouseEnter={() => setActiveIndex(idx)}
-                      onClick={() => pick(opt)}
-                    >
-                      <span>{opt.label}</span>
-                      {isSelected ? <em aria-hidden>✓</em> : null}
-                    </button>
-                  )
-                })
-              )}
+  const panel = createPortal(
+    <AnimatePresence>
+      {open && pos ? (
+        <motion.button
+          key="backdrop"
+          type="button"
+          className="rpm-select-backdrop"
+          aria-label="إغلاق القائمة"
+          onClick={closePanel}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        />
+      ) : null}
+      {open && pos ? (
+        <motion.div
+          key="panel"
+          ref={listRef}
+          className={`rpm-select-panel ${pos.openUp ? 'is-up' : 'is-down'}`}
+          style={{
+            top: pos.openUp ? undefined : pos.top,
+            bottom: pos.openUp ? window.innerHeight - pos.top : undefined,
+            left: pos.left,
+            width: pos.width,
+            maxHeight: pos.maxHeight,
+            transformOrigin: pos.openUp ? 'center bottom' : 'center top',
+          }}
+          initial={{ opacity: 0, scale: 0.96, y: pos.openUp ? 6 : -6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.12 } }}
+          transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.7 }}
+          role="listbox"
+          id={listId}
+          aria-label={label}
+        >
+          {showSearch ? (
+            <div className="rpm-select-panel__search">
+              <IconSearch size={15} />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={onSearchKey}
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
+                enterKeyHint="search"
+              />
             </div>
+          ) : null}
+
+          <div className="rpm-select-panel__list">
+            {filtered.length === 0 ? (
+              <div className="rpm-select-panel__empty">لا توجد نتائج</div>
+            ) : (
+              filtered.map((opt, idx) => {
+                const isSelected = opt.value === selectedValue
+                const isActive = idx === activeIndex
+                return (
+                  <button
+                    key={opt.value || `empty-${idx}`}
+                    type="button"
+                    role="option"
+                    data-idx={idx}
+                    aria-selected={isSelected}
+                    className={`rpm-select-panel__option ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''}`}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    onClick={() => pick(opt)}
+                  >
+                    <span className="rpm-select-panel__check" aria-hidden>
+                      {isSelected ? <IconCheck size={15} /> : null}
+                    </span>
+                    <span className="rpm-select-panel__text">{opt.label}</span>
+                  </button>
+                )
+              })
+            )}
           </div>
-        </>,
-        document.body,
-      )
-    : null
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body,
+  )
 
   return (
     <div className={`rpm-field ${error ? 'has-error' : ''}`} ref={rootRef}>
