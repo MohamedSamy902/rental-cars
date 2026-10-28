@@ -90,8 +90,9 @@
   position: fixed;
   inset: 0;
   z-index: 150;
-  display: grid;
-  align-items: end;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   overscroll-behavior: contain;
 }
 
@@ -106,6 +107,9 @@
 .rpm-asheet {
   position: relative;
   display: grid;
+  max-height: 88%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   gap: 0.5rem;
   padding-block: 0 calc(0.75rem + var(--safe-bottom));
   padding-inline: 0.75rem;

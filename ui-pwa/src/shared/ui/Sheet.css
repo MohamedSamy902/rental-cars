@@ -1,10 +1,14 @@
+/* Flex (not an auto-sized grid row) so the sheet height resolves against the
+   viewport, never against its own content — tall forms used to push the whole
+   sheet below the fold, leaving only the backdrop visible. */
 .rpm-sheet-root {
   position: fixed;
   inset: 0;
   z-index: 120;
-  display: grid;
-  align-items: end;
-  justify-items: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
@@ -23,10 +27,13 @@
 .rpm-sheet-wrap {
   position: relative;
   z-index: 1;
+  flex: 0 0 auto;
   width: 100%;
   max-width: 100%;
   height: min(92%, 920px);
-  display: grid;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   will-change: transform;
 }
@@ -65,6 +72,7 @@
 .rpm-sheet {
   position: relative;
   z-index: 1;
+  flex: 1 1 auto;
   width: 100%;
   min-height: 0;
   display: flex;
@@ -208,8 +216,8 @@
 
 @media (min-width: 981px) {
   .rpm-sheet-root {
+    justify-content: center;
     align-items: center;
-    justify-items: center;
     padding: 1.75rem;
   }
 
