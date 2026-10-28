@@ -1,0 +1,34 @@
+.rpm-sign {
+  display: grid;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.rpm-sign__canvas {
+  width: 100%;
+  height: 160px;
+  touch-action: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, var(--brand)), var(--surface));
+  cursor: crosshair;
+}
+
+.rpm-sign__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rpm-sign__clear {
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+  padding-inline: 0.4rem;
+}

@@ -1,0 +1,136 @@
+:root,
+[data-theme='light'] {
+  /* Cool comfortable light — no warm cream */
+  --ink: #0f172a;
+  --ink-soft: #1e293b;
+  --nav: #ffffff;
+  --nav-muted: #64748b;
+  --nav-active: #0f766e;
+  --nav-active-bg: #ccfbf1;
+
+  --bg: #f1f5f9;
+  --bg-elev: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #eef2f7;
+  --surface-glass: color-mix(in srgb, #ffffff 88%, transparent);
+
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+
+  --brand: #0d9488;
+  --brand-hover: #0f766e;
+  --brand-soft: #f0fdfa;
+  --brand-ink: #0f766e;
+
+  --success: #159a57;
+  --success-soft: #ecfdf5;
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --info: #2563eb;
+  --info-soft: #eff6ff;
+
+  --border: rgb(15 23 42 / 8%);
+  --border-strong: rgb(15 23 42 / 14%);
+  --hairline: rgb(15 23 42 / 6%);
+
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 4%);
+  --shadow: 0 10px 28px rgb(15 23 42 / 6%);
+  --shadow-lg: 0 22px 48px rgb(15 23 42 / 10%);
+  --shadow-rail: 0 12px 32px rgb(15 23 42 / 8%);
+
+  --bg-mesh-1: rgb(13 148 136 / 7%);
+  --bg-mesh-2: rgb(37 99 235 / 5%);
+  --bg-mesh-3: rgb(14 165 233 / 4%);
+
+  --rail-bg: #ffffff;
+  --rail-border: rgb(15 23 42 / 8%);
+  --rail-brand-shadow: 0 10px 24px rgb(13 148 136 / 22%);
+  --rail-divider: rgb(15 23 42 / 8%);
+  --rail-quit-bg: #fef2f2;
+  --rail-theme-bg: #f1f5f9;
+
+  --radius-sm: 14px;
+  --radius: 20px;
+  --radius-lg: 24px;
+  --radius-xl: 28px;
+
+  --font-display: 'Tajawal', 'IBM Plex Sans Arabic', sans-serif;
+  --font-body: 'IBM Plex Sans Arabic', 'Tajawal', sans-serif;
+
+  --shell-nav-width: 92px;
+  --bottom-nav-height: 72px;
+  --header-height: 76px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+
+  --motion: 220ms;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --ink: #e8edf7;
+  --ink-soft: #c9d2e3;
+  --nav: #0a0d14;
+  --nav-muted: #7b879c;
+  --nav-active: #5eead4;
+  --nav-active-bg: rgb(94 234 212 / 16%);
+
+  --bg: #0b0e14;
+  --bg-elev: #10151f;
+  --surface: #151a24;
+  --surface-2: #1b2230;
+  --surface-glass: color-mix(in srgb, #151a24 78%, transparent);
+
+  --text: #e8edf7;
+  --text-muted: #9aa6bb;
+  --text-faint: #6f7b90;
+
+  --brand: #14b8a6;
+  --brand-hover: #2dd4bf;
+  --brand-soft: rgb(20 184 166 / 16%);
+  --brand-ink: #5eead4;
+
+  --success: #22c55e;
+  --success-soft: rgb(34 197 94 / 14%);
+  --warning: #fb923c;
+  --warning-soft: rgb(251 146 60 / 14%);
+  --danger: #f87171;
+  --danger-soft: rgb(248 113 113 / 14%);
+  --info: #60a5fa;
+  --info-soft: rgb(96 165 250 / 14%);
+
+  --border: rgb(232 237 247 / 8%);
+  --border-strong: rgb(232 237 247 / 14%);
+  --hairline: rgb(232 237 247 / 6%);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 35%);
+  --shadow: 0 14px 36px rgb(0 0 0 / 35%);
+  --shadow-lg: 0 28px 60px rgb(0 0 0 / 45%);
+  --shadow-rail: 0 18px 40px rgb(0 0 0 / 45%);
+
+  --bg-mesh-1: color-mix(in srgb, var(--brand) 12%, transparent);
+  --bg-mesh-2: rgb(96 165 250 / 8%);
+  --bg-mesh-3: rgb(251 146 60 / 6%);
+
+  --rail-bg: linear-gradient(180deg, color-mix(in srgb, var(--brand) 12%, #0a0d14) 0%, #0a0d14 38%, #070a10 100%);
+  --rail-border: rgb(255 255 255 / 6%);
+  --rail-brand-shadow: 0 12px 28px rgb(13 148 136 / 32%);
+  --rail-divider: rgb(255 255 255 / 8%);
+  --rail-quit-bg: rgb(248 113 113 / 10%);
+  --rail-theme-bg: rgb(255 255 255 / 6%);
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  [data-theme='light'],
+  [data-theme='dark'] {
+    --motion: 0ms;
+  }
+}

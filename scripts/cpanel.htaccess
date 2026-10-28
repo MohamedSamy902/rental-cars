@@ -1,0 +1,44 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # HTTPS (اختياري — فعّله بعد تثبيت شهادة SSL)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Authorization / Sanctum
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Laravel API + health + sanctum cookie routes
+    RewriteRule ^api(/.*)?$ index.php [L,QSA]
+    RewriteRule ^up$ index.php [L,QSA]
+    RewriteRule ^sanctum(/.*)?$ index.php [L,QSA]
+    RewriteRule ^storage(/.*)?$ index.php [L,QSA]
+
+    # ملفات الواجهة الثابتة كما هي
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # باقي المسارات → SPA
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+# منع تصفح المجلدات
+Options -Indexes
+
+# كاش للأصول المبنية
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+</IfModule>
