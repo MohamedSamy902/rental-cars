@@ -1,6 +1,8 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { IconClose } from './Icons'
+import { useIsMobile, useSheetDrag } from './useSheetDrag'
 import './Sheet.css'
 
 type Props = {
@@ -12,6 +14,8 @@ type Props = {
   /** Mobile header dismiss label — إلغاء forms, إغلاق detail */
   closeLabel?: string
 }
+
+const sheetSpring = { type: 'spring', stiffness: 420, damping: 40, mass: 0.9 } as const
 
 function resetPageScroll() {
   const main = document.querySelector('.shell-main') as HTMLElement | null
@@ -25,16 +29,30 @@ function resetPageScroll() {
   }
 }
 
-export function Sheet({ open, title, onClose, children, footer, closeLabel = 'إلغاء' }: Props) {
+export function Sheet(props: Props) {
+  return createPortal(
+    <AnimatePresence>{props.open ? <SheetLayer key="rpm-sheet" {...props} /> : null}</AnimatePresence>,
+    document.body,
+  )
+}
+
+function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء' }: Omit<Props, 'open'>) {
   const rootRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const savedScroll = useRef(0)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+  const close = useCallback(() => onCloseRef.current(), [])
+  const titleId = useId()
+  const mobile = useIsMobile()
+  const { startDrag, dragProps } = useSheetDrag(close, mobile)
 
   useEffect(() => {
-    if (!open) return
     savedScroll.current = window.scrollY || document.documentElement.scrollTop || 0
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') close()
     }
     const prev = document.body.style.overflow
     const prevPos = document.body.style.position
@@ -56,11 +74,10 @@ export function Sheet({ open, title, onClose, children, footer, closeLabel = 'إ
       window.scrollTo(0, savedScroll.current)
       window.setTimeout(() => resetPageScroll(), 0)
     }
-  }, [open, onClose])
+  }, [close])
 
   // Keep sheet inside the visual viewport so the iOS keyboard doesn't shove the UI away
   useEffect(() => {
-    if (!open) return
     const root = rootRef.current
     const vv = window.visualViewport
     if (!root) return
@@ -85,11 +102,10 @@ export function Sheet({ open, title, onClose, children, footer, closeLabel = 'إ
       root.style.top = ''
       root.style.bottom = ''
     }
-  }, [open])
+  }, [])
 
   // Scroll focused inputs inside the sheet body only (never the page)
   useEffect(() => {
-    if (!open) return
     const body = bodyRef.current
     if (!body) return
     const onFocusIn = (e: FocusEvent) => {
@@ -105,41 +121,52 @@ export function Sheet({ open, title, onClose, children, footer, closeLabel = 'إ
     }
     body.addEventListener('focusin', onFocusIn)
     return () => body.removeEventListener('focusin', onFocusIn)
-  }, [open])
+  }, [])
 
-  if (!open) return null
+  const motionIn = mobile
+    ? { initial: { y: '100%' }, animate: { y: 0 }, exit: { y: '100%' } }
+    : {
+        initial: { opacity: 0, y: 14, scale: 0.98 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: 10, scale: 0.98 },
+      }
 
-  return createPortal(
+  return (
     <div className="rpm-sheet-root" role="presentation" ref={rootRef}>
-      <button
+      <motion.button
         className="rpm-sheet-backdrop"
         aria-label="إغلاق اللوحة"
-        onClick={onClose}
+        onClick={close}
         type="button"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
       />
-      <div className="rpm-sheet-wrap">
+      <motion.div className="rpm-sheet-wrap" {...motionIn} transition={sheetSpring} {...dragProps}>
         <button
           type="button"
           className="rpm-sheet__close rpm-sheet__close--desk"
           aria-label="إغلاق"
-          onClick={onClose}
+          onClick={close}
         >
           <IconClose size={16} />
         </button>
-        <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby="rpm-sheet-title">
-          <div className="rpm-sheet__handle" aria-hidden />
-          <header className="rpm-sheet__head">
-            <button type="button" className="rpm-sheet__cancel" onClick={onClose}>
-              {closeLabel}
-            </button>
-            <h2 id="rpm-sheet-title">{title}</h2>
-            <span className="rpm-sheet__head-spacer" aria-hidden />
-          </header>
+        <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+          <div className="rpm-sheet__grab" onPointerDown={startDrag}>
+            <div className="rpm-sheet__handle" aria-hidden />
+            <header className="rpm-sheet__head">
+              <button type="button" className="rpm-sheet__cancel" onClick={close}>
+                {closeLabel}
+              </button>
+              <h2 id={titleId}>{title}</h2>
+              <span className="rpm-sheet__head-spacer" aria-hidden />
+            </header>
+          </div>
           <div className="rpm-sheet__body" ref={bodyRef}>{children}</div>
           {footer ? <footer className="rpm-sheet__foot">{footer}</footer> : null}
         </aside>
-      </div>
-    </div>,
-    document.body,
+      </motion.div>
+    </div>
   )
 }

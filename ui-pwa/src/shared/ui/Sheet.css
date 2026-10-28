@@ -1,18 +1,3 @@
-@keyframes rpm-fade-up {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes rpm-sheet-in-mobile {
-  from { transform: translateY(110%); }
-  to { transform: translateY(0); }
-}
-
-@keyframes rpm-sheet-in-desktop {
-  from { transform: translateY(12px) scale(0.98); opacity: 0; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
-}
-
 .rpm-sheet-root {
   position: fixed;
   inset: 0;
@@ -20,19 +5,19 @@
   display: grid;
   align-items: end;
   justify-items: stretch;
-  padding: 0;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .rpm-sheet-backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(10 14 20 / 48%);
+  background: var(--overlay);
   border: 0;
   cursor: pointer;
-  animation: rpm-fade-up 180ms var(--ease, ease);
+  touch-action: none;
 }
 
 .rpm-sheet-wrap {
@@ -40,15 +25,17 @@
   z-index: 1;
   width: 100%;
   max-width: 100%;
+  height: min(92%, 920px);
   display: grid;
   box-sizing: border-box;
+  will-change: transform;
 }
 
 .rpm-sheet__close {
   position: absolute;
   z-index: 3;
-  inset-block-start: 0;
-  inset-inline-end: 0;
+  inset-block-start: -21px;
+  inset-inline-end: -21px;
   width: 42px;
   height: 42px;
   display: none;
@@ -56,49 +43,64 @@
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 10px 28px rgb(15 23 42 / 18%);
-  transform: translate(50%, -50%);
+  color: var(--text-muted);
+  box-shadow: var(--shadow);
   transition:
-    transform var(--motion, 200ms) var(--ease, ease),
-    background var(--motion, 200ms) var(--ease, ease),
-    color var(--motion, 200ms) var(--ease, ease),
-    box-shadow var(--motion, 200ms) var(--ease, ease);
-}
-
-[dir='rtl'] .rpm-sheet__close {
-  transform: translate(-50%, -50%);
+    transform var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
 }
 
 .rpm-sheet__close:hover {
-  background: var(--surface-2);
-  color: var(--danger, #dc2626);
-  box-shadow: 0 12px 30px rgb(15 23 42 / 22%);
+  background: var(--action-hover);
+  border-color: var(--action-hover);
+  color: var(--on-action-hover);
+}
+
+.rpm-sheet__close:active {
+  transform: scale(0.94);
 }
 
 .rpm-sheet {
   position: relative;
   z-index: 1;
   width: 100%;
-  height: min(92%, 920px);
-  max-height: min(92%, 920px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
   background: var(--surface);
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -18px 48px rgb(15 23 42 / 22%);
-  animation: rpm-sheet-in-mobile 280ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-block-end: 0;
+  border-start-start-radius: 24px;
+  border-start-end-radius: 24px;
+  box-shadow: var(--shadow-sheet);
   overflow: hidden;
+}
+
+/* Grab zone: handle + header. Drag here dismisses; never scrolls the page */
+.rpm-sheet__grab {
+  flex-shrink: 0;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.rpm-sheet__grab:active {
+  cursor: grabbing;
 }
 
 .rpm-sheet__handle {
   width: 44px;
   height: 5px;
-  margin: 0.45rem auto 0;
+  margin: 0.55rem auto 0.1rem;
   border-radius: 999px;
-  background: var(--border-strong, var(--border));
-  flex-shrink: 0;
+  background: var(--border-strong);
+  transition: background-color var(--motion-fast) ease, width var(--motion-fast) ease;
+}
+.rpm-sheet__grab:active .rpm-sheet__handle {
+  width: 56px;
+  background: var(--text-faint);
 }
 
 .rpm-sheet__head {
@@ -106,28 +108,36 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.55rem 1rem 0.85rem;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
   min-height: 52px;
+  padding-block: 0.45rem 0.8rem;
+  padding-inline: 1rem;
+  border-block-end: 1px solid var(--border);
 }
 
 .rpm-sheet__head h2 {
+  margin: 0;
   font-size: 1.05rem;
   line-height: 1.3;
   text-align: center;
-  margin: 0;
+  color: var(--text);
 }
 
 .rpm-sheet__cancel {
   justify-self: start;
   min-height: 40px;
-  padding: 0.35rem 0.15rem;
-  color: var(--brand-ink);
-  font-weight: 800;
+  padding-inline: 0.65rem;
+  border-radius: 0.5rem;
+  color: var(--text-muted);
+  font-weight: 700;
   font-size: 0.95rem;
   background: transparent;
   border: 0;
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+.rpm-sheet__cancel:hover,
+.rpm-sheet__cancel:active {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .rpm-sheet__head-spacer {
@@ -140,7 +150,8 @@
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 1.05rem 1.1rem;
+  padding-block: 1.05rem;
+  padding-inline: 1.1rem;
   display: grid;
   align-content: start;
   gap: 0.95rem;
@@ -149,9 +160,10 @@
 
 .rpm-sheet__foot {
   flex-shrink: 0;
-  padding: 0.85rem 1rem calc(0.95rem + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 92%, var(--surface-2));
+  padding-block: 0.85rem calc(0.95rem + var(--safe-bottom));
+  padding-inline: 1rem;
+  border-block-start: 1px solid var(--border);
+  background: var(--surface-2);
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.55rem;
@@ -180,10 +192,11 @@
 .rpm-form-grid .rpm-switch {
   width: 100%;
   justify-content: space-between;
-  padding: 0.75rem 0.9rem;
+  padding-block: 0.75rem;
+  padding-inline: 0.9rem;
   border-radius: 14px;
   background: var(--surface-2);
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
 }
 
 .rpm-form-grid .rpm-switch__label {
@@ -201,16 +214,20 @@
 
   .rpm-sheet-wrap {
     width: min(560px, calc(100vw - 3rem));
+    height: auto;
+    max-height: min(88dvh, 840px);
   }
 
   .rpm-sheet {
-    width: 100%;
-    height: auto;
     max-height: min(88dvh, 840px);
-    margin: 0;
-    border-radius: 22px;
-    box-shadow: 0 28px 64px rgb(15 23 42 / 22%);
-    animation: rpm-sheet-in-desktop 260ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
+    border-block-end: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .rpm-sheet__grab {
+    touch-action: auto;
+    cursor: default;
   }
 
   .rpm-sheet__handle,
@@ -223,32 +240,28 @@
     display: grid;
   }
 
-  .rpm-sheet__close--desk:active {
-    transform: translate(50%, -50%) scale(0.96);
-  }
-
-  [dir='rtl'] .rpm-sheet__close--desk:active {
-    transform: translate(-50%, -50%) scale(0.96);
-  }
-
   .rpm-sheet__head {
     display: flex;
     justify-content: space-between;
-    padding: 1rem 1.15rem;
+    padding-block: 1rem;
+    padding-inline: 1.25rem;
   }
 
   .rpm-sheet__head h2 {
     text-align: start;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
+  }
+
+  .rpm-sheet__body {
+    padding-inline: 1.25rem;
   }
 
   .rpm-sheet__foot {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
-    grid-template-columns: none;
-    padding: 0.95rem 1.15rem 1.1rem;
-    border-radius: 0 0 22px 22px;
+    padding-block: 0.95rem 1.1rem;
+    padding-inline: 1.25rem;
   }
 
   .rpm-sheet__foot .rpm-btn--secondary,
@@ -259,7 +272,8 @@
   .rpm-sheet__foot > .rpm-btn--primary,
   .rpm-sheet__foot > .rpm-btn:not(.rpm-btn--secondary):not(.rpm-btn--ghost):not(.rpm-btn--danger) {
     width: auto;
-    min-height: 42px;
-    font-size: inherit;
+    min-height: 2.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
   }
 }
