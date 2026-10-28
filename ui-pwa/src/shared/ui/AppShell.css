@@ -630,8 +630,9 @@
     background: var(--surface-hover);
     border-color: transparent;
   }
+  /* pb-24: clears the 72px bottom nav with 1.5rem to spare, no dead void */
   .shell-main {
-    padding-block: 0.75rem calc(8rem + var(--safe-bottom));
+    padding-block: 0.75rem calc(var(--bottom-nav-height) + 1.5rem + var(--safe-bottom));
     padding-inline: 0.85rem;
     overflow-x: clip;
   }

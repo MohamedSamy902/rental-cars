@@ -49,8 +49,8 @@
     opacity: 0.6;
   }
 
-  /* The FAB's top edge sits ~8.4rem up; keep the last card fully clear of it */
+  /* The FAB's top edge sits nav + 3.875rem up; keep the last card just clear of it */
   .shell-main:has(.rpm-fab-dock) {
-    padding-block-end: calc(var(--bottom-nav-height) + 5.5rem + var(--safe-bottom));
+    padding-block-end: calc(var(--bottom-nav-height) + 4.75rem + var(--safe-bottom));
   }
 }

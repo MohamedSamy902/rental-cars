@@ -9,7 +9,7 @@ import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, StatusPill, Sheet,
   TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField, MediaUpload,
-  useToast, SkeletonBlock, ErrorState,
+  useToast, SkeletonBlock, ErrorState, QrCode,
 } from '@/shared/ui'
 import './VehicleDetailPage.css'
 import './pages.css'
@@ -174,31 +174,6 @@ const emptyAcc = {
   name: '', default_qty: '1', required_each_rental: true, is_active: true, notes: '',
 }
 
-function buildQrDataUrl(text: string) {
-  const canvas = document.createElement('canvas')
-  const size = 180
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return ''
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, size, size)
-  ctx.fillStyle = '#0f172a'
-  let h = 0
-  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0
-  const cells = 21
-  const cell = Math.floor(size / cells)
-  for (let y = 0; y < cells; y += 1) {
-    for (let x = 0; x < cells; x += 1) {
-      const bit = ((h >> ((x + y) % 24)) ^ (x * 7 + y * 13 + text.length)) & 1
-      if (bit || (x < 3 && y < 3) || (x > cells - 4 && y < 3) || (x < 3 && y > cells - 4)) {
-        ctx.fillRect(x * cell, y * cell, cell - 1, cell - 1)
-      }
-    }
-  }
-  return canvas.toDataURL('image/png')
-}
-
 function shortDate(value?: string | null) {
   if (!value) return '—'
   return value.slice(0, 10)
@@ -246,10 +221,6 @@ export function VehicleDetailPage() {
   const [accForm, setAccForm] = useState(emptyAcc)
   const [estimatedKm, setEstimatedKm] = useState<number | null>(null)
 
-  const qrImage = useMemo(
-    () => (dossier?.qr.payload ? buildQrDataUrl(dossier.qr.payload) : ''),
-    [dossier?.qr.payload],
-  )
 
   const revenueSeries = useMemo(
     () => (dossier?.charts.revenue_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
@@ -1042,10 +1013,13 @@ export function VehicleDetailPage() {
       <div className="vd-panel__head" style={{ marginTop: '0.35rem' }}>
         <h2>رمز QR</h2>
       </div>
-      <div className="vd-qr" style={{ maxWidth: 220, justifySelf: 'start' }}>
-        {qrImage ? <img src={qrImage} alt="QR" width={160} height={160} /> : null}
-        <p className="vd-qr__label">{dossier.qr.label}{'\n'}{dossier.qr.payload}</p>
-      </div>
+      <QrCode
+        className="vd-qr-panel"
+        value={dossier.qr.payload}
+        label={dossier.qr.label}
+        fileName={`rpm-${v.code}-qr`}
+        size={176}
+      />
     </section>
   )
 
@@ -1101,10 +1075,13 @@ export function VehicleDetailPage() {
               <span>الإيجار اليومي</span>
               <strong>{formatMoney(v.daily_rate)}</strong>
             </div>
-            <div className="vd-qr">
-              {qrImage ? <img src={qrImage} alt="QR" width={132} height={132} /> : null}
-              <p className="vd-qr__label">امسح للوصول السريع</p>
-            </div>
+            <QrCode
+              className="vd-qr"
+              value={dossier.qr.payload}
+              label="امسح للوصول السريع"
+              fileName={`rpm-${v.code}-qr`}
+              size={124}
+            />
           </aside>
         </div>
       </header>

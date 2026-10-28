@@ -4,7 +4,6 @@
   --vd-pad: clamp(1rem, 2.2vw, 1.6rem);
   display: grid;
   gap: 1rem;
-  padding-block-end: 2rem;
   animation: vd-in 420ms var(--ease) both;
 }
 
@@ -180,31 +179,9 @@
   justify-items: stretch;
 }
 
-.vd-qr {
-  display: grid;
-  gap: 0.45rem;
-  justify-items: center;
-  padding: 0.9rem;
-  border-radius: 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  text-align: center;
-}
-
-.vd-qr img {
-  width: 132px;
-  height: 132px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid var(--border);
-}
-
-.vd-qr__label {
-  margin: 0;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  line-height: 1.35;
-  word-break: break-all;
+.vd-qr-panel {
+  justify-self: start;
+  width: min(15rem, 100%);
 }
 
 .vd-rate {
@@ -689,7 +666,10 @@
     grid-template-columns: 1fr;
   }
 
-  .vd-kpis,
+  .vd-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .vd-chart-kpis,
   .vd-charts {
     grid-template-columns: 1fr;
@@ -704,9 +684,13 @@
     height: 180px !important;
   }
 
-  .vd-split,
-  .vd-facts {
+  .vd-split {
     grid-template-columns: 1fr;
+  }
+
+  .vd-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
   }
 
   .vd-hero__side {
@@ -721,6 +705,31 @@
 @media (max-width: 560px) {
   .vd-hero__side {
     grid-template-columns: 1fr;
+  }
+
+  /* Compact QR row: code on one side, caption + actions on the other */
+  .vd-qr.rpm-qr {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    justify-items: stretch;
+    align-items: center;
+    column-gap: 0.875rem;
+  }
+  .vd-qr .rpm-qr__plate {
+    grid-row: 1 / -1;
+  }
+  .vd-qr .rpm-qr__label {
+    text-align: start;
+    align-self: end;
+  }
+  .vd-qr .rpm-qr__actions {
+    align-self: start;
+  }
+
+  .vd-fact {
+    padding-block: 0.625rem;
+    padding-inline: 0.75rem;
+    border-radius: 0.75rem;
   }
 
   .vd-plate__num {
