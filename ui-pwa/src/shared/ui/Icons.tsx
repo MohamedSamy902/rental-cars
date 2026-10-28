@@ -61,6 +61,9 @@ export const IconSearch = (p: Props) => (
 export const IconPlus = (p: Props) => (
   <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>
 )
+export const IconRefresh = (p: Props) => (
+  <Svg {...p}><path d="M20 11a8 8 0 0 0-14.6-4.5L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0 0 14.6 4.5L20 16" /><path d="M20 20v-4h-4" /></Svg>
+)
 export const IconLogout = (p: Props) => (
   <Svg {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></Svg>
 )

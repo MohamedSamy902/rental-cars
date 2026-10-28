@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Area,
@@ -25,12 +25,16 @@ import {
 import { AnimatedNumber } from '@/shared/ui/AnimatedNumber'
 import { Badge, type BadgeTone } from '@/shared/ui/Badge'
 import { Card, CardContent, CardHeader } from '@/shared/ui/Card'
-import { ErrorState, SkeletonBlock } from '@/shared/ui'
+import { DropdownMenu, ErrorState, SkeletonBlock, useToast, type MenuItem } from '@/shared/ui'
 import {
+  IconCalendar,
   IconCar,
   IconClipboard,
   IconMore,
+  IconPlus,
+  IconRefresh,
   IconReturn,
+  IconStore,
   IconTrend,
   IconUsers,
   IconWrench,
@@ -175,12 +179,8 @@ function ChartTooltip({
   )
 }
 
-function CardMenuButton({ label }: { label: string }) {
-  return (
-    <button type="button" className="db-card-menu" aria-label={label}>
-      <IconMore size={16} />
-    </button>
-  )
+function CardMenu({ label, items }: { label: string; items: MenuItem[] }) {
+  return <DropdownMenu label={label} items={items} triggerClassName="db-card-menu" trigger={<IconMore size={16} />} />
 }
 
 export function DashboardPage() {
@@ -191,6 +191,9 @@ export function DashboardPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [revenueRange, setRevenueRange] = useState<RevenueRange>('week')
+  const [refreshing, setRefreshing] = useState(false)
+  const navigate = useNavigate()
+  const toast = useToast()
 
   useEffect(() => {
     api<Dash>('/dashboard')
@@ -198,6 +201,53 @@ export function DashboardPage() {
       .catch((e) => setError(e.message || 'تعذّر تحميل اللوحة'))
       .finally(() => setLoading(false))
   }, [])
+
+  const refresh = useCallback(() => {
+    setRefreshing(true)
+    api<Dash>('/dashboard')
+      .then((next) => {
+        setData(next)
+        toast.success('تم تحديث بيانات اللوحة')
+      })
+      .catch((e) => toast.error(e.message || 'تعذّر تحديث اللوحة'))
+      .finally(() => setRefreshing(false))
+  }, [toast])
+
+  const menus = useMemo(() => {
+    const go = (id: string, label: string, to: string, icon: ReactNode): MenuItem => ({
+      id,
+      label,
+      icon,
+      onSelect: () => navigate(to),
+    })
+    const tail: MenuItem[] = [
+      { id: 'sep', separator: true },
+      { id: 'refresh', label: 'تحديث البيانات', icon: <IconRefresh size={16} />, onSelect: refresh },
+    ]
+    return {
+      occupancy: [
+        go('fleet', 'عرض الأسطول', '/vehicles', <IconCar size={16} />),
+        go('maintenance', 'الصيانة وأوامر الشغل', '/maintenance', <IconWrench size={16} />),
+        ...tail,
+      ],
+      operations: [
+        go('bookings', 'كل العقود', '/bookings', <IconClipboard size={16} />),
+        go('new', 'عقد جديد', '/bookings?new=1', <IconPlus size={16} />),
+        ...tail,
+      ],
+      fleet: [
+        go('fleet', 'عرض الأسطول', '/vehicles', <IconCar size={16} />),
+        go('showroom', 'وضع المعرض', '/showroom', <IconStore size={16} />),
+        go('maintenance', 'الصيانة', '/maintenance', <IconWrench size={16} />),
+        ...tail,
+      ],
+      returns: [
+        go('calendar', 'فتح التقويم', '/calendar', <IconCalendar size={16} />),
+        go('bookings', 'كل العقود', '/bookings', <IconClipboard size={16} />),
+        ...tail,
+      ],
+    }
+  }, [navigate, refresh])
 
   const revenueSeries = useMemo(() => {
     if (!data) return []
@@ -404,7 +454,7 @@ export function DashboardPage() {
         ))}
       </section>
 
-      <section className="db-bento">
+      <section className={`db-bento ${refreshing ? 'is-refreshing' : ''}`.trim()} aria-busy={refreshing}>
         <motion.div
           className="db-span-5"
           initial={{ opacity: 0, y: 12 }}
@@ -418,7 +468,7 @@ export function DashboardPage() {
               action={
                 <>
                   <Link to="/vehicles">الأسطول</Link>
-                  <CardMenuButton label="خيارات الإشغال" />
+                  <CardMenu label="خيارات الإشغال" items={menus.occupancy} />
                 </>
               }
             />
@@ -483,7 +533,7 @@ export function DashboardPage() {
               action={
                 <>
                   <Link to="/bookings">العقود</Link>
-                  <CardMenuButton label="خيارات العمليات" />
+                  <CardMenu label="خيارات العمليات" items={menus.operations} />
                 </>
               }
             />
@@ -622,7 +672,7 @@ export function DashboardPage() {
             <CardHeader
               title="حالة الأسطول"
               description="توزيع المركبات"
-              action={<CardMenuButton label="خيارات الأسطول" />}
+              action={<CardMenu label="خيارات الأسطول" items={menus.fleet} />}
             />
             <CardContent>
               <div className="db-fleet">
@@ -677,7 +727,7 @@ export function DashboardPage() {
               action={
                 <>
                   <Link to="/calendar">التقويم</Link>
-                  <CardMenuButton label="خيارات الإرجاعات" />
+                  <CardMenu label="خيارات الإرجاعات" items={menus.returns} />
                 </>
               }
             />
