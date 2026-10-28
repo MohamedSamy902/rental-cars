@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\OperationsController;
+use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
@@ -131,6 +132,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('permission:expenses.view')->get('/expenses', [ExpenseController::class, 'index']);
     Route::middleware('permission:expenses.create')->post('/expenses', [ExpenseController::class, 'store']);
+
+    Route::middleware('permission:owners.view')->group(function () {
+        Route::get('/owners', [VehicleOwnerController::class, 'index']);
+        Route::get('/owners/{owner}', [VehicleOwnerController::class, 'show']);
+        Route::get('/owners/{owner}/balance', [VehicleOwnerController::class, 'balance']);
+        Route::get('/owner-payouts', [VehicleOwnerController::class, 'payoutsIndex']);
+    });
+    Route::middleware('permission:owners.create')->post('/owners', [VehicleOwnerController::class, 'store']);
+    Route::middleware('permission:owners.update')->put('/owners/{owner}', [VehicleOwnerController::class, 'update']);
+    Route::middleware('permission:owners.payout')->post('/owners/{owner}/payouts', [VehicleOwnerController::class, 'payout']);
 
     Route::get('/accounting/overview', [AccountingController::class, 'overview'])->middleware('permission:accounting.view');
     Route::post('/accounting/lock-month', [AccountingController::class, 'lockMonth'])->middleware('permission:accounting.lock_month');

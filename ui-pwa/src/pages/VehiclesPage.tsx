@@ -10,6 +10,7 @@ import './pages.css'
 
 type Accessory = { id: number; name: string; default_qty?: number }
 type Document = { id: number; type: string; file_path?: string | null; expires_on?: string | null; issued_on?: string | null; notes?: string | null }
+type OwnerOption = { id: number; full_name: string; phone?: string | null }
 
 type Vehicle = {
   id: number
@@ -29,6 +30,10 @@ type Vehicle = {
   tracker_sim_number?: string | null
   notes?: string | null
   is_active?: boolean
+  owner_id?: number | null
+  owner_monthly_amount?: number | null
+  owner_since?: string | null
+  owner?: OwnerOption | null
   accessories?: Accessory[] | null
   documents?: Document[] | null
 }
@@ -53,6 +58,7 @@ const emptyForm = {
   code: '', plate: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
   odometer: '', daily_rate: '', default_deposit: '', rental_priority: '50',
   tracker_device_number: '', tracker_sim_number: '', notes: '', is_active: true,
+  owner_id: '', owner_monthly_amount: '',
 }
 
 export function VehiclesPage() {
@@ -75,6 +81,13 @@ export function VehiclesPage() {
   const [qrLabel, setQrLabel] = useState('')
   const [qrImage, setQrImage] = useState('')
   const [estimatedKm, setEstimatedKm] = useState<number | null>(null)
+  const [owners, setOwners] = useState<OwnerOption[]>([])
+
+  useEffect(() => {
+    void api<{ data: OwnerOption[] }>('/owners?active_only=1&per_page=100')
+      .then((res) => setOwners(res.data))
+      .catch(() => setOwners([]))
+  }, [])
 
   async function load(nextSearch = search, nextChip = chip) {
     setLoading(true)
@@ -123,6 +136,8 @@ export function VehiclesPage() {
         tracker_sim_number: res.data.tracker_sim_number || '',
         notes: res.data.notes || '',
         is_active: res.data.is_active !== false,
+        owner_id: res.data.owner_id ? String(res.data.owner_id) : '',
+        owner_monthly_amount: res.data.owner_monthly_amount != null ? String(res.data.owner_monthly_amount) : '',
       })
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -144,6 +159,10 @@ export function VehiclesPage() {
           daily_rate: Number(form.daily_rate),
           default_deposit: Number(form.default_deposit),
           rental_priority: Number(form.rental_priority || 50),
+          owner_id: form.owner_id ? Number(form.owner_id) : null,
+          owner_monthly_amount: form.owner_id && form.owner_monthly_amount !== ''
+            ? Number(form.owner_monthly_amount)
+            : null,
         },
       })
       toast.success('تم إضافة السيارة.')
@@ -174,6 +193,10 @@ export function VehiclesPage() {
           daily_rate: Number(form.daily_rate),
           default_deposit: Number(form.default_deposit),
           rental_priority: Number(form.rental_priority || 50),
+          owner_id: form.owner_id ? Number(form.owner_id) : null,
+          owner_monthly_amount: form.owner_id && form.owner_monthly_amount !== ''
+            ? Number(form.owner_monthly_amount)
+            : null,
         },
       })
       toast.success(res.message || 'تم التحديث.')
@@ -310,6 +333,25 @@ export function VehiclesPage() {
       <NumberField label="درجة أولوية التأجير" value={form.rental_priority} onChange={(e) => setForm({ ...form, rental_priority: e.target.value })} hint="من ٠ إلى ١٠٠" />
       <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
       <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
+      <SelectField
+        label="المالك (عربيات الغير)"
+        value={form.owner_id}
+        onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
+        options={[
+          { value: '', label: '— ملك المركز —' },
+          ...owners.map((o) => ({ value: String(o.id), label: o.full_name + (o.phone ? ` · ${o.phone}` : '') })),
+        ]}
+        hint="اتركه فارغاً إن كانت العربية ملك المركز"
+      />
+      {form.owner_id ? (
+        <MoneyField
+          label="المبلغ الشهري للمالك"
+          required
+          value={form.owner_monthly_amount}
+          onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })}
+          hint="المبلغ الثابت المستحق شهرياً لهذا المالك عن هذه العربية"
+        />
+      ) : null}
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       <SwitchField label="نشطة" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
     </div>
@@ -430,6 +472,9 @@ export function VehiclesPage() {
                 { label: 'أولوية التأجير', value: detail.rental_priority },
                 { label: 'جهاز التتبع', value: detail.tracker_device_number || '—' },
                 { label: 'شريحة التتبع', value: detail.tracker_sim_number || '—' },
+                { label: 'المالك', value: detail.owner?.full_name || 'ملك المركز' },
+                { label: 'المبلغ الشهري للمالك', value: detail.owner_id ? formatMoney(detail.owner_monthly_amount || 0) : '—' },
+                { label: 'تاريخ ربط المالك', value: detail.owner_since || '—' },
                 { label: 'نشطة', value: detail.is_active === false ? 'لا' : 'نعم' },
                 { label: 'ملاحظات', value: detail.notes || '—' },
               ]}

@@ -599,6 +599,35 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | سجل | `/audit-logs` | `/audit-logs` |
 | إشعارات | `/notifications*` | `/notifications` |
 | وسائط | `/media*` | رفع في العملاء/المركبات/الأضرار |
+| ملاك العربيات | `/owners*` | `/owners` |
+
+---
+
+## ١٦‑ب) ملاك العربيات (عربيات الغير)
+
+بعض العربيات ليست ملك المركز — تُربط بمالك وتُستحق له مبلغ شهري ثابت عند إضافة/تعديل المركبة. يمكن صرف جزء من المستحق في أي يوم، مع رصيد: مستحق · مصروف · متبقي.
+
+| Method | Path | صلاحية |
+|--------|------|--------|
+| GET | `/owners` | `owners.view` |
+| POST | `/owners` | `owners.create` |
+| GET | `/owners/{id}` | `owners.view` — عربيات + استحقاقات + سحوبات + رصيد |
+| PUT | `/owners/{id}` | `owners.update` |
+| GET | `/owners/{id}/balance?month=YYYY-MM` | `owners.view` |
+| POST | `/owners/{id}/payouts` | `owners.payout` (حسّاسة) |
+| GET | `/owner-payouts` | `owners.view` |
+
+**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since`
+
+**ترحيل محاسبي**
+- استحقاق شهري: مدين `5200` مصروف إيجار ملاك · دائن `2100` مستحقات ملاك
+- صرف: مدين `2100` · دائن صندوق `1000` أو بنك `1100`
+
+**POST /owners/{id}/payouts**
+```json
+{ "amount": 3000, "paid_on": "2026-10-15", "payment_method": "cash", "vehicle_id": 12, "notes": "دفعة جزئية" }
+```
+يرفض إن تجاوز المتبقي.
 
 ---
 

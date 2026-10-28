@@ -26,6 +26,7 @@ class PermissionCatalog
             'violations' => ['المخالفات', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل']],
             'deposits' => ['التأمين النقدي', ['view' => 'عرض', 'collect' => 'قبض', 'settle' => 'تسوية']],
             'expenses' => ['المصروفات', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل']],
+            'owners' => ['ملاك العربيات', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'payout' => 'صرف للمالك']],
             'petty_cash' => ['العهدة', ['view' => 'عرض', 'manage' => 'إدارة']],
             'accounting' => ['الحسابات', ['view' => 'عرض', 'lock_month' => 'إقفال شهر', 'reopen_month' => 'إعادة فتح شهر']],
             'payments' => ['الدفعات', ['view' => 'عرض', 'create' => 'إضافة']],
@@ -74,6 +75,7 @@ class PermissionCatalog
             'violations' => 'المخالفات',
             'deposits' => 'التأمين النقدي',
             'expenses' => 'المصروفات',
+            'owners' => 'ملاك العربيات',
             'petty_cash' => 'العهدة',
             'accounting' => 'الحسابات',
             'payments' => 'الدفعات',
@@ -101,6 +103,7 @@ class PermissionCatalog
                 'accounting.reopen_month',
                 'hr.payroll_approve',
                 'petty_cash.manage',
+                'owners.payout',
                 'contracts_swap.execute',
                 'contracts_cancel.approve',
                 'staff.manage',
@@ -132,13 +135,13 @@ class PermissionCatalog
         }
 
         $super = Role::query()->where('name', 'super_admin')->first();
-        if ($super && $super->permissions()->count() === 0) {
-            $super->permissions()->sync(Permission::query()->pluck('id'));
+        if ($super) {
+            $super->permissions()->syncWithoutDetaching(Permission::query()->pluck('id'));
         }
 
         $viewer = Role::query()->where('name', 'viewer')->first();
-        if ($viewer && $viewer->permissions()->count() === 0) {
-            $viewer->permissions()->sync(
+        if ($viewer) {
+            $viewer->permissions()->syncWithoutDetaching(
                 Permission::query()->where('key', 'like', '%.view')->pluck('id')
             );
         }

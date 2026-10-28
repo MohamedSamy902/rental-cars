@@ -26,10 +26,12 @@ class AccountingService
             ['code' => '1100', 'name' => 'البنك', 'type' => 'asset'],
             ['code' => '1200', 'name' => 'ذمم العملاء', 'type' => 'asset'],
             ['code' => '1300', 'name' => 'تأمينات نقدية محتجزة', 'type' => 'liability'],
+            ['code' => '2100', 'name' => 'مستحقات ملاك العربيات', 'type' => 'liability'],
             ['code' => '4000', 'name' => 'إيراد الإيجار', 'type' => 'income'],
             ['code' => '4100', 'name' => 'إيراد كيلومترات زيادة', 'type' => 'income'],
             ['code' => '4200', 'name' => 'إيراد أضرار', 'type' => 'income'],
             ['code' => '4300', 'name' => 'إيراد رسوم تشغيل', 'type' => 'income'],
+            ['code' => '5200', 'name' => 'مصروف إيجار ملاك', 'type' => 'expense'],
         ];
 
         $rows = [];
