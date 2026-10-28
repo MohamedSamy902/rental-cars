@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { useDragControls, type PanInfo } from 'framer-motion'
 
 const MOBILE_QUERY = '(max-width: 980px)'
-const DISMISS_OFFSET = 110
-const DISMISS_VELOCITY = 550
+const DISMISS_OFFSET = 120
+const FLICK_VELOCITY = 700
+const FLICK_MIN_OFFSET = 56
 
 export function useIsMobile() {
   const [mobile, setMobile] = useState(() =>
@@ -46,7 +47,8 @@ export function useSheetDrag(onDismiss: () => void, enabled: boolean) {
         dragElastic: { top: 0, bottom: 0.9 },
         dragMomentum: false,
         onDragEnd: (_: unknown, info: PanInfo) => {
-          if (info.offset.y > DISMISS_OFFSET || info.velocity.y > DISMISS_VELOCITY) {
+          const flicked = info.velocity.y > FLICK_VELOCITY && info.offset.y > FLICK_MIN_OFFSET
+          if (info.offset.y > DISMISS_OFFSET || flicked) {
             dismissRef.current()
           }
         },
