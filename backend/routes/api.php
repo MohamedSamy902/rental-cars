@@ -11,13 +11,13 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\OperationsController;
-use App\Http\Controllers\Api\PushSubscriptionController;
-use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\PayrollController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\WorkOrderController;
 use App\Models\Notification;
@@ -65,15 +65,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:hr.view')->group(function () {
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/payroll', [PayrollController::class, 'index']);
+        Route::get('/salary-advances', [PayrollController::class, 'advances']);
     });
     Route::middleware('permission:hr.create')->group(function () {
         Route::post('/employees', [EmployeeController::class, 'store']);
         Route::post('/payroll/draft', [PayrollController::class, 'draft']);
+        Route::post('/salary-advances', [PayrollController::class, 'storeAdvance']);
+        Route::delete('/salary-advances/{salaryAdvance}', [PayrollController::class, 'destroyAdvance']);
     });
     Route::put('/employees/{employee}', [EmployeeController::class, 'update'])
         ->middleware('permission:hr.update');
-    Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve'])
-        ->middleware('permission:hr.payroll_approve');
+    Route::middleware('permission:hr.payroll_approve')->group(function () {
+        Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve']);
+        Route::post('/payroll/lines/{payrollLine}/payout', [PayrollController::class, 'payout']);
+    });
 
     Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
@@ -154,6 +159,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:owners.payout')->post('/owners/{owner}/payouts', [VehicleOwnerController::class, 'payout']);
 
     Route::get('/accounting/overview', [AccountingController::class, 'overview'])->middleware('permission:accounting.view');
+    Route::get('/accounting/months/{year}/{month}', [AccountingController::class, 'month'])
+        ->whereNumber(['year', 'month'])
+        ->middleware('permission:accounting.view');
     Route::post('/accounting/lock-month', [AccountingController::class, 'lockMonth'])->middleware('permission:accounting.lock_month');
     Route::post('/accounting/reopen-month', [AccountingController::class, 'reopenMonth'])->middleware('permission:accounting.reopen_month');
     Route::get('/accounting/payments', [AccountingController::class, 'payments'])->middleware('permission:payments.view');

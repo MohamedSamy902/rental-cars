@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreContractRequest;
 use App\Models\Contract;
+use App\Models\TenantSetting;
+use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -61,9 +63,9 @@ class ContractController extends Controller
         return response()->json(['data' => $contract, 'message' => 'تم إنشاء العقد.'], 201);
     }
 
-    public function show(Contract $contract): JsonResponse
+    public function show(Contract $contract, ContractDossierService $dossier): JsonResponse
     {
-        return response()->json(['data' => $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections'])]);
+        return response()->json(['data' => $dossier->build($contract)]);
     }
 
     public function approve(Request $request, Contract $contract): JsonResponse
@@ -148,7 +150,7 @@ class ContractController extends Controller
     public function printData(Contract $contract): JsonResponse
     {
         $contract->load(['customer', 'vehicle.documents', 'vehicle.accessories', 'deposit.deductions', 'inspections.damages']);
-        $tenant = \App\Models\TenantSetting::query()->first();
+        $tenant = TenantSetting::query()->first();
 
         return response()->json([
             'data' => [

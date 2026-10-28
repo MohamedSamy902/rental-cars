@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\Contract;
+use App\Models\Expense;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\MonthLock;
@@ -261,6 +262,10 @@ class AccountingService
                 'label' => $dt->translatedFormat('F Y'),
                 'locked' => $lock?->isLocked() ?? false,
                 'rent_revenue' => (int) $rentCredit,
+                'expenses' => (int) Expense::query()
+                    ->whereYear('spent_on', $year)
+                    ->whereMonth('spent_on', $month)
+                    ->sum('amount'),
                 'completed_contracts' => Contract::query()
                     ->where('status', 'completed')
                     ->whereYear('actual_ends_at', $year)
