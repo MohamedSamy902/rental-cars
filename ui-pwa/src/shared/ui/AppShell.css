@@ -343,23 +343,36 @@
 .shell-icon--mobile { display: none; }
 
 .shell-cta {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   min-height: 2.25rem;
-  padding-inline: 1rem;
+  padding: 0.5rem 1rem;
+  padding-inline-start: 1.15rem;
   border-radius: 0.5rem;
-  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  background: #18181b;
   color: #fff;
-  border: 1px solid rgb(0 0 0 / 8%);
+  border: 1px solid rgb(255 255 255 / 10%);
   font-family: var(--font-body);
   font-weight: 500;
   font-size: 0.875rem;
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 22%),
-    0 1px 2px rgb(220 38 38 / 28%),
-    0 8px 20px rgb(220 38 38 / 18%);
+    inset 0 1px 0 rgb(255 255 255 / 10%),
+    0 1px 2px rgb(24 24 27 / 12%);
   transition: background 150ms ease, transform 150ms ease;
+}
+.shell-cta::before {
+  content: '';
+  position: absolute;
+  inset-block: 0.35rem;
+  inset-inline-start: 0.35rem;
+  width: 0.2rem;
+  border-radius: 999px;
+  background: #dc2626;
+}
+.shell-cta:hover {
+  background: #27272a;
 }
 .shell-cta:active {
   transform: scale(0.98);
@@ -402,7 +415,8 @@
   padding: 0.85rem 1.25rem 0.5rem;
   min-width: 0;
   max-width: 100%;
-  overflow-x: clip;
+  /* avoid overflow-x:clip — it forces overflow-y containment and clips KPI cards */
+  overflow: visible;
 }
 .shell-main > div {
   width: min(1240px, 100%);

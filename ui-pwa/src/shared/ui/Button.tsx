@@ -19,6 +19,8 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   iconStart?: ReactNode
   /** Trailing icon */
   iconEnd?: ReactNode
+  /** Thin crimson brand mark on the inline-start edge (use with primary) */
+  brandMark?: boolean
   children: ReactNode
 }
 
@@ -33,6 +35,7 @@ export function Button({
   type = 'button',
   iconStart,
   iconEnd,
+  brandMark = false,
   ...rest
 }: Props) {
   const [internalBusy, setInternalBusy] = useState(false)
@@ -99,7 +102,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`rpm-btn rpm-btn--${variant} rpm-btn--${size} ${className}`.trim()}
+      className={`rpm-btn rpm-btn--${variant} rpm-btn--${size} ${brandMark ? 'rpm-btn--brand-mark' : ''} ${className}`.trim()}
       disabled={locked}
       aria-busy={busy || undefined}
       {...rest}

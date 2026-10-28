@@ -347,7 +347,9 @@ export function DashboardPage() {
           </p>
         </div>
         <Button
-          variant="accent"
+          variant="primary"
+          brandMark
+          size="md"
           iconStart={<IconPlus size={16} />}
           onClick={() => navigate('/bookings?new=1')}
         >
@@ -359,9 +361,10 @@ export function DashboardPage() {
         {kpis.map((k, i) => (
           <motion.div
             key={k.label}
-            initial={{ opacity: 0, y: 12 }}
+            className="db-kpi-shell"
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04 * i, duration: 0.35 }}
+            transition={{ delay: 0.04 * i, duration: 0.3 }}
           >
             <Link to={k.href} className={`db-kpi tone-${k.tone}`}>
               <div className="db-kpi__top">
@@ -374,7 +377,7 @@ export function DashboardPage() {
                 <AnimatedNumber value={k.value} kind={k.kind} />
               </div>
               <div className="db-kpi__foot">
-                <Badge tone={k.badgeTone} dot={false}>
+                <Badge tone={k.badgeTone} dot>
                   {k.badge}
                 </Badge>
                 <MiniSpark values={k.spark} tone={k.tone} />
@@ -538,7 +541,7 @@ export function DashboardPage() {
                 </strong>
               }
             />
-            <CardContent>
+            <CardContent dense>
               <div className="db-range" role="tablist" aria-label="نطاق الإيراد">
                 {(
                   [
@@ -561,11 +564,11 @@ export function DashboardPage() {
               </div>
               <div className="db-chart">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revenueSeries} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+                  <AreaChart data={revenueSeries} margin={{ top: 6, right: 2, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#18181b" stopOpacity={0.18} />
-                        <stop offset="55%" stopColor="#18181b" stopOpacity={0.06} />
+                        <stop offset="0%" stopColor="#18181b" stopOpacity={0.22} />
+                        <stop offset="45%" stopColor="#18181b" stopOpacity={0.08} />
                         <stop offset="100%" stopColor="#18181b" stopOpacity={0} />
                       </linearGradient>
                     </defs>
@@ -573,19 +576,20 @@ export function DashboardPage() {
                       dataKey="label"
                       tickLine={false}
                       axisLine={false}
-                      tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                      tick={{ fill: '#71717a', fontSize: 11 }}
                       interval={revenueRange === 'year' ? 1 : 0}
+                      height={28}
                     />
                     <YAxis hide domain={['dataMin', 'dataMax']} />
                     <Tooltip
                       content={<ChartTooltip />}
-                      cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
+                      cursor={{ stroke: '#d4d4d8', strokeWidth: 1 }}
                     />
                     <Area
                       type="monotone"
                       dataKey="value"
                       stroke="#18181b"
-                      strokeWidth={2.4}
+                      strokeWidth={2.5}
                       fill="url(#revFill)"
                       animationDuration={850}
                       activeDot={{ r: 4, fill: '#dc2626', stroke: '#fff', strokeWidth: 2 }}
