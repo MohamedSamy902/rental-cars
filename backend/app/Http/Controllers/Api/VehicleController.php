@@ -3,7 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Contract;
+use App\Models\Expense;
+use App\Models\MediaFile;
+use App\Models\OwnerMonthDue;
+use App\Models\OwnerPayout;
 use App\Models\Vehicle;
+use App\Models\Violation;
+use App\Models\WorkOrder;
 use App\Services\Fleet\VehicleAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -120,6 +127,162 @@ class VehicleController extends Controller
     public function show(Vehicle $vehicle): JsonResponse
     {
         return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents', 'owner']))]);
+    }
+
+    /** ملف المركبة الكامل: حجوزات · صيانة · مصروفات · مرفقات · مالك · QR */
+    public function dossier(Vehicle $vehicle): JsonResponse
+    {
+        $vehicle->load(['accessories', 'documents', 'owner']);
+
+        $contracts = Contract::query()
+            ->with(['customer:id,full_name,phone', 'deposit'])
+            ->where('vehicle_id', $vehicle->id)
+            ->latest('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (Contract $c) => [
+                'id' => $c->id,
+                'number' => $c->number,
+                'status' => $c->status,
+                'starts_at' => $c->starts_at?->toIso8601String(),
+                'planned_ends_at' => $c->planned_ends_at?->toIso8601String(),
+                'actual_ends_at' => $c->actual_ends_at?->toIso8601String(),
+                'final_total' => $c->final_total,
+                'period_rent' => $c->period_rent,
+                'odometer_out' => $c->odometer_out,
+                'odometer_in' => $c->odometer_in,
+                'customer' => $c->customer ? [
+                    'id' => $c->customer->id,
+                    'full_name' => $c->customer->full_name,
+                    'phone' => $c->customer->phone,
+                ] : null,
+            ]);
+
+        $workOrders = WorkOrder::query()
+            ->with('lines')
+            ->where('vehicle_id', $vehicle->id)
+            ->latest('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (WorkOrder $w) => [
+                'id' => $w->id,
+                'status' => $w->status,
+                'workshop' => $w->workshop,
+                'opened_on' => $w->opened_on?->toDateString(),
+                'closed_on' => $w->closed_on?->toDateString(),
+                'odometer' => $w->odometer,
+                'parts_cost' => $w->parts_cost,
+                'labor_cost' => $w->labor_cost,
+                'notes' => $w->notes,
+                'lines' => $w->lines->map(fn ($l) => [
+                    'id' => $l->id,
+                    'description' => $l->description,
+                    'quantity' => $l->quantity,
+                    'unit_price' => $l->unit_price,
+                ])->values(),
+            ]);
+
+        $expenses = Expense::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->latest('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (Expense $e) => [
+                'id' => $e->id,
+                'title' => $e->title,
+                'category' => $e->category,
+                'amount' => $e->amount,
+                'spent_on' => $e->spent_on?->toDateString(),
+                'payment_method' => $e->payment_method,
+                'notes' => $e->notes,
+            ]);
+
+        $violations = Violation::query()
+            ->with('customer:id,full_name')
+            ->where('vehicle_id', $vehicle->id)
+            ->latest('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (Violation $v) => [
+                'id' => $v->id,
+                'status' => $v->status,
+                'amount' => $v->amount,
+                'location' => $v->location,
+                'occurred_at' => $v->occurred_at?->toIso8601String(),
+                'customer' => $v->customer ? [
+                    'id' => $v->customer->id,
+                    'full_name' => $v->customer->full_name,
+                ] : null,
+            ]);
+
+        $media = MediaFile::query()
+            ->where('attachable_type', Vehicle::class)
+            ->where('attachable_id', $vehicle->id)
+            ->latest('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (MediaFile $m) => [
+                'id' => $m->id,
+                'kind' => $m->kind,
+                'original_name' => $m->original_name,
+                'collection' => $m->collection,
+                'purpose' => $m->purpose,
+                'mime_type' => $m->mime_type,
+                'size_bytes' => $m->size_bytes,
+                'url' => url('/api/media/'.$m->id.'/file'),
+                'created_at' => $m->created_at?->toIso8601String(),
+            ]);
+
+        $ownerDues = OwnerMonthDue::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->latest('year_month')
+            ->limit(36)
+            ->get()
+            ->map(fn (OwnerMonthDue $d) => [
+                'id' => $d->id,
+                'year_month' => $d->year_month,
+                'amount' => $d->amount,
+            ]);
+
+        $ownerPayouts = OwnerPayout::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->latest('id')
+            ->limit(50)
+            ->get()
+            ->map(fn (OwnerPayout $p) => [
+                'id' => $p->id,
+                'amount' => $p->amount,
+                'paid_on' => $p->paid_on?->toDateString() ?? $p->paid_on,
+                'payment_method' => $p->payment_method,
+                'notes' => $p->notes,
+            ]);
+
+        $qr = url('/showroom?vehicle='.$vehicle->id);
+        $qrLabel = trim($vehicle->brand.' '.$vehicle->model.' · '.$vehicle->plate);
+
+        return response()->json([
+            'data' => [
+                'vehicle' => $this->present($vehicle),
+                'contracts' => $contracts->values(),
+                'work_orders' => $workOrders->values(),
+                'expenses' => $expenses->values(),
+                'violations' => $violations->values(),
+                'media' => $media->values(),
+                'owner_dues' => $ownerDues->values(),
+                'owner_payouts' => $ownerPayouts->values(),
+                'qr' => [
+                    'payload' => $qr,
+                    'label' => $qrLabel,
+                ],
+                'totals' => [
+                    'contracts' => $contracts->count(),
+                    'work_orders' => $workOrders->count(),
+                    'expenses_amount' => $expenses->sum('amount'),
+                    'violations' => $violations->count(),
+                    'media' => $media->count(),
+                ],
+            ],
+        ]);
     }
 
     public function update(Request $request, Vehicle $vehicle): JsonResponse

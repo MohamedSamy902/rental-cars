@@ -5,6 +5,7 @@ import { AppShell, ToastProvider, SkeletonBlock } from '@/shared/ui'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { VehiclesPage } from '@/pages/VehiclesPage'
+import { VehicleDetailPage } from '@/pages/VehicleDetailPage'
 import { BookingsPage } from '@/pages/BookingsPage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { MaintenancePage } from '@/pages/MaintenancePage'
@@ -58,6 +59,7 @@ export default function App() {
               >
                 <Route index element={<DashboardPage />} />
                 <Route path="vehicles" element={<VehiclesPage />} />
+                <Route path="vehicles/:id" element={<VehicleDetailPage />} />
                 <Route path="bookings" element={<BookingsPage />} />
                 <Route path="calendar" element={<CalendarPage />} />
                 <Route path="maintenance" element={<MaintenancePage />} />

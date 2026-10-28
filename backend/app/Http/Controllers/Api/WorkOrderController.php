@@ -18,6 +18,9 @@ class WorkOrderController extends Controller
         if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);
         }
+        if ($vehicleId = $request->integer('vehicle_id')) {
+            $q->where('vehicle_id', $vehicleId);
+        }
         $rows = $q->paginate(50);
 
         return response()->json([

@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \App\Http\Middleware\EnsurePermission::class,
             'feature' => \App\Http\Middleware\EnsureFeatureFlag::class,
             'integrator' => \App\Http\Middleware\EnsureIntegrator::class,
+            'idempotency' => \App\Http\Middleware\EnsureIdempotency::class,
+        ]);
+        $middleware->api(append: [
+            \App\Http\Middleware\EnsureIdempotency::class,
         ]);
         // صلاحيات/فيتشر قبل ربط النماذج — حتى لا يُكشف وجود السجل بـ 404 قبل 403
         $middleware->prependToPriorityList(
