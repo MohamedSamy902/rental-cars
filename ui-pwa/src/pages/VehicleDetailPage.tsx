@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import {
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
@@ -11,7 +15,15 @@ import './VehicleDetailPage.css'
 import './pages.css'
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
-type Accessory = { id: number; name: string; default_qty?: number }
+type Accessory = {
+  id: number
+  name: string
+  default_qty?: number
+  required_each_rental?: boolean
+  is_active?: boolean
+  notes?: string | null
+  sort_order?: number
+}
 type Document = {
   id: number
   type: string
@@ -30,10 +42,20 @@ type Vehicle = {
   year: number
   category: string
   fuel_type: string
+  color?: string | null
+  transmission?: string | null
+  chassis_number?: string | null
+  engine_number?: string | null
+  engine_capacity?: string | null
+  seats?: number | null
   odometer: number
+  odometer_source?: string | null
   daily_rate: number
   default_deposit: number
+  target_monthly_income?: number | null
+  purchase_value_estimate?: number | null
   status: string
+  manual_status?: string | null
   rental_priority: number
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
@@ -45,7 +67,12 @@ type Vehicle = {
   owner?: OwnerOption | null
   accessories?: Accessory[] | null
   documents?: Document[] | null
+  created_at?: string | null
+  updated_at?: string | null
 }
+
+type ChartPoint = { month: string; amount: number; count?: number }
+type StatusSlice = { status: string; label: string; count: number }
 
 type Dossier = {
   vehicle: Vehicle
@@ -58,8 +85,6 @@ type Dossier = {
     actual_ends_at?: string | null
     final_total?: number | null
     period_rent?: number | null
-    odometer_out?: number | null
-    odometer_in?: number | null
     customer?: { id: number; full_name: string; phone?: string | null } | null
   }>
   work_orders: Array<{
@@ -81,7 +106,6 @@ type Dossier = {
     amount: number
     spent_on?: string | null
     payment_method?: string | null
-    notes?: string | null
   }>
   violations: Array<{
     id: number
@@ -98,7 +122,6 @@ type Dossier = {
     collection?: string | null
     purpose?: string | null
     url: string
-    created_at?: string | null
   }>
   owner_dues: Array<{ id: number; year_month: string; amount: number }>
   owner_payouts: Array<{
@@ -106,41 +129,49 @@ type Dossier = {
     amount: number
     paid_on?: string | null
     payment_method?: string | null
-    notes?: string | null
   }>
   qr: { payload: string; label: string }
+  charts: {
+    contracts_by_status: StatusSlice[]
+    expenses_by_month: ChartPoint[]
+    maintenance_by_month: ChartPoint[]
+    revenue_by_month: ChartPoint[]
+  }
   totals: {
     contracts: number
     work_orders: number
     expenses_amount: number
     violations: number
     media: number
+    maintenance_cost?: number
+    revenue_amount?: number
+    accessories?: number
+    documents?: number
   }
 }
 
-type TabId = 'overview' | 'bookings' | 'maintenance' | 'expenses' | 'docs' | 'owner'
+type TabId = 'overview' | 'charts' | 'accessories' | 'bookings' | 'maintenance' | 'expenses' | 'docs' | 'owner'
 
 const statusLabel: Record<string, string> = {
-  available: 'متاحة',
-  reserved: 'محجوزة',
-  rented: 'مؤجرة',
-  maintenance: 'في صيانة',
-  out_of_service: 'خارج الخدمة',
-  pending: 'قيد الانتظار',
-  approved: 'معتمدة',
-  active: 'نشطة',
-  completed: 'مكتملة',
-  cancelled: 'ملغاة',
-  open: 'مفتوحة',
-  in_progress: 'قيد التنفيذ',
-  closed: 'مغلقة',
+  available: 'متاحة', reserved: 'محجوزة', rented: 'مؤجرة', maintenance: 'في صيانة',
+  out_of_service: 'خارج الخدمة', pending: 'قيد الانتظار', approved: 'معتمدة',
+  active: 'نشطة', completed: 'مكتملة', cancelled: 'ملغاة', open: 'مفتوحة',
+  in_progress: 'قيد التنفيذ', closed: 'مغلقة',
 }
+
+const chartColors = ['#0d9488', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#64748b']
 
 const emptyForm = {
   code: '', plate: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
-  odometer: '', daily_rate: '', default_deposit: '', rental_priority: '50',
+  color: '', transmission: 'أوتوماتيك', chassis_number: '', engine_number: '', engine_capacity: '',
+  seats: '5', odometer: '', daily_rate: '', default_deposit: '', rental_priority: '50',
+  target_monthly_income: '', purchase_value_estimate: '',
   tracker_device_number: '', tracker_sim_number: '', notes: '', is_active: true,
   owner_id: '', owner_monthly_amount: '',
+}
+
+const emptyAcc = {
+  name: '', default_qty: '1', required_each_rental: true, is_active: true, notes: '',
 }
 
 function buildQrDataUrl(text: string) {
@@ -173,6 +204,13 @@ function shortDate(value?: string | null) {
   return value.slice(0, 10)
 }
 
+function monthLabel(ym: string) {
+  const [, m] = ym.split('-')
+  const names = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+  const idx = Number(m) - 1
+  return names[idx] || ym
+}
+
 function Fact({ label, value, wide }: { label: string; value: ReactNode; wide?: boolean }) {
   return (
     <div className={`vd-fact${wide ? ' vd-fact--wide' : ''}`}>
@@ -202,13 +240,69 @@ export function VehicleDetailPage() {
   const [form, setForm] = useState(emptyForm)
   const [owners, setOwners] = useState<OwnerOption[]>([])
   const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '' })
-  const [accName, setAccName] = useState('')
+  const [docEdit, setDocEdit] = useState<Document | null>(null)
+  const [accOpen, setAccOpen] = useState(false)
+  const [accEdit, setAccEdit] = useState<Accessory | null>(null)
+  const [accForm, setAccForm] = useState(emptyAcc)
   const [estimatedKm, setEstimatedKm] = useState<number | null>(null)
 
   const qrImage = useMemo(
     () => (dossier?.qr.payload ? buildQrDataUrl(dossier.qr.payload) : ''),
     [dossier?.qr.payload],
   )
+
+  const revenueSeries = useMemo(
+    () => (dossier?.charts.revenue_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
+    [dossier],
+  )
+  const expenseSeries = useMemo(
+    () => (dossier?.charts.expenses_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
+    [dossier],
+  )
+  const maintenanceSeries = useMemo(
+    () => (dossier?.charts.maintenance_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
+    [dossier],
+  )
+  const statusDonut = useMemo(
+    () => (dossier?.charts.contracts_by_status || [])
+      .filter((s) => s.count > 0)
+      .map((s) => ({
+        key: s.status,
+        name: statusLabel[s.status] || s.label || s.status,
+        value: s.count,
+      })),
+    [dossier],
+  )
+
+  function fillForm(v: Vehicle) {
+    setForm({
+      code: v.code,
+      plate: v.plate,
+      brand: v.brand,
+      model: v.model,
+      year: String(v.year),
+      category: v.category,
+      fuel_type: v.fuel_type,
+      color: v.color || '',
+      transmission: v.transmission || 'أوتوماتيك',
+      chassis_number: v.chassis_number || '',
+      engine_number: v.engine_number || '',
+      engine_capacity: v.engine_capacity || '',
+      seats: v.seats != null ? String(v.seats) : '5',
+      odometer: String(v.odometer),
+      daily_rate: String(v.daily_rate),
+      default_deposit: String(v.default_deposit),
+      rental_priority: String(v.rental_priority ?? 50),
+      target_monthly_income: v.target_monthly_income != null ? String(v.target_monthly_income) : '',
+      purchase_value_estimate: v.purchase_value_estimate != null ? String(v.purchase_value_estimate) : '',
+      tracker_device_number: v.tracker_device_number || '',
+      tracker_sim_number: v.tracker_sim_number || '',
+      notes: v.notes || '',
+      is_active: v.is_active !== false,
+      owner_id: v.owner_id ? String(v.owner_id) : '',
+      owner_monthly_amount: v.owner_monthly_amount != null ? String(v.owner_monthly_amount) : '',
+    })
+  }
 
   async function load() {
     if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
@@ -221,26 +315,7 @@ export function VehicleDetailPage() {
     try {
       const res = await api<{ data: Dossier }>(`/vehicles/${vehicleId}/dossier`)
       setDossier(res.data)
-      const v = res.data.vehicle
-      setForm({
-        code: v.code,
-        plate: v.plate,
-        brand: v.brand,
-        model: v.model,
-        year: String(v.year),
-        category: v.category,
-        fuel_type: v.fuel_type,
-        odometer: String(v.odometer),
-        daily_rate: String(v.daily_rate),
-        default_deposit: String(v.default_deposit),
-        rental_priority: String(v.rental_priority ?? 50),
-        tracker_device_number: v.tracker_device_number || '',
-        tracker_sim_number: v.tracker_sim_number || '',
-        notes: v.notes || '',
-        is_active: v.is_active !== false,
-        owner_id: v.owner_id ? String(v.owner_id) : '',
-        owner_monthly_amount: v.owner_monthly_amount != null ? String(v.owner_monthly_amount) : '',
-      })
+      fillForm(res.data.vehicle)
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -248,38 +323,109 @@ export function VehicleDetailPage() {
     }
   }
 
-  useEffect(() => {
-    void load()
-  }, [vehicleId])
-
+  useEffect(() => { void load() }, [vehicleId])
   useEffect(() => {
     void api<{ data: OwnerOption[] }>('/owners?active_only=1&per_page=100')
       .then((res) => setOwners(res.data))
       .catch(() => setOwners([]))
   }, [])
 
+  function vehiclePayload() {
+    return {
+      ...form,
+      year: Number(form.year),
+      odometer: Number(form.odometer),
+      daily_rate: Number(form.daily_rate),
+      default_deposit: Number(form.default_deposit),
+      rental_priority: Number(form.rental_priority || 50),
+      seats: form.seats ? Number(form.seats) : null,
+      target_monthly_income: form.target_monthly_income !== '' ? Number(form.target_monthly_income) : null,
+      purchase_value_estimate: form.purchase_value_estimate !== '' ? Number(form.purchase_value_estimate) : null,
+      color: form.color || null,
+      transmission: form.transmission || null,
+      chassis_number: form.chassis_number || null,
+      engine_number: form.engine_number || null,
+      engine_capacity: form.engine_capacity || null,
+      owner_id: form.owner_id ? Number(form.owner_id) : null,
+      owner_monthly_amount: form.owner_id && form.owner_monthly_amount !== ''
+        ? Number(form.owner_monthly_amount)
+        : null,
+    }
+  }
+
   async function onUpdate() {
     if (!dossier) return
     setSaving(true)
     try {
-      await api(`/vehicles/${dossier.vehicle.id}`, {
-        method: 'PUT',
-        json: {
-          ...form,
-          year: Number(form.year),
-          odometer: Number(form.odometer),
-          daily_rate: Number(form.daily_rate),
-          default_deposit: Number(form.default_deposit),
-          rental_priority: Number(form.rental_priority || 50),
-          owner_id: form.owner_id ? Number(form.owner_id) : null,
-          owner_monthly_amount: form.owner_id && form.owner_monthly_amount !== ''
-            ? Number(form.owner_monthly_amount)
-            : null,
-        },
-      })
+      await api(`/vehicles/${dossier.vehicle.id}`, { method: 'PUT', json: vehiclePayload() })
       toast.success('تم تحديث المركبة.')
       setEditOpen(false)
       setEditing(false)
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function openAccCreate() {
+    setAccEdit(null)
+    setAccForm(emptyAcc)
+    setAccOpen(true)
+  }
+
+  function openAccEdit(a: Accessory) {
+    setAccEdit(a)
+    setAccForm({
+      name: a.name,
+      default_qty: String(a.default_qty ?? 1),
+      required_each_rental: a.required_each_rental !== false,
+      is_active: a.is_active !== false,
+      notes: a.notes || '',
+    })
+    setAccOpen(true)
+  }
+
+  async function saveAccessory() {
+    if (!dossier || !accForm.name.trim()) {
+      toast.error('اسم المستلزم مطلوب.')
+      return
+    }
+    setSaving(true)
+    try {
+      const body = {
+        name: accForm.name.trim(),
+        default_qty: Number(accForm.default_qty || 1),
+        required_each_rental: accForm.required_each_rental,
+        is_active: accForm.is_active,
+        notes: accForm.notes || null,
+      }
+      if (accEdit) {
+        await api(`/vehicles/${dossier.vehicle.id}/accessories/${accEdit.id}`, { method: 'PUT', json: body })
+        toast.success('تم تحديث المستلزم.')
+      } else {
+        await api(`/vehicles/${dossier.vehicle.id}/accessories`, { method: 'POST', json: body })
+        toast.success('تم إضافة المستلزم.')
+      }
+      setAccOpen(false)
+      setAccEdit(null)
+      setAccForm(emptyAcc)
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteAccessory(a: Accessory) {
+    if (!dossier) return
+    if (!window.confirm(`حذف المستلزم «${a.name}»؟`)) return
+    setSaving(true)
+    try {
+      await api(`/vehicles/${dossier.vehicle.id}/accessories/${a.id}`, { method: 'DELETE' })
+      toast.success('تم حذف المستلزم.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -312,16 +458,37 @@ export function VehicleDetailPage() {
     }
   }
 
-  async function addAccessory() {
-    if (!dossier || !accName.trim()) return
+  async function saveDocumentEdit() {
+    if (!dossier || !docEdit) return
     setSaving(true)
     try {
-      await api(`/vehicles/${dossier.vehicle.id}/accessories`, {
-        method: 'POST',
-        json: { name: accName.trim(), default_qty: 1, required_each_rental: true },
+      await api(`/vehicles/${dossier.vehicle.id}/documents/${docEdit.id}`, {
+        method: 'PUT',
+        json: {
+          type: docEdit.type,
+          file_path: docEdit.file_path || undefined,
+          expires_on: docEdit.expires_on || undefined,
+          issued_on: docEdit.issued_on || undefined,
+          notes: docEdit.notes || undefined,
+        },
       })
-      toast.success('تم إضافة المستلزم.')
-      setAccName('')
+      toast.success('تم تحديث المستند.')
+      setDocEdit(null)
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteDocument(d: Document) {
+    if (!dossier) return
+    if (!window.confirm(`حذف مستند «${d.type}»؟`)) return
+    setSaving(true)
+    try {
+      await api(`/vehicles/${dossier.vehicle.id}/documents/${d.id}`, { method: 'DELETE' })
+      toast.success('تم حذف المستند.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -351,14 +518,22 @@ export function VehicleDetailPage() {
       <NumberField label="سنة الصنع" required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
       <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'SUV', label: 'SUV' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
       <SelectField label="نوع الوقود" required options={[{ value: 'بنزين', label: 'بنزين' }, { value: 'ديزل', label: 'ديزل' }, { value: 'هجين', label: 'هجين' }]} value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} />
+      <TextField label="اللون" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
+      <SelectField label="ناقل الحركة" options={[{ value: 'أوتوماتيك', label: 'أوتوماتيك' }, { value: 'مانيوال', label: 'مانيوال' }]} value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} />
+      <NumberField label="عدد المقاعد" value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
+      <TextField label="رقم الشاسيه" value={form.chassis_number} onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} />
+      <TextField label="رقم المحرك" value={form.engine_number} onChange={(e) => setForm({ ...form, engine_number: e.target.value })} />
+      <TextField label="سعة المحرك" value={form.engine_capacity} onChange={(e) => setForm({ ...form, engine_capacity: e.target.value })} />
       <NumberField label="العداد الفعلي" required value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
-      <MoneyField label="الإيجار اليومي الافتراضي" required value={form.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
-      <MoneyField label="التأمين النقدي الافتراضي" required value={form.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
-      <NumberField label="درجة أولوية التأجير" value={form.rental_priority} onChange={(e) => setForm({ ...form, rental_priority: e.target.value })} />
+      <MoneyField label="الإيجار اليومي" required value={form.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
+      <MoneyField label="التأمين النقدي" required value={form.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
+      <MoneyField label="المستهدف الشهري" value={form.target_monthly_income} onChange={(e) => setForm({ ...form, target_monthly_income: e.target.value })} />
+      <MoneyField label="تقدير قيمة الشراء" value={form.purchase_value_estimate} onChange={(e) => setForm({ ...form, purchase_value_estimate: e.target.value })} />
+      <NumberField label="أولوية التأجير" value={form.rental_priority} onChange={(e) => setForm({ ...form, rental_priority: e.target.value })} />
       <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
       <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
       <SelectField
-        label="المالك (عربيات الغير)"
+        label="المالك"
         value={form.owner_id}
         onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
         options={[
@@ -367,12 +542,7 @@ export function VehicleDetailPage() {
         ]}
       />
       {form.owner_id ? (
-        <MoneyField
-          label="المبلغ الشهري للمالك"
-          required
-          value={form.owner_monthly_amount}
-          onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })}
-        />
+        <MoneyField label="المبلغ الشهري للمالك" required value={form.owner_monthly_amount} onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })} />
       ) : null}
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       <SwitchField label="نشطة" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
@@ -380,11 +550,7 @@ export function VehicleDetailPage() {
   )
 
   if (loading) {
-    return (
-      <div className="vd">
-        <SkeletonBlock rows={10} />
-      </div>
-    )
+    return <div className="vd"><SkeletonBlock rows={10} /></div>
   }
 
   if (error || !dossier) {
@@ -395,7 +561,7 @@ export function VehicleDetailPage() {
           description={error || 'لا توجد بيانات'}
           action={
             <div className="rpm-actions-row">
-              <Button variant="secondary" onClick={() => navigate('/vehicles')}>رجوع للأسطول</Button>
+              <Button variant="secondary" onClick={() => navigate('/vehicles')}>رجوع</Button>
               <Button onClick={() => load()}>إعادة المحاولة</Button>
             </div>
           }
@@ -405,9 +571,13 @@ export function VehicleDetailPage() {
   }
 
   const v = dossier.vehicle
+  const accessories = v.accessories || []
   const ownerInitial = (v.owner?.full_name || 'م').trim().charAt(0)
+
   const tabs: Array<{ id: TabId; label: string; count?: number }> = [
-    { id: 'overview', label: 'نظرة عامة' },
+    { id: 'overview', label: 'التفاصيل' },
+    { id: 'charts', label: 'الشارتات' },
+    { id: 'accessories', label: 'المستلزمات', count: accessories.length },
     { id: 'bookings', label: 'الحجوزات', count: dossier.totals.contracts },
     { id: 'maintenance', label: 'الصيانة', count: dossier.totals.work_orders },
     { id: 'expenses', label: 'المصروفات', count: dossier.expenses.length },
@@ -418,43 +588,208 @@ export function VehicleDetailPage() {
   const overviewPanel = (
     <section className="vd-panel" key="overview">
       <div className="vd-panel__head">
-        <h2>بيانات التشغيل</h2>
-        <p>المواصفات · التتبع · التأمين</p>
+        <h2>البيانات الأساسية</h2>
+        <p>المواصفات · التعريف · التشغيل</p>
       </div>
       <div className="vd-facts">
         <Fact label="الكود الداخلي" value={v.code} />
+        <Fact label="اللوحة" value={v.plate} />
+        <Fact label="الماركة / الموديل" value={`${v.brand} ${v.model}`} />
         <Fact label="سنة الصنع" value={v.year} />
         <Fact label="الفئة" value={v.category} />
         <Fact label="الوقود" value={v.fuel_type} />
+        <Fact label="اللون" value={v.color || '—'} />
+        <Fact label="ناقل الحركة" value={v.transmission || '—'} />
+        <Fact label="المقاعد" value={v.seats ?? '—'} />
+        <Fact label="سعة المحرك" value={v.engine_capacity || '—'} />
+        <Fact label="رقم الشاسيه" value={v.chassis_number || '—'} />
+        <Fact label="رقم المحرك" value={v.engine_number || '—'} />
+      </div>
+
+      <div className="vd-panel__head" style={{ marginTop: '0.35rem' }}>
+        <h2>التشغيل والأسعار</h2>
+      </div>
+      <div className="vd-facts">
         <Fact label="العداد الفعلي" value={`${formatNumber(v.odometer)} كم`} />
-        <Fact label="أولوية التأجير" value={v.rental_priority} />
+        <Fact label="مصدر العداد" value={v.odometer_source || '—'} />
+        <Fact label="الإيجار اليومي" value={formatMoney(v.daily_rate)} />
         <Fact label="التأمين النقدي" value={formatMoney(v.default_deposit)} />
+        <Fact label="المستهدف الشهري" value={v.target_monthly_income != null ? formatMoney(v.target_monthly_income) : '—'} />
+        <Fact label="تقدير قيمة الشراء" value={v.purchase_value_estimate != null ? formatMoney(v.purchase_value_estimate) : '—'} />
+        <Fact label="أولوية التأجير" value={v.rental_priority} />
+        <Fact label="الحالة التشغيلية" value={statusLabel[v.status] || v.status} />
+        <Fact label="حالة يدوية" value={v.manual_status || '—'} />
         <Fact label="نشطة" value={v.is_active === false ? 'لا' : 'نعم'} />
         <Fact label="جهاز التتبع" value={v.tracker_device_number || '—'} />
         <Fact label="شريحة التتبع" value={v.tracker_sim_number || '—'} />
+        <Fact label="أُنشئت" value={shortDate(v.created_at)} />
+        <Fact label="آخر تحديث" value={shortDate(v.updated_at)} />
         <Fact label="ملاحظات" value={v.notes || '—'} wide />
       </div>
       {estimatedKm != null ? (
         <p className="vd-note">العداد التقديري أثناء التأجير: {formatNumber(estimatedKm)} كم</p>
       ) : null}
+    </section>
+  )
 
-      <div className="vd-panel__head" style={{ marginTop: '0.5rem' }}>
-        <h2>المستلزمات</h2>
-        <p>{(v.accessories || []).length} عنصر</p>
+  const chartsPanel = (
+    <section className="vd-panel" key="charts">
+      <div className="vd-panel__head">
+        <h2>تحليل المركبة</h2>
+        <p>إيراد · مصروف · صيانة · توزيع العقود</p>
       </div>
-      {(v.accessories || []).length === 0 ? <Empty>لا مستلزمات مسجّلة</Empty> : (
-        <div className="vd-chips">
-          {(v.accessories || []).map((a) => (
-            <span key={a.id} className="vd-chip">{a.name}<span className="muted">×{a.default_qty ?? 1}</span></span>
-          ))}
+      <div className="vd-chart-kpis">
+        <div className="vd-kpi"><span>إيراد العقود</span><strong>{formatMoney(dossier.totals.revenue_amount || 0)}</strong></div>
+        <div className="vd-kpi"><span>المصروفات</span><strong>{formatMoney(dossier.totals.expenses_amount)}</strong></div>
+        <div className="vd-kpi"><span>تكلفة الصيانة</span><strong>{formatMoney(dossier.totals.maintenance_cost || 0)}</strong></div>
+        <div className="vd-kpi"><span>المخالفات</span><strong>{dossier.totals.violations}</strong></div>
+      </div>
+
+      <div className="vd-charts">
+        <article className="vd-chart-card">
+          <div className="vd-chart-card__head">
+            <h3>الإيراد الشهري</h3>
+            <p>آخر ١٢ شهراً</p>
+          </div>
+          <div className="vd-chart-card__body">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={revenueSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="vdRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="var(--brand)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                <YAxis tickLine={false} axisLine={false} width={48} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                <Tooltip formatter={(value) => [formatMoney(Number(value ?? 0)), 'الإيراد']} contentStyle={{ borderRadius: 12, border: '1px solid var(--border)' }} />
+                <Area type="monotone" dataKey="amount" stroke="var(--brand)" strokeWidth={2.4} fill="url(#vdRev)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className="vd-chart-card">
+          <div className="vd-chart-card__head">
+            <h3>المصروفات الشهرية</h3>
+            <p>مرتبطة بالمركبة</p>
+          </div>
+          <div className="vd-chart-card__body">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={expenseSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                <YAxis tickLine={false} axisLine={false} width={48} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                <Tooltip formatter={(value) => [formatMoney(Number(value ?? 0)), 'المصروف']} contentStyle={{ borderRadius: 12, border: '1px solid var(--border)' }} />
+                <Bar dataKey="amount" fill="#2563eb" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className="vd-chart-card">
+          <div className="vd-chart-card__head">
+            <h3>تكلفة الصيانة</h3>
+            <p>قطع + عمالة</p>
+          </div>
+          <div className="vd-chart-card__body">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={maintenanceSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                <YAxis tickLine={false} axisLine={false} width={48} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                <Tooltip formatter={(value) => [formatMoney(Number(value ?? 0)), 'التكلفة']} contentStyle={{ borderRadius: 12, border: '1px solid var(--border)' }} />
+                <Bar dataKey="amount" fill="#d97706" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className="vd-chart-card">
+          <div className="vd-chart-card__head">
+            <h3>توزيع العقود</h3>
+            <p>حسب الحالة</p>
+          </div>
+          <div className="vd-chart-card__body vd-chart-card__body--pie">
+            {statusDonut.length === 0 ? <Empty>لا عقود للرسم</Empty> : (
+              <>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={statusDonut} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="88%" paddingAngle={3} strokeWidth={0}>
+                      {statusDonut.map((entry, i) => (
+                        <Cell key={entry.key} fill={chartColors[i % chartColors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid var(--border)' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <ul className="vd-chart-legend">
+                  {statusDonut.map((item, i) => (
+                    <li key={item.key}>
+                      <i style={{ background: chartColors[i % chartColors.length] }} />
+                      <span>{item.name}</span>
+                      <b>{item.value}</b>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        </article>
+      </div>
+    </section>
+  )
+
+  const accessoriesPanel = (
+    <section className="vd-panel" key="accessories">
+      <div className="vd-panel__head">
+        <div>
+          <h2>المستلزمات</h2>
+          <p>تُراجع مع كل تأجير · {accessories.length} عنصر</p>
+        </div>
+        <Button size="sm" className="vd-no-print" onClick={openAccCreate}>إضافة مستلزم</Button>
+      </div>
+      {accessories.length === 0 ? (
+        <Empty>
+          لا مستلزمات بعد.
+          <div className="vd-no-print" style={{ marginTop: '0.75rem' }}>
+            <Button size="sm" onClick={openAccCreate}>إضافة أول مستلزم</Button>
+          </div>
+        </Empty>
+      ) : (
+        <div className="rpm-table-wrap">
+          <table className="rpm-table">
+            <thead>
+              <tr>
+                <th>المستلزم</th>
+                <th>الكمية</th>
+                <th>مطلوب بكل تأجير</th>
+                <th>الحالة</th>
+                <th>ملاحظات</th>
+                <th className="vd-no-print"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {accessories.map((a) => (
+                <tr key={a.id}>
+                  <td><strong className="rpm-table__primary">{a.name}</strong></td>
+                  <td>{a.default_qty ?? 1}</td>
+                  <td>{a.required_each_rental === false ? 'لا' : 'نعم'}</td>
+                  <td>{a.is_active === false ? 'موقوف' : 'نشط'}</td>
+                  <td>{a.notes || '—'}</td>
+                  <td className="vd-no-print">
+                    <div className="rpm-actions-row" style={{ justifyContent: 'flex-end' }}>
+                      <Button size="sm" variant="ghost" onClick={() => openAccEdit(a)}>تعديل</Button>
+                      <Button size="sm" variant="danger" loading={saving} onClick={() => deleteAccessory(a)}>حذف</Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-      <div className="vd-form-block vd-no-print">
-        <div className="rpm-form-grid">
-          <TextField label="اسم المستلزم" value={accName} onChange={(e) => setAccName(e.target.value)} />
-          <Button size="sm" loading={saving} onClick={() => addAccessory()}>إضافة مستلزم</Button>
-        </div>
-      </div>
     </section>
   )
 
@@ -465,48 +800,25 @@ export function VehicleDetailPage() {
         <p>{dossier.totals.contracts} عقد</p>
       </div>
       {dossier.contracts.length === 0 ? <Empty>لا حجوزات لهذه المركبة بعد</Empty> : (
-        <>
-          <div className="vd-timeline rpm-mobile-only">
-            {dossier.contracts.map((c) => (
-              <div key={c.id} className="vd-tl">
-                <span className="vd-tl__dot" aria-hidden />
-                <div className="vd-tl__body">
-                  <div className="vd-tl__row">
-                    <strong>{c.number}</strong>
-                    <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
-                  </div>
-                  <div className="vd-tl__meta">
-                    {c.customer?.full_name || '—'} · {shortDate(c.starts_at)} → {shortDate(c.actual_ends_at || c.planned_ends_at)}
-                  </div>
-                  <div className="vd-tl__meta">
-                    {c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : '—')}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="rpm-table-wrap rpm-desktop-only">
-            <table className="rpm-table">
-              <thead>
-                <tr>
-                  <th>العقد</th><th>العميل</th><th>الحالة</th><th>من</th><th>إلى</th><th>الإجمالي</th>
+        <div className="rpm-table-wrap">
+          <table className="rpm-table">
+            <thead>
+              <tr><th>العقد</th><th>العميل</th><th>الحالة</th><th>من</th><th>إلى</th><th>الإجمالي</th></tr>
+            </thead>
+            <tbody>
+              {dossier.contracts.map((c) => (
+                <tr key={c.id}>
+                  <td><span className="rpm-table__code">{c.number}</span></td>
+                  <td>{c.customer?.full_name || '—'}</td>
+                  <td><StatusPill status={c.status} label={statusLabel[c.status] || c.status} /></td>
+                  <td>{shortDate(c.starts_at)}</td>
+                  <td>{shortDate(c.actual_ends_at || c.planned_ends_at)}</td>
+                  <td>{c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : '—')}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {dossier.contracts.map((c) => (
-                  <tr key={c.id}>
-                    <td><span className="rpm-table__code">{c.number}</span></td>
-                    <td>{c.customer?.full_name || '—'}</td>
-                    <td><StatusPill status={c.status} label={statusLabel[c.status] || c.status} /></td>
-                    <td>{shortDate(c.starts_at)}</td>
-                    <td>{shortDate(c.actual_ends_at || c.planned_ends_at)}</td>
-                    <td>{c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : '—')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   )
@@ -514,60 +826,35 @@ export function VehicleDetailPage() {
   const maintenancePanel = (
     <section className="vd-panel" key="maintenance">
       <div className="vd-panel__head">
-        <h2>الصيانات وأوامر الشغل</h2>
-        <p>{dossier.totals.work_orders} أمر</p>
+        <h2>الصيانات</h2>
+        <p>{dossier.totals.work_orders} أمر · تكلفة {formatMoney(dossier.totals.maintenance_cost || 0)}</p>
       </div>
       {dossier.work_orders.length === 0 ? <Empty>لا صيانات مسجّلة</Empty> : (
-        <>
-          <div className="vd-timeline rpm-mobile-only">
-            {dossier.work_orders.map((w) => (
-              <div key={w.id} className="vd-tl">
-                <span className="vd-tl__dot" aria-hidden />
-                <div className="vd-tl__body">
-                  <div className="vd-tl__row">
-                    <strong>#{w.id} · {w.workshop || 'ورشة'}</strong>
-                    <StatusPill status={w.status} label={statusLabel[w.status] || w.status} />
-                  </div>
-                  <div className="vd-tl__meta">
-                    {w.opened_on || '—'} → {w.closed_on || 'مفتوح'} · عداد {w.odometer != null ? formatNumber(w.odometer) : '—'}
-                  </div>
-                  <div className="vd-tl__meta">
-                    قطع {formatMoney(w.parts_cost || 0)} · عمالة {formatMoney(w.labor_cost || 0)}
-                    {w.lines.length > 0 ? ` · ${w.lines.map((l) => l.description).join('، ')}` : ''}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="rpm-table-wrap rpm-desktop-only">
-            <table className="rpm-table">
-              <thead>
-                <tr>
-                  <th>#</th><th>الحالة</th><th>الورشة</th><th>الفتح</th><th>الإغلاق</th><th>العداد</th><th>قطع / عمالة</th>
+        <div className="rpm-table-wrap">
+          <table className="rpm-table">
+            <thead>
+              <tr><th>#</th><th>الحالة</th><th>الورشة</th><th>الفتح</th><th>الإغلاق</th><th>العداد</th><th>قطع / عمالة</th></tr>
+            </thead>
+            <tbody>
+              {dossier.work_orders.map((w) => (
+                <tr key={w.id}>
+                  <td>{w.id}</td>
+                  <td><StatusPill status={w.status} label={statusLabel[w.status] || w.status} /></td>
+                  <td>{w.workshop || '—'}</td>
+                  <td>{w.opened_on || '—'}</td>
+                  <td>{w.closed_on || '—'}</td>
+                  <td>{w.odometer != null ? formatNumber(w.odometer) : '—'}</td>
+                  <td>
+                    {formatMoney(w.parts_cost || 0)} / {formatMoney(w.labor_cost || 0)}
+                    {w.lines.length > 0 ? <p className="muted">{w.lines.map((l) => l.description).join(' · ')}</p> : null}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {dossier.work_orders.map((w) => (
-                  <tr key={w.id}>
-                    <td>{w.id}</td>
-                    <td><StatusPill status={w.status} label={statusLabel[w.status] || w.status} /></td>
-                    <td>{w.workshop || '—'}</td>
-                    <td>{w.opened_on || '—'}</td>
-                    <td>{w.closed_on || '—'}</td>
-                    <td>{w.odometer != null ? formatNumber(w.odometer) : '—'}</td>
-                    <td>
-                      {formatMoney(w.parts_cost || 0)} / {formatMoney(w.labor_cost || 0)}
-                      {w.lines.length > 0 ? <p className="muted">{w.lines.map((l) => l.description).join(' · ')}</p> : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-
-      <div className="vd-panel__head" style={{ marginTop: '0.35rem' }}>
+      <div className="vd-panel__head" style={{ marginTop: '0.5rem' }}>
         <h2>المخالفات</h2>
         <p>{dossier.totals.violations}</p>
       </div>
@@ -598,12 +885,10 @@ export function VehicleDetailPage() {
         <h2>المصروفات</h2>
         <p>الإجمالي {formatMoney(dossier.totals.expenses_amount)}</p>
       </div>
-      {dossier.expenses.length === 0 ? <Empty>لا مصروفات مرتبطة بالمركبة</Empty> : (
+      {dossier.expenses.length === 0 ? <Empty>لا مصروفات مرتبطة</Empty> : (
         <div className="rpm-table-wrap">
           <table className="rpm-table">
-            <thead>
-              <tr><th>العنوان</th><th>التصنيف</th><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th></tr>
-            </thead>
+            <thead><tr><th>العنوان</th><th>التصنيف</th><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th></tr></thead>
             <tbody>
               {dossier.expenses.map((e) => (
                 <tr key={e.id}>
@@ -634,6 +919,10 @@ export function VehicleDetailPage() {
               <div>
                 <strong>{d.type}</strong>
                 <div><span>صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}{d.file_path ? ' · مرفق' : ''}</span></div>
+              </div>
+              <div className="rpm-actions-row vd-no-print">
+                <Button size="sm" variant="ghost" onClick={() => setDocEdit({ ...d })}>تعديل</Button>
+                <Button size="sm" variant="danger" loading={saving} onClick={() => deleteDocument(d)}>حذف</Button>
               </div>
             </div>
           ))}
@@ -718,7 +1007,6 @@ export function VehicleDetailPage() {
       ) : (
         <Empty>هذه المركبة ملك المركز — لا يوجد مالك خارجي مرتبط.</Empty>
       )}
-
       {(dossier.owner_dues.length > 0 || dossier.owner_payouts.length > 0) ? (
         <div className="vd-split">
           <div>
@@ -757,13 +1045,11 @@ export function VehicleDetailPage() {
           </div>
         </div>
       ) : null}
-
       <div className="vd-panel__head" style={{ marginTop: '0.35rem' }}>
-        <h2>رمز QR للطباعة</h2>
-        <p>جاهز للعرض على المركبة</p>
+        <h2>رمز QR</h2>
       </div>
       <div className="vd-qr" style={{ maxWidth: 220, justifySelf: 'start' }}>
-        {qrImage ? <img src={qrImage} alt="رمز QR للمركبة" width={160} height={160} /> : null}
+        {qrImage ? <img src={qrImage} alt="QR" width={160} height={160} /> : null}
         <p className="vd-qr__label">{dossier.qr.label}{'\n'}{dossier.qr.payload}</p>
       </div>
     </section>
@@ -771,6 +1057,8 @@ export function VehicleDetailPage() {
 
   const panelByTab: Record<TabId, ReactNode> = {
     overview: overviewPanel,
+    charts: chartsPanel,
+    accessories: accessoriesPanel,
     bookings: bookingsPanel,
     maintenance: maintenancePanel,
     expenses: expensesPanel,
@@ -787,16 +1075,13 @@ export function VehicleDetailPage() {
 
       <header className="vd-hero">
         <div className="vd-hero__top">
-          <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>
-            ← الأسطول
-          </button>
+          <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>← الأسطول</button>
           <div className="vd-hero__actions vd-no-print">
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
             <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
             <Button size="sm" onClick={() => window.print()}>طباعة</Button>
           </div>
         </div>
-
         <div className="vd-hero__body">
           <div className="vd-identity">
             <div className="vd-identity__status">
@@ -808,15 +1093,15 @@ export function VehicleDetailPage() {
               <p className="vd-plate__num">{v.plate}</p>
             </div>
             <h1 className="vd-title">{v.brand} {v.model}</h1>
-            <p className="vd-sub">{v.year} · ملف تشغيلي كامل جاهز للطباعة</p>
+            <p className="vd-sub">{v.year}{v.color ? ` · ${v.color}` : ''}{v.transmission ? ` · ${v.transmission}` : ''}</p>
             <div className="vd-tags">
               <span className="vd-tag">{v.category}</span>
               <span className="vd-tag">{v.fuel_type}</span>
               <span className="vd-tag">{formatNumber(v.odometer)} كم</span>
+              {v.seats ? <span className="vd-tag">{v.seats} مقاعد</span> : null}
               {v.owner ? <span className="vd-tag">مالك: {v.owner.full_name}</span> : <span className="vd-tag">ملك المركز</span>}
             </div>
           </div>
-
           <aside className="vd-hero__side">
             <div className="vd-rate">
               <span>الإيجار اليومي</span>
@@ -831,50 +1116,24 @@ export function VehicleDetailPage() {
       </header>
 
       <div className="vd-kpis">
-        <div className="vd-kpi">
-          <span>الحجوزات</span>
-          <strong>{dossier.totals.contracts}</strong>
-        </div>
-        <div className="vd-kpi">
-          <span>أوامر الصيانة</span>
-          <strong>{dossier.totals.work_orders}</strong>
-        </div>
-        <div className="vd-kpi">
-          <span>المصروفات</span>
-          <strong>{formatMoney(dossier.totals.expenses_amount)}</strong>
-        </div>
-        <div className="vd-kpi">
-          <span>المخالفات</span>
-          <strong>{dossier.totals.violations}</strong>
-          <em>{dossier.totals.media} مرفق</em>
-        </div>
+        <div className="vd-kpi"><span>الحجوزات</span><strong>{dossier.totals.contracts}</strong></div>
+        <div className="vd-kpi"><span>الصيانة</span><strong>{dossier.totals.work_orders}</strong></div>
+        <div className="vd-kpi"><span>المصروفات</span><strong>{formatMoney(dossier.totals.expenses_amount)}</strong></div>
+        <div className="vd-kpi"><span>المستلزمات</span><strong>{accessories.length}</strong><em>{dossier.totals.media} مرفق</em></div>
       </div>
 
       <nav className="vd-tabs vd-no-print" aria-label="أقسام ملف المركبة">
         {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`vd-tab${tab === t.id ? ' is-active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
+          <button key={t.id} type="button" className={`vd-tab${tab === t.id ? ' is-active' : ''}`} onClick={() => setTab(t.id)}>
             {t.label}
             {t.count != null ? <span className="vd-tab__count">{t.count}</span> : null}
           </button>
         ))}
       </nav>
 
-      <div className="vd-no-print">
-        {panelByTab[tab]}
-      </div>
-
+      <div className="vd-no-print">{panelByTab[tab]}</div>
       <div className="vd-print-all">
-        {overviewPanel}
-        {bookingsPanel}
-        {maintenancePanel}
-        {expensesPanel}
-        {docsPanel}
-        {ownerPanel}
+        {overviewPanel}{chartsPanel}{accessoriesPanel}{bookingsPanel}{maintenancePanel}{expensesPanel}{docsPanel}{ownerPanel}
       </div>
 
       <Sheet
@@ -889,6 +1148,57 @@ export function VehicleDetailPage() {
         }
       >
         {editing ? formFields : null}
+      </Sheet>
+
+      <Sheet
+        open={accOpen}
+        title={accEdit ? 'تعديل مستلزم' : 'إضافة مستلزم'}
+        onClose={() => { setAccOpen(false); setAccEdit(null) }}
+        footer={
+          <>
+            <Button loading={saving} onClick={() => saveAccessory()}>{accEdit ? 'حفظ التعديل' : 'إضافة'}</Button>
+            <Button variant="secondary" onClick={() => { setAccOpen(false); setAccEdit(null) }}>إلغاء</Button>
+          </>
+        }
+      >
+        <div className="rpm-form-grid">
+          <TextField label="اسم المستلزم" required value={accForm.name} onChange={(e) => setAccForm({ ...accForm, name: e.target.value })} hint="مثل: مثلث عاكس · طفاية · إطار احتياطي" />
+          <NumberField label="الكمية الافتراضية" required value={accForm.default_qty} onChange={(e) => setAccForm({ ...accForm, default_qty: e.target.value })} />
+          <SwitchField label="مطلوب في كل تأجير" checked={accForm.required_each_rental} onChange={(val) => setAccForm({ ...accForm, required_each_rental: val })} />
+          <SwitchField label="نشط" checked={accForm.is_active} onChange={(val) => setAccForm({ ...accForm, is_active: val })} />
+          <TextAreaField label="ملاحظات" value={accForm.notes} onChange={(e) => setAccForm({ ...accForm, notes: e.target.value })} />
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={!!docEdit}
+        title="تعديل مستند"
+        onClose={() => setDocEdit(null)}
+        footer={
+          <>
+            <Button loading={saving} onClick={() => saveDocumentEdit()}>حفظ</Button>
+            <Button variant="secondary" onClick={() => setDocEdit(null)}>إلغاء</Button>
+          </>
+        }
+      >
+        {docEdit ? (
+          <div className="rpm-form-grid">
+            <SelectField
+              label="نوع المستند"
+              value={docEdit.type}
+              onChange={(e) => setDocEdit({ ...docEdit, type: e.target.value })}
+              options={[
+                { value: 'رخصة تسيير', label: 'رخصة تسيير' },
+                { value: 'تأمين', label: 'تأمين' },
+                { value: 'فحص فني', label: 'فحص فني' },
+                { value: 'أخرى', label: 'أخرى' },
+              ]}
+            />
+            <TextField label="تاريخ الإصدار" type="date" value={docEdit.issued_on || ''} onChange={(e) => setDocEdit({ ...docEdit, issued_on: e.target.value })} />
+            <TextField label="تاريخ الانتهاء" type="date" value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />
+            <TextAreaField label="ملاحظات" value={docEdit.notes || ''} onChange={(e) => setDocEdit({ ...docEdit, notes: e.target.value })} />
+          </div>
+        ) : null}
       </Sheet>
     </div>
   )
