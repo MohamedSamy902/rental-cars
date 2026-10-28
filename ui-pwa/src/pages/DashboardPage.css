@@ -65,13 +65,13 @@
   gap: 1.25rem;
   align-items: stretch;
   overflow: visible;
-  min-height: 7.5rem;
+  min-height: 8.75rem;
 }
 
 .db-kpi-shell {
   display: flex;
   min-width: 0;
-  min-height: 7.5rem; /* min-h-[120px] */
+  min-height: 8.75rem; /* ~140px — avoid cramped/clipped metrics */
   height: 100%;
   overflow: visible;
 }
@@ -80,12 +80,12 @@
   display: grid;
   grid-template-rows: auto auto 1fr;
   align-content: start;
-  gap: 0.65rem;
+  gap: 0.75rem;
   box-sizing: border-box;
   width: 100%;
-  min-height: 7.5rem; /* min-h-[120px] */
+  min-height: 8.75rem;
   height: 100%;
-  padding: 1.1rem 1.15rem;
+  padding: 1.25rem 1.25rem;
   border-radius: 0.75rem;
   background: #fff;
   border: 1px solid color-mix(in srgb, #e4e4e7 80%, transparent);
@@ -243,6 +243,23 @@
 .db-span-5 > .rpm-card > .rpm-card__content,
 .db-span-7 > .rpm-card > .rpm-card__content {
   flex: 1 1 auto;
+}
+
+/* Revenue card: chart grows to kill dead white space when row stretches */
+.db-span-7 > .rpm-card > .rpm-card__content:has(.db-chart) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.db-span-7 > .rpm-card > .rpm-card__content:has(.db-chart) .db-range {
+  flex-shrink: 0;
+}
+
+.db-span-7 > .rpm-card > .rpm-card__content:has(.db-chart) .db-chart {
+  flex: 1 1 auto;
+  min-height: 15rem;
+  height: auto;
 }
 
 .db-card-menu {
@@ -510,8 +527,9 @@
 }
 
 .db-chart {
-  height: 14rem;
-  min-height: 14rem;
+  position: relative;
+  height: 15rem;
+  min-height: 15rem;
   width: 100%;
 }
 
@@ -706,7 +724,7 @@
 
   .db-kpi-shell,
   .db-kpi {
-    min-height: 7.5rem;
+    min-height: 8.75rem;
   }
 
   .db-table-wrap {
