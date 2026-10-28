@@ -6,6 +6,11 @@
   box-sizing: border-box;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
 html {
   direction: rtl;
   -webkit-text-size-adjust: 100%;
