@@ -32,6 +32,7 @@ const railNav: NavItem[] = [
   { to: '/inventory', label: 'المخزون', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
   { to: '/petty-cash', label: 'العهدة', icon: <IconWallet />, feature: 'petty_cash', permission: 'petty_cash.view' },
   { to: '/expenses', label: 'المصروفات', icon: <IconWallet />, permission: 'expenses.view' },
+  { to: '/owners', label: 'ملاك العربيات', icon: <IconUsers />, permission: 'owners.view' },
   { to: '/violations', label: 'المخالفات', icon: <IconAlert />, permission: 'violations.view' },
   { to: '/customers', label: 'العملاء', icon: <IconUsers />, permission: 'customers.view' },
   { to: '/department-notice', label: 'إخطار القسم', icon: <IconClipboard />, feature: 'department_notice', permission: 'department_notice.print' },

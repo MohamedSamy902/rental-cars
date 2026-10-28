@@ -28,6 +28,7 @@ const ITEMS: Item[] = [
   { to: '/audit-logs', label: 'سجل التعديلات', group: 'النظام', icon: <IconShield /> },
   { to: '/notifications', label: 'الإشعارات', group: 'النظام', icon: <IconBell /> },
   { to: '/expenses', label: 'المصروفات', group: 'المالية', icon: <IconWallet /> },
+  { to: '/owners', label: 'ملاك العربيات', group: 'المالية', icon: <IconUsers /> },
   { to: '/hr', label: 'الموارد البشرية', group: 'النظام', icon: <IconUsers /> },
   { to: '/chat', label: 'محادثة التشغيل', group: 'النظام', icon: <IconBell /> },
   { to: '/settings', label: 'الإعدادات', group: 'النظام', icon: <IconSettings /> },

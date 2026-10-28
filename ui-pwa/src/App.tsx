@@ -23,6 +23,7 @@ import { PettyCashPage } from '@/pages/PettyCashPage'
 import { IntegratorPage } from '@/pages/IntegratorPage'
 import { AuditLogsPage } from '@/pages/AuditLogsPage'
 import { ExpensesPage } from '@/pages/ExpensesPage'
+import { OwnersPage } from '@/pages/OwnersPage'
 import { HrPage } from '@/pages/HrPage'
 import { ChatPage } from '@/pages/ChatPage'
 import type { ReactNode } from 'react'
@@ -68,6 +69,7 @@ export default function App() {
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="expenses" element={<ExpensesPage />} />
+                <Route path="owners" element={<OwnersPage />} />
                 <Route path="petty-cash" element={<PettyCashPage />} />
                 <Route path="hr" element={<HrPage />} />
                 <Route path="chat" element={<ChatPage />} />

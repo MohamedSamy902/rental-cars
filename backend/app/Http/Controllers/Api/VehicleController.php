@@ -43,6 +43,7 @@ class VehicleController extends Controller
             }
         }
 
+        $q->with('owner:id,full_name,phone');
         $rows = $q->paginate((int) $request->integer('per_page', 50));
 
         $data = collect($rows->items())->map(function (Vehicle $v) {
@@ -80,6 +81,9 @@ class VehicleController extends Controller
             'transmission' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
+            'owner_id' => ['nullable', 'integer', 'exists:vehicle_owners,id'],
+            'owner_monthly_amount' => ['nullable', 'integer', 'min:0'],
+            'owner_since' => ['nullable', 'date'],
         ], [], [
             'code' => 'الكود الداخلي',
             'plate' => 'رقم اللوحة',
@@ -91,7 +95,17 @@ class VehicleController extends Controller
             'odometer' => 'العداد الفعلي',
             'daily_rate' => 'الإيجار اليومي',
             'default_deposit' => 'التأمين النقدي',
+            'owner_id' => 'المالك',
+            'owner_monthly_amount' => 'المبلغ الشهري للمالك',
         ]);
+
+        if (! empty($data['owner_id']) && empty($data['owner_since'])) {
+            $data['owner_since'] = now()->toDateString();
+        }
+        if (empty($data['owner_id'])) {
+            $data['owner_id'] = null;
+            $data['owner_monthly_amount'] = $data['owner_monthly_amount'] ?? null;
+        }
 
         $vehicle = Vehicle::query()->create([
             ...$data,
@@ -100,12 +114,12 @@ class VehicleController extends Controller
             'is_active' => $data['is_active'] ?? true,
         ]);
 
-        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم إضافة السيارة.'], 201);
+        return response()->json(['data' => $this->present($vehicle->load('owner')), 'message' => 'تم إضافة السيارة.'], 201);
     }
 
     public function show(Vehicle $vehicle): JsonResponse
     {
-        return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents']))]);
+        return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents', 'owner']))]);
     }
 
     public function update(Request $request, Vehicle $vehicle): JsonResponse
@@ -126,11 +140,29 @@ class VehicleController extends Controller
             'tracker_sim_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
+            'owner_id' => ['nullable', 'integer', 'exists:vehicle_owners,id'],
+            'owner_monthly_amount' => ['nullable', 'integer', 'min:0'],
+            'owner_since' => ['nullable', 'date'],
+        ], [], [
+            'owner_id' => 'المالك',
+            'owner_monthly_amount' => 'المبلغ الشهري للمالك',
         ]);
+
+        if (array_key_exists('owner_id', $data)) {
+            if ($data['owner_id'] && ! $vehicle->owner_id) {
+                $data['owner_since'] = $data['owner_since'] ?? now()->toDateString();
+            }
+            if (! $data['owner_id']) {
+                $data['owner_id'] = null;
+                if (! array_key_exists('owner_monthly_amount', $data)) {
+                    $data['owner_monthly_amount'] = null;
+                }
+            }
+        }
 
         $vehicle->update($data);
 
-        return response()->json(['data' => $this->present($vehicle->fresh()), 'message' => 'تم تحديث السيارة.']);
+        return response()->json(['data' => $this->present($vehicle->fresh()->load('owner')), 'message' => 'تم تحديث السيارة.']);
     }
 
     /**
@@ -166,6 +198,14 @@ class VehicleController extends Controller
             'tracker_sim_number' => $v->tracker_sim_number,
             'is_active' => $v->is_active,
             'status' => $status,
+            'owner_id' => $v->owner_id,
+            'owner_monthly_amount' => $v->owner_monthly_amount,
+            'owner_since' => $v->owner_since?->toDateString(),
+            'owner' => $v->relationLoaded('owner') && $v->owner ? [
+                'id' => $v->owner->id,
+                'full_name' => $v->owner->full_name,
+                'phone' => $v->owner->phone,
+            ] : null,
             'accessories' => $v->relationLoaded('accessories') ? $v->accessories : null,
             'documents' => $v->relationLoaded('documents') ? $v->documents : null,
             'notes' => $v->notes,
