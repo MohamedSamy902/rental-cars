@@ -3,6 +3,8 @@ import './BrandLogo.css'
 type Props = {
   /** full = RPM + Rent A Car lockup · mark = RPM wordmark for tight spaces */
   variant?: 'full' | 'mark'
+  /** Drop the black tile when the host surface is already black */
+  bare?: boolean
   className?: string
 }
 
@@ -11,10 +13,10 @@ const assets = {
   mark: { src: 'brand/rpm-mark.webp', width: 320, height: 120 },
 }
 
-export function BrandLogo({ variant = 'full', className = '' }: Props) {
+export function BrandLogo({ variant = 'full', bare = false, className = '' }: Props) {
   const asset = assets[variant]
   return (
-    <span className={`rpm-logo rpm-logo--${variant} ${className}`.trim()}>
+    <span className={`rpm-logo rpm-logo--${variant} ${bare ? 'rpm-logo--bare' : ''} ${className}`.replace(/\s+/g, ' ').trim()}>
       <img
         src={`${import.meta.env.BASE_URL}${asset.src}`}
         alt="RPM Rent A Car"

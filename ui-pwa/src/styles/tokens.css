@@ -5,8 +5,6 @@
   --ink-soft: #27272a;
   --nav: #ffffff;
   --nav-muted: #71717a;
-  --nav-active: #dc2626;
-  --nav-active-bg: #fef2f2;
 
   --bg: #f4f4f5;
   --bg-elev: #ffffff;
@@ -93,6 +91,8 @@
   --rail-border: var(--border);
   --rail-divider: var(--hairline);
   --rail-quit-bg: #fef2f2;
+  --rail-active-bg: #e4e4e7;
+  --rail-active-fg: #18181b;
   --rail-theme-bg: #f4f4f5;
   --logo-tile: #0a0a0a;
   /* Physical plate replica stays light; dimmed in dark mode to avoid glare */
@@ -124,8 +124,6 @@
   --ink-soft: #e4e4e7;
   --nav: #0c0c0e;
   --nav-muted: #a1a1aa;
-  --nav-active: #f87171;
-  --nav-active-bg: rgb(239 68 68 / 14%);
 
   --bg: #09090b;
   --bg-elev: #111113;
@@ -207,6 +205,8 @@
   --rail-border: #1f1f23;
   --rail-divider: #1f1f23;
   --rail-quit-bg: rgb(248 113 113 / 10%);
+  --rail-active-bg: #27272a;
+  --rail-active-fg: #fafafa;
   --rail-theme-bg: rgb(255 255 255 / 5%);
   --logo-tile: #000000;
   --plate-bg: #d4d4d8;

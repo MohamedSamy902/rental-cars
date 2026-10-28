@@ -130,3 +130,42 @@ export const IconCash = (p: Props) => (
 export const IconKey = (p: Props) => (
   <Svg {...p}><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9.2-9.2M17 6l3 3M15 8l2 2" /></Svg>
 )
+export const IconStore = (p: Props) => (
+  <Svg {...p}><path d="M3 9 4.5 4h15L21 9" /><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" /><path d="M5 11.5V21h14v-9.5" /><path d="M10 21v-5h4v5" /></Svg>
+)
+export const IconReceipt = (p: Props) => (
+  <Svg {...p}><path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21z" /><path d="M9 8h6M9 12h6M9 16h3" /></Svg>
+)
+export const IconLandmark = (p: Props) => (
+  <Svg {...p}><path d="M3 21h18M4 18h16M12 3 3 8h18z" /><path d="M6 11v7M10 11v7M14 11v7M18 11v7" /></Svg>
+)
+export const IconBriefcase = (p: Props) => (
+  <Svg {...p}><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18" /></Svg>
+)
+export const IconFileText = (p: Props) => (
+  <Svg {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6M9 9h2" /></Svg>
+)
+export const IconChat = (p: Props) => (
+  <Svg {...p}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z" /><path d="M8.5 12h.01M12 12h.01M15.5 12h.01" /></Svg>
+)
+export const IconUserCog = (p: Props) => (
+  <Svg {...p}><circle cx="9" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 9.5-4.9" /><circle cx="18" cy="17" r="2.5" /><path d="M18 13v1.5M18 19.5V21M14.5 17H16M20 17h1.5M15.5 14.5l1 1M19.5 18.5l1 1M20.5 14.5l-1 1M16.5 18.5l-1 1" /></Svg>
+)
+export const IconHistory = (p: Props) => (
+  <Svg {...p}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3.5 2" /></Svg>
+)
+export const IconMail = (p: Props) => (
+  <Svg {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></Svg>
+)
+export const IconLock = (p: Props) => (
+  <Svg {...p}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></Svg>
+)
+export const IconEyeOff = (p: Props) => (
+  <Svg {...p}><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" /></Svg>
+)
+export const IconDownload = (p: Props) => (
+  <Svg {...p}><path d="M12 3v12M7 10l5 5 5-5M4 21h16" /></Svg>
+)
+export const IconZap = (p: Props) => (
+  <Svg {...p}><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></Svg>
+)

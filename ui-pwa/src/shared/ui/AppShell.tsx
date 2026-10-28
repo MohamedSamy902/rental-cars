@@ -8,9 +8,10 @@ import { BrandLogo } from './BrandLogo'
 import { CommandPalette } from './CommandPalette'
 import { useSheetDrag } from './useSheetDrag'
 import {
-  IconAlert, IconBell, IconBox, IconCalendar, IconCar, IconChart, IconChevron,
-  IconClipboard, IconHome, IconLogout, IconMenu, IconMoon, IconPlus, IconQueue,
-  IconSearch, IconSettings, IconShield, IconSun, IconUsers, IconWallet, IconWrench,
+  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart, IconChat,
+  IconChevron, IconClipboard, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
+  IconLogout, IconMenu, IconMoon, IconPlus, IconQueue, IconReceipt, IconSearch, IconSettings,
+  IconStore, IconSun, IconUserCog, IconUsers, IconWallet, IconWrench,
 } from './Icons'
 import './Button.css'
 import './AppShell.css'
@@ -30,21 +31,21 @@ const railNav: NavItem[] = [
   { to: '/bookings', label: 'العقود', icon: <IconClipboard />, permission: 'contracts.view' },
   { to: '/calendar', label: 'التقويم', icon: <IconCalendar />, permission: 'contracts.view' },
   { to: '/waitlist', label: 'الانتظار', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
-  { to: '/showroom', label: 'المعرض', icon: <IconCar />, feature: 'showroom', permission: 'showroom.run' },
+  { to: '/showroom', label: 'المعرض', icon: <IconStore />, feature: 'showroom', permission: 'showroom.run' },
   { to: '/maintenance', label: 'الصيانة', icon: <IconWrench />, permission: 'maintenance.view' },
   { to: '/inventory', label: 'المخزون', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
   { to: '/petty-cash', label: 'العهدة', icon: <IconWallet />, feature: 'petty_cash', permission: 'petty_cash.view' },
-  { to: '/expenses', label: 'المصروفات', icon: <IconWallet />, permission: 'expenses.view' },
-  { to: '/owners', label: 'ملاك العربيات', icon: <IconUsers />, permission: 'owners.view' },
+  { to: '/expenses', label: 'المصروفات', icon: <IconReceipt />, permission: 'expenses.view' },
+  { to: '/owners', label: 'ملاك العربيات', icon: <IconKey />, permission: 'owners.view' },
   { to: '/violations', label: 'المخالفات', icon: <IconAlert />, permission: 'violations.view' },
   { to: '/customers', label: 'العملاء', icon: <IconUsers />, permission: 'customers.view' },
-  { to: '/department-notice', label: 'إخطار القسم', icon: <IconClipboard />, feature: 'department_notice', permission: 'department_notice.print' },
-  { to: '/accounts', label: 'الحسابات', icon: <IconWallet />, permission: 'accounting.view' },
+  { to: '/department-notice', label: 'إخطار القسم', icon: <IconFileText />, feature: 'department_notice', permission: 'department_notice.print' },
+  { to: '/accounts', label: 'الحسابات', icon: <IconLandmark />, permission: 'accounting.view' },
   { to: '/reports', label: 'التقارير', icon: <IconChart />, permission: 'reports.view' },
-  { to: '/hr', label: 'الموارد البشرية', icon: <IconUsers />, feature: 'hr', permission: 'hr.view' },
-  { to: '/chat', label: 'المحادثة', icon: <IconBell />, feature: 'chat' },
-  { to: '/staff', label: 'الموظفون', icon: <IconShield />, permission: 'staff.view' },
-  { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconShield />, permission: 'audit.view' },
+  { to: '/hr', label: 'الموارد البشرية', icon: <IconBriefcase />, feature: 'hr', permission: 'hr.view' },
+  { to: '/chat', label: 'المحادثة', icon: <IconChat />, feature: 'chat' },
+  { to: '/staff', label: 'الموظفون', icon: <IconUserCog />, permission: 'staff.view' },
+  { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconHistory />, permission: 'audit.view' },
   { to: '/notifications', label: 'الإشعارات', icon: <IconBell />, permission: 'notifications.view' },
   { to: '/settings', label: 'الإعدادات', icon: <IconSettings />, permission: 'settings.view' },
 ]
@@ -242,14 +243,6 @@ export function AppShell() {
               </button>
               <button
                 type="button"
-                className="shell-icon shell-icon--desk"
-                aria-label={theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
-                onClick={toggleTheme}
-              >
-                {theme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
-              </button>
-              <button
-                type="button"
                 className="shell-icon shell-icon--bell"
                 aria-label={unread > 0 ? `إشعارات · ${unread} غير مقروء` : 'إشعارات'}
                 onClick={() => navigate('/notifications')}
@@ -340,9 +333,6 @@ export function AppShell() {
                 <div className="shell-drawer__head">
                   <BrandLogo variant="mark" />
                   <span className="shell-drawer__title">كل الأقسام</span>
-                  <button type="button" className="shell-icon" onClick={toggleTheme} aria-label="تبديل المظهر">
-                    {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
-                  </button>
                 </div>
               </div>
               <div className="shell-drawer__grid">
@@ -358,6 +348,24 @@ export function AppShell() {
                     <span>{item.label}</span>
                   </NavLink>
                 ))}
+              </div>
+              <div className="shell-drawer__foot">
+                <button type="button" className="shell-drawer__action" onClick={toggleTheme}>
+                  {theme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+                  <span>{theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="shell-drawer__action shell-drawer__action--quit"
+                  onClick={async () => {
+                    closeDrawer()
+                    await logout()
+                    navigate('/login')
+                  }}
+                >
+                  <IconLogout size={18} />
+                  <span>تسجيل الخروج</span>
+                </button>
               </div>
               <p className="shell-drawer__credit">
                 تم الإنشاء بواسطة{' '}

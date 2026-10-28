@@ -14,45 +14,6 @@
   border-block-start: 1px solid var(--border);
 }
 
-/* ───────────── Login ───────────── */
-.rpm-login {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 1.25rem;
-  background: #09090b;
-}
-
-.rpm-login__card {
-  width: min(420px, 100%);
-  display: grid;
-  gap: 0.9rem;
-  padding: 1.75rem;
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  box-shadow: 0 30px 80px rgb(0 0 0 / 45%);
-}
-
-.rpm-login__brand {
-  display: grid;
-  justify-items: start;
-  gap: 0.6rem;
-}
-.rpm-login__brand .rpm-logo {
-  --logo-h: 64px;
-}
-.rpm-login__brand span,
-.rpm-login__hint {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-.rpm-login h1 { font-size: 1.25rem; }
-.rpm-login__card > .rpm-btn {
-  width: 100%;
-}
-
 /* ───────────── Panels ───────────── */
 .rpm-panel {
   background: var(--surface);
@@ -352,12 +313,6 @@
     border-radius: 14px;
     padding-block: 0.85rem;
     padding-inline: 0.9rem;
-  }
-
-  .rpm-login__card {
-    padding-block: 1.4rem;
-    padding-inline: 1.15rem;
-    border-radius: 20px;
   }
 
   /* Tables marked --stack render as card lists on phones */
