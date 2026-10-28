@@ -1,26 +1,29 @@
-/* The artwork ships on black, so the tile is black in both themes */
+/* The artwork is white-on-black, so it always sits on a black tile.
+   Placement sets --logo-h only; padding and radius scale from it. */
 .rpm-logo {
-  display: inline-grid;
-  place-items: center;
+  --logo-h: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  overflow: hidden;
-  border-radius: 12px;
+  box-sizing: border-box;
+  height: var(--logo-h);
+  padding-block: calc(var(--logo-h) * 0.2);
+  padding-inline: calc(var(--logo-h) * 0.3);
+  border-radius: calc(var(--logo-h) * 0.28);
   background: var(--logo-tile);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 6%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 7%);
 }
 
 .rpm-logo img {
-  width: 100%;
+  display: block;
+  width: auto;
   height: 100%;
-  object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
 }
 
 .rpm-logo--full {
-  aspect-ratio: 640 / 305;
-}
-
-.rpm-logo--mark {
-  aspect-ratio: 320 / 120;
+  padding-block: calc(var(--logo-h) * 0.1);
+  padding-inline: calc(var(--logo-h) * 0.16);
 }

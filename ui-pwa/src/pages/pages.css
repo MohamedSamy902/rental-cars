@@ -44,8 +44,7 @@
   gap: 0.6rem;
 }
 .rpm-login__brand .rpm-logo {
-  width: 152px;
-  border-radius: 14px;
+  --logo-h: 64px;
 }
 .rpm-login__brand span,
 .rpm-login__hint {

@@ -64,19 +64,7 @@
   transform: translateY(-1px);
 }
 .shell-rail__brand .rpm-logo {
-  box-shadow: var(--rail-brand-shadow);
-}
-.shell.is-collapsed .shell-rail__brand .rpm-logo {
-  width: 64px;
-  height: 44px;
-  aspect-ratio: auto;
-  padding-inline: 3px;
-  border-radius: 14px;
-}
-.shell.is-expanded .shell-rail__brand .rpm-logo {
-  width: 128px;
-  height: auto;
-  border-radius: 14px;
+  --logo-h: 30px;
 }
 
 .shell-rail__toggle {
@@ -476,10 +464,7 @@
   border-block-end: 1px solid var(--border);
 }
 .shell-drawer__head .rpm-logo {
-  width: 72px;
-  height: 34px;
-  aspect-ratio: auto;
-  border-radius: 10px;
+  --logo-h: 28px;
 }
 .shell-drawer__title {
   flex: 1;
@@ -584,10 +569,7 @@
     justify-content: center;
   }
   .shell-top__brand-mobile .rpm-logo {
-    width: 84px;
-    height: 32px;
-    aspect-ratio: auto;
-    border-radius: 9px;
+    --logo-h: 28px;
   }
   .shell-search { display: none; }
   .shell-icon {

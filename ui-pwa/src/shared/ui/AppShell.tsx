@@ -155,7 +155,7 @@ export function AppShell() {
         <div className="shell-rail__inner">
           <div className="shell-rail__brand-row">
             <NavLink to="/" className="shell-rail__brand" title="RPM Rent A Car" aria-label="لوحة اليوم">
-              <BrandLogo variant={expanded ? 'full' : 'mark'} />
+              <BrandLogo variant="mark" />
             </NavLink>
             <button
               type="button"
