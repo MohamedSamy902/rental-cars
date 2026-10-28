@@ -13,10 +13,15 @@ class ExpenseController extends Controller
 {
     public function __construct(private readonly ExpenseService $service) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $q = Expense::query()->with(['vehicle', 'employee'])->latest('id');
+        if ($vehicleId = $request->integer('vehicle_id')) {
+            $q->where('vehicle_id', $vehicleId);
+        }
+
         return response()->json([
-            'data' => Expense::query()->with(['vehicle', 'employee'])->latest('id')->limit(100)->get(),
+            'data' => $q->limit(100)->get(),
         ]);
     }
 

@@ -26,6 +26,9 @@ class ContractController extends Controller
                     ->orWhereHas('customer', fn ($c) => $c->where('full_name', 'like', "%{$search}%"));
             });
         }
+        if ($vehicleId = $request->integer('vehicle_id')) {
+            $q->where('vehicle_id', $vehicleId);
+        }
 
         $rows = $q->paginate((int) $request->integer('per_page', 50));
 
