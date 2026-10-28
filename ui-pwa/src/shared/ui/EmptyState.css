@@ -1,8 +1,10 @@
 .rpm-empty {
   text-align: center;
-  padding: 2.5rem 1.25rem;
+  padding-block: 2.5rem;
+  padding-inline: 1.25rem;
   background: var(--surface);
-  border: 1px dashed var(--border);
+  color: var(--text);
+  border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
   display: grid;
   gap: 0.5rem;
@@ -20,6 +22,6 @@
 }
 
 .rpm-empty--error {
-  border-color: color-mix(in srgb, var(--danger) 35%, white);
-  background: color-mix(in srgb, var(--danger) 5%, white);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  background: var(--danger-soft);
 }

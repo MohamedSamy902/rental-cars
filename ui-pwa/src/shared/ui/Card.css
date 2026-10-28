@@ -1,77 +1,62 @@
-/* Enterprise card shell — header · divider · content */
+/* Card surface — header · divider · content · footer */
 
-.rpm-card {
+.rpm-surface {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: #fff;
-  border: 1px solid color-mix(in srgb, #e4e4e7 80%, transparent);
-  border-radius: 0.75rem; /* rounded-xl */
-  box-shadow: 0 1px 2px rgb(24 24 27 / 4%); /* shadow-xs */
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  box-shadow: var(--shadow-xs);
   overflow: hidden;
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
-[data-theme='dark'] .rpm-card {
-  background: var(--surface);
-  border-color: var(--border);
+.rpm-surface--interactive:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
-.rpm-card--interactive:hover {
-  border-color: #d4d4d8;
-  box-shadow: 0 1px 3px rgb(24 24 27 / 8%), 0 1px 2px rgb(24 24 27 / 4%);
-}
-
-.rpm-card__header {
+.rpm-surface__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.875rem 1.25rem;
-  border-block-end: 1px solid #e4e4e7;
-  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  padding-block: 0.875rem;
+  padding-inline: 1.25rem;
+  border-block-end: 1px solid var(--border);
+  background: var(--surface);
 }
 
-[data-theme='dark'] .rpm-card__header {
-  border-block-end-color: var(--border);
-}
-
-.rpm-card__header-main {
+.rpm-surface__header-main {
   display: grid;
   gap: 0.15rem;
   min-width: 0;
 }
 
-.rpm-card__title {
+.rpm-surface__title {
   margin: 0;
   font-family: var(--font-display);
   font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #18181b;
+  color: var(--text);
   line-height: 1.35;
 }
 
-[data-theme='dark'] .rpm-card__title {
-  color: var(--text);
-}
-
-.rpm-card__description {
+.rpm-surface__description {
   margin: 0;
   font-size: 0.75rem;
   font-weight: 500;
-  color: #71717a;
+  color: var(--text-muted);
   line-height: 1.4;
 }
 
-[data-theme='dark'] .rpm-card__description {
-  color: var(--text-muted);
-}
-
-.rpm-card__action {
+.rpm-surface__action {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -79,44 +64,57 @@
   margin-inline-start: auto;
 }
 
-.rpm-card__action a,
-.rpm-card__action .rpm-card__action-link {
+.rpm-surface__action a,
+.rpm-surface__action .rpm-surface__action-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding-inline: 0.5rem;
+  border-radius: 0.425rem;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #dc2626;
-  text-decoration: none;
-  transition: color 150ms ease;
+  color: var(--accent-ink);
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
 }
 
-.rpm-card__action a:hover,
-.rpm-card__action .rpm-card__action-link:hover {
-  color: #b91c1c;
+.rpm-surface__action a:hover,
+.rpm-surface__action .rpm-surface__action-link:hover {
+  background: var(--accent-soft);
 }
 
-.rpm-card__content {
+.rpm-surface__content {
   padding: 1.25rem;
   min-width: 0;
 }
 
-.rpm-card__content--flush {
+.rpm-surface__content--flush {
   padding: 0;
 }
 
-.rpm-card__content--dense {
-  padding: 1rem 1.25rem 1.25rem;
+.rpm-surface__content--dense {
+  padding-block: 1rem 1.25rem;
+  padding-inline: 1.25rem;
 }
 
-.rpm-card__footer {
+.rpm-surface__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.85rem 1.25rem;
-  border-block-start: 1px solid #f4f4f5;
-  background: #fafafa;
+  padding-block: 0.85rem;
+  padding-inline: 1.25rem;
+  border-block-start: 1px solid var(--border);
+  background: var(--surface-2);
 }
 
-[data-theme='dark'] .rpm-card__footer {
-  border-block-start-color: var(--border);
-  background: var(--surface-2);
+@media (max-width: 980px) {
+  .rpm-surface__header {
+    padding-inline: 1rem;
+  }
+  .rpm-surface__content {
+    padding: 1rem;
+  }
+  .rpm-surface__content--flush {
+    padding: 0;
+  }
 }

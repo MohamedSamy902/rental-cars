@@ -1,7 +1,7 @@
-/* Minimal shared page styles for non-dashboard screens (logic pages) */
+/* Shared page primitives for operational screens */
 .rpm-stack {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.85rem;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -9,48 +9,62 @@
 }
 
 .rpm-detail-actions {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
+  margin-block-start: 0.75rem;
+  padding-block-start: 0.75rem;
+  border-block-start: 1px solid var(--border);
 }
 
+/* ───────────── Login ───────────── */
 .rpm-login {
   min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 1.25rem;
   background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 42%),
-    linear-gradient(160deg, #0b1220, #14303a 55%, #0f766e);
+    radial-gradient(900px 520px at 100% 0%, rgb(220 38 38 / 22%), transparent 60%),
+    radial-gradient(700px 420px at 0% 100%, rgb(255 255 255 / 5%), transparent 55%),
+    linear-gradient(160deg, #09090b, #18181b 60%, #0c0c0e);
 }
 
 .rpm-login__card {
   width: min(420px, 100%);
   display: grid;
-  gap: 0.85rem;
-  padding: 1.5rem;
-  border-radius: var(--radius-lg);
+  gap: 0.9rem;
+  padding: 1.75rem;
+  border-radius: var(--radius-xl);
   background: var(--surface);
-  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 45%);
 }
 
-.rpm-login__brand { display: grid; gap: 0.15rem; }
-.rpm-login__brand strong {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  letter-spacing: 0.08em;
-  color: var(--brand-hover);
+.rpm-login__brand {
+  display: grid;
+  justify-items: start;
+  gap: 0.6rem;
+}
+.rpm-login__brand .rpm-logo {
+  width: 152px;
+  border-radius: 14px;
 }
 .rpm-login__brand span,
-.rpm-login__hint { color: var(--text-muted); font-size: 0.85rem; }
+.rpm-login__hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
 .rpm-login h1 { font-size: 1.25rem; }
+.rpm-login__card > .rpm-btn {
+  width: 100%;
+}
 
+/* ───────────── Panels ───────────── */
 .rpm-panel {
   background: var(--surface);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem;
-  box-shadow: var(--shadow-sm);
+  padding: 1.1rem;
+  box-shadow: var(--shadow-xs);
 }
 
 .rpm-panel__head {
@@ -58,20 +72,25 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.85rem;
+  margin-block-end: 0.85rem;
 }
 
 .rpm-panel__head h3 { font-size: 1rem; }
 
 .rpm-text-link {
-  color: var(--brand-ink);
+  color: var(--accent-ink);
   font-size: 0.82rem;
   font-weight: 700;
+  border-radius: 0.375rem;
+  transition: color var(--motion-fast) ease, background-color var(--motion-fast) ease;
+}
+.rpm-text-link:hover {
+  background: var(--accent-soft);
 }
 
 .rpm-two-col {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 @media (min-width: 960px) {
@@ -95,22 +114,25 @@
   padding: 0.75rem;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 .rpm-dense-row p,
-.muted { margin: 0.15rem 0 0; color: var(--text-muted); font-size: 0.8rem; }
+.muted { margin-block: 0.15rem 0; color: var(--text-muted); font-size: 0.8rem; }
 
+/* ───────────── Tables ───────────── */
 .rpm-table-wrap {
   width: 100%;
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
-  box-shadow: none;
+  box-shadow: var(--shadow-xs);
 }
 
 .rpm-table {
@@ -118,48 +140,49 @@
   min-width: 720px;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.9rem;
-  background: var(--bg);
+  font-size: 0.875rem;
+  color: var(--text);
 }
 
 .rpm-table thead th {
   position: sticky;
-  top: 0;
+  inset-block-start: 0;
   z-index: 1;
-  padding: 0.75rem 0.9rem;
+  padding-block: 0.7rem;
+  padding-inline: 1rem;
   background: var(--surface-2);
   color: var(--text-muted);
   font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-weight: 600;
   text-align: start;
   white-space: nowrap;
-  border-bottom: 1px solid var(--border-strong);
+  border-block-end: 1px solid var(--border);
 }
 
 .rpm-table tbody td {
-  padding: 0.8rem 0.9rem;
+  padding-block: 0.8rem;
+  padding-inline: 1rem;
   text-align: start;
   vertical-align: middle;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  background: var(--bg);
-}
-
-.rpm-table tbody tr:nth-child(even) td {
-  background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+  border-block-end: 1px solid var(--hairline);
+  background: var(--surface);
+  transition: background-color var(--motion-fast) ease;
 }
 
 .rpm-table tbody tr:last-child td {
-  border-bottom: none;
+  border-block-end: none;
+}
+
+.rpm-table tbody tr:hover td {
+  background: var(--surface-2);
 }
 
 .rpm-table tbody tr.is-clickable {
   cursor: pointer;
 }
 
-.rpm-table tbody tr:hover td {
-  background: color-mix(in srgb, var(--brand-soft) 40%, var(--bg));
+.rpm-table tbody tr.is-clickable:hover td:first-child {
+  box-shadow: inset -3px 0 0 var(--accent);
 }
 
 .rpm-table td .rpm-btn {
@@ -173,31 +196,38 @@
 
 .rpm-table--compact {
   min-width: 0;
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
 }
 
 .rpm-table--compact thead th,
 .rpm-table--compact tbody td {
-  padding: 0.55rem 0.7rem;
+  padding-block: 0.55rem;
+  padding-inline: 0.75rem;
 }
 
 .rpm-table__code {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+  font-size: 0.8125rem;
+  padding-block: 0.15rem;
+  padding-inline: 0.45rem;
+  border-radius: 0.375rem;
+  background: var(--surface-3);
 }
 
 .rpm-table__primary {
   display: block;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .rpm-table__sub {
   display: block;
-  margin-top: 0.15rem;
+  margin-block-start: 0.15rem;
   color: var(--text-muted);
   font-size: 0.78rem;
 }
 
+/* ───────────── List cards (mobile lists / clickable rows) ───────────── */
 .rpm-card-list {
   display: grid;
   gap: 0.65rem;
@@ -206,33 +236,44 @@
 .rpm-card {
   display: grid;
   gap: 0.45rem;
-  padding: 0.95rem 1rem;
+  padding-block: 0.95rem;
+  padding-inline: 1rem;
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: none;
+  box-shadow: var(--shadow-xs);
   width: 100%;
   max-width: 100%;
   text-align: start;
-  color: inherit;
+  color: var(--text);
+  transition:
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
 .rpm-card.is-clickable {
   cursor: pointer;
-  transition: border-color var(--motion, 200ms) var(--ease, ease), transform var(--motion, 200ms) var(--ease, ease);
+}
+
+.rpm-card.is-clickable:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .rpm-card.is-clickable:active {
   transform: scale(0.99);
+  background: var(--surface-2);
 }
 
 .rpm-card.is-unread {
-  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
-  background: color-mix(in srgb, var(--brand-soft) 55%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface));
 }
 
 .rpm-card__chev {
-  color: var(--text-muted);
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
@@ -255,7 +296,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin-top: 0.25rem;
+  margin-block-start: 0.25rem;
 }
 
 .rpm-inline-create {
@@ -269,11 +310,12 @@
   padding: 0.85rem;
   border-radius: 14px;
   background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 .rpm-inline-box__title {
   margin: 0;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.9rem;
 }
 
@@ -284,60 +326,19 @@
   .rpm-desktop-only { display: none !important; }
 
   .rpm-stack {
-    gap: 0.65rem;
-    padding-bottom: 0.35rem;
+    gap: 0.7rem;
+    padding-block-end: 0.35rem;
   }
 
   .rpm-panel {
     border-radius: 16px;
-    box-shadow: none;
-    padding: 0.9rem;
+    padding: 0.95rem;
   }
 
   .rpm-panel__head {
-    margin-bottom: 0.65rem;
+    margin-block-end: 0.65rem;
   }
 
-  .rpm-summary {
-    display: flex;
-    gap: 0.5rem;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    margin-bottom: 0.75rem;
-  }
-  .rpm-summary::-webkit-scrollbar { display: none; }
-  .rpm-summary__item {
-    flex: 0 0 42%;
-    min-width: 132px;
-    scroll-snap-align: start;
-    border-radius: 16px;
-    padding: 0.8rem 0.85rem;
-    box-shadow: none;
-  }
-
-  .rpm-filters { margin-bottom: 0.75rem; gap: 0.55rem; }
-  .rpm-filters__search {
-    min-height: 46px;
-    border-radius: 14px;
-    background: var(--surface-2);
-    border-color: transparent;
-  }
-  .rpm-chip {
-    min-height: 38px;
-    border-radius: 12px;
-    background: var(--surface-2);
-    border-color: transparent;
-  }
-  .rpm-chip.is-active {
-    background: var(--brand-soft);
-    border-color: transparent;
-  }
-
-  .rpm-card {
-    border-radius: 16px;
-    box-shadow: none;
-  }
   .rpm-card__actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -353,12 +354,87 @@
   .rpm-dense-row,
   .rpm-task-list li {
     border-radius: 14px;
-    padding: 0.85rem 0.9rem;
+    padding-block: 0.85rem;
+    padding-inline: 0.9rem;
   }
 
   .rpm-login__card {
-    padding: 1.25rem 1.1rem;
+    padding-block: 1.4rem;
+    padding-inline: 1.15rem;
     border-radius: 20px;
+  }
+
+  /* Tables marked --stack render as card lists on phones */
+  .rpm-table-wrap:has(.rpm-table--stack) {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .rpm-table--stack {
+    min-width: 0;
+  }
+  .rpm-table--stack thead {
+    display: none;
+  }
+  .rpm-table--stack,
+  .rpm-table--stack tbody {
+    display: block;
+    width: 100%;
+  }
+  .rpm-table--stack tbody {
+    display: grid;
+    gap: 0.6rem;
+  }
+  .rpm-table--stack tbody tr {
+    display: grid;
+    gap: 0.1rem;
+    padding-block: 0.6rem;
+    padding-inline: 0.9rem;
+    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-xs);
+  }
+  .rpm-table--stack tbody td,
+  .rpm-table--stack tbody tr:hover td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.25rem;
+    padding: 0.3rem 0;
+    border: 0;
+    border-block-end: 1px solid var(--hairline);
+    background: transparent;
+    text-align: end;
+  }
+  .rpm-table--stack tbody td:last-child {
+    border-block-end: 0;
+  }
+  .rpm-table--stack tbody td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: start;
+  }
+  .rpm-table--stack tbody td[data-label='']::before {
+    content: none;
+  }
+  .rpm-table--stack tbody td[data-label=''] {
+    justify-content: stretch;
+  }
+  .rpm-table--stack tbody td[data-label=''] .rpm-actions-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rpm-table--stack tbody td[data-label=''] .rpm-btn {
+    width: 100%;
+    min-height: 40px;
   }
 }
 
@@ -377,19 +453,32 @@
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: 0.55rem 1rem;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--brand) 14%, transparent);
-  color: var(--brand);
-  font-weight: 700;
+  padding-block: 0.55rem;
+  padding-inline: 1rem;
+  border-radius: 0.5rem;
+  background: var(--action);
+  color: var(--on-action);
+  font-weight: 500;
+  font-size: 0.875rem;
   text-decoration: none;
+  transition:
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
+}
+.rpm-link-btn:hover {
+  background: var(--action-hover);
+  color: var(--on-action-hover);
+}
+.rpm-link-btn:active {
+  transform: scale(0.98);
 }
 
 .rpm-qr-box {
-  margin-top: 0.75rem;
+  margin-block-start: 0.75rem;
   padding: 0.75rem;
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   white-space: pre-wrap;
   word-break: break-all;
@@ -397,10 +486,12 @@
 }
 
 .rpm-qr-img {
-  margin-top: 0.5rem;
+  margin-block-start: 0.5rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: #fff;
+  /* QR codes need a light quiet zone to scan, even in dark mode */
+  background: #ffffff;
+  padding: 0.35rem;
 }
 
 .rpm-actions-row {
@@ -437,11 +528,11 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
-  margin-top: 1rem;
+  margin-block-start: 1rem;
 }
 
 .rpm-dossier-split h4 {
-  margin: 0 0 0.5rem;
+  margin-block: 0 0.5rem;
   font-size: 0.9rem;
 }
 
@@ -454,16 +545,19 @@
 .rpm-media-chip {
   display: grid;
   gap: 0.25rem;
-  padding: 0.75rem 0.85rem;
+  padding-block: 0.75rem;
+  padding-inline: 0.85rem;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--surface-2);
   color: inherit;
   text-decoration: none;
+  transition: border-color var(--motion-fast) ease, background-color var(--motion-fast) ease;
 }
 
 .rpm-media-chip:hover {
   border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .rpm-print-only { display: none; }
@@ -475,11 +569,13 @@
   }
 }
 
+/* Print is always ink-on-paper regardless of theme */
 @media print {
   .rpm-no-print,
-  .shell-sidebar,
-  .shell-topbar,
-  .shell-bottom-nav,
+  .shell-rail,
+  .shell-top,
+  .shell-dock,
+  .shell-credit,
   .rpm-fab,
   .rpm-page-header__action {
     display: none !important;
@@ -491,9 +587,9 @@
     display: flex !important;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #0f172a;
+    margin-block-end: 1rem;
+    padding-block-end: 0.5rem;
+    border-block-end: 2px solid #18181b;
     font-size: 1rem;
   }
 
@@ -503,15 +599,15 @@
   .rpm-table-wrap,
   .rpm-table,
   .rpm-table tbody td {
-    background: #fff !important;
-    color: #0f172a !important;
+    background: #ffffff !important;
+    color: #18181b !important;
     box-shadow: none !important;
   }
 
   .rpm-panel {
     break-inside: avoid;
-    border: 1px solid #cbd5e1 !important;
-    margin-bottom: 0.75rem;
+    border: 1px solid #d4d4d8 !important;
+    margin-block-end: 0.75rem;
     padding: 0.75rem !important;
   }
 

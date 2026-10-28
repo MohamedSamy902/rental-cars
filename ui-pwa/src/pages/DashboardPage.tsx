@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 import { api } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
+import { useTheme, type ThemeMode } from '@/shared/theme/ThemeContext'
 import {
   formatDayShort,
   formatMoney,
@@ -54,11 +55,37 @@ type Dash = {
   }[]
 }
 
-const fleetTone: Record<string, string> = {
-  available: '#059669',
-  rented: '#334155',
-  reserved: '#475569',
-  maintenance: '#f59e0b',
+/** SVG chart attributes can't resolve CSS variables, so charts read a per-theme palette */
+const chartPalette: Record<ThemeMode, {
+  line: string
+  axis: string
+  cursor: string
+  dot: string
+  dotRing: string
+  slice: string
+  fleet: Record<string, string>
+  fallback: string
+}> = {
+  light: {
+    line: '#18181b',
+    axis: '#71717a',
+    cursor: '#d4d4d8',
+    dot: '#dc2626',
+    dotRing: '#ffffff',
+    slice: '#ffffff',
+    fleet: { available: '#059669', rented: '#334155', reserved: '#71717a', maintenance: '#f59e0b' },
+    fallback: '#a1a1aa',
+  },
+  dark: {
+    line: '#fafafa',
+    axis: '#a1a1aa',
+    cursor: '#3f3f46',
+    dot: '#ef4444',
+    dotRing: '#141416',
+    slice: '#141416',
+    fleet: { available: '#34d399', rented: '#94a3b8', reserved: '#52525b', maintenance: '#fbbf24' },
+    fallback: '#52525b',
+  },
 }
 
 function startOfDay(d: Date) {
@@ -158,6 +185,8 @@ function CardMenuButton({ label }: { label: string }) {
 
 export function DashboardPage() {
   const { user } = useAuth()
+  const { theme } = useTheme()
+  const palette = chartPalette[theme]
   const [data, setData] = useState<Dash | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -555,32 +584,32 @@ export function DashboardPage() {
                   <AreaChart data={revenueSeries} margin={{ top: 6, right: 2, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#18181b" stopOpacity={0.22} />
-                        <stop offset="45%" stopColor="#18181b" stopOpacity={0.08} />
-                        <stop offset="100%" stopColor="#18181b" stopOpacity={0} />
+                        <stop offset="0%" stopColor={palette.line} stopOpacity={0.22} />
+                        <stop offset="45%" stopColor={palette.line} stopOpacity={0.08} />
+                        <stop offset="100%" stopColor={palette.line} stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <XAxis
                       dataKey="label"
                       tickLine={false}
                       axisLine={false}
-                      tick={{ fill: '#71717a', fontSize: 11 }}
+                      tick={{ fill: palette.axis, fontSize: 11 }}
                       interval={revenueRange === 'year' ? 1 : 0}
                       height={28}
                     />
                     <YAxis hide domain={['dataMin', 'dataMax']} />
                     <Tooltip
                       content={<ChartTooltip />}
-                      cursor={{ stroke: '#d4d4d8', strokeWidth: 1 }}
+                      cursor={{ stroke: palette.cursor, strokeWidth: 1 }}
                     />
                     <Area
                       type="monotone"
                       dataKey="value"
-                      stroke="#18181b"
+                      stroke={palette.line}
                       strokeWidth={2.5}
                       fill="url(#revFill)"
                       animationDuration={850}
-                      activeDot={{ r: 4, fill: '#dc2626', stroke: '#fff', strokeWidth: 2 }}
+                      activeDot={{ r: 4, fill: palette.dot, stroke: palette.dotRing, strokeWidth: 2 }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -613,11 +642,11 @@ export function DashboardPage() {
                         innerRadius="64%"
                         outerRadius="90%"
                         paddingAngle={4}
-                        stroke="#ffffff"
+                        stroke={palette.slice}
                         strokeWidth={3}
                       >
                         {donut.map((entry) => (
-                          <Cell key={entry.key} fill={fleetTone[entry.key] || '#94a3b8'} />
+                          <Cell key={entry.key} fill={palette.fleet[entry.key] || palette.fallback} />
                         ))}
                       </Pie>
                     </PieChart>
@@ -630,7 +659,7 @@ export function DashboardPage() {
                 <ul className="db-fleet__legend">
                   {donut.map((item) => (
                     <li key={item.key}>
-                      <i style={{ background: fleetTone[item.key] }} />
+                      <i style={{ background: palette.fleet[item.key] || palette.fallback }} />
                       <span>{item.name}</span>
                       <b className="tabular-nums">{formatNumber(item.value)}</b>
                     </li>

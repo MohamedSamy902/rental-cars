@@ -9,7 +9,7 @@
 .rpm-cmd__backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(20 24 31 / 45%);
+  background: var(--overlay);
   backdrop-filter: blur(8px);
 }
 .rpm-cmd__panel {
@@ -25,8 +25,9 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 1rem 1.15rem;
-  border-bottom: 1px solid var(--border);
+  padding-block: 1rem;
+  padding-inline: 1.15rem;
+  border-block-end: 1px solid var(--border);
   color: var(--text-muted);
 }
 .rpm-cmd__search input {
@@ -59,8 +60,12 @@
   border-radius: var(--radius-sm);
   text-align: start;
 }
+.rpm-cmd__item {
+  color: var(--text);
+  transition: background-color var(--motion-fast) ease;
+}
 .rpm-cmd__item.is-active,
-.rpm-cmd__item:hover { background: var(--brand-soft); }
+.rpm-cmd__item:hover { background: var(--surface-hover); }
 .rpm-cmd__icon {
   width: 36px;
   height: 36px;
@@ -71,8 +76,8 @@
   flex-shrink: 0;
 }
 .rpm-cmd__item.is-active .rpm-cmd__icon {
-  background: var(--brand);
-  color: white;
+  background: var(--action);
+  color: var(--on-action);
 }
 .rpm-cmd__meta { display: grid; gap: 0.1rem; min-width: 0; }
 .rpm-cmd__meta strong { font-size: 0.95rem; font-weight: 700; }

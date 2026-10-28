@@ -16,7 +16,7 @@ export function Card({
 }: CardProps) {
   return (
     <Tag
-      className={`rpm-card ${interactive ? 'rpm-card--interactive' : ''} ${className}`.trim()}
+      className={`rpm-surface ${interactive ? 'rpm-surface--interactive' : ''} ${className}`.trim()}
       {...rest}
     >
       {children}
@@ -32,12 +32,12 @@ type HeaderProps = HTMLAttributes<HTMLDivElement> & {
 
 export function CardHeader({ title, description, action, className = '', ...rest }: HeaderProps) {
   return (
-    <div className={`rpm-card__header ${className}`.trim()} {...rest}>
-      <div className="rpm-card__header-main">
-        <h2 className="rpm-card__title">{title}</h2>
-        {description ? <p className="rpm-card__description">{description}</p> : null}
+    <div className={`rpm-surface__header ${className}`.trim()} {...rest}>
+      <div className="rpm-surface__header-main">
+        <h2 className="rpm-surface__title">{title}</h2>
+        {description ? <p className="rpm-surface__description">{description}</p> : null}
       </div>
-      {action ? <div className="rpm-card__action">{action}</div> : null}
+      {action ? <div className="rpm-surface__action">{action}</div> : null}
     </div>
   )
 }
@@ -49,9 +49,9 @@ type SlotProps = HTMLAttributes<HTMLDivElement> & {
 }
 
 export function CardContent({ flush, dense, className = '', children, ...rest }: SlotProps) {
-  const pad = flush ? 'rpm-card__content--flush' : dense ? 'rpm-card__content--dense' : ''
+  const pad = flush ? 'rpm-surface__content--flush' : dense ? 'rpm-surface__content--dense' : ''
   return (
-    <div className={`rpm-card__content ${pad} ${className}`.trim()} {...rest}>
+    <div className={`rpm-surface__content ${pad} ${className}`.trim()} {...rest}>
       {children}
     </div>
   )
@@ -59,7 +59,7 @@ export function CardContent({ flush, dense, className = '', children, ...rest }:
 
 export function CardFooter({ className = '', children, ...rest }: SlotProps) {
   return (
-    <div className={`rpm-card__footer ${className}`.trim()} {...rest}>
+    <div className={`rpm-surface__footer ${className}`.trim()} {...rest}>
       {children}
     </div>
   )

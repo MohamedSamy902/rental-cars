@@ -10,11 +10,11 @@
   gap: 0.75rem;
   align-items: start;
   padding: 0.85rem 0.15rem;
-  border-bottom: 1px solid var(--hairline, var(--border));
+  border-block-end: 1px solid var(--hairline, var(--border));
 }
 
 .rpm-detail__row:last-child {
-  border-bottom: 0;
+  border-block-end: 0;
 }
 
 .rpm-detail__row dt {

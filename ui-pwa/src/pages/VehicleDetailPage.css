@@ -4,7 +4,7 @@
   --vd-pad: clamp(1rem, 2.2vw, 1.6rem);
   display: grid;
   gap: 1rem;
-  padding-bottom: 2rem;
+  padding-block-end: 2rem;
   animation: vd-in 420ms var(--ease) both;
 }
 
@@ -40,7 +40,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.85rem;
-  margin-bottom: 1.15rem;
+  margin-block-end: 1.15rem;
 }
 
 .vd-back {
@@ -161,7 +161,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 0.15rem;
+  margin-block-start: 0.15rem;
 }
 
 .vd-tag {
@@ -215,8 +215,8 @@
   gap: 0.15rem;
   padding: 0.85rem 1rem;
   border-radius: 16px;
-  background: var(--brand);
-  color: #fff;
+  background: var(--action);
+  color: var(--on-action);
   box-shadow: var(--rail-brand-shadow);
 }
 
@@ -272,7 +272,7 @@
 /* Sticky tabs */
 .vd-tabs {
   position: sticky;
-  top: 0;
+  inset-block-start: 0;
   z-index: 5;
   display: flex;
   gap: 0.35rem;
@@ -474,15 +474,15 @@
   grid-template-columns: 18px minmax(0, 1fr);
   gap: 0.75rem;
   padding: 0.85rem 0;
-  border-bottom: 1px solid var(--border);
+  border-block-end: 1px solid var(--border);
 }
 
-.vd-tl:last-child { border-bottom: 0; }
+.vd-tl:last-child { border-block-end: 0; }
 
 .vd-tl__dot {
   width: 10px;
   height: 10px;
-  margin-top: 0.35rem;
+  margin-block-start: 0.35rem;
   border-radius: 50%;
   background: var(--brand);
   box-shadow: 0 0 0 4px var(--brand-soft);
@@ -587,9 +587,9 @@
 }
 
 .vd-form-block {
-  margin-top: 0.35rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--border);
+  margin-block-start: 0.35rem;
+  padding-block-start: 0.85rem;
+  border-block-start: 1px solid var(--border);
 }
 
 .vd-note {
@@ -732,9 +732,9 @@
     display: flex !important;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.4rem;
-    border-bottom: 2px solid #0f172a;
+    margin-block-end: 0.75rem;
+    padding-block-end: 0.4rem;
+    border-block-end: 2px solid #0f172a;
   }
 
   .vd,
@@ -754,7 +754,7 @@
   .vd-hero {
     break-inside: avoid;
     border: 1px solid #cbd5e1 !important;
-    margin-bottom: 0.65rem;
+    margin-block-end: 0.65rem;
   }
 
   .vd-print-all {

@@ -1,36 +1,55 @@
 .rpm-toasts {
   position: fixed;
   inset-inline: 1rem;
-  bottom: calc(var(--bottom-nav-height) + 1rem);
-  z-index: 80;
+  inset-block-end: calc(var(--bottom-nav-height) + 1rem + var(--safe-bottom));
+  z-index: 130;
   display: grid;
   gap: 0.5rem;
   pointer-events: none;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 981px) {
   .rpm-toasts {
     inset-inline-start: auto;
     inset-inline-end: 1.5rem;
-    bottom: 1.5rem;
+    inset-block-end: 1.5rem;
     width: min(360px, calc(100vw - 2rem));
   }
 }
 
 .rpm-toast {
-  padding: 0.85rem 1rem;
+  position: relative;
+  padding-block: 0.8rem;
+  padding-inline: 2.25rem 1rem;
   border-radius: var(--radius-sm);
-  color: #fff;
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  border: 1px solid var(--border);
   font-weight: 600;
-  box-shadow: 0 10px 30px rgb(15 23 42 / 18%);
+  font-size: 0.875rem;
+  box-shadow: var(--shadow-lg);
   animation: rpm-fade-up var(--motion) var(--ease);
   pointer-events: auto;
 }
 
-.rpm-toast--success {
-  background: var(--success);
+.rpm-toast::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 1rem;
+  inset-block-start: 50%;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-block-start: -0.275rem;
+  border-radius: 999px;
+  background: currentColor;
 }
 
-.rpm-toast--error {
+.rpm-toast--success::before {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent);
+}
+
+.rpm-toast--error::before {
   background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 25%, transparent);
 }

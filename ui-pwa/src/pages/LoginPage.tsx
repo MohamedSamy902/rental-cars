@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/shared/auth/AuthContext'
-import { Button, TextField, useToast } from '@/shared/ui'
+import { BrandLogo, Button, TextField, useToast } from '@/shared/ui'
 import type { ApiError } from '@/shared/api/client'
 import './pages.css'
 
@@ -41,7 +41,7 @@ export function LoginPage() {
     <div className="rpm-login">
       <form className="rpm-login__card" onSubmit={onSubmit}>
         <div className="rpm-login__brand">
-          <strong>RPM</strong>
+          <BrandLogo variant="full" />
           <span>نظام إدارة تأجير السيارات</span>
         </div>
         <h1>تسجيل الدخول</h1>
@@ -62,7 +62,7 @@ export function LoginPage() {
           error={errors.password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <Button type="submit" loading={saving}>
+        <Button type="submit" size="lg" loading={saving}>
           دخول
         </Button>
         <p className="rpm-login__hint">تجريبي: admin@rpm.local / password</p>

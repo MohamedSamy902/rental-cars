@@ -1,34 +1,37 @@
-/* Enterprise SaaS buttons — zinc primary · outline secondary · crimson accent */
+/* One button system. Every variant shares the header «عقد جديد» interaction:
+   150ms color transition · clear hover · 0.98 press · visible focus ring. */
 
 .rpm-btn {
-  --btn-ring: transparent;
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   min-height: 2.25rem;
-  padding: 0.5rem 1rem;
+  padding-block: 0.5rem;
+  padding-inline: 1rem;
   border-radius: 0.5rem;
   border: 1px solid transparent;
   font-family: var(--font-body);
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.25;
-  letter-spacing: 0;
   white-space: nowrap;
-  box-shadow: none;
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
   transition:
-    background-color 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease,
-    opacity 150ms ease;
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    transform var(--motion-fast) ease,
+    opacity var(--motion-fast) ease;
 }
 
 .rpm-btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
@@ -39,7 +42,6 @@
 .rpm-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 .rpm-btn__icon {
@@ -69,145 +71,111 @@
 /* Sizes */
 .rpm-btn--sm {
   min-height: 2rem;
-  padding: 0.375rem 0.75rem;
+  padding-block: 0.375rem;
+  padding-inline: 0.75rem;
   font-size: 0.8125rem;
   border-radius: 0.425rem;
 }
 
 .rpm-btn--md {
   min-height: 2.25rem;
-  padding: 0.5rem 1rem;
 }
 
 .rpm-btn--lg {
   min-height: 2.75rem;
-  padding: 0.625rem 1.25rem;
+  padding-block: 0.625rem;
+  padding-inline: 1.25rem;
   font-size: 0.9375rem;
   border-radius: 0.625rem;
 }
 
-/* Primary — solid zinc, clean (no red outline) */
+/* Primary — zinc at rest, deep crimson on hover */
 .rpm-btn--primary {
-  background: #18181b;
-  color: #fff;
-  border-color: transparent;
-  box-shadow: none;
+  background: var(--action);
+  color: var(--on-action);
 }
 
 .rpm-btn--primary:hover:not(:disabled) {
-  background: #27272a;
+  background: var(--action-hover);
+  color: var(--on-action-hover);
 }
 
-.rpm-btn--primary:focus-visible {
-  outline-color: #18181b;
+.rpm-btn--primary:hover:focus-visible {
+  outline-color: var(--action-hover);
 }
 
-/* Brand accent lives on the leading icon only — not the button chrome */
 .rpm-btn--brand-mark .rpm-btn__icon {
-  color: #dc2626;
+  color: var(--accent);
 }
 
-/* Secondary / outline */
+.rpm-btn--brand-mark:hover:not(:disabled) .rpm-btn__icon {
+  color: currentColor;
+}
+
+/* Secondary — outline */
 .rpm-btn--secondary {
-  background: #fff;
-  color: #3f3f46;
-  border-color: #e4e4e7;
-  box-shadow: 0 1px 2px rgb(24 24 27 / 4%);
-}
-
-.rpm-btn--secondary:hover:not(:disabled) {
-  background: #fafafa;
-  border-color: #d4d4d8;
-}
-
-[data-theme='dark'] .rpm-btn--secondary {
   background: var(--surface);
   color: var(--text);
   border-color: var(--border);
+  box-shadow: var(--shadow-xs);
 }
 
-[data-theme='dark'] .rpm-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-2);
+.rpm-btn--secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
 }
 
-/* Accent — crimson CTA with depth */
+/* Accent — solid crimson for the one critical CTA */
 .rpm-btn--accent {
-  background: linear-gradient(180deg, #f87171 0%, #dc2626 55%, #b91c1c 100%);
-  color: #fff;
-  border-color: rgb(127 29 29 / 35%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 32%),
-    inset 0 -1px 0 rgb(0 0 0 / 12%),
-    0 1px 2px rgb(220 38 38 / 28%),
-    0 8px 18px rgb(220 38 38 / 22%);
+  background: var(--accent-solid);
+  color: var(--on-accent);
 }
 
 .rpm-btn--accent:hover:not(:disabled) {
-  background: linear-gradient(180deg, #fb7185 0%, #ef4444 45%, #991b1b 100%);
+  background: var(--accent-solid-hover);
 }
 
 .rpm-btn--accent:focus-visible {
-  outline-color: #dc2626;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 32%),
-    0 0 0 3px rgb(220 38 38 / 24%);
+  outline-color: var(--accent-solid);
 }
 
-/* Danger — critical destructive (same family, flatter) */
+/* Danger — soft at rest, solid crimson on hover so destructive intent is explicit */
 .rpm-btn--danger {
-  background: #dc2626;
-  color: #fff;
-  border-color: rgb(0 0 0 / 6%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 16%),
-    0 1px 2px rgb(220 38 38 / 20%);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+  border-color: color-mix(in srgb, var(--danger) 22%, transparent);
 }
 
 .rpm-btn--danger:hover:not(:disabled) {
-  background: #b91c1c;
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
+  color: #ffffff;
 }
 
 .rpm-btn--danger:focus-visible {
-  outline-color: #dc2626;
+  outline-color: var(--accent-solid);
 }
 
 /* Ghost */
 .rpm-btn--ghost {
   background: transparent;
-  color: #52525b;
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.rpm-btn--ghost:hover:not(:disabled) {
-  background: #f4f4f5;
-  color: #18181b;
-}
-
-[data-theme='dark'] .rpm-btn--ghost {
   color: var(--text-muted);
 }
 
-[data-theme='dark'] .rpm-btn--ghost:hover:not(:disabled) {
-  background: var(--surface-2);
+.rpm-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
   color: var(--text);
 }
 
-/* Spinner */
+/* Spinner inherits the variant's text color */
 .rpm-btn__spinner {
   width: 0.875rem;
   height: 0.875rem;
-  border: 2px solid rgb(255 255 255 / 35%);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-block-start-color: currentColor;
   border-radius: 50%;
   animation: rpm-spin 0.7s linear infinite;
   flex-shrink: 0;
-}
-
-.rpm-btn--secondary .rpm-btn__spinner,
-.rpm-btn--ghost .rpm-btn__spinner {
-  border-color: rgb(24 24 27 / 15%);
-  border-top-color: #18181b;
 }
 
 @keyframes rpm-spin {

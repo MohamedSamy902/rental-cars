@@ -63,7 +63,7 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.3rem;
-  margin-bottom: 0.35rem;
+  margin-block-end: 0.35rem;
 }
 
 .cal-weekdays span {
@@ -140,15 +140,24 @@
   display: block;
   width: 100%;
   min-width: 0;
-  padding: 0.18rem 0.28rem;
-  border-radius: 7px;
+  padding-block: 0.18rem;
+  padding-inline: 0.35rem 0.28rem;
+  border-radius: 6px;
   border: 0;
+  border-inline-start: 3px solid var(--steel);
   text-align: start;
   font-size: 0.62rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.25;
-  color: #fff;
-  background: var(--brand);
+  color: var(--steel-ink);
+  background: var(--steel-soft);
+  transition: filter var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+.cal-chip:hover {
+  filter: brightness(0.97);
+}
+.cal-chip:active {
+  transform: scale(0.98);
 }
 
 .cal-chip__text {
@@ -158,17 +167,30 @@
   white-space: nowrap;
 }
 
-.cal-chip.is-active { background: var(--success, #16a34a); }
-.cal-chip.is-approved { background: var(--brand); }
-.cal-chip.is-pending { background: var(--warning, #d97706); color: #1a1208; }
+.cal-chip.is-active {
+  border-inline-start-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success-ink);
+}
+.cal-chip.is-approved {
+  border-inline-start-color: var(--steel);
+  background: var(--steel-soft);
+  color: var(--steel-ink);
+}
+.cal-chip.is-pending {
+  border-inline-start-color: var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning-ink);
+}
 .cal-chip.is-more {
+  border-inline-start: 0;
   background: var(--surface);
   color: var(--text-muted);
   box-shadow: inset 0 0 0 1px var(--border);
   text-align: center;
 }
 .cal-chip.is-focus {
-  outline: 2px solid color-mix(in srgb, #fff 55%, transparent);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -176,13 +198,13 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--brand);
+  background: var(--steel);
   display: inline-block;
 }
 
-.cal-dot.is-active { background: var(--success, #16a34a); }
-.cal-dot.is-approved { background: var(--brand); }
-.cal-dot.is-pending { background: var(--warning, #d97706); }
+.cal-dot.is-active { background: var(--success); }
+.cal-dot.is-approved { background: var(--steel); }
+.cal-dot.is-pending { background: var(--warning); }
 
 .cal-legend {
   display: flex;
