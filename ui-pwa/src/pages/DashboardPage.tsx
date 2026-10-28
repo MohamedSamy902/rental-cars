@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
+  YAxis,
 } from 'recharts'
 import { api } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
@@ -51,11 +52,12 @@ type Dash = {
   }[]
 }
 
+/** Semantic fleet tones — emerald / steel / amber / crimson (no teal) */
 const fleetTone: Record<string, string> = {
-  available: '#16a34a',
-  rented: '#0d9488',
-  reserved: '#ea580c',
-  maintenance: '#dc2626',
+  available: '#059669',
+  rented: '#334155',
+  reserved: '#475569',
+  maintenance: '#f59e0b',
 }
 
 function startOfDay(d: Date) {
@@ -71,12 +73,23 @@ function urgencyPill(at: string, status: string) {
   if (diffH < 24) return { label: 'اليوم', tone: 'warn' }
   if (diffH < 48) return { label: 'غداً', tone: 'warn' }
   const days = Math.ceil(diffH / 24)
-  return { label: `${days} يوم`, tone: 'danger' }
+  return { label: `${days} يوم`, tone: 'muted' }
+}
+
+function contractStatusPill(status: string) {
+  const map: Record<string, { label: string; tone: string }> = {
+    active: { label: 'نشط', tone: 'steel' },
+    approved: { label: 'معتمد', tone: 'ok' },
+    draft: { label: 'مسودة', tone: 'muted' },
+    completed: { label: 'مكتمل', tone: 'ok' },
+    cancelled: { label: 'ملغى', tone: 'danger' },
+  }
+  return map[status] || { label: status, tone: 'muted' }
 }
 
 function MiniSpark({ values, tone = 'brand' }: { values: number[]; tone?: string }) {
-  const w = 88
-  const h = 32
+  const w = 72
+  const h = 28
   const max = Math.max(...values, 1)
   const min = Math.min(...values, 0)
   const span = Math.max(max - min, 1)
@@ -92,7 +105,14 @@ function MiniSpark({ values, tone = 'brand' }: { values: number[]; tone?: string
   return (
     <svg className={`db-spark tone-${tone}`} viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden>
       <polygon points={fillPoints} className="db-spark__fill" />
-      <polyline points={points} className="db-spark__line" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline
+        points={points}
+        className="db-spark__line"
+        fill="none"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -107,6 +127,24 @@ function sparkFromValue(value: number, seed: number): number[] {
 }
 
 type RevenueRange = 'week' | 'month' | 'year'
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: { value?: number }[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="db-tooltip">
+      <span>{label}</span>
+      <strong>{formatMoney(Number(payload[0]?.value ?? 0))}</strong>
+    </div>
+  )
+}
 
 export function DashboardPage() {
   const { user } = useAuth()
@@ -157,7 +195,20 @@ export function DashboardPage() {
       })
     }
 
-    const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+    const monthNames = [
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
+    ]
     const nowMonth = today.getMonth()
     return Array.from({ length: 12 }, (_, i) => {
       const monthIndex = (nowMonth - 11 + i + 12) % 12
@@ -176,7 +227,11 @@ export function DashboardPage() {
   )
 
   const revenueRangeLabel =
-    revenueRange === 'week' ? 'أسبوعي · ٧ أيام' : revenueRange === 'month' ? 'شهري · ٤ أسابيع' : 'سنوي · ١٢ شهراً'
+    revenueRange === 'week'
+      ? 'أسبوعي · ٧ أيام'
+      : revenueRange === 'month'
+        ? 'شهري · ٤ أسابيع'
+        : 'سنوي · ١٢ شهراً'
 
   const donut = useMemo(() => {
     if (!data) return []
@@ -192,7 +247,7 @@ export function DashboardPage() {
     if (!data) return []
     return [...data.recent_contracts]
       .sort((a, b) => new Date(a.planned_ends_at).getTime() - new Date(b.planned_ends_at).getTime())
-      .slice(0, 4)
+      .slice(0, 5)
   }, [data])
 
   if (loading) {
@@ -212,31 +267,37 @@ export function DashboardPage() {
   const ring = Math.PI * 2 * 54
 
   const revenueSpark = revenueSeries.map((d) => d.value)
+  const availableNow = data.kpis.available || 0
+  const fleetTotal = data.fleet_total || 1
+
   const kpis = [
     {
       label: 'متاحة الآن',
-      value: data.kpis.available || 0,
+      value: availableNow,
       kind: 'number' as const,
-      hint: `من ${formatNumber(data.fleet_total)}`,
-      icon: <IconCar size={18} />,
+      badge: `${formatPercent(Math.round((availableNow / fleetTotal) * 100))} من الأسطول`,
+      badgeTone: 'ok' as const,
+      icon: <IconCar size={16} />,
       tone: 'ok',
-      spark: sparkFromValue(data.kpis.available || 1, 1),
+      spark: sparkFromValue(availableNow || 1, 1),
     },
     {
       label: 'عقود نشطة',
       value: data.kpis.rented || 0,
       kind: 'number' as const,
-      hint: 'مؤجّرة حالياً',
-      icon: <IconClipboard size={18} />,
-      tone: 'brand',
+      badge: 'مؤجّرة حالياً',
+      badgeTone: 'steel' as const,
+      icon: <IconClipboard size={16} />,
+      tone: 'steel',
       spark: sparkFromValue(data.kpis.rented || 1, 2),
     },
     {
       label: 'ترجع اليوم',
       value: data.kpis.returning_today || 0,
       kind: 'number' as const,
-      hint: 'تحتاج استلام',
-      icon: <IconReturn size={18} />,
+      badge: 'تحتاج استلام',
+      badgeTone: 'warn' as const,
+      icon: <IconReturn size={16} />,
       tone: 'warn',
       spark: sparkFromValue(data.kpis.returning_today || 1, 3),
     },
@@ -244,8 +305,9 @@ export function DashboardPage() {
       label: 'إيراد متوقع',
       value: data.kpis.expected_revenue || 0,
       kind: 'money' as const,
-      hint: 'أفق التشغيل',
-      icon: <IconTrend size={18} />,
+      badge: 'أفق التشغيل',
+      badgeTone: 'brand' as const,
+      icon: <IconTrend size={16} />,
       tone: 'brand',
       spark: revenueSpark.length ? revenueSpark : sparkFromValue(data.kpis.expected_revenue || 1, 4),
     },
@@ -254,17 +316,18 @@ export function DashboardPage() {
   return (
     <div className="db">
       <motion.header
-        className="db-welcome"
+        className="db-hero"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
       >
-        <div>
+        <div className="db-hero__copy">
+          <p className="db-hero__eyebrow">لوحة التشغيل · RPM</p>
           <h1>مرحباً، {firstName}</h1>
-          <p>
+          <p className="db-hero__sub">
             لديك <strong className="tabular-nums">{formatNumber(openTasks)}</strong> مهام تحتاج متابعة
-            و <strong className="tabular-nums">{formatNumber(data.kpis.returning_today || 0)}</strong> مركبة
-            ترجع اليوم.
+            و <strong className="tabular-nums">{formatNumber(data.kpis.returning_today || 0)}</strong>{' '}
+            مركبة ترجع اليوم.
           </p>
         </div>
         <button type="button" className="db-cta" onClick={() => navigate('/bookings?new=1')}>
@@ -283,22 +346,23 @@ export function DashboardPage() {
             transition={{ delay: 0.04 * i, duration: 0.35 }}
           >
             <div className="db-kpi__top">
-              <span>{k.label}</span>
-              <span className="db-kpi__ico">{k.icon}</span>
+              <span className="db-kpi__label">{k.label}</span>
+              <span className="db-kpi__ico" aria-hidden>
+                {k.icon}
+              </span>
             </div>
-            <div className="db-kpi__row">
-              <strong>
-                <AnimatedNumber value={k.value} kind={k.kind} />
-              </strong>
+            <div className="db-kpi__value">
+              <AnimatedNumber value={k.value} kind={k.kind} />
+            </div>
+            <div className="db-kpi__foot">
+              <em className={`db-kpi__badge is-${k.badgeTone}`}>{k.badge}</em>
               <MiniSpark values={k.spark} tone={k.tone} />
             </div>
-            <em>{k.hint}</em>
           </motion.article>
         ))}
       </section>
 
       <section className="db-bento">
-        {/* TrueTrack-style gauge hero card */}
         <motion.article
           className="db-card db-card--gauge"
           initial={{ opacity: 0, y: 12 }}
@@ -319,13 +383,7 @@ export function DashboardPage() {
             <div className="db-gauge__ring" aria-hidden>
               <svg viewBox="0 0 140 140">
                 <circle cx="70" cy="70" r="54" className="track" />
-                <circle
-                  className="dots"
-                  cx="70"
-                  cy="70"
-                  r="62"
-                  strokeDasharray="2 8"
-                />
+                <circle className="dots" cx="70" cy="70" r="62" strokeDasharray="2 8" />
                 <motion.circle
                   cx="70"
                   cy="70"
@@ -366,51 +424,71 @@ export function DashboardPage() {
           </div>
         </motion.article>
 
-        {/* TrueTrack reminders */}
         <motion.article
-          className="db-card db-card--reminders"
+          className="db-card db-card--ops"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.14, duration: 0.35 }}
         >
           <div className="db-card__head">
             <div>
-              <h2>تذكيرات قادمة</h2>
+              <h2>عمليات قادمة</h2>
               <p>ما يحتاج قراراً أولاً</p>
             </div>
             <Link to="/bookings" className="db-link">
               العقود
             </Link>
           </div>
-          <ul className="db-reminders">
-            {data.tasks.length === 0 ? (
-              <li className="db-empty">لا تذكيرات معلّقة</li>
-            ) : (
-              data.tasks.map((task, i) => {
-                const pill = urgencyPill(task.at, task.status)
-                return (
-                  <motion.li
-                    key={task.id}
-                    initial={{ opacity: 0, x: 8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.04 * i }}
-                  >
-                    <span className="db-reminders__ico" aria-hidden>
-                      <IconClipboard size={16} />
-                    </span>
-                    <div>
-                      <strong>{task.title}</strong>
-                      <span>{task.subtitle}</span>
-                    </div>
-                    <em className={`db-pill is-${pill.tone}`}>{pill.label}</em>
-                  </motion.li>
-                )
-              })
-            )}
-          </ul>
+
+          <div className="db-table-wrap">
+            <table className="db-table">
+              <thead>
+                <tr>
+                  <th>المهمة</th>
+                  <th>التفاصيل</th>
+                  <th>الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.tasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="db-empty-cell">
+                      لا تذكيرات معلّقة
+                    </td>
+                  </tr>
+                ) : (
+                  data.tasks.map((task, i) => {
+                    const pill = urgencyPill(task.at, task.status)
+                    return (
+                      <motion.tr
+                        key={task.id}
+                        initial={{ opacity: 0, x: 8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.03 * i }}
+                      >
+                        <td>
+                          <div className="db-table__primary">
+                            <span className="db-table__ico" aria-hidden>
+                              <IconClipboard size={14} />
+                            </span>
+                            <strong>{task.title}</strong>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="db-table__muted">{task.subtitle}</span>
+                        </td>
+                        <td>
+                          <em className={`db-pill is-${pill.tone}`}>{pill.label}</em>
+                        </td>
+                      </motion.tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </motion.article>
 
-        {/* Ecommerce revenue chart */}
         <motion.article
           className="db-card db-card--chart"
           initial={{ opacity: 0, y: 12 }}
@@ -423,7 +501,10 @@ export function DashboardPage() {
               <p>{revenueRangeLabel}</p>
             </div>
             <strong className="db-card__figure">
-              <AnimatedNumber value={revenueRange === 'week' ? (data.kpis.expected_revenue || 0) : revenueTotal} kind="money" />
+              <AnimatedNumber
+                value={revenueRange === 'week' ? data.kpis.expected_revenue || 0 : revenueTotal}
+                kind="money"
+              />
             </strong>
           </div>
           <div className="db-range" role="tablist" aria-label="نطاق الإيراد">
@@ -451,8 +532,9 @@ export function DashboardPage() {
               <AreaChart data={revenueSeries} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="var(--brand)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#18181b" stopOpacity={0.18} />
+                    <stop offset="55%" stopColor="#18181b" stopOpacity={0.06} />
+                    <stop offset="100%" stopColor="#18181b" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -462,28 +544,22 @@ export function DashboardPage() {
                   tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
                   interval={revenueRange === 'year' ? 1 : 0}
                 />
-                <Tooltip
-                  formatter={(value) => [formatMoney(Number(value ?? 0)), 'توقّع']}
-                  contentStyle={{
-                    borderRadius: 14,
-                    border: '1px solid var(--border)',
-                    fontFamily: 'var(--font-body)',
-                  }}
-                />
+                <YAxis hide domain={['dataMin', 'dataMax']} />
+                <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }} />
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="var(--brand)"
-                  strokeWidth={2.5}
+                  stroke="#18181b"
+                  strokeWidth={2.4}
                   fill="url(#revFill)"
                   animationDuration={850}
+                  activeDot={{ r: 4, fill: '#dc2626', stroke: '#fff', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </motion.article>
 
-        {/* Fleet donut */}
         <motion.article
           className="db-card db-card--fleet"
           initial={{ opacity: 0, y: 12 }}
@@ -504,10 +580,11 @@ export function DashboardPage() {
                     data={donut}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius="68%"
-                    outerRadius="92%"
-                    paddingAngle={3}
-                    strokeWidth={0}
+                    innerRadius="64%"
+                    outerRadius="90%"
+                    paddingAngle={4}
+                    stroke="#ffffff"
+                    strokeWidth={3}
                   >
                     {donut.map((entry) => (
                       <Cell key={entry.key} fill={fleetTone[entry.key] || '#94a3b8'} />
@@ -532,9 +609,8 @@ export function DashboardPage() {
           </div>
         </motion.article>
 
-        {/* Low-stock style alerts → returns */}
         <motion.article
-          className="db-card db-card--alerts"
+          className="db-card db-card--returns"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.26, duration: 0.35 }}
@@ -548,31 +624,62 @@ export function DashboardPage() {
               التقويم
             </Link>
           </div>
-          <ul className="db-alerts">
-            {returns.length === 0 ? (
-              <li className="db-empty">
-                <IconReturn size={18} />
-                لا إرجاعات مجدولة
-              </li>
-            ) : (
-              returns.map((c) => (
-                <li key={c.id}>
-                  <div>
-                    <strong>
-                      {c.vehicle?.brand} {c.vehicle?.model}
-                    </strong>
-                    <span>
-                      {c.number} · {c.customer?.full_name}
-                    </span>
-                  </div>
-                  <em className="db-alerts__meta">
-                    <b className="tabular-nums">{formatTime(c.planned_ends_at)}</b>
-                    <span>{formatDayShort(c.planned_ends_at)}</span>
-                  </em>
-                </li>
-              ))
-            )}
-          </ul>
+
+          <div className="db-table-wrap">
+            <table className="db-table">
+              <thead>
+                <tr>
+                  <th>المركبة</th>
+                  <th>العقد / العميل</th>
+                  <th>الحالة</th>
+                  <th>الموعد</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returns.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="db-empty-cell">
+                      <IconReturn size={18} />
+                      لا إرجاعات مجدولة
+                    </td>
+                  </tr>
+                ) : (
+                  returns.map((c) => {
+                    const st = contractStatusPill(c.status)
+                    const overdue = new Date(c.planned_ends_at).getTime() < Date.now()
+                    return (
+                      <tr key={c.id}>
+                        <td>
+                          <strong>
+                            {c.vehicle?.brand} {c.vehicle?.model}
+                          </strong>
+                          {c.vehicle?.plate ? (
+                            <span className="db-table__muted tabular-nums">{c.vehicle.plate}</span>
+                          ) : null}
+                        </td>
+                        <td>
+                          <span className="db-table__muted">
+                            {c.number} · {c.customer?.full_name}
+                          </span>
+                        </td>
+                        <td>
+                          <em className={`db-pill is-${overdue ? 'danger' : st.tone}`}>
+                            {overdue ? 'متأخر' : st.label}
+                          </em>
+                        </td>
+                        <td className="db-table__time">
+                          <b className={`tabular-nums ${overdue ? 'is-overdue' : ''}`}>
+                            {formatTime(c.planned_ends_at)}
+                          </b>
+                          <span>{formatDayShort(c.planned_ends_at)}</span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </motion.article>
 
         <motion.article
@@ -589,18 +696,24 @@ export function DashboardPage() {
           </div>
           <div className="db-quick">
             <Link to="/customers">
-              <IconUsers size={18} />
-              العملاء
+              <span className="db-quick__ico">
+                <IconUsers size={18} />
+              </span>
+              <span className="db-quick__label">العملاء</span>
               <b className="tabular-nums">{formatNumber(data.kpis.customers || 0)}</b>
             </Link>
             <Link to="/maintenance">
-              <IconWrench size={18} />
-              الصيانة
+              <span className="db-quick__ico">
+                <IconWrench size={18} />
+              </span>
+              <span className="db-quick__label">الصيانة</span>
               <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
             </Link>
             <Link to="/vehicles">
-              <IconCar size={18} />
-              المتاح
+              <span className="db-quick__ico">
+                <IconCar size={18} />
+              </span>
+              <span className="db-quick__label">المتاح</span>
               <b className="tabular-nums">{formatPercent(100 - data.occupancy_pct)}</b>
             </Link>
           </div>

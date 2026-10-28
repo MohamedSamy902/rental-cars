@@ -73,12 +73,12 @@ img {
 }
 
 :focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--brand) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .tabular-nums {
