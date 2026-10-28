@@ -571,6 +571,17 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/notifications/unread-count` | `{ "unread": N }` |
 | POST | `/notifications/{id}/read` | تعليم مقروء (مالك الإشعار فقط — حماية IDOR) |
 
+### Web Push (موبايل)
+صلاحية `notifications.view` · يحتاج VAPID في `.env` (`php artisan push:vapid --write`) وHTTPS.
+
+| Method | Path | الوصف |
+|--------|------|--------|
+| GET | `/push/vapid-public-key` | المفتاح العام للمتصفح |
+| GET | `/push/status` | `{ enabled, devices }` |
+| POST | `/push/subscribe` | تسجيل جهاز `{ endpoint, keys:{p256dh,auth} }` |
+| POST | `/push/unsubscribe` | إلغاء جهاز |
+| POST | `/push/test` | إرسال إشعار تجريبي للأجهزة المسجّلة |
+
 ---
 
 ## ١٦) خريطة الوحدات ↔ المسارات
@@ -597,7 +608,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | إعدادات | `/settings/tenant` | `/settings` |
 | مُدمج | نفس settings + flags | `/integrator` |
 | سجل | `/audit-logs` | `/audit-logs` |
-| إشعارات | `/notifications*` | `/notifications` |
+| إشعارات | `/notifications*` · `/push*` | `/notifications` (قائمة + تفعيل Push) |
 | وسائط | `/media*` | رفع في العملاء/المركبات/الأضرار |
 | ملاك العربيات | `/owners*` | `/owners` |
 
