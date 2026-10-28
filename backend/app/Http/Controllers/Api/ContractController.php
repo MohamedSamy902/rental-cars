@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreContractRequest;
 use App\Models\Contract;
 use App\Services\Contracts\ContractLifecycleService;
 use DomainException;
@@ -46,35 +47,10 @@ class ContractController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreContractRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'customer_id' => ['required', 'exists:customers,id'],
-            'vehicle_id' => ['required', 'exists:vehicles,id'],
-            'guarantor_customer_id' => ['nullable', 'exists:customers,id'],
-            'starts_at' => ['required', 'date'],
-            'planned_ends_at' => ['required', 'date', 'after:starts_at'],
-            'daily_rate' => ['nullable', 'integer', 'min:0'],
-            'daily_km_allowance' => ['nullable', 'integer', 'min:0'],
-            'excess_km_rate' => ['nullable', 'integer', 'min:0'],
-            'deposit' => ['nullable', 'integer', 'min:0'],
-            'min_days' => ['nullable', 'integer', 'min:0'],
-            'discount' => ['nullable', 'integer', 'min:0'],
-            'other_fees' => ['nullable', 'integer', 'min:0'],
-            'other_fees_description' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'extended_from_contract_id' => ['nullable', 'exists:contracts,id'],
-            'swapped_from_contract_id' => ['nullable', 'exists:contracts,id'],
-            'swap_reason' => ['nullable', 'string'],
-        ], [], [
-            'customer_id' => 'العميل',
-            'vehicle_id' => 'السيارة',
-            'starts_at' => 'وقت البداية',
-            'planned_ends_at' => 'وقت النهاية المخطط',
-        ]);
-
         try {
-            $contract = $this->lifecycle->create($data, $request->user()?->id);
+            $contract = $this->lifecycle->create($request->validated(), $request->user()?->id);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -102,10 +78,26 @@ class ContractController extends Controller
     {
         $data = $request->validate([
             'odometer_out' => ['required', 'integer', 'min:0'],
-        ], [], ['odometer_out' => 'عداد الخروج']);
+            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'notes' => ['nullable', 'string'],
+            'signature_data' => ['nullable', 'string'],
+            'accessories' => ['nullable', 'array'],
+            'accessories.*.name' => ['required_with:accessories', 'string'],
+            'accessories.*.expected_qty' => ['nullable', 'integer', 'min:0'],
+            'accessories.*.actual_qty' => ['nullable', 'integer', 'min:0'],
+            'accessories.*.ok' => ['nullable', 'boolean'],
+            'damages' => ['nullable', 'array'],
+            'damages.*.position' => ['required_with:damages', 'string'],
+            'damages.*.description' => ['required_with:damages', 'string'],
+        ], [], ['odometer_out' => 'عداد الخروج', 'signature_data' => 'توقيع العميل']);
 
         try {
-            $contract = $this->lifecycle->activateOnHandover($contract, (int) $data['odometer_out'], $request->user()?->id);
+            $contract = $this->lifecycle->activateOnHandover(
+                $contract,
+                (int) $data['odometer_out'],
+                $request->user()?->id,
+                $data,
+            );
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -119,7 +111,18 @@ class ContractController extends Controller
             'odometer_in' => ['required', 'integer', 'min:0'],
             'returned_at' => ['nullable', 'date'],
             'damage_fee' => ['nullable', 'integer', 'min:0'],
-        ], [], ['odometer_in' => 'عداد العودة']);
+            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'notes' => ['nullable', 'string'],
+            'signature_data' => ['nullable', 'string'],
+            'accessories' => ['nullable', 'array'],
+            'accessories.*.name' => ['required_with:accessories', 'string'],
+            'accessories.*.expected_qty' => ['nullable', 'integer', 'min:0'],
+            'accessories.*.actual_qty' => ['nullable', 'integer', 'min:0'],
+            'accessories.*.ok' => ['nullable', 'boolean'],
+            'damages' => ['nullable', 'array'],
+            'damages.*.position' => ['required_with:damages', 'string'],
+            'damages.*.description' => ['required_with:damages', 'string'],
+        ], [], ['odometer_in' => 'عداد العودة', 'signature_data' => 'توقيع العميل']);
 
         $returnedAt = isset($data['returned_at']) ? new \DateTimeImmutable($data['returned_at']) : null;
 
@@ -130,12 +133,29 @@ class ContractController extends Controller
                 $returnedAt,
                 $request->user()?->id,
                 (int) ($data['damage_fee'] ?? 0),
+                $data,
             );
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
         return response()->json(['data' => $contract, 'message' => 'تم الاستلام وإقفال الإجمالي.']);
+    }
+
+    public function printData(Contract $contract): JsonResponse
+    {
+        $contract->load(['customer', 'vehicle.documents', 'vehicle.accessories', 'deposit.deductions', 'inspections.damages']);
+        $tenant = \App\Models\TenantSetting::query()->first();
+
+        return response()->json([
+            'data' => [
+                'tenant' => [
+                    'center_name' => $tenant?->center_name,
+                    'print_footer' => $tenant?->print_footer,
+                ],
+                'contract' => $contract,
+            ],
+        ]);
     }
 
     public function cancel(Request $request, Contract $contract): JsonResponse

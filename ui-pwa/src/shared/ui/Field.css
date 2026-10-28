@@ -1,4 +1,5 @@
 .rpm-field {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -58,32 +59,13 @@
   resize: vertical;
 }
 
-.rpm-select {
-  appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
-    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
-  background-position:
-    calc(100% - 18px) calc(50% - 3px),
-    calc(100% - 12px) calc(50% - 3px);
-  background-size:
-    6px 6px,
-    6px 6px;
-  background-repeat: no-repeat;
-  padding-inline-end: 2rem;
-}
-
-[dir='rtl'] .rpm-select {
-  background-position:
-    18px calc(50% - 3px),
-    12px calc(50% - 3px);
-}
-
 .rpm-switch {
   display: inline-flex;
   align-items: center;
   gap: 0.7rem;
   min-height: 44px;
   cursor: pointer;
+  max-width: 100%;
 }
 
 .rpm-switch input {
@@ -124,4 +106,36 @@
 
 .rpm-switch__label {
   font-weight: 600;
+}
+
+@media (max-width: 980px) {
+  .rpm-input {
+    min-height: 48px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    border-color: transparent;
+    font-size: 1rem;
+  }
+
+  .rpm-input:focus {
+    background: var(--surface);
+    border-color: var(--brand);
+  }
+
+  .rpm-field.has-error .rpm-input {
+    border-color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 6%, var(--surface));
+  }
+
+  .rpm-textarea {
+    min-height: 110px;
+  }
+
+  .rpm-switch {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0.75rem 0.9rem;
+    border-radius: 14px;
+    background: var(--surface-2);
+  }
 }

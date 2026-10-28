@@ -47,3 +47,55 @@ export async function api<T>(
 
   return data as T
 }
+
+/** رفع ملف multipart — لا تُضبط Content-Type يدوياً (الحد الفاصل يضعه المتصفح). */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const headers = new Headers({ Accept: 'application/json' })
+  const token = getToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+
+  const res = await fetch(`/api${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : null
+
+  if (!res.ok) {
+    const err: ApiError = {
+      message: data?.message || 'تعذّر رفع الملف.',
+      errors: data?.errors,
+      status: res.status,
+    }
+    throw err
+  }
+
+  return data as T
+}
+
+/** جلب ملف وسائط خاص كمحتوى ثنائي (للمعاينة بعد المصادقة). */
+export async function apiBlob(path: string): Promise<Blob> {
+  const headers = new Headers({ Accept: '*/*' })
+  const token = getToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+
+  const normalized = path.startsWith('/api/')
+    ? path.slice(4)
+    : path.startsWith('http')
+      ? new URL(path).pathname.replace(/^\/api/, '')
+      : path.startsWith('/')
+        ? path
+        : `/${path}`
+
+  const res = await fetch(`/api${normalized}`, { headers })
+  if (!res.ok) {
+    const err: ApiError = {
+      message: 'تعذّر تحميل الملف.',
+      status: res.status,
+    }
+    throw err
+  }
+  return res.blob()
+}

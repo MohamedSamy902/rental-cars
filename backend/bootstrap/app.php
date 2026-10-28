@@ -14,6 +14,24 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->alias([
+            'permission' => \App\Http\Middleware\EnsurePermission::class,
+            'feature' => \App\Http\Middleware\EnsureFeatureFlag::class,
+            'integrator' => \App\Http\Middleware\EnsureIntegrator::class,
+        ]);
+        // صلاحيات/فيتشر قبل ربط النماذج — حتى لا يُكشف وجود السجل بـ 404 قبل 403
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\EnsurePermission::class,
+        );
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\EnsureFeatureFlag::class,
+        );
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\EnsureIntegrator::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

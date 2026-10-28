@@ -35,4 +35,19 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class);
     }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function hasPermission(string $key): bool
+    {
+        $this->loadMissing('role.permissions');
+        if ($this->role?->name === 'super_admin') {
+            return true;
+        }
+
+        return (bool) $this->role?->permissions?->contains('key', $key);
+    }
 }

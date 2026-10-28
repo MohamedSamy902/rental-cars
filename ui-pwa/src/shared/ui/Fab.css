@@ -1,0 +1,24 @@
+.rpm-fab {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .rpm-fab {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    inset-inline-end: 1rem;
+    inset-block-end: calc(4.6rem + var(--safe-bottom));
+    z-index: 45;
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    background: linear-gradient(145deg, var(--brand), var(--brand-hover));
+    color: #fff;
+    box-shadow: 0 14px 32px color-mix(in srgb, var(--brand) 35%, transparent);
+  }
+
+  .rpm-fab:active {
+    transform: scale(0.96);
+  }
+}

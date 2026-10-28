@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\Role;
+use App\Models\TenantSetting;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\Accounting\AccountingService;
+use App\Support\PermissionCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -23,7 +26,21 @@ class ContractLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->user = User::factory()->create();
+        PermissionCatalog::ensureSeeded();
+        TenantSetting::query()->create([
+            'center_name' => 'اختبار',
+            'feature_flags' => [
+                'showroom' => true, 'petty_cash' => true, 'waitlist' => true, 'inventory' => true,
+                'department_notice' => true, 'chat' => true, 'evaluations' => true, 'hr' => true,
+            ],
+            'operational' => [
+                'require_handover_signature' => true,
+                'block_expired_license' => false,
+                'block_expired_vehicle_docs' => false,
+            ],
+        ]);
+        $admin = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $this->user = User::factory()->create(['role_id' => $admin->id, 'is_active' => true]);
         Sanctum::actingAs($this->user);
         app(AccountingService::class)->ensureChartOfAccounts();
 
@@ -69,12 +86,23 @@ class ContractLifecycleTest extends TestCase
             'method' => 'cash',
             'receipt_number' => 'R-1',
         ])->assertCreated();
+        $signature = 'sig-'.str_repeat('client-ok-', 6);
         $this->postJson("/api/contracts/{$id}/handover", [
             'odometer_out' => 10000,
+            'signature_data' => $signature,
+            'fuel_level' => 80,
+            'accessories' => [
+                ['name' => 'مثلث تحذير', 'expected_qty' => 1, 'actual_qty' => 1, 'ok' => true],
+            ],
         ])->assertOk();
         $this->postJson("/api/contracts/{$id}/return", [
             'odometer_in' => 10300,
             'damage_fee' => 100,
+            'signature_data' => $signature,
+            'fuel_level' => 40,
+            'damages' => [
+                ['position' => 'الباب الأمامي', 'description' => 'خدش سطحي'],
+            ],
         ])->assertOk()
             ->assertJsonPath('data.status', 'completed');
 
