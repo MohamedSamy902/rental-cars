@@ -140,6 +140,25 @@ type LayerProps = {
   onSelect: (item: MenuAction) => void
 }
 
+/** Viewport position for the popover, or null once the trigger has scrolled out of view */
+function measure(trigger: HTMLElement | null, menu: HTMLElement | null): Pos | null {
+  if (!trigger || !menu) return null
+  const rect = trigger.getBoundingClientRect()
+  if (rect.bottom < 0 || rect.top > window.innerHeight) return null
+  const w = menu.offsetWidth
+  const h = menu.offsetHeight
+  const pad = 8
+  const gap = 6
+  const rtl = getComputedStyle(trigger).direction === 'rtl'
+  // Align the menu's inline-end edge with the trigger's inline-end edge so it opens inward
+  let left = rtl ? rect.left : rect.right - w
+  left = Math.min(Math.max(pad, left), window.innerWidth - w - pad)
+  const below = rect.bottom + gap
+  const up = below + h > window.innerHeight - pad && rect.top - gap - h > pad
+  const top = up ? rect.top - gap - h : below
+  return { top, left, origin: `${rtl ? 'left' : 'right'} ${up ? 'bottom' : 'top'}` }
+}
+
 function Popover({
   id,
   label,
@@ -156,38 +175,47 @@ function Popover({
   }, [onClose])
 
   useLayoutEffect(() => {
-    const trigger = anchor.current
-    const menu = menuRef.current
-    if (!trigger || !menu) return
-    const rect = trigger.getBoundingClientRect()
-    const w = menu.offsetWidth
-    const h = menu.offsetHeight
-    const pad = 8
-    const gap = 6
-    const rtl = getComputedStyle(trigger).direction === 'rtl'
-    // Align the menu's inline-end edge with the trigger's inline-end edge so it opens inward
-    let left = rtl ? rect.left : rect.right - w
-    left = Math.min(Math.max(pad, left), window.innerWidth - w - pad)
-    const below = rect.bottom + gap
-    const up = below + h > window.innerHeight - pad && rect.top - gap - h > pad
-    const top = up ? rect.top - gap - h : below
-    setPos({ top, left, origin: `${rtl ? 'left' : 'right'} ${up ? 'bottom' : 'top'}` })
+    const next = measure(anchor.current, menuRef.current)
+    if (next) setPos(next)
   }, [anchor])
 
+  // Hidden (visibility) elements can't take focus, so wait until the menu is positioned
+  const placed = pos !== null
   useEffect(() => {
+    if (!placed) return
     const first = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')
     first?.focus({ preventScroll: true })
+  }, [placed])
+
+  useEffect(() => {
     const onDoc = (e: PointerEvent) => {
       const t = e.target as Node
       if (menuRef.current?.contains(t) || anchor.current?.contains(t)) return
       onCloseRef.current(false)
     }
-    const onViewport = () => onCloseRef.current(false)
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || menuRef.current?.contains(e.target as Node)) return
+      onCloseRef.current(true)
+    }
+    // Follow the trigger while the page scrolls (momentum/trackpad scrolling is common right
+    // after a tap); only close once the trigger has left the viewport.
+    let frame = 0
+    const onViewport = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const next = measure(anchor.current, menuRef.current)
+        if (next) setPos(next)
+        else onCloseRef.current(false)
+      })
+    }
     document.addEventListener('pointerdown', onDoc)
+    document.addEventListener('keydown', onEsc)
     window.addEventListener('resize', onViewport)
     window.addEventListener('scroll', onViewport, true)
     return () => {
+      cancelAnimationFrame(frame)
       document.removeEventListener('pointerdown', onDoc)
+      document.removeEventListener('keydown', onEsc)
       window.removeEventListener('resize', onViewport)
       window.removeEventListener('scroll', onViewport, true)
     }
