@@ -56,6 +56,11 @@ export function Button({
       return
     }
 
+    // أزرار submit بدون onClick: لا تعطّل الزر قبل onSubmit وإلا يُلغى إرسال الفورم
+    if (type === 'submit' && !onClick) {
+      return
+    }
+
     inFlight.current = true
     setInternalBusy(true)
 
@@ -76,7 +81,6 @@ export function Button({
       return
     }
 
-    // fire-and-forget: انتظر أن يفعّل الأب loading، وإلا أفرج بعد مهلة قصيرة لمنع الدبل-كليك
     window.setTimeout(() => {
       if (!loadingRef.current) {
         inFlight.current = false
@@ -91,8 +95,8 @@ export function Button({
       className={`rpm-btn rpm-btn--${variant} rpm-btn--${size} ${className}`.trim()}
       disabled={locked}
       aria-busy={loading || internalBusy || undefined}
-      onClick={handleClick}
       {...rest}
+      onClick={handleClick}
     >
       {loading || internalBusy ? <span className="rpm-btn__spinner" aria-hidden /> : null}
       <span className={loading || internalBusy ? 'rpm-btn__label is-loading' : 'rpm-btn__label'}>
