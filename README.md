@@ -257,3 +257,32 @@ rental-cars/
 - مصروفات · عهدة · حسابات · إقفال شهر · تقارير · موارد بشرية · إشعارات
 
 الإنتاج المستهدف: **cPanel + MySQL InnoDB utf8mb4** · Cron بدل Redis/WebSocket/Worker دائم.
+
+---
+
+## ٧) إشعارات الموبايل (Web Push)
+
+القائمة داخل النظام تبقى، ومعها **Push يصل لشاشة الموبايل** عبر PWA (بدون Firebase إجباري · مناسب لـ cPanel).
+
+### تفعيل السيرفر
+```bash
+cd backend
+php artisan push:vapid --write
+php artisan migrate --force
+php artisan config:clear
+```
+
+تأكد أن الدومين على **HTTPS** (AutoSSL في cPanel).
+
+### تفعيل من الموبايل
+1. افتح الموقع على Chrome (أندرويد) أو Safari 16.4+ (آيفون بعد **إضافة إلى الشاشة الرئيسية**).  
+2. ادخل بحسابك → **الإشعارات** → **تفعيل على هذا الجهاز** → اسمح بالإذن.  
+3. اختياري: **إرسال تجربة** للتأكد.
+
+| المنصة | الدعم |
+|--------|--------|
+| Android Chrome / Edge | ممتاز |
+| iPhone/iPad (Safari 16.4+) | بعد تثبيت الـ PWA على الشاشة الرئيسية |
+| سطح المكتب Chrome | يعمل أيضاً |
+
+المكتبة: `minishlink/web-push` · المسارات: `/api/push/*` · الاشتراكات في جدول `push_subscriptions`.

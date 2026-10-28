@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\OperationsController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ReportController;
@@ -212,5 +213,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
             return response()->json(['data' => $notification]);
         });
+
+        Route::get('/push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey']);
+        Route::get('/push/status', [PushSubscriptionController::class, 'status']);
+        Route::post('/push/subscribe', [PushSubscriptionController::class, 'subscribe']);
+        Route::post('/push/unsubscribe', [PushSubscriptionController::class, 'unsubscribe']);
+        Route::post('/push/test', [PushSubscriptionController::class, 'test']);
     });
 });

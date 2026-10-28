@@ -200,9 +200,14 @@ class DemoSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        Notification::query()->firstOrCreate(
-            ['user_id' => $user->id, 'title' => 'قرب انتهاء عقد CNT-00001'],
-            ['body' => 'عقد أحمد محمود ينتهي اليوم — جهّز الاستلام.', 'link_type' => 'contract', 'link_id' => 1],
-        );
+        if (! Notification::query()->where('user_id', $user->id)->where('title', 'قرب انتهاء عقد CNT-00001')->exists()) {
+            app(\App\Services\Notifications\NotificationDispatchService::class)->notify(
+                $user,
+                'قرب انتهاء عقد CNT-00001',
+                'عقد أحمد محمود ينتهي اليوم — جهّز الاستلام.',
+                'contract',
+                1,
+            );
+        }
     }
 }

@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    /*
+    | Web Push (PWA → موبايل)
+    | توليد المفاتيح: php artisan push:vapid --write
+    | يعمل على HTTPS (أو localhost). Android Chrome ممتاز · iOS 16.4+ بعد «إضافة للشاشة الرئيسية».
+    */
+    'webpush' => [
+        'vapid' => [
+            'subject' => env('VAPID_SUBJECT', 'mailto:admin@rpm.local'),
+            'public_key' => env('VAPID_PUBLIC_KEY'),
+            'private_key' => env('VAPID_PRIVATE_KEY'),
+        ],
+    ],
+
 ];
