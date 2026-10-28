@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
+import { useNewContract } from '@/shared/contracts/newContractContext'
 import { BrandLogo } from './BrandLogo'
 import { CommandPalette } from './CommandPalette'
 import { useSheetDrag } from './useSheetDrag'
@@ -64,6 +65,7 @@ const WA_URL = 'https://wa.me/201150100104'
 export function AppShell() {
   const { user, logout, can, featureEnabled } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { openNewContract } = useNewContract()
   const navigate = useNavigate()
   const location = useLocation()
   const [cmdOpen, setCmdOpen] = useState(false)
@@ -257,7 +259,7 @@ export function AppShell() {
               <button
                 type="button"
                 className="rpm-btn rpm-btn--primary rpm-btn--md shell-cta--desk"
-                onClick={() => navigate('/bookings?new=1')}
+                onClick={openNewContract}
               >
                 <span className="rpm-btn__icon" aria-hidden>
                   <IconPlus size={16} />

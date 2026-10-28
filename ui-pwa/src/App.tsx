@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/shared/auth/AuthContext'
 import { ThemeProvider } from '@/shared/theme/ThemeContext'
 import { AppShell, ToastProvider, SkeletonBlock } from '@/shared/ui'
+import { NewContractProvider } from '@/shared/contracts/NewContract'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { VehiclesPage } from '@/pages/VehiclesPage'
@@ -53,7 +54,9 @@ export default function App() {
               <Route
                 element={
                   <Protected>
-                    <AppShell />
+                    <NewContractProvider>
+                      <AppShell />
+                    </NewContractProvider>
                   </Protected>
                 }
               >

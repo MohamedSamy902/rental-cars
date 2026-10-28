@@ -39,6 +39,7 @@ import {
   IconUsers,
   IconWrench,
 } from '@/shared/ui/Icons'
+import { useNewContract } from '@/shared/contracts/newContractContext'
 import './DashboardPage.css'
 
 type Dash = {
@@ -194,6 +195,7 @@ export function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
+  const { openNewContract } = useNewContract()
 
   useEffect(() => {
     api<Dash>('/dashboard')
@@ -232,7 +234,7 @@ export function DashboardPage() {
       ],
       operations: [
         go('bookings', 'كل العقود', '/bookings', <IconClipboard size={16} />),
-        go('new', 'عقد جديد', '/bookings?new=1', <IconPlus size={16} />),
+        { id: 'new', label: 'عقد جديد', icon: <IconPlus size={16} />, onSelect: openNewContract },
         ...tail,
       ],
       fleet: [
@@ -247,7 +249,7 @@ export function DashboardPage() {
         ...tail,
       ],
     }
-  }, [navigate, refresh])
+  }, [navigate, refresh, openNewContract])
 
   const revenueSeries = useMemo(() => {
     if (!data) return []
