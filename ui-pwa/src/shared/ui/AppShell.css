@@ -360,7 +360,7 @@
 }
 .shell-cta__icon {
   display: inline-flex;
-  color: #dc2626;
+  color: #fff;
   flex-shrink: 0;
 }
 .shell-cta__icon svg {
@@ -368,11 +368,14 @@
   height: 1rem;
 }
 .shell-cta:hover {
-  background: #27272a;
+  background: #b91c1c;
 }
 .shell-cta:focus-visible {
   outline: 2px solid #18181b;
   outline-offset: 2px;
+}
+.shell-cta:hover:focus-visible {
+  outline-color: #b91c1c;
 }
 .shell-cta:active {
   transform: scale(0.98);
