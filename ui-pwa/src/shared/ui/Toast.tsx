@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import './Toast.css'
 
-type ToastItem = { id: number; message: string; tone: 'success' | 'error' }
+type ToastItem = { id: number; message: string; tone: 'success' | 'error' | 'info' }
 
 type ToastApi = {
   success: (message: string) => void
   error: (message: string) => void
+  info: (message: string) => void
 }
 
 const ToastContext = createContext<ToastApi | null>(null)
@@ -25,6 +26,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     () => ({
       success: (message) => push(message, 'success'),
       error: (message) => push(message, 'error'),
+      info: (message) => push(message, 'info'),
     }),
     [push],
   )

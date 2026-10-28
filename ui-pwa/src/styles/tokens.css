@@ -93,6 +93,8 @@
   --rail-quit-bg: #fef2f2;
   --rail-active-bg: #e4e4e7;
   --rail-active-fg: #18181b;
+  --auth-card-border: rgb(228 228 231 / 80%);
+  --auth-card-shadow: 0 1px 3px 0 rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
   --rail-theme-bg: #f4f4f5;
   --logo-tile: #0a0a0a;
   /* Physical plate replica stays light; dimmed in dark mode to avoid glare */
@@ -207,6 +209,8 @@
   --rail-quit-bg: rgb(248 113 113 / 10%);
   --rail-active-bg: #27272a;
   --rail-active-fg: #fafafa;
+  --auth-card-border: #27272a;
+  --auth-card-shadow: 0 4px 20px -4px rgb(0 0 0 / 50%);
   --rail-theme-bg: rgb(255 255 255 / 5%);
   --logo-tile: #000000;
   --plate-bg: #d4d4d8;

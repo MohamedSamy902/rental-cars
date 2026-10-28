@@ -1,9 +1,9 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { BrandLogo, Button, useToast } from '@/shared/ui'
-import { IconCheck, IconEye, IconEyeOff, IconLock, IconMail, IconZap } from '@/shared/ui/Icons'
+import { IconCheck, IconEye, IconEyeOff, IconLock, IconMail } from '@/shared/ui/Icons'
 import type { ApiError } from '@/shared/api/client'
 import './LoginPage.css'
 
@@ -79,11 +79,10 @@ export function LoginPage() {
   const { user, loading, login } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
-  const [email, setEmail] = useState(readRememberedEmail)
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState(() => readRememberedEmail() || DEMO.email)
+  const [password, setPassword] = useState(DEMO.password)
   const [remember, setRemember] = useState(() => readRememberedEmail() !== '')
   const [showPassword, setShowPassword] = useState(false)
-  const [forgotOpen, setForgotOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -111,12 +110,6 @@ export function LoginPage() {
     }
   }
 
-  function fillDemo() {
-    setEmail(DEMO.email)
-    setPassword(DEMO.password)
-    setErrors({})
-  }
-
   return (
     <div className="auth">
       <motion.form
@@ -137,16 +130,6 @@ export function LoginPage() {
             <h1>تسجيل الدخول</h1>
             <p>أدخل بيانات حسابك للوصول إلى لوحة التشغيل.</p>
           </div>
-
-          <button type="button" className="auth-demo" onClick={fillDemo}>
-            <span className="auth-demo__icon" aria-hidden>
-              <IconZap size={14} />
-            </span>
-            <span className="auth-demo__text">
-              <strong>تعبئة الحساب التجريبي</strong>
-              <span dir="ltr">{DEMO.email}</span>
-            </span>
-          </button>
 
           <AuthInput
             label="البريد الإلكتروني"
@@ -191,39 +174,17 @@ export function LoginPage() {
             <button
               type="button"
               className="auth-link"
-              aria-expanded={forgotOpen}
-              aria-controls="auth-forgot"
-              onClick={() => setForgotOpen((v) => !v)}
+              onClick={() => toast.info('لإعادة تعيين كلمة المرور تواصل مع مدير النظام في فرعك.')}
             >
               نسيت كلمة المرور؟
             </button>
           </div>
-
-          <AnimatePresence initial={false}>
-            {forgotOpen ? (
-              <motion.p
-                id="auth-forgot"
-                className="auth-note"
-                role="status"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.18 }}
-              >
-                لإعادة تعيين كلمة المرور تواصل مع مدير النظام في فرعك.
-              </motion.p>
-            ) : null}
-          </AnimatePresence>
 
           <Button type="submit" variant="accent" size="lg" loading={saving} className="auth-submit">
             دخول
           </Button>
         </div>
       </motion.form>
-
-      <p className="auth-foot">
-        RPM Rent A Car · <span>منصة التشغيل</span>
-      </p>
     </div>
   )
 }

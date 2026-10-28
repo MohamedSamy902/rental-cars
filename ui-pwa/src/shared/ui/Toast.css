@@ -51,3 +51,7 @@
 .rpm-toast--error::before {
   background: var(--danger);
 }
+
+.rpm-toast--info::before {
+  background: var(--text-muted);
+}

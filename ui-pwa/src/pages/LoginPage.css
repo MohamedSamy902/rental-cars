@@ -16,8 +16,8 @@
   overflow: hidden;
   border-radius: var(--radius-xl);
   background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--auth-card-border);
+  box-shadow: var(--auth-card-shadow);
 }
 
 /* Black band = the logo artwork's own background, so the lockup sits natively */
@@ -63,64 +63,6 @@
   margin: 0;
   font-size: 0.875rem;
   color: var(--text-muted);
-}
-
-/* Quick demo fill */
-.auth-demo {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  width: 100%;
-  padding-block: 0.5rem;
-  padding-inline: 0.625rem 0.875rem;
-  border-radius: 999px;
-  border: 1px dashed var(--border-strong);
-  background: var(--surface-2);
-  color: var(--text);
-  text-align: start;
-  cursor: pointer;
-  transition:
-    background-color var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    transform var(--motion-fast) ease;
-}
-.auth-demo:hover {
-  background: var(--surface-hover);
-  border-color: var(--text-faint);
-}
-.auth-demo:active {
-  transform: scale(0.98);
-}
-.auth-demo:focus-visible {
-  outline: 2px solid var(--ring-strong);
-  outline-offset: 2px;
-}
-.auth-demo__icon {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--accent-solid);
-  color: #ffffff;
-}
-.auth-demo__text {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.25rem 0.75rem;
-  flex: 1;
-  min-width: 0;
-  font-size: 0.8125rem;
-}
-.auth-demo__text strong {
-  font-weight: 700;
-}
-.auth-demo__text span {
-  color: var(--text-muted);
-  font-size: 0.75rem;
 }
 
 /* Fields */
@@ -291,29 +233,12 @@
   outline: 2px solid var(--ring-strong);
   outline-offset: 2px;
 }
-.auth-note {
-  margin: 0;
-  overflow: hidden;
-  padding-block: 0.625rem;
-  padding-inline: 0.875rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
 
 .auth-submit.rpm-btn {
   width: 100%;
   min-height: 3rem;
   font-size: 1rem;
   font-weight: 700;
-}
-
-.auth-foot {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--text-faint);
 }
 
 @media (max-width: 480px) {
