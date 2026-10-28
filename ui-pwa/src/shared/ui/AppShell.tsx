@@ -12,27 +12,37 @@ import {
 } from './Icons'
 import './AppShell.css'
 
-type NavItem = { to: string; label: string; icon: React.ReactNode; end?: boolean }
+type NavItem = {
+  to: string
+  label: string
+  icon: React.ReactNode
+  end?: boolean
+  feature?: string
+  permission?: string
+}
 
 const railNav: NavItem[] = [
   { to: '/', label: 'لوحة اليوم', icon: <IconHome />, end: true },
-  { to: '/vehicles', label: 'المركبات', icon: <IconCar /> },
-  { to: '/bookings', label: 'العقود', icon: <IconClipboard /> },
-  { to: '/calendar', label: 'التقويم', icon: <IconCalendar /> },
-  { to: '/waitlist', label: 'الانتظار', icon: <IconQueue /> },
-  { to: '/showroom', label: 'المعرض', icon: <IconCar /> },
-  { to: '/maintenance', label: 'الصيانة', icon: <IconWrench /> },
-  { to: '/inventory', label: 'المخزون', icon: <IconBox /> },
-  { to: '/petty-cash', label: 'العهدة', icon: <IconWallet /> },
-  { to: '/violations', label: 'المخالفات', icon: <IconAlert /> },
-  { to: '/customers', label: 'العملاء', icon: <IconUsers /> },
-  { to: '/department-notice', label: 'إخطار القسم', icon: <IconClipboard /> },
-  { to: '/accounts', label: 'الحسابات', icon: <IconWallet /> },
-  { to: '/reports', label: 'التقارير', icon: <IconChart /> },
-  { to: '/staff', label: 'الموظفون', icon: <IconShield /> },
-  { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconShield /> },
-  { to: '/notifications', label: 'الإشعارات', icon: <IconBell /> },
-  { to: '/settings', label: 'الإعدادات', icon: <IconSettings /> },
+  { to: '/vehicles', label: 'المركبات', icon: <IconCar />, permission: 'vehicles.view' },
+  { to: '/bookings', label: 'العقود', icon: <IconClipboard />, permission: 'contracts.view' },
+  { to: '/calendar', label: 'التقويم', icon: <IconCalendar />, permission: 'contracts.view' },
+  { to: '/waitlist', label: 'الانتظار', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
+  { to: '/showroom', label: 'المعرض', icon: <IconCar />, feature: 'showroom', permission: 'showroom.run' },
+  { to: '/maintenance', label: 'الصيانة', icon: <IconWrench />, permission: 'maintenance.view' },
+  { to: '/inventory', label: 'المخزون', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
+  { to: '/petty-cash', label: 'العهدة', icon: <IconWallet />, feature: 'petty_cash', permission: 'petty_cash.view' },
+  { to: '/expenses', label: 'المصروفات', icon: <IconWallet />, permission: 'expenses.view' },
+  { to: '/violations', label: 'المخالفات', icon: <IconAlert />, permission: 'violations.view' },
+  { to: '/customers', label: 'العملاء', icon: <IconUsers />, permission: 'customers.view' },
+  { to: '/department-notice', label: 'إخطار القسم', icon: <IconClipboard />, feature: 'department_notice', permission: 'department_notice.print' },
+  { to: '/accounts', label: 'الحسابات', icon: <IconWallet />, permission: 'accounting.view' },
+  { to: '/reports', label: 'التقارير', icon: <IconChart />, permission: 'reports.view' },
+  { to: '/hr', label: 'الموارد البشرية', icon: <IconUsers />, feature: 'hr', permission: 'hr.view' },
+  { to: '/chat', label: 'المحادثة', icon: <IconBell />, feature: 'chat' },
+  { to: '/staff', label: 'الموظفون', icon: <IconShield />, permission: 'staff.view' },
+  { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconShield />, permission: 'audit.view' },
+  { to: '/notifications', label: 'الإشعارات', icon: <IconBell />, permission: 'notifications.view' },
+  { to: '/settings', label: 'الإعدادات', icon: <IconSettings />, permission: 'settings.view' },
 ]
 
 const mobileNav: NavItem[] = [
@@ -47,13 +57,25 @@ const RAIL_KEY = 'rpm.shell.expanded'
 const WA_URL = 'https://wa.me/201150100104'
 
 export function AppShell() {
-  const { user, logout } = useAuth()
+  const { user, logout, can, featureEnabled } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
   const [cmdOpen, setCmdOpen] = useState(false)
   const [drawer, setDrawer] = useState(false)
   const [unread, setUnread] = useState(0)
+
+  const visibleRail = railNav.filter((item) => {
+    if (item.feature && !featureEnabled(item.feature)) return false
+    if (item.permission && !can(item.permission)) return false
+    return true
+  })
+  const visibleMobile = mobileNav.filter((item) => {
+    const full = railNav.find((r) => r.to === item.to)
+    if (full?.feature && !featureEnabled(full.feature)) return false
+    if (full?.permission && !can(full.permission)) return false
+    return true
+  })
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(RAIL_KEY) === '1'
@@ -135,7 +157,7 @@ export function AppShell() {
           </div>
 
           <nav className="shell-rail__nav">
-            {railNav.map((item) => (
+            {visibleRail.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -267,7 +289,7 @@ export function AppShell() {
       </div>
 
       <nav className="shell-dock" aria-label="تنقّل الموبايل">
-        {mobileNav.map((item) => (
+        {visibleMobile.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -301,7 +323,7 @@ export function AppShell() {
                 </button>
               </div>
               <div className="shell-drawer__grid">
-                {railNav.map((item) => (
+                {visibleRail.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}

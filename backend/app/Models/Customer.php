@@ -12,8 +12,9 @@ class Customer extends Model
 
     protected $fillable = [
         'full_name', 'phone', 'phone_alt', 'email', 'national_id', 'national_id_expires_on',
-        'passport_number', 'passport_expires_on', 'birth_date', 'address', 'license_number',
-        'license_expires_on', 'status', 'blacklist_reason', 'blacklisted_by', 'blacklisted_at', 'notes',
+        'national_id_image_path', 'passport_number', 'passport_expires_on', 'birth_date', 'address',
+        'license_number', 'license_expires_on', 'license_image_path',
+        'status', 'blacklist_reason', 'blacklisted_by', 'blacklisted_at', 'notes',
     ];
 
     protected function casts(): array

@@ -589,3 +589,21 @@ password: password
 ---
 
 *نهاية وثائق API — الإصدار ١٫٠ — يُحدَّث مع أي مسار جديد في نفس الـ PR*
+
+---
+
+## ١٨) إضافات إغلاق الفجوات (٢٫٠)
+
+| Method | Path | صلاحية / ملاحظة |
+|--------|------|------------------|
+| PUT | `/settings/operational` | `settings.update` — تشغيل يومي فقط |
+| PUT | `/integrator/tenant` | دور `super_admin` فقط |
+| GET/POST | `/expenses` | `expenses.view` / `expenses.create` |
+| GET/POST | `/payroll` · `/payroll/draft` · `/payroll/{id}/approve` | HR |
+| GET/POST | `/evaluations` | خلف `feature:evaluations` |
+| GET/POST | `/chat` | خلف `feature:chat` · حد 100/يوم |
+| POST | `/ocr/review` | مراجعة حقول داخلية بلا إرسال خارجي |
+| POST | `/print-snapshots` | حفظ نسخة وقت الطباعة |
+| GET | `/vehicles/{id}/estimated-odometer` | عداد تقديري أثناء التأجير |
+
+كل المسارات الحساسة محمية بـ `permission:` و/أو `feature:` و/أو `integrator`.

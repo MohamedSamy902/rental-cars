@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\TenantSetting;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,13 +48,17 @@ class AuthController extends Controller
     }
 
     /**
-     * @return array{id:int,name:string,email:string,role:?string,role_name:?string,permissions:list<string>,is_integrator:bool}
+     * @return array{
+     *   id:int,name:string,email:string,role:?string,role_name:?string,
+     *   permissions:list<string>,is_integrator:bool,feature_flags:array<string,bool>
+     * }
      */
     private function presentUser(User $user): array
     {
         $user->loadMissing('role.permissions');
         $permissions = $user->role?->permissions?->pluck('key')->values()->all() ?? [];
         $roleName = $user->role?->name;
+        $flags = TenantSetting::query()->value('feature_flags') ?? [];
 
         return [
             'id' => $user->id,
@@ -63,6 +68,7 @@ class AuthController extends Controller
             'role_name' => $roleName,
             'permissions' => $permissions,
             'is_integrator' => $roleName === 'super_admin',
+            'feature_flags' => is_array($flags) ? $flags : [],
         ];
     }
 

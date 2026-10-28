@@ -311,3 +311,10 @@
   word-break: break-all;
   font-size: 0.85rem;
 }
+
+.rpm-qr-img {
+  margin-top: 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: #fff;
+}

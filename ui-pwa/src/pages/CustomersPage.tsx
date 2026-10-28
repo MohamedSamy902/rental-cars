@@ -23,6 +23,7 @@ type Customer = {
 
 const emptyForm = {
   full_name: '', phone: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01', national_id: '', notes: '',
+  national_id_image_path: '', license_image_path: '',
 }
 
 export function CustomersPage() {
@@ -73,6 +74,8 @@ export function CustomersPage() {
         license_expires_on: res.data.license_expires_on,
         national_id: res.data.national_id || '',
         notes: res.data.notes || '',
+        national_id_image_path: (res.data as any).national_id_image_path || '',
+        license_image_path: (res.data as any).license_image_path || '',
       })
       setBlacklistReason(res.data.blacklist_reason || '')
     } catch (e) {
@@ -146,6 +149,8 @@ export function CustomersPage() {
       <TextField label="رقم الرخصة" required value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
       <TextField label="انتهاء الرخصة" required type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      <TextField label="مسار صورة البطاقة (محلي)" value={(form as any).national_id_image_path || ''} onChange={(e) => setForm({ ...form, national_id_image_path: e.target.value } as any)} hint="يُحفظ محلياً — بلا إرسال لخدمة خارجية" />
+      <TextField label="مسار صورة الرخصة (محلي)" value={(form as any).license_image_path || ''} onChange={(e) => setForm({ ...form, license_image_path: e.target.value } as any)} />
     </div>
   )
 

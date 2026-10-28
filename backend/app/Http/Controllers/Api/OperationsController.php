@@ -13,6 +13,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleAccessory;
 use App\Models\VehicleDocument;
 use App\Services\Fleet\VehicleAvailabilityService;
+use App\Models\PrintSnapshot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,16 +28,20 @@ class OperationsController extends Controller
         $flags = $settings?->feature_flags ?? [];
         abort_unless(($flags['showroom'] ?? true) === true, 403, 'وضع المعرض غير مفعّل.');
 
+        $activeIds = \App\Models\Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip();
+        $reservedIds = \App\Models\Contract::query()
+            ->where('status', 'approved')
+            ->where('starts_at', '<=', now())
+            ->where('planned_ends_at', '>=', now())
+            ->pluck('vehicle_id')
+            ->flip();
+
         $rows = Vehicle::query()->where('is_active', true)->orderByDesc('rental_priority')->get()
-            ->map(function (Vehicle $v) {
+            ->map(function (Vehicle $v) use ($activeIds, $reservedIds) {
                 $status = $this->availability->statusOnDate([
                     'manual_status' => $v->manual_status,
-                    'has_active_handover' => $v->contracts()->where('status', 'active')->exists(),
-                    'has_approved_covering_date' => $v->contracts()
-                        ->where('status', 'approved')
-                        ->where('starts_at', '<=', now())
-                        ->where('planned_ends_at', '>=', now())
-                        ->exists(),
+                    'has_active_handover' => $activeIds->has($v->id),
+                    'has_approved_covering_date' => $reservedIds->has($v->id),
                     'open_work_order_blocks' => $v->manual_status === 'maintenance',
                 ]);
 
@@ -86,7 +91,10 @@ class OperationsController extends Controller
             }
         }
 
-        $rows = $q->limit(200)->get(['id', 'full_name', 'phone', 'national_id', 'license_number', 'license_expires_on', 'birth_date', 'status']);
+        $rows = $q->limit(200)->get([
+            'id', 'full_name', 'phone', 'national_id', 'national_id_image_path',
+            'license_number', 'license_expires_on', 'license_image_path', 'birth_date', 'status',
+        ]);
 
         return response()->json([
             'data' => [
@@ -98,7 +106,21 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function updateTenant(Request $request): JsonResponse
+    public function updateOperational(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'center_name' => ['sometimes', 'string', 'max:200'],
+            'print_footer' => ['nullable', 'string', 'max:300'],
+            'operational' => ['nullable', 'array'],
+        ]);
+
+        $settings = TenantSetting::query()->firstOrCreate([]);
+        $settings->fill($data)->save();
+
+        return response()->json(['data' => $settings->fresh(), 'message' => 'تم حفظ إعدادات التشغيل.']);
+    }
+
+    public function updateIntegrator(Request $request): JsonResponse
     {
         $data = $request->validate([
             'center_name' => ['sometimes', 'string', 'max:200'],
@@ -107,13 +129,57 @@ class OperationsController extends Controller
             'inventory_mode' => ['sometimes', 'in:unified,per_branch'],
             'colors' => ['nullable', 'array'],
             'feature_flags' => ['nullable', 'array'],
-            'operational' => ['nullable', 'array'],
+            'logo_path' => ['nullable', 'string', 'max:500'],
         ]);
 
         $settings = TenantSetting::query()->firstOrCreate([]);
         $settings->fill($data)->save();
 
-        return response()->json(['data' => $settings->fresh(), 'message' => 'تم حفظ إعدادات المركز.']);
+        return response()->json(['data' => $settings->fresh(), 'message' => 'تم حفظ إعدادات المُدمج.']);
+    }
+
+    /** @deprecated استخدم updateOperational أو updateIntegrator */
+    public function updateTenant(Request $request): JsonResponse
+    {
+        if ($request->user()?->role?->name === 'super_admin' && (
+            $request->exists('feature_flags') || $request->exists('colors') || $request->exists('multi_branch')
+        )) {
+            return $this->updateIntegrator($request);
+        }
+
+        return $this->updateOperational($request);
+    }
+
+    public function estimatedOdometer(Request $request, Vehicle $vehicle): JsonResponse
+    {
+        $active = $vehicle->contracts()->where('status', 'active')->latest('id')->first();
+        if (! $active || ! $active->odometer_out || ! $active->starts_at) {
+            return response()->json([
+                'data' => [
+                    'vehicle_id' => $vehicle->id,
+                    'estimated' => (int) $vehicle->odometer,
+                    'basis' => 'recorded',
+                    'note' => 'لا عقد نشط — يُعرض العداد المسجّل.',
+                ],
+            ]);
+        }
+
+        $days = max(1, $active->starts_at->diffInDays(now()) + 1);
+        $dailyKm = (int) ($active->frozen_daily_km_allowance ?: 200);
+        $estimated = (int) $active->odometer_out + ($days * $dailyKm);
+
+        return response()->json([
+            'data' => [
+                'vehicle_id' => $vehicle->id,
+                'contract_id' => $active->id,
+                'odometer_out' => (int) $active->odometer_out,
+                'days_elapsed' => $days,
+                'daily_km_allowance' => $dailyKm,
+                'estimated' => $estimated,
+                'basis' => 'active_contract_projection',
+                'note' => 'تقدير أثناء التأجير للتنبيه فقط — المرجع الفعلي عند الاستلام.',
+            ],
+        ]);
     }
 
     public function auditLogs(Request $request): JsonResponse
@@ -260,5 +326,23 @@ class OperationsController extends Controller
         return response()->json([
             'data' => Employee::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'job_title']),
         ]);
+    }
+
+    public function storePrintSnapshot(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'type' => ['required', 'in:contract,invoice,receipt,handover,department_notice'],
+            'record_type' => ['required', 'string', 'max:120'],
+            'record_id' => ['required', 'integer', 'min:1'],
+            'payload' => ['required', 'array'],
+        ], [], ['type' => 'نوع المستند']);
+
+        $row = PrintSnapshot::query()->create([
+            ...$data,
+            'printed_by' => $request->user()?->id,
+            'printed_at' => now(),
+        ]);
+
+        return response()->json(['data' => $row, 'message' => 'تم حفظ نسخة الطباعة.'], 201);
     }
 }

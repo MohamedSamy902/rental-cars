@@ -50,6 +50,8 @@ class CustomerController extends Controller
             'address' => ['nullable', 'string'],
             'license_number' => ['required', 'string', 'max:50'],
             'license_expires_on' => ['required', 'date'],
+            'national_id_image_path' => ['nullable', 'string', 'max:500'],
+            'license_image_path' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
         ], [], [
             'full_name' => 'الاسم الكامل',
@@ -83,6 +85,8 @@ class CustomerController extends Controller
             'birth_date' => ['sometimes', 'date'],
             'license_number' => ['sometimes', 'string', 'max:50'],
             'license_expires_on' => ['sometimes', 'date'],
+            'national_id_image_path' => ['nullable', 'string', 'max:500'],
+            'license_image_path' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
             'status' => ['sometimes', 'in:active,blacklist'],
             'blacklist_reason' => ['nullable', 'string'],

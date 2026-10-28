@@ -57,7 +57,7 @@ export function IntegratorPage() {
   async function save() {
     setSaving(true)
     try {
-      await api('/settings/tenant', {
+      await api('/integrator/tenant', {
         method: 'PUT',
         json: {
           center_name: centerName,
