@@ -30,8 +30,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'آر بي إم', {
       body: data.body || '',
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: '/brand/icon-192.png',
+      badge: '/brand/favicon-48.png',
       dir: data.dir || 'rtl',
       lang: data.lang || 'ar',
       data: { url: data.url || '/notifications' },
