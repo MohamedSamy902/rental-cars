@@ -22,10 +22,14 @@ import {
   formatTime,
 } from '@/shared/lib/format'
 import { AnimatedNumber } from '@/shared/ui/AnimatedNumber'
+import { Badge, type BadgeTone } from '@/shared/ui/Badge'
+import { Button } from '@/shared/ui/Button'
+import { Card, CardContent, CardHeader } from '@/shared/ui/Card'
 import { ErrorState, SkeletonBlock } from '@/shared/ui'
 import {
   IconCar,
   IconClipboard,
+  IconMore,
   IconPlus,
   IconReturn,
   IconTrend,
@@ -52,7 +56,6 @@ type Dash = {
   }[]
 }
 
-/** Semantic fleet tones — emerald / steel / amber / crimson (no teal) */
 const fleetTone: Record<string, string> = {
   available: '#059669',
   rented: '#334155',
@@ -66,23 +69,23 @@ function startOfDay(d: Date) {
   return x
 }
 
-function urgencyPill(at: string, status: string) {
-  if (status === 'completed') return { label: 'مكتمل', tone: 'ok' }
+function urgencyPill(at: string, status: string): { label: string; tone: BadgeTone } {
+  if (status === 'completed') return { label: 'مكتمل', tone: 'success' }
   const diffH = (new Date(at).getTime() - Date.now()) / 36e5
   if (diffH < 0) return { label: 'متأخر', tone: 'danger' }
-  if (diffH < 24) return { label: 'اليوم', tone: 'warn' }
-  if (diffH < 48) return { label: 'غداً', tone: 'warn' }
+  if (diffH < 24) return { label: 'اليوم', tone: 'warning' }
+  if (diffH < 48) return { label: 'غداً', tone: 'warning' }
   const days = Math.ceil(diffH / 24)
   return { label: `${days} يوم`, tone: 'muted' }
 }
 
-function contractStatusPill(status: string) {
-  const map: Record<string, { label: string; tone: string }> = {
+function contractStatusPill(status: string): { label: string; tone: BadgeTone } {
+  const map: Record<string, { label: string; tone: BadgeTone }> = {
     active: { label: 'نشط', tone: 'steel' },
-    approved: { label: 'معتمد', tone: 'ok' },
-    pending: { label: 'معلّق', tone: 'warn' },
+    approved: { label: 'معتمد', tone: 'success' },
+    pending: { label: 'معلّق', tone: 'warning' },
     draft: { label: 'مسودة', tone: 'muted' },
-    completed: { label: 'مكتمل', tone: 'ok' },
+    completed: { label: 'مكتمل', tone: 'muted' },
     cancelled: { label: 'ملغى', tone: 'danger' },
   }
   return map[status] || { label: status, tone: 'muted' }
@@ -144,6 +147,14 @@ function ChartTooltip({
       <span>{label}</span>
       <strong>{formatMoney(Number(payload[0]?.value ?? 0))}</strong>
     </div>
+  )
+}
+
+function CardMenuButton({ label }: { label: string }) {
+  return (
+    <button type="button" className="db-card-menu" aria-label={label}>
+      <IconMore size={16} />
+    </button>
   )
 }
 
@@ -277,40 +288,44 @@ export function DashboardPage() {
       value: availableNow,
       kind: 'number' as const,
       badge: `${formatPercent(Math.round((availableNow / fleetTotal) * 100))} من الأسطول`,
-      badgeTone: 'ok' as const,
+      badgeTone: 'success' as BadgeTone,
       icon: <IconCar size={16} />,
       tone: 'ok',
       spark: sparkFromValue(availableNow || 1, 1),
+      href: '/vehicles',
     },
     {
       label: 'عقود نشطة',
       value: data.kpis.rented || 0,
       kind: 'number' as const,
       badge: 'مؤجّرة حالياً',
-      badgeTone: 'steel' as const,
+      badgeTone: 'steel' as BadgeTone,
       icon: <IconClipboard size={16} />,
       tone: 'steel',
       spark: sparkFromValue(data.kpis.rented || 1, 2),
+      href: '/bookings',
     },
     {
       label: 'ترجع اليوم',
       value: data.kpis.returning_today || 0,
       kind: 'number' as const,
       badge: 'تحتاج استلام',
-      badgeTone: 'warn' as const,
+      badgeTone: 'warning' as BadgeTone,
       icon: <IconReturn size={16} />,
       tone: 'warn',
       spark: sparkFromValue(data.kpis.returning_today || 1, 3),
+      href: '/calendar',
     },
     {
       label: 'إيراد متوقع',
       value: data.kpis.expected_revenue || 0,
       kind: 'money' as const,
       badge: 'أفق التشغيل',
-      badgeTone: 'brand' as const,
+      badgeTone: 'brand' as BadgeTone,
       icon: <IconTrend size={16} />,
       tone: 'brand',
       spark: revenueSpark.length ? revenueSpark : sparkFromValue(data.kpis.expected_revenue || 1, 4),
+      href: '/reports',
     },
   ]
 
@@ -331,394 +346,421 @@ export function DashboardPage() {
             مركبة ترجع اليوم.
           </p>
         </div>
-        <button type="button" className="db-cta" onClick={() => navigate('/bookings?new=1')}>
-          <IconPlus size={16} />
+        <Button
+          variant="accent"
+          iconStart={<IconPlus size={16} />}
+          onClick={() => navigate('/bookings?new=1')}
+        >
           عقد جديد
-        </button>
+        </Button>
       </motion.header>
 
       <section className="db-kpis" aria-label="مؤشرات سريعة">
         {kpis.map((k, i) => (
-          <motion.article
+          <motion.div
             key={k.label}
-            className={`db-kpi tone-${k.tone}`}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.04 * i, duration: 0.35 }}
           >
-            <div className="db-kpi__top">
-              <span className="db-kpi__label">{k.label}</span>
-              <span className="db-kpi__ico" aria-hidden>
-                {k.icon}
-              </span>
-            </div>
-            <div className="db-kpi__value">
-              <AnimatedNumber value={k.value} kind={k.kind} />
-            </div>
-            <div className="db-kpi__foot">
-              <em className={`db-kpi__badge is-${k.badgeTone}`}>{k.badge}</em>
-              <MiniSpark values={k.spark} tone={k.tone} />
-            </div>
-          </motion.article>
+            <Link to={k.href} className={`db-kpi tone-${k.tone}`}>
+              <div className="db-kpi__top">
+                <span className="db-kpi__label">{k.label}</span>
+                <span className="db-kpi__ico" aria-hidden>
+                  {k.icon}
+                </span>
+              </div>
+              <div className="db-kpi__value">
+                <AnimatedNumber value={k.value} kind={k.kind} />
+              </div>
+              <div className="db-kpi__foot">
+                <Badge tone={k.badgeTone} dot={false}>
+                  {k.badge}
+                </Badge>
+                <MiniSpark values={k.spark} tone={k.tone} />
+              </div>
+            </Link>
+          </motion.div>
         ))}
       </section>
 
       <section className="db-bento">
-        <motion.article
-          className="db-card db-card--gauge"
+        <motion.div
+          className="db-span-5"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.35 }}
         >
-          <div className="db-card__head">
-            <div>
-              <h2>صحة الإشغال</h2>
-              <p>قراءة لحظية للأسطول النشط</p>
-            </div>
-            <Link to="/vehicles" className="db-link">
-              الأسطول
-            </Link>
-          </div>
+          <Card>
+            <CardHeader
+              title="صحة الإشغال"
+              description="قراءة لحظية للأسطول النشط"
+              action={
+                <>
+                  <Link to="/vehicles">الأسطول</Link>
+                  <CardMenuButton label="خيارات الإشغال" />
+                </>
+              }
+            />
+            <CardContent>
+              <div className="db-gauge">
+                <div className="db-gauge__ring" aria-hidden>
+                  <svg viewBox="0 0 140 140">
+                    <circle cx="70" cy="70" r="54" className="track" />
+                    <circle className="dots" cx="70" cy="70" r="62" strokeDasharray="2 8" />
+                    <motion.circle
+                      cx="70"
+                      cy="70"
+                      r="54"
+                      className="progress"
+                      strokeDasharray={ring}
+                      initial={{ strokeDashoffset: ring }}
+                      animate={{
+                        strokeDashoffset: ring * (1 - Math.min(data.occupancy_pct, 100) / 100),
+                      }}
+                      transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </svg>
+                  <div className="db-gauge__center">
+                    <AnimatedNumber value={data.occupancy_pct} kind="percent" className="db-gauge__pct" />
+                    <span>إشغال</span>
+                  </div>
+                </div>
 
-          <div className="db-gauge">
-            <div className="db-gauge__ring" aria-hidden>
-              <svg viewBox="0 0 140 140">
-                <circle cx="70" cy="70" r="54" className="track" />
-                <circle className="dots" cx="70" cy="70" r="62" strokeDasharray="2 8" />
-                <motion.circle
-                  cx="70"
-                  cy="70"
-                  r="54"
-                  className="progress"
-                  strokeDasharray={ring}
-                  initial={{ strokeDashoffset: ring }}
-                  animate={{
-                    strokeDashoffset: ring * (1 - Math.min(data.occupancy_pct, 100) / 100),
-                  }}
-                  transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-                />
-              </svg>
-              <div className="db-gauge__center">
-                <AnimatedNumber value={data.occupancy_pct} kind="percent" className="db-gauge__pct" />
-                <span>إشغال</span>
+                <ul className="db-gauge__stats">
+                  <li>
+                    <span>أسطول</span>
+                    <b className="tabular-nums">{formatNumber(data.fleet_total)}</b>
+                  </li>
+                  <li>
+                    <span>مؤجّر</span>
+                    <b className="tabular-nums">{formatNumber(data.kpis.rented || 0)}</b>
+                  </li>
+                  <li>
+                    <span>صيانة</span>
+                    <b className="tabular-nums">{formatNumber(data.fleet_status.maintenance || 0)}</b>
+                  </li>
+                  <li>
+                    <span>أوامر شغل</span>
+                    <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
+                  </li>
+                </ul>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-            <ul className="db-gauge__stats">
-              <li>
-                <span>أسطول</span>
-                <b className="tabular-nums">{formatNumber(data.fleet_total)}</b>
-              </li>
-              <li>
-                <span>مؤجّر</span>
-                <b className="tabular-nums">{formatNumber(data.kpis.rented || 0)}</b>
-              </li>
-              <li>
-                <span>صيانة</span>
-                <b className="tabular-nums">{formatNumber(data.fleet_status.maintenance || 0)}</b>
-              </li>
-              <li>
-                <span>أوامر شغل</span>
-                <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
-              </li>
-            </ul>
-          </div>
-        </motion.article>
-
-        <motion.article
-          className="db-card db-card--ops"
+        <motion.div
+          className="db-span-7"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.14, duration: 0.35 }}
         >
-          <div className="db-card__head">
-            <div>
-              <h2>عمليات قادمة</h2>
-              <p>ما يحتاج قراراً أولاً</p>
-            </div>
-            <Link to="/bookings" className="db-link">
-              العقود
-            </Link>
-          </div>
+          <Card>
+            <CardHeader
+              title="عمليات قادمة"
+              description="ما يحتاج قراراً أولاً"
+              action={
+                <>
+                  <Link to="/bookings">العقود</Link>
+                  <CardMenuButton label="خيارات العمليات" />
+                </>
+              }
+            />
+            <CardContent flush>
+              <div className="db-table-wrap">
+                <table className="db-table">
+                  <thead>
+                    <tr>
+                      <th>المهمة</th>
+                      <th>التفاصيل</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.tasks.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="db-empty-cell">
+                          لا تذكيرات معلّقة
+                        </td>
+                      </tr>
+                    ) : (
+                      data.tasks.map((task, i) => {
+                        const pill = urgencyPill(task.at, task.status)
+                        return (
+                          <motion.tr
+                            key={task.id}
+                            initial={{ opacity: 0, x: 8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.03 * i }}
+                          >
+                            <td>
+                              <div className="db-table__primary">
+                                <span className="db-table__ico" aria-hidden>
+                                  <IconClipboard size={14} />
+                                </span>
+                                <strong>{task.title}</strong>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="db-table__muted">{task.subtitle}</span>
+                            </td>
+                            <td>
+                              <Badge tone={pill.tone}>{pill.label}</Badge>
+                            </td>
+                          </motion.tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-          <div className="db-table-wrap">
-            <table className="db-table">
-              <thead>
-                <tr>
-                  <th>المهمة</th>
-                  <th>التفاصيل</th>
-                  <th>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.tasks.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="db-empty-cell">
-                      لا تذكيرات معلّقة
-                    </td>
-                  </tr>
-                ) : (
-                  data.tasks.map((task, i) => {
-                    const pill = urgencyPill(task.at, task.status)
-                    return (
-                      <motion.tr
-                        key={task.id}
-                        initial={{ opacity: 0, x: 8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.03 * i }}
-                      >
-                        <td>
-                          <div className="db-table__primary">
-                            <span className="db-table__ico" aria-hidden>
-                              <IconClipboard size={14} />
-                            </span>
-                            <strong>{task.title}</strong>
-                          </div>
-                        </td>
-                        <td>
-                          <span className="db-table__muted">{task.subtitle}</span>
-                        </td>
-                        <td>
-                          <em className={`db-pill is-${pill.tone}`}>{pill.label}</em>
-                        </td>
-                      </motion.tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </motion.article>
-
-        <motion.article
-          className="db-card db-card--chart"
+        <motion.div
+          className="db-span-7"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18, duration: 0.35 }}
         >
-          <div className="db-card__head">
-            <div>
-              <h2>اتجاه الإيراد</h2>
-              <p>{revenueRangeLabel}</p>
-            </div>
-            <strong className="db-card__figure">
-              <AnimatedNumber
-                value={revenueRange === 'week' ? data.kpis.expected_revenue || 0 : revenueTotal}
-                kind="money"
-              />
-            </strong>
-          </div>
-          <div className="db-range" role="tablist" aria-label="نطاق الإيراد">
-            {(
-              [
-                { id: 'week', label: 'أسبوعي' },
-                { id: 'month', label: 'شهري' },
-                { id: 'year', label: 'سنوي' },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={revenueRange === tab.id}
-                className={`db-range__btn ${revenueRange === tab.id ? 'is-active' : ''}`}
-                onClick={() => setRevenueRange(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="db-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueSeries} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#18181b" stopOpacity={0.18} />
-                    <stop offset="55%" stopColor="#18181b" stopOpacity={0.06} />
-                    <stop offset="100%" stopColor="#18181b" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
-                  interval={revenueRange === 'year' ? 1 : 0}
-                />
-                <YAxis hide domain={['dataMin', 'dataMax']} />
-                <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }} />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#18181b"
-                  strokeWidth={2.4}
-                  fill="url(#revFill)"
-                  animationDuration={850}
-                  activeDot={{ r: 4, fill: '#dc2626', stroke: '#fff', strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.article>
+          <Card>
+            <CardHeader
+              title="اتجاه الإيراد"
+              description={revenueRangeLabel}
+              action={
+                <strong className="db-card__figure">
+                  <AnimatedNumber
+                    value={revenueRange === 'week' ? data.kpis.expected_revenue || 0 : revenueTotal}
+                    kind="money"
+                  />
+                </strong>
+              }
+            />
+            <CardContent>
+              <div className="db-range" role="tablist" aria-label="نطاق الإيراد">
+                {(
+                  [
+                    { id: 'week', label: 'أسبوعي' },
+                    { id: 'month', label: 'شهري' },
+                    { id: 'year', label: 'سنوي' },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={revenueRange === tab.id}
+                    className={`db-range__btn ${revenueRange === tab.id ? 'is-active' : ''}`}
+                    onClick={() => setRevenueRange(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <div className="db-chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={revenueSeries} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#18181b" stopOpacity={0.18} />
+                        <stop offset="55%" stopColor="#18181b" stopOpacity={0.06} />
+                        <stop offset="100%" stopColor="#18181b" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                      interval={revenueRange === 'year' ? 1 : 0}
+                    />
+                    <YAxis hide domain={['dataMin', 'dataMax']} />
+                    <Tooltip
+                      content={<ChartTooltip />}
+                      cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#18181b"
+                      strokeWidth={2.4}
+                      fill="url(#revFill)"
+                      animationDuration={850}
+                      activeDot={{ r: 4, fill: '#dc2626', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <motion.article
-          className="db-card db-card--fleet"
+        <motion.div
+          className="db-span-5"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.22, duration: 0.35 }}
         >
-          <div className="db-card__head">
-            <div>
-              <h2>حالة الأسطول</h2>
-              <p>توزيع المركبات</p>
-            </div>
-          </div>
-          <div className="db-fleet">
-            <div className="db-fleet__chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={donut}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius="64%"
-                    outerRadius="90%"
-                    paddingAngle={4}
-                    stroke="#ffffff"
-                    strokeWidth={3}
-                  >
-                    {donut.map((entry) => (
-                      <Cell key={entry.key} fill={fleetTone[entry.key] || '#94a3b8'} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="db-fleet__center">
-                <strong className="tabular-nums">{formatNumber(data.fleet_total)}</strong>
-                <span>مركبة</span>
+          <Card>
+            <CardHeader
+              title="حالة الأسطول"
+              description="توزيع المركبات"
+              action={<CardMenuButton label="خيارات الأسطول" />}
+            />
+            <CardContent>
+              <div className="db-fleet">
+                <div className="db-fleet__chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={donut}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="64%"
+                        outerRadius="90%"
+                        paddingAngle={4}
+                        stroke="#ffffff"
+                        strokeWidth={3}
+                      >
+                        {donut.map((entry) => (
+                          <Cell key={entry.key} fill={fleetTone[entry.key] || '#94a3b8'} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="db-fleet__center">
+                    <strong className="tabular-nums">{formatNumber(data.fleet_total)}</strong>
+                    <span>مركبة</span>
+                  </div>
+                </div>
+                <ul className="db-fleet__legend">
+                  {donut.map((item) => (
+                    <li key={item.key}>
+                      <i style={{ background: fleetTone[item.key] }} />
+                      <span>{item.name}</span>
+                      <b className="tabular-nums">{formatNumber(item.value)}</b>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
-            <ul className="db-fleet__legend">
-              {donut.map((item) => (
-                <li key={item.key}>
-                  <i style={{ background: fleetTone[item.key] }} />
-                  <span>{item.name}</span>
-                  <b className="tabular-nums">{formatNumber(item.value)}</b>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </motion.article>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <motion.article
-          className="db-card db-card--returns"
+        <motion.div
+          className="db-span-7"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.26, duration: 0.35 }}
         >
-          <div className="db-card__head">
-            <div>
-              <h2>إرجاعات قادمة</h2>
-              <p>تنبيهات الاستلام</p>
-            </div>
-            <Link to="/calendar" className="db-link">
-              التقويم
-            </Link>
-          </div>
-
-          <div className="db-table-wrap">
-            <table className="db-table">
-              <thead>
-                <tr>
-                  <th>المركبة</th>
-                  <th>العقد / العميل</th>
-                  <th>الحالة</th>
-                  <th>الموعد</th>
-                </tr>
-              </thead>
-              <tbody>
-                {returns.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="db-empty-cell">
-                      <IconReturn size={18} />
-                      لا إرجاعات مجدولة
-                    </td>
-                  </tr>
-                ) : (
-                  returns.map((c) => {
-                    const st = contractStatusPill(c.status)
-                    const overdue = new Date(c.planned_ends_at).getTime() < Date.now()
-                    return (
-                      <tr key={c.id}>
-                        <td>
-                          <strong>
-                            {c.vehicle?.brand} {c.vehicle?.model}
-                          </strong>
-                          {c.vehicle?.plate ? (
-                            <span className="db-table__muted tabular-nums">{c.vehicle.plate}</span>
-                          ) : null}
-                        </td>
-                        <td>
-                          <span className="db-table__muted">
-                            {c.number} · {c.customer?.full_name}
-                          </span>
-                        </td>
-                        <td>
-                          <em className={`db-pill is-${overdue ? 'danger' : st.tone}`}>
-                            {overdue ? 'متأخر' : st.label}
-                          </em>
-                        </td>
-                        <td className="db-table__time">
-                          <b className={`tabular-nums ${overdue ? 'is-overdue' : ''}`}>
-                            {formatTime(c.planned_ends_at)}
-                          </b>
-                          <span>{formatDayShort(c.planned_ends_at)}</span>
+          <Card>
+            <CardHeader
+              title="إرجاعات قادمة"
+              description="تنبيهات الاستلام"
+              action={
+                <>
+                  <Link to="/calendar">التقويم</Link>
+                  <CardMenuButton label="خيارات الإرجاعات" />
+                </>
+              }
+            />
+            <CardContent flush>
+              <div className="db-table-wrap">
+                <table className="db-table">
+                  <thead>
+                    <tr>
+                      <th>المركبة</th>
+                      <th>العقد / العميل</th>
+                      <th>الحالة</th>
+                      <th>الموعد</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {returns.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="db-empty-cell">
+                          <IconReturn size={18} />
+                          لا إرجاعات مجدولة
                         </td>
                       </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </motion.article>
+                    ) : (
+                      returns.map((c) => {
+                        const st = contractStatusPill(c.status)
+                        const overdue = new Date(c.planned_ends_at).getTime() < Date.now()
+                        return (
+                          <tr key={c.id}>
+                            <td>
+                              <strong>
+                                {c.vehicle?.brand} {c.vehicle?.model}
+                              </strong>
+                              {c.vehicle?.plate ? (
+                                <span className="db-table__muted tabular-nums">{c.vehicle.plate}</span>
+                              ) : null}
+                            </td>
+                            <td>
+                              <span className="db-table__muted">
+                                {c.number} · {c.customer?.full_name}
+                              </span>
+                            </td>
+                            <td>
+                              <Badge tone={overdue ? 'danger' : st.tone}>
+                                {overdue ? 'متأخر' : st.label}
+                              </Badge>
+                            </td>
+                            <td className="db-table__time">
+                              <b className={`tabular-nums ${overdue ? 'is-overdue' : ''}`}>
+                                {formatTime(c.planned_ends_at)}
+                              </b>
+                              <span>{formatDayShort(c.planned_ends_at)}</span>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <motion.article
-          className="db-card db-card--quick"
+        <motion.div
+          className="db-span-5"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.35 }}
         >
-          <div className="db-card__head">
-            <div>
-              <h2>اختصارات</h2>
-              <p>وصول سريع</p>
-            </div>
-          </div>
-          <div className="db-quick">
-            <Link to="/customers">
-              <span className="db-quick__ico">
-                <IconUsers size={18} />
-              </span>
-              <span className="db-quick__label">العملاء</span>
-              <b className="tabular-nums">{formatNumber(data.kpis.customers || 0)}</b>
-            </Link>
-            <Link to="/maintenance">
-              <span className="db-quick__ico">
-                <IconWrench size={18} />
-              </span>
-              <span className="db-quick__label">الصيانة</span>
-              <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
-            </Link>
-            <Link to="/vehicles">
-              <span className="db-quick__ico">
-                <IconCar size={18} />
-              </span>
-              <span className="db-quick__label">المتاح</span>
-              <b className="tabular-nums">{formatPercent(100 - data.occupancy_pct)}</b>
-            </Link>
-          </div>
-        </motion.article>
+          <Card>
+            <CardHeader title="اختصارات" description="وصول سريع" />
+            <CardContent dense>
+              <div className="db-quick">
+                <Link to="/customers">
+                  <span className="db-quick__ico">
+                    <IconUsers size={18} />
+                  </span>
+                  <span className="db-quick__label">العملاء</span>
+                  <b className="tabular-nums">{formatNumber(data.kpis.customers || 0)}</b>
+                </Link>
+                <Link to="/maintenance">
+                  <span className="db-quick__ico">
+                    <IconWrench size={18} />
+                  </span>
+                  <span className="db-quick__label">الصيانة</span>
+                  <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
+                </Link>
+                <Link to="/vehicles">
+                  <span className="db-quick__ico">
+                    <IconCar size={18} />
+                  </span>
+                  <span className="db-quick__label">المتاح</span>
+                  <b className="tabular-nums">{formatPercent(100 - data.occupancy_pct)}</b>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </section>
     </div>
   )

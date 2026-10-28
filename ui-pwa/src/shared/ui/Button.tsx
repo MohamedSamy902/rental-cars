@@ -8,13 +8,17 @@ import {
 } from 'react'
 import './Button.css'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Variant = 'primary' | 'secondary' | 'accent' | 'ghost' | 'danger'
 type Size = 'md' | 'sm' | 'lg'
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant
   size?: Size
   loading?: boolean
+  /** Leading icon (RTL-aware via flex order + gap) */
+  iconStart?: ReactNode
+  /** Trailing icon */
+  iconEnd?: ReactNode
   children: ReactNode
 }
 
@@ -27,6 +31,8 @@ export function Button({
   className = '',
   onClick,
   type = 'button',
+  iconStart,
+  iconEnd,
   ...rest
 }: Props) {
   const [internalBusy, setInternalBusy] = useState(false)
@@ -48,6 +54,7 @@ export function Button({
   }, [loading, internalBusy])
 
   const locked = Boolean(disabled || loading || internalBusy)
+  const busy = loading || internalBusy
 
   function handleClick(e: MouseEvent<HTMLButtonElement>) {
     if (locked || inFlight.current) {
@@ -94,14 +101,14 @@ export function Button({
       type={type}
       className={`rpm-btn rpm-btn--${variant} rpm-btn--${size} ${className}`.trim()}
       disabled={locked}
-      aria-busy={loading || internalBusy || undefined}
+      aria-busy={busy || undefined}
       {...rest}
       onClick={handleClick}
     >
-      {loading || internalBusy ? <span className="rpm-btn__spinner" aria-hidden /> : null}
-      <span className={loading || internalBusy ? 'rpm-btn__label is-loading' : 'rpm-btn__label'}>
-        {children}
-      </span>
+      {busy ? <span className="rpm-btn__spinner" aria-hidden /> : null}
+      {!busy && iconStart ? <span className="rpm-btn__icon">{iconStart}</span> : null}
+      <span className={busy ? 'rpm-btn__label is-loading' : 'rpm-btn__label'}>{children}</span>
+      {!busy && iconEnd ? <span className="rpm-btn__icon">{iconEnd}</span> : null}
     </button>
   )
 }

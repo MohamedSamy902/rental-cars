@@ -345,16 +345,24 @@
 .shell-cta {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  min-height: 42px;
+  gap: 0.5rem;
+  min-height: 2.25rem;
   padding-inline: 1rem;
-  border-radius: 14px;
-  background: var(--accent);
+  border-radius: 0.5rem;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
   color: #fff;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 0.9rem;
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 28%, transparent);
+  border: 1px solid rgb(0 0 0 / 8%);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.875rem;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 22%),
+    0 1px 2px rgb(220 38 38 / 28%),
+    0 8px 20px rgb(220 38 38 / 18%);
+  transition: background 150ms ease, transform 150ms ease;
+}
+.shell-cta:active {
+  transform: scale(0.98);
 }
 
 .shell-user {
