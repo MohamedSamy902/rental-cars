@@ -123,6 +123,18 @@ return new class extends Migration
                 $table->timestamps();
                 $table->index(['employee_id', 'year', 'month']);
             });
+        } else {
+            Schema::table('salary_advances', function (Blueprint $table) {
+                if (! Schema::hasColumn('salary_advances', 'year')) {
+                    $table->unsignedSmallInteger('year')->nullable()->after('method');
+                }
+                if (! Schema::hasColumn('salary_advances', 'month')) {
+                    $table->unsignedTinyInteger('month')->nullable()->after('year');
+                }
+                if (! Schema::hasColumn('salary_advances', 'created_by')) {
+                    $table->foreignId('created_by')->nullable()->after('notes')->constrained('users')->nullOnDelete();
+                }
+            });
         }
     }
 

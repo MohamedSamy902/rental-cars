@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\SalaryAdvanceController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\VehicleAssetController;
 use App\Http\Controllers\Api\VehicleController;
@@ -72,20 +73,17 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::middleware('permission:hr.salaries,hr.view')->group(function () {
         Route::get('/payroll', [PayrollController::class, 'index']);
-        Route::get('/salary-advances', [PayrollController::class, 'advances']);
     });
     Route::middleware('permission:hr.create,hr.salaries')->group(function () {
         Route::post('/employees', [EmployeeController::class, 'store']);
         Route::post('/payroll/draft', [PayrollController::class, 'draft']);
-        Route::post('/salary-advances', [PayrollController::class, 'storeAdvance']);
-        Route::delete('/salary-advances/{salaryAdvance}', [PayrollController::class, 'destroyAdvance']);
     });
     Route::put('/employees/{employee}', [EmployeeController::class, 'update'])
         ->middleware('permission:hr.update,hr.salaries');
-    Route::middleware('permission:hr.payroll_approve,hr.salaries')->group(function () {
-        Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve']);
-        Route::post('/payroll/lines/{payrollLine}/payout', [PayrollController::class, 'payout']);
-    });
+    Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve'])
+        ->middleware('permission:hr.payroll_approve,hr.salaries');
+    Route::post('/payroll/lines/{payrollLine}/payout', [PayrollController::class, 'payout'])
+        ->middleware('permission:hr.salaries,hr.payroll_approve');
 
     Route::middleware('permission:hr.custody,hr.view')->group(function () {
         Route::get('/employee-assignments', [EmployeeAssignmentController::class, 'index']);
@@ -93,6 +91,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:hr.custody,hr.update')->group(function () {
         Route::post('/employee-assignments', [EmployeeAssignmentController::class, 'store']);
         Route::post('/employee-assignments/{assignment}/acknowledge', [EmployeeAssignmentController::class, 'acknowledgeReceipt']);
+    });
+
+    Route::middleware('permission:hr.advances,hr.salaries,hr.view')->group(function () {
+        Route::get('/salary-advances', [SalaryAdvanceController::class, 'index']);
+    });
+    Route::middleware('permission:hr.advances')->group(function () {
+        Route::post('/salary-advances', [SalaryAdvanceController::class, 'store']);
+        Route::delete('/salary-advances/{salaryAdvance}', [SalaryAdvanceController::class, 'destroy']);
     });
 
     Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');

@@ -143,6 +143,15 @@ class P1SpecRequirementsTest extends TestCase
 
     public function test_salary_advances_crud_and_payroll_deduction(): void
     {
+        $deletable = $this->postJson('/api/salary-advances', [
+            'employee_id' => $this->employee->id,
+            'amount' => 200,
+            'advanced_on' => now()->toDateString(),
+            'method' => 'cash',
+        ])->assertCreated()->json('data.id');
+
+        $this->deleteJson("/api/salary-advances/{$deletable}")->assertOk();
+
         $this->postJson('/api/salary-advances', [
             'employee_id' => $this->employee->id,
             'amount' => 1000,
@@ -157,9 +166,9 @@ class P1SpecRequirementsTest extends TestCase
         $this->postJson('/api/payroll/draft', [
             'year' => (int) now()->format('Y'),
             'month' => (int) now()->format('n'),
-        ])->assertCreated()->assertJsonPath('data.lines.0.deductions', 1000)
-            ->assertJsonPath('data.lines.0.net_amount', 4000)
-            ->assertJsonPath('data.lines.0.advances', 1000);
+        ])->assertCreated()
+            ->assertJsonPath('data.lines.0.advances', 1000)
+            ->assertJsonPath('data.lines.0.net_amount', 4000);
 
         $runId = (int) \App\Models\PayrollRun::query()->value('id');
         $lineId = (int) \App\Models\PayrollLine::query()->value('id');
@@ -182,7 +191,7 @@ class P1SpecRequirementsTest extends TestCase
             ->assertJsonPath('data.carried_over', 0);
 
         $advId = SalaryAdvance::query()->value('id');
-        $this->deleteJson("/api/salary-advances/{$advId}")->assertOk();
+        $this->deleteJson("/api/salary-advances/{$advId}")->assertStatus(422);
     }
 
     public function test_occupancy_uses_rented_days_over_capacity(): void

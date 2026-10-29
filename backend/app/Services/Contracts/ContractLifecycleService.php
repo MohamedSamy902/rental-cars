@@ -8,6 +8,7 @@ use App\Models\ContractVehicleSwap;
 use App\Models\Customer;
 use App\Models\Deposit;
 use App\Models\DepositDeduction;
+use App\Models\Inspection;
 use App\Models\Payment;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -642,15 +643,33 @@ class ContractLifecycleService
 
             Vehicle::query()->whereKey($replacementId)->update(['odometer' => $odometerOut]);
 
-            $this->inspections->record($locked->id, [
-                'type' => 'handover',
-                'odometer' => $odometerOut,
-                'fuel_level' => (int) ($data['fuel_level'] ?? 50),
-                'notes' => 'تسليم البديلة عند التبديل بسبب عطل',
-                'signature_data' => $data['signature_data'] ?? ('swap-ack:'.str_repeat('0', 48)),
-                'accessories' => $data['accessories'] ?? [],
-                'damages' => $data['damages'] ?? [],
-            ], $userId);
+            // Same-contract swap: unique (contract_id, type) allows one handover — update it
+            // for the replacement vehicle instead of inserting a second handover row.
+            $handover = Inspection::query()
+                ->where('contract_id', $locked->id)
+                ->where('type', 'handover')
+                ->first();
+            if ($handover) {
+                $handover->fill([
+                    'odometer' => $odometerOut,
+                    'fuel_level' => (int) ($data['fuel_level'] ?? $handover->fuel_level ?? 50),
+                    'notes' => trim(($handover->notes ? $handover->notes."\n" : '').'تسليم البديلة عند التبديل بسبب عطل'),
+                    'signature_data' => $data['signature_data'] ?? $handover->signature_data ?? ('swap-ack:'.str_repeat('0', 48)),
+                    'accessories_json' => $data['accessories'] ?? $handover->accessories_json ?? [],
+                    'inspected_at' => now(),
+                    'inspector_id' => $userId ?? $handover->inspector_id,
+                ])->save();
+            } else {
+                $this->inspections->record($locked->id, [
+                    'type' => 'handover',
+                    'odometer' => $odometerOut,
+                    'fuel_level' => (int) ($data['fuel_level'] ?? 50),
+                    'notes' => 'تسليم البديلة عند التبديل بسبب عطل',
+                    'signature_data' => $data['signature_data'] ?? ('swap-ack:'.str_repeat('0', 48)),
+                    'accessories' => $data['accessories'] ?? [],
+                    'damages' => $data['damages'] ?? [],
+                ], $userId);
+            }
 
             AuditLog::query()->create([
                 'user_id' => $userId,
