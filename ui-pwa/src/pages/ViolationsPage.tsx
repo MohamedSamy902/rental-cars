@@ -56,6 +56,7 @@ export function ViolationsPage() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ vehicle_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   async function load() {
     setLoading(true)
@@ -70,6 +71,7 @@ export function ViolationsPage() {
   useEffect(() => { load() }, [])
 
   async function onSave() {
+    setFieldErrors({})
     try {
       await api('/violations', {
         method: 'POST',
@@ -85,7 +87,13 @@ export function ViolationsPage() {
       setOpen(false)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      const apiErr = e as ApiError
+      const next: Record<string, string> = {}
+      if (apiErr.errors) {
+        for (const [k, v] of Object.entries(apiErr.errors)) next[k] = v[0]
+      }
+      setFieldErrors(next)
+      toast.error(apiErr.message)
     }
   }
 
@@ -126,15 +134,16 @@ export function ViolationsPage() {
       />
       <Sheet open={open} title="مخالفة جديدة" onClose={() => setOpen(false)} footer={<><Button onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
-          <SelectField label="السيارة" required options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))} value={form.vehicle_id} onChange={(e) => setForm({ ...form, vehicle_id: e.target.value })} />
-          <TextField label="وقت المخالفة" required type="datetime-local" value={form.occurred_at} onChange={(e) => setForm({ ...form, occurred_at: e.target.value })} />
-          <MoneyField label="المبلغ (للمتابعة)" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-          <TextField label="المكان" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          <SelectField label="السيارة" required error={fieldErrors.vehicle_id} options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))} value={form.vehicle_id} onChange={(e) => setForm({ ...form, vehicle_id: e.target.value })} />
+          <TextField label="وقت المخالفة" required error={fieldErrors.occurred_at} type="datetime-local" value={form.occurred_at} onChange={(e) => setForm({ ...form, occurred_at: e.target.value })} />
+          <MoneyField label="المبلغ (للمتابعة)" required error={fieldErrors.amount} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          <TextField label="المكان" error={fieldErrors.location} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           <MediaUpload
             label="صورة المخالفة"
             accept="both"
             collection="violations"
             purpose="ticket"
+            error={fieldErrors.photo_path}
             value={form.photo_path || null}
             onChange={(path) => setForm({ ...form, photo_path: path || '' })}
           />

@@ -65,13 +65,13 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             onChange={(e) => patch({ odometer_in: e.target.value })}
           />
         ) : null}
-        {action === 'handover' || action === 'return' ? (
+        {action === 'handover' || action === 'return' || action === 'swap' ? (
           <NumberField label="مستوى البنزين %" value={form.fuel_level} onChange={(e) => patch({ fuel_level: e.target.value })} />
         ) : null}
         {action === 'return' || action === 'swap' ? (
           <MoneyField label="رسوم أضرار" value={form.damage_fee} onChange={(e) => patch({ damage_fee: e.target.value })} />
         ) : null}
-        {action === 'return' ? (
+        {action === 'return' || action === 'swap' ? (
           <>
             <TextField label="موضع الضرر (إن وُجد)" value={form.damage_position} onChange={(e) => patch({ damage_position: e.target.value })} />
             <TextAreaField label="وصف الضرر" value={form.damage_description} onChange={(e) => patch({ damage_description: e.target.value })} />
@@ -88,11 +88,11 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             />
           </>
         ) : null}
-        {action === 'handover' || action === 'return' ? (
+        {action === 'handover' || action === 'return' || action === 'swap' ? (
           <>
             <TextAreaField label="ملاحظات الفحص" value={form.notes} onChange={(e) => patch({ notes: e.target.value })} />
             <SignatureField
-              required={action === 'handover' || Boolean(form.damage_fee) || Boolean(form.damage_position)}
+              required={action === 'handover' || action === 'swap' || Boolean(form.damage_fee) || Boolean(form.damage_position)}
               value={form.signature_data}
               onChange={(signature_data) => patch({ signature_data })}
             />

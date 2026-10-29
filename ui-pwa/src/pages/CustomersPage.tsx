@@ -41,6 +41,7 @@ export function CustomersPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [blacklistReason, setBlacklistReason] = useState('')
 
   async function load() {
@@ -88,8 +89,19 @@ export function CustomersPage() {
     }
   }
 
+  function mapApiErrors(e: unknown) {
+    const apiErr = e as ApiError
+    const next: Record<string, string> = {}
+    if (apiErr.errors) {
+      for (const [k, v] of Object.entries(apiErr.errors)) next[k] = v[0]
+    }
+    setFieldErrors(next)
+    toast.error(apiErr.message)
+  }
+
   async function onSave() {
     setSaving(true)
+    setFieldErrors({})
     try {
       await api('/customers', { method: 'POST', json: form })
       toast.success('تم تسجيل العميل.')
@@ -97,7 +109,7 @@ export function CustomersPage() {
       setForm(emptyForm)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      mapApiErrors(e)
     } finally {
       setSaving(false)
     }
@@ -106,6 +118,7 @@ export function CustomersPage() {
   async function onUpdate() {
     if (!detail) return
     setSaving(true)
+    setFieldErrors({})
     try {
       const res = await api<{ data: Customer; message: string }>(`/customers/${detail.id}`, {
         method: 'PUT',
@@ -116,7 +129,7 @@ export function CustomersPage() {
       setEditing(false)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      mapApiErrors(e)
     } finally {
       setSaving(false)
     }
@@ -190,12 +203,12 @@ export function CustomersPage() {
 
   const formFields = (
     <div className="rpm-form-grid">
-      <TextField label="الاسم الكامل" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-      <TextField label="الهاتف" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-      <TextField label="الرقم القومي" value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
-      <TextField label="تاريخ الميلاد" required type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
-      <TextField label="رقم الرخصة" required value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
-      <TextField label="انتهاء الرخصة" required type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
+      <TextField label="الاسم الكامل" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+      <TextField label="الهاتف" required error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <TextField label="تاريخ الميلاد" required error={fieldErrors.birth_date} type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
+      <TextField label="رقم الرخصة" required error={fieldErrors.license_number} value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
+      <TextField label="انتهاء الرخصة" required error={fieldErrors.license_expires_on} type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       <MediaUpload
         label="صورة البطاقة"
@@ -203,6 +216,7 @@ export function CustomersPage() {
         collection="customers_id"
         purpose="national_id"
         accept="image"
+        error={fieldErrors.national_id_image_path}
         attachableType={editing && detail ? 'customer' : undefined}
         attachableId={editing && detail ? detail.id : undefined}
         onChange={(path) => setForm({ ...form, national_id_image_path: path || '' })}
@@ -213,6 +227,7 @@ export function CustomersPage() {
         collection="customers_id"
         purpose="license"
         accept="image"
+        error={fieldErrors.license_image_path}
         attachableType={editing && detail ? 'customer' : undefined}
         attachableId={editing && detail ? detail.id : undefined}
         onChange={(path) => setForm({ ...form, license_image_path: path || '' })}

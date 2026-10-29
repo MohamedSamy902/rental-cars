@@ -100,6 +100,16 @@ export function useContractLifecycle(onMutated?: () => void) {
             odometer_in: Number(actionForm.odometer_in),
             odometer_out: Number(actionForm.odometer_out),
             damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
+            fuel_level: actionForm.fuel_level ? Number(actionForm.fuel_level) : 50,
+            signature_data: actionForm.signature_data || undefined,
+            notes: actionForm.notes || undefined,
+            damages: actionForm.damage_position
+              ? [{
+                  position: actionForm.damage_position,
+                  description: actionForm.damage_description || actionForm.damage_position,
+                  photo_path: actionForm.damage_photo_path || null,
+                }]
+              : [],
           },
         })
         toast.success('تم التبديل بسبب عطل.')

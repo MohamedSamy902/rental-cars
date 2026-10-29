@@ -146,7 +146,7 @@ export const bookingStatusLabel: Record<BookingStatus, string> = {
 
 export const categoryOptions = [
   { value: 'economy', label: 'اقتصادي' },
-  { value: 'suv', label: 'SUV' },
+  { value: 'suv', label: 'دفع رباعي' },
   { value: 'luxury', label: 'فاخر' },
 ]
 

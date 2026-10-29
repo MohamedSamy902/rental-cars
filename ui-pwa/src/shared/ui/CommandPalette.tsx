@@ -176,7 +176,7 @@ function PaletteLayer({ onClose }: { onClose: () => void }) {
               إلغاء
             </button>
           ) : (
-            <kbd className="rpm-cmd__kbd">Esc</kbd>
+            <kbd className="rpm-cmd__kbd">خروج</kbd>
           )}
         </div>
         <ul className="rpm-cmd__list" id="rpm-cmd-list" role="listbox" ref={listRef}>

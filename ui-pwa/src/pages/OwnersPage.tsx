@@ -69,6 +69,7 @@ export function OwnersPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [detail, setDetail] = useState<(Owner & { vehicles?: OwnerVehicle[]; dues?: Due[]; payouts?: Payout[] }) | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -117,8 +118,19 @@ export function OwnersPage() {
     }
   }
 
+  function mapApiErrors(e: unknown) {
+    const apiErr = e as ApiError
+    const next: Record<string, string> = {}
+    if (apiErr.errors) {
+      for (const [k, v] of Object.entries(apiErr.errors)) next[k] = v[0]
+    }
+    setFieldErrors(next)
+    toast.error(apiErr.message)
+  }
+
   async function onSave() {
     setSaving(true)
+    setFieldErrors({})
     try {
       await api('/owners', { method: 'POST', json: form })
       toast.success('تم تسجيل المالك.')
@@ -126,7 +138,7 @@ export function OwnersPage() {
       setForm(emptyForm)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      mapApiErrors(e)
     } finally {
       setSaving(false)
     }
@@ -135,6 +147,7 @@ export function OwnersPage() {
   async function onUpdate() {
     if (!detail) return
     setSaving(true)
+    setFieldErrors({})
     try {
       const res = await api<{ data: Owner; message: string }>(`/owners/${detail.id}`, {
         method: 'PUT',
@@ -145,7 +158,7 @@ export function OwnersPage() {
       await openDetail(detail.id)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      mapApiErrors(e)
     } finally {
       setSaving(false)
     }
@@ -181,9 +194,9 @@ export function OwnersPage() {
 
   const formFields = (
     <div className="rpm-form-grid">
-      <TextField label="اسم المالك" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-      <TextField label="الهاتف" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-      <TextField label="الرقم القومي" value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <TextField label="اسم المالك" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+      <TextField label="الهاتف" error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
     </div>
   )
