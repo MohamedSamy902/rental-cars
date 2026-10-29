@@ -28,6 +28,8 @@ class WorkOrderController extends Controller
             'meta' => ['total' => $rows->total()],
             'summary' => [
                 'open' => WorkOrder::query()->whereIn('status', ['open', 'in_progress'])->count(),
+                'open_only' => WorkOrder::query()->where('status', 'open')->count(),
+                'in_progress' => WorkOrder::query()->where('status', 'in_progress')->count(),
                 'closed' => WorkOrder::query()->where('status', 'closed')->count(),
             ],
         ]);
@@ -58,7 +60,7 @@ class WorkOrderController extends Controller
         ]);
 
         try {
-            $order = $this->service->open($data, $data['lines'] ?? []);
+            $order = $this->service->open($data, $data['lines'] ?? [], $request->user()?->id);
         } catch (\DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, SummaryStrip, Button, StatusPill, useToast,
+  PageHeader, MetricCardGrid, Button, StatusPill, useToast,
   SkeletonBlock, ErrorState, EmptyState, TextField, Sheet,
+  IconCash, IconReturn, IconLandmark,
 } from '@/shared/ui'
 import './pages.css'
+import './AccountsPage.css'
 
 type MonthRow = {
   year: number
@@ -13,14 +16,20 @@ type MonthRow = {
   label: string
   locked: boolean
   rent_revenue: number
+  expenses?: number
   completed_contracts: number
 }
 
 type Account = { id: number; code: string; name: string; type: string }
 type Payment = { id: number; amount: number; direction: string; method: string; paid_at: string; notes?: string; reference?: string }
 
+function monthKey(m: MonthRow) {
+  return `${m.year}-${String(m.month).padStart(2, '0')}`
+}
+
 export function AccountsPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [months, setMonths] = useState<MonthRow[]>([])
@@ -50,7 +59,7 @@ export function AccountsPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { void load() }, [])
 
   async function lockMonth(m: MonthRow) {
     try {
@@ -88,36 +97,53 @@ export function AccountsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="الحسابات"
-        subtitle="توزيع الإيجار على الشهور · إقفال شهر · بلا رصيد دائن وبلا ترحيل مخالفات"
+        subtitle="توزيع الإيجار على الشهور · إقفال شهر · رصيد دائن للعملاء — التقارير ليست نهائية بعد (ترحيل التأمين/الدفعات مؤجّل)"
       />
 
-      <SummaryStrip
+      <MetricCardGrid
+        label="ملخص الحسابات"
         items={[
-          { label: 'مقبوضات', value: formatMoney(totals.payments_in), tone: 'success' },
-          { label: 'مدفوعات للعملاء', value: formatMoney(totals.payments_out), tone: 'warning' },
-          { label: 'دليل الحسابات', value: String(accounts.length) },
+          { id: 'in', label: 'مقبوضات', value: totals.payments_in, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
+          { id: 'out', label: 'مدفوعات للعملاء', value: totals.payments_out, format: 'money', tone: 'warning', icon: <IconReturn size={16} /> },
+          { id: 'coa', label: 'دليل الحسابات', value: accounts.length, icon: <IconLandmark size={16} /> },
         ]}
       />
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>الشهور</h3></div>
         {months.length === 0 ? <EmptyState title="لا توجد بيانات شهرية بعد" /> : (
-          <div className="rpm-dense-list">
+          <div className="ac-months">
             {months.map((m) => (
-              <div key={`${m.year}-${m.month}`} className="rpm-dense-row">
-                <div>
-                  <strong>{m.label}</strong>
-                  <p className="muted">إيراد إيجار مرحّل: {formatMoney(m.rent_revenue)} · عقود مكتملة: {m.completed_contracts}</p>
-                </div>
-                <div className="rpm-card__actions">
+              <article key={monthKey(m)} className="ac-month">
+                <header className="ac-month__head">
+                  <h4>{m.label}</h4>
                   <StatusPill status={m.locked ? 'maintenance' : 'available'} label={m.locked ? 'مقفل' : 'مفتوح'} />
+                </header>
+                <dl className="ac-month__metrics">
+                  <div>
+                    <dt>إيراد إيجار</dt>
+                    <dd className="tabular-nums">{formatMoney(m.rent_revenue)}</dd>
+                  </div>
+                  <div>
+                    <dt>مصروفات</dt>
+                    <dd className="tabular-nums">{formatMoney(m.expenses ?? 0)}</dd>
+                  </div>
+                  <div>
+                    <dt>عقود مكتملة</dt>
+                    <dd className="tabular-nums">{m.completed_contracts}</dd>
+                  </div>
+                </dl>
+                <div className="ac-month__actions">
+                  <Button size="sm" variant="secondary" onClick={() => navigate(`/accounts/months/${monthKey(m)}`)}>
+                    دفتر الشهر
+                  </Button>
                   {!m.locked ? (
-                    <Button size="sm" variant="secondary" onClick={() => lockMonth(m)}>إقفال</Button>
+                    <Button size="sm" variant="secondary" onClick={() => void lockMonth(m)}>إقفال</Button>
                   ) : (
                     <Button size="sm" variant="secondary" onClick={() => setReopen(m)}>إعادة فتح</Button>
                   )}
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
@@ -159,7 +185,7 @@ export function AccountsPage() {
         onClose={() => setReopen(null)}
         footer={
           <>
-            <Button loading={saving} onClick={reopenMonth}>تأكيد</Button>
+            <Button loading={saving} onClick={() => void reopenMonth()}>تأكيد</Button>
             <Button variant="secondary" onClick={() => setReopen(null)}>إلغاء</Button>
           </>
         }

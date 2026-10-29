@@ -1,5 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { apiBlob, apiUpload, type ApiError } from '@/shared/api/client'
+import { heicToJpeg, isHeicFile } from '@/shared/lib/heicConvert'
+import {
+  acceptForKind,
+  DEFAULT_MEDIA_LIMITS,
+  getMediaLimits,
+  maxMbForFile,
+  type MediaLimits,
+} from '@/shared/lib/mediaLimits'
 import { FieldShell } from './Field'
 import './MediaUpload.css'
 
@@ -23,18 +31,14 @@ type Props = {
   collection?: string
   purpose?: string
   accept?: AcceptKind
+  /** Optional capture hint for mobile camera; omit to keep gallery/file picker. */
+  capture?: 'environment' | 'user'
   attachableType?: string
   attachableId?: number
   required?: boolean
   error?: string
   hint?: string
   disabled?: boolean
-}
-
-const ACCEPT: Record<AcceptKind, string> = {
-  image: 'image/jpeg,image/png,image/webp,image/gif',
-  video: 'video/mp4,video/webm,video/quicktime',
-  both: 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime',
 }
 
 function mediaApiPath(stored: string): string | null {
@@ -47,6 +51,16 @@ function mediaApiPath(stored: string): string | null {
   return null
 }
 
+async function prepareUploadFile(file: File): Promise<File> {
+  if (!isHeicFile(file)) return file
+  try {
+    return await heicToJpeg(file)
+  } catch {
+    /* السيرفر يقبل HEIC كاحتياط */
+    return file
+  }
+}
+
 export function MediaUpload({
   label,
   value,
@@ -54,11 +68,12 @@ export function MediaUpload({
   collection = 'general',
   purpose,
   accept = 'image',
+  capture,
   attachableType,
   attachableId,
   required,
   error,
-  hint = 'يُحفظ محلياً على السيرفر — بلا إرسال لخدمة خارجية',
+  hint,
   disabled,
 }: Props) {
   const inputId = useId()
@@ -67,7 +82,18 @@ export function MediaUpload({
   const [localError, setLocalError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<'image' | 'video' | null>(null)
+  const [limits, setLimits] = useState<MediaLimits>(DEFAULT_MEDIA_LIMITS)
   const blobRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void getMediaLimits().then((l) => {
+      if (!cancelled) setLimits(l)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -104,10 +130,29 @@ export function MediaUpload({
   async function onPick(file: File | null) {
     if (!file) return
     setLocalError(null)
+
+    const currentLimits = await getMediaLimits()
+    setLimits(currentLimits)
+
+    const maxMb = maxMbForFile(currentLimits, file, accept)
+    const maxBytes = maxMb * 1024 * 1024
+    if (file.size > maxBytes) {
+      setLocalError(`حجم الملف أكبر من المسموح (الحد الأقصى ${maxMb} ميجا)`)
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
+
     setUploading(true)
     try {
+      const uploadFile = await prepareUploadFile(file)
+
+      if (uploadFile !== file && uploadFile.size > maxBytes) {
+        setLocalError(`حجم الملف أكبر من المسموح (الحد الأقصى ${maxMb} ميجا)`)
+        return
+      }
+
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', uploadFile)
       fd.append('collection', collection)
       if (purpose) fd.append('purpose', purpose)
       if (attachableType) fd.append('attachable_type', attachableType)
@@ -118,7 +163,7 @@ export function MediaUpload({
       const storePath = `/media/${media.id}/file`
 
       if (blobRef.current) URL.revokeObjectURL(blobRef.current)
-      const local = URL.createObjectURL(file)
+      const local = URL.createObjectURL(uploadFile)
       blobRef.current = local
       setPreviewUrl(local)
       setPreviewKind(media.kind === 'video' ? 'video' : 'image')
@@ -144,10 +189,12 @@ export function MediaUpload({
   }
 
   const showError = error || localError || undefined
+  const resolvedHint = hint ?? limits.hint ?? DEFAULT_MEDIA_LIMITS.hint
+  const acceptAttr = acceptForKind(limits, accept)
 
   return (
-    <FieldShell label={label} required={required} error={showError} hint={hint} htmlFor={inputId}>
-      <div className={`rpm-media ${disabled ? 'is-disabled' : ''}`}>
+    <FieldShell label={label} required={required} error={showError} hint={resolvedHint} htmlFor={inputId}>
+      <div className={`rpm-media ${disabled ? 'is-disabled' : ''} ${uploading ? 'is-uploading' : ''}`}>
         {previewUrl ? (
           <div className="rpm-media__preview">
             {previewKind === 'video' ? (
@@ -166,7 +213,8 @@ export function MediaUpload({
             ref={inputRef}
             id={inputId}
             type="file"
-            accept={ACCEPT[accept]}
+            accept={acceptAttr}
+            capture={capture}
             disabled={disabled || uploading}
             className="rpm-media__input"
             onChange={(e) => void onPick(e.target.files?.[0] || null)}
@@ -185,6 +233,11 @@ export function MediaUpload({
             </button>
           ) : null}
         </div>
+        {uploading ? (
+          <p className="rpm-media__progress" role="status" aria-live="polite">
+            جارٍ الرفع…
+          </p>
+        ) : null}
       </div>
     </FieldShell>
   )

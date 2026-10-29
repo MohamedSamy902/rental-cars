@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountingController;
+use App\Http\Controllers\Api\AttentionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CollaborationController;
 use App\Http\Controllers\Api\ContractController;
@@ -32,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/dashboard', DashboardController::class);
+    Route::get('/attention', AttentionController::class);
 
     Route::post('/media', [MediaController::class, 'store']);
     Route::get('/media/{medium}', [MediaController::class, 'show']);
@@ -99,6 +101,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/customers', [CustomerController::class, 'index'])->middleware('permission:customers.view');
     Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.create');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->middleware('permission:customers.view');
+    Route::post('/customers/{customer}/apply-credit', [CustomerController::class, 'applyCredit'])
+        ->middleware('permission:payments.create,contracts.update');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])
         ->middleware('permission:customers.update,blacklist.manage');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->middleware('permission:customers.update');

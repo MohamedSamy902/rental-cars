@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, Button, Sheet, Fab, NumberField, MoneyField, SelectField, TextAreaField,
-  useToast, EmptyState, SkeletonBlock, DetailList,
+  PageHeader, FilterBar, Button, Sheet, Fab, NumberField, MoneyField, SelectField, TextAreaField,
+  useToast, DataTable, IconWallet, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -18,16 +18,58 @@ type Account = {
 
 type Employee = { id: number; name: string; job_title?: string }
 
+const columns: DataColumn<Account>[] = [
+  {
+    id: 'employee',
+    header: 'الموظف',
+    cell: (a) => <strong className="rpm-table__primary">{a.employee?.name || `موظف #${a.employee_id}`}</strong>,
+    sortValue: (a) => a.employee?.name,
+    mobile: 'title',
+  },
+  { id: 'job', header: 'الوظيفة', cell: (a) => a.employee?.job_title || '—', sortValue: (a) => a.employee?.job_title, mobile: 'subtitle' },
+  { id: 'balance', header: 'الرصيد', cell: (a) => <strong>{formatMoney(a.balance)}</strong>, sortValue: (a) => Number(a.balance) },
+  { id: 'limit', header: 'حد العهدة', cell: (a) => formatMoney(a.limit_amount), sortValue: (a) => Number(a.limit_amount) },
+]
+
 export function PettyCashPage() {
   const toast = useToast()
   const [rows, setRows] = useState<Account[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useState('all')
   const [open, setOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState<Account | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ employee_id: '', limit_amount: '1000', balance: '' })
   const [move, setMove] = useState({ type: 'spend', amount: '', notes: '' })
+
+  const lowBalanceCount = useMemo(
+    () => rows.filter((a) => Number(a.balance) <= Number(a.limit_amount) * 0.2).length,
+    [rows],
+  )
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'active', label: 'نشطة' },
+      {
+        id: 'low',
+        label: 'رصيد منخفض',
+        attention: lowBalanceCount > 0 ? ('warning' as const) : null,
+        attentionLabel: `${lowBalanceCount} عهدة رصيدها منخفض`,
+      },
+    ],
+    [lowBalanceCount],
+  )
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return rows.filter((a) => {
+      if (chip === 'active' && !a.is_active) return false
+      if (chip === 'low' && Number(a.balance) > Number(a.limit_amount) * 0.2) return false
+      if (!q) return true
+      return (a.employee?.name || '').toLowerCase().includes(q) || (a.employee?.job_title || '').toLowerCase().includes(q)
+    })
+  }, [rows, chip, search])
 
   async function load() {
     setLoading(true)
@@ -107,27 +149,28 @@ export function PettyCashPage() {
         mobileFab
       />
       <Fab label="عهدة جديدة" onClick={() => void openCreate()} />
-      {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا توجد عهد مسجّلة" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((a) => (
-          <article key={a.id} className="rpm-card">
-            <div className="rpm-card__row">
-              <strong>{a.employee?.name || `موظف #${a.employee_id}`}</strong>
-              <span className="muted">{a.employee?.job_title || ''}</span>
-            </div>
-            <DetailList
-              rows={[
-                { label: 'الرصيد', value: formatMoney(a.balance) },
-                { label: 'حد العهدة', value: formatMoney(a.limit_amount) },
-              ]}
-            />
-            <div className="rpm-card__actions">
-              <Button size="sm" onClick={() => setMoveOpen(a)}>حركة</Button>
-            </div>
-          </article>
-        ))}
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="بحث باسم الموظف…"
+      />
+      <DataTable
+        label="العهد"
+        rows={visible}
+        columns={columns}
+        rowKey={(a) => a.id}
+        rowLabel={(a) => `عهدة ${a.employee?.name ?? ''}`}
+        loading={loading}
+        onRowClick={(a) => setMoveOpen(a)}
+        rowActions={(a) => [
+          { id: 'move', label: 'تسجيل حركة', icon: <IconWallet size={16} />, onSelect: () => setMoveOpen(a) },
+        ]}
+        emptyTitle="لا توجد عهد مسجّلة"
+        emptyDescription="سجّل عهدة لموظف لتتبع التسليم والاستخدام والمرتجع."
+      />
 
       <Sheet
         open={open}

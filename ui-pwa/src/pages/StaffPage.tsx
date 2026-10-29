@@ -4,10 +4,12 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, Sheet, Fab, TextField, SelectField, NumberField, MoneyField, SwitchField,
-  useToast, EmptyState, ErrorState, SkeletonBlock, StatusPill,
+  useToast, EmptyState, ErrorState, SkeletonBlock, StatusPill, AttentionDot,
   IconPlus, IconShield, IconBadge, IconUsers, IconSearch,
 } from '@/shared/ui'
+import { IconEdit, IconMail, IconPhone } from '@/shared/ui/Icons'
 import './StaffPage.css'
+import '@/shared/ui/AttentionDot.css'
 
 type Role = {
   id: number
@@ -407,10 +409,15 @@ export function StaffPage() {
 
       <div className="st-tabs" role="tablist" aria-label="أقسام الصفحة">
         {([
-          { id: 'users', label: 'حسابات الدخول' },
-          { id: 'permissions', label: 'الأدوار والصلاحيات' },
-          { id: 'hr', label: 'سجل الموارد البشرية' },
-        ] as const).map((t) => (
+          {
+            id: 'users' as const,
+            label: 'حسابات الدخول',
+            attention: (users.some((u) => !u.is_active) ? 'warning' : null) as 'warning' | null,
+            attentionLabel: 'حسابات موقوفة',
+          },
+          { id: 'permissions' as const, label: 'الأدوار والصلاحيات', attention: null as 'warning' | null, attentionLabel: undefined },
+          { id: 'hr' as const, label: 'سجل الموارد البشرية', attention: null as 'warning' | null, attentionLabel: undefined },
+        ]).map((t) => (
           <button
             key={t.id}
             type="button"
@@ -419,7 +426,12 @@ export function StaffPage() {
             className={`st-tabs__btn ${tab === t.id ? 'is-active' : ''}`}
             onClick={() => setTab(t.id)}
           >
-            {t.label}
+            <span className="rpm-attention-inline">
+              {t.label}
+              {t.attention ? (
+                <AttentionDot tone={t.attention} placement="inline" label={t.attentionLabel} />
+              ) : null}
+            </span>
           </button>
         ))}
       </div>
@@ -460,24 +472,35 @@ export function StaffPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(i, 8) * 0.03, duration: 0.3, ease }}
                 >
-                  <div className="st-user__top">
+                  <header className="st-user__head">
                     <span className="st-user__avatar" aria-hidden>{u.name.slice(0, 1)}</span>
-                    <div className="st-user__meta">
+                    <div className="st-user__id">
                       <strong>{u.name}</strong>
-                      <em>{u.email}</em>
+                      <span className="st-user__role">
+                        <IconShield size={13} />
+                        {u.role?.label || 'بدون دور'}
+                      </span>
                     </div>
                     <StatusPill
                       status={u.is_active ? 'active' : 'cancelled'}
                       label={u.is_active ? 'نشط' : 'موقوف'}
                     />
-                  </div>
-                  <div className="st-user__row">
-                    <span>{u.role?.label || 'بدون دور'}</span>
-                    <span>{u.phone || '—'}</span>
-                  </div>
-                  <div className="st-user__actions">
-                    <Button size="sm" variant="secondary" onClick={() => openEditUser(u)}>تعديل</Button>
-                  </div>
+                  </header>
+                  <dl className="st-user__contact">
+                    <div>
+                      <dt><IconMail size={14} /><span>البريد</span></dt>
+                      <dd dir="ltr">{u.email}</dd>
+                    </div>
+                    <div>
+                      <dt><IconPhone size={14} /><span>الهاتف</span></dt>
+                      <dd dir="ltr" className="tabular-nums">{u.phone || '—'}</dd>
+                    </div>
+                  </dl>
+                  <footer className="st-user__foot">
+                    <Button size="sm" variant="secondary" iconStart={<IconEdit size={15} />} onClick={() => openEditUser(u)}>
+                      تعديل الحساب
+                    </Button>
+                  </footer>
                 </motion.article>
               ))}
             </div>

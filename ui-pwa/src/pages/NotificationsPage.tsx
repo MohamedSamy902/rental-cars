@@ -1,14 +1,45 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime } from '@/shared/lib/format'
 import { PageHeader, SkeletonBlock, EmptyState, Button, useToast } from '@/shared/ui'
 import { disableWebPush, enableWebPush, pushSupported, sendTestPush } from '@/shared/push/webPush'
 import './pages.css'
+import './NotificationsPage.css'
 
-type Note = { id: number; title: string; body: string; created_at: string; read_at?: string | null }
+type Note = {
+  id: number
+  title: string
+  body: string
+  created_at: string
+  read_at?: string | null
+  link_type?: string | null
+  link_id?: number | null
+}
+
+function shortcut(type?: string | null, id?: number | null): { to: string; label: string } | null {
+  if (!type) return null
+  if (type === 'contract' && id) return { to: `/contracts/${id}`, label: 'فتح العقد' }
+  if (type === 'vehicle' && id) return { to: `/vehicles/${id}`, label: 'ملف المركبة' }
+  if (type === 'customer') return { to: '/customers', label: 'العملاء' }
+  if (type === 'owner') return { to: '/owners', label: 'الملاك' }
+  if (type === 'payroll') return { to: '/hr', label: 'الموارد البشرية' }
+  return null
+}
+
+function relativeDay(iso: string) {
+  const d = new Date(iso)
+  const today = new Date()
+  const start = (x: Date) => Date.UTC(x.getFullYear(), x.getMonth(), x.getDate())
+  const diff = Math.round((start(today) - start(d)) / 86400000)
+  if (diff === 0) return 'اليوم'
+  if (diff === 1) return 'أمس'
+  return formatDateTime(iso).split('،')[0] || formatDateTime(iso)
+}
 
 export function NotificationsPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [rows, setRows] = useState<Note[]>([])
   const [unread, setUnread] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -96,27 +127,44 @@ export function NotificationsPage() {
     }
   }
 
+  async function openNote(n: Note) {
+    if (!n.read_at) await markRead(n.id)
+    const go = shortcut(n.link_type, n.link_id)
+    if (go) navigate(go.to)
+  }
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Note[]>()
+    for (const n of rows) {
+      const key = relativeDay(n.created_at)
+      const list = map.get(key) ?? []
+      list.push(n)
+      map.set(key, list)
+    }
+    return [...map.entries()]
+  }, [rows])
+
   return (
-    <div className="rpm-stack">
+    <div className="rpm-stack nf">
       <PageHeader
         title="الإشعارات"
-        subtitle={unread > 0 ? `${unread} غير مقروء` : 'قائمة داخل النظام + إشعار يصل للموبايل'}
+        subtitle={unread > 0 ? `${unread} غير مقروء` : 'سجل زمني داخل النظام + وصول للموبايل'}
         action={unread > 0 ? <Button variant="secondary" onClick={() => void markAll()}>تعليم الكل كمقروء</Button> : undefined}
       />
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>إشعارات الموبايل (Push)</h3></div>
-        <p className="muted" style={{ marginBottom: '0.75rem' }}>
+        <p className="muted">
           {pushSupported()
             ? 'فعّل الإذن ليصلك تنبيه على شاشة الموبايل حتى لو التطبيق مقفول. أندرويد: Chrome/Edge · آيفون: iOS 16.4+ بعد «إضافة إلى الشاشة الرئيسية» وعلى HTTPS.'
             : 'هذا المتصفح لا يدعم Web Push.'}
         </p>
-        <p className="muted" style={{ marginBottom: '0.75rem' }}>
+        <p className="muted">
           حالة السيرفر: {pushEnabled ? 'مفاتيح VAPID جاهزة' : 'غير مفعّل — نفّذ php artisan push:vapid --write'}
           {' · '}
           أجهزة هذا الحساب: {devices}
         </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="rpm-actions-row">
           <Button loading={busy} onClick={() => void onEnablePush()}>تفعيل على هذا الجهاز</Button>
           {devices > 0 ? (
             <>
@@ -129,20 +177,36 @@ export function NotificationsPage() {
 
       {loading ? <SkeletonBlock rows={4} /> : null}
       {!loading && rows.length === 0 ? <EmptyState title="لا توجد إشعارات" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((n) => (
-          <article key={n.id} className={`rpm-card ${n.read_at ? '' : 'is-unread'}`.trim()}>
-            <div className="rpm-card__row">
-              <strong>{n.title}</strong>
-              {!n.read_at ? (
-                <Button size="sm" variant="secondary" onClick={() => void markRead(n.id)}>تعليم كمقروء</Button>
-              ) : (
-                <span className="muted">مقروء</span>
-              )}
-            </div>
-            <p>{n.body}</p>
-            <p className="muted">{formatDateTime(n.created_at)}</p>
-          </article>
+
+      <div className="nf-feed" role="feed" aria-label="سجل الإشعارات">
+        {grouped.map(([day, items]) => (
+          <section key={day} className="nf-day">
+            <h3>{day}</h3>
+            <ol>
+              {items.map((n) => {
+                const go = shortcut(n.link_type, n.link_id)
+                const unreadNote = !n.read_at
+                return (
+                  <li key={n.id}>
+                    <article className={`nf-item ${unreadNote ? 'is-unread' : ''}`.trim()}>
+                      <button type="button" className="nf-item__main" onClick={() => void openNote(n)}>
+                        <span className="nf-item__dot" aria-hidden />
+                        <span className="nf-item__body">
+                          <strong>{n.title}</strong>
+                          <p>{n.body}</p>
+                          <time dateTime={n.created_at}>{formatDateTime(n.created_at)}</time>
+                        </span>
+                      </button>
+                      <div className="nf-item__actions">
+                        {go ? <Button size="sm" variant="secondary" onClick={() => void openNote(n)}>{go.label}</Button> : null}
+                        {unreadNote ? <Button size="sm" variant="secondary" onClick={() => void markRead(n.id)}>مقروء</Button> : null}
+                      </div>
+                    </article>
+                  </li>
+                )
+              })}
+            </ol>
+          </section>
         ))}
       </div>
     </div>

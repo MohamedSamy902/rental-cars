@@ -3,6 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import {
   PageHeader, Button, SelectField, TextField, useToast, EmptyState, SkeletonBlock,
 } from '@/shared/ui'
+import { escapeHtml } from '@/shared/lib/escapeHtml'
 import { formatDateTime } from '@/shared/lib/format'
 import './pages.css'
 
@@ -67,18 +68,19 @@ export function DepartmentNoticePage() {
     }
     const body = rows.map((c) => `
       <section style="break-inside:avoid;margin:0 0 18px;padding:14px;border:1px solid #cbd5e1;border-radius:12px">
-        <h2 style="margin:0 0 8px;font-size:18px">${c.full_name}</h2>
-        <p>الهاتف: ${c.phone || '—'}</p>
-        <p>الرقم القومي: ${c.national_id || '—'}</p>
-        <p>الرخصة: ${c.license_number || '—'} · تنتهي ${c.license_expires_on || '—'}</p>
-        <p>تاريخ الميلاد: ${c.birth_date || '—'}</p>
+        <h2 style="margin:0 0 8px;font-size:18px">${escapeHtml(c.full_name)}</h2>
+        <p>الهاتف: ${escapeHtml(c.phone || '—')}</p>
+        <p>الرقم القومي: ${escapeHtml(c.national_id || '—')}</p>
+        <p>الرخصة: ${escapeHtml(c.license_number || '—')} · تنتهي ${escapeHtml(c.license_expires_on || '—')}</p>
+        <p>تاريخ الميلاد: ${escapeHtml(c.birth_date || '—')}</p>
       </section>
     `).join('')
+    const meta = `${escapeHtml(center || '')} · ${escapeHtml(generatedAt ? formatDateTime(generatedAt) : '')}`
     w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>إخطار القسم</title>
       <style>body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a} h1{margin:0 0 4px} .muted{color:#64748b}</style>
       </head><body>
       <h1>إخطار القسم</h1>
-      <p class="muted">${center || ''} · ${generatedAt ? formatDateTime(generatedAt) : ''}</p>
+      <p class="muted">${meta}</p>
       ${body || '<p>لا توجد بيانات</p>'}
       <script>window.onload=()=>window.print()<\/script>
       </body></html>`)

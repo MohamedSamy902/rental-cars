@@ -14,7 +14,7 @@ class Customer extends Model
         'full_name', 'phone', 'phone_alt', 'email', 'national_id', 'national_id_expires_on',
         'national_id_image_path', 'passport_number', 'passport_expires_on', 'birth_date', 'address',
         'license_number', 'license_expires_on', 'license_image_path',
-        'status', 'blacklist_reason', 'blacklisted_by', 'blacklisted_at', 'notes',
+        'status', 'blacklist_reason', 'blacklisted_by', 'blacklisted_at', 'notes', 'credit_balance',
     ];
 
     protected function casts(): array
@@ -31,5 +31,10 @@ class Customer extends Model
     public function contracts(): HasMany
     {
         return $this->hasMany(Contract::class);
+    }
+
+    public function creditMovements(): HasMany
+    {
+        return $this->hasMany(CustomerCreditMovement::class);
     }
 }

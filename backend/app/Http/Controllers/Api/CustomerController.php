@@ -4,11 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Services\Customers\CustomerCreditService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
+    public function __construct(private readonly CustomerCreditService $credits) {}
+
     public function index(Request $request): JsonResponse
     {
         $q = Customer::query()->latest('id');
@@ -71,7 +75,37 @@ class CustomerController extends Controller
 
     public function show(Customer $customer): JsonResponse
     {
-        return response()->json(['data' => $customer]);
+        return response()->json([
+            'data' => $customer,
+            'credit_ledger' => $this->credits->ledger($customer),
+        ]);
+    }
+
+    public function applyCredit(Request $request, Customer $customer): JsonResponse
+    {
+        $data = $request->validate([
+            'contract_id' => ['required', 'exists:contracts,id'],
+            'amount' => ['required', 'integer', 'min:1'],
+        ], [], [
+            'contract_id' => 'العقد',
+            'amount' => 'المبلغ',
+        ]);
+
+        try {
+            $result = $this->credits->applyToContract(
+                $customer,
+                (int) $data['contract_id'],
+                (int) $data['amount'],
+                $request->user()?->id,
+            );
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => $result,
+            'message' => 'تم خصم الرصيد الدائن لسداد العقد.',
+        ]);
     }
 
     public function update(Request $request, Customer $customer): JsonResponse

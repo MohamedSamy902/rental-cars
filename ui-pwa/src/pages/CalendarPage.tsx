@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '@/shared/api/client'
-import { formatDateTime } from '@/shared/lib/format'
-import { PageHeader, StatusPill, SkeletonBlock, EmptyState, IconChevron } from '@/shared/ui'
+import { formatTime } from '@/shared/lib/format'
+import { PageHeader, StatusPill, SkeletonBlock, IconChevron } from '@/shared/ui'
+import { useIsMobile } from '@/shared/ui/useSheetDrag'
 import './CalendarPage.css'
 
 type Contract = {
@@ -23,12 +25,13 @@ const statusLabel: Record<string, string> = {
 
 const WEEKDAYS = ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'] // سبت → جمعة
 
-const monthFormatter = new Intl.DateTimeFormat('ar-EG', { month: 'long', year: 'numeric' })
+const monthFormatter = new Intl.DateTimeFormat('ar-EG', { month: 'long', year: 'numeric', numberingSystem: 'latn' })
 const dayFormatter = new Intl.DateTimeFormat('ar-EG', {
   weekday: 'long',
   day: 'numeric',
   month: 'long',
   year: 'numeric',
+  numberingSystem: 'latn',
 })
 
 function startOfDay(d: Date) {
@@ -74,10 +77,18 @@ export function CalendarPage() {
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selected, setSelected] = useState(() => startOfDay(new Date()))
   const [focusId, setFocusId] = useState<number | null>(null)
+  const [fleetSize, setFleetSize] = useState(0)
+  const mobile = useIsMobile()
 
   useEffect(() => {
-    api<{ data: Contract[] }>('/contracts?per_page=100')
-      .then((res) => setRows(res.data.filter((c) => ['pending', 'approved', 'active'].includes(c.status))))
+    Promise.all([
+      api<{ data: Contract[]; meta?: { total?: number } }>('/contracts?per_page=200'),
+      api<{ summary?: { total?: number } }>('/vehicles?per_page=1'),
+    ])
+      .then(([res, fleet]) => {
+        setRows(res.data.filter((c) => ['pending', 'approved', 'active'].includes(c.status)))
+        setFleetSize(fleet.summary?.total ?? 0)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -98,7 +109,9 @@ export function CalendarPage() {
   }, [cells, rows])
 
   const selectedEvents = byDay.get(selectedKey) || []
-  const focused = focusId ? rows.find((r) => r.id === focusId) || null : null
+  const orderedEvents = focusId
+    ? [...selectedEvents].sort((a, b) => Number(b.id === focusId) - Number(a.id === focusId))
+    : selectedEvents
 
   function shiftMonth(delta: number) {
     setMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1))
@@ -114,7 +127,7 @@ export function CalendarPage() {
 
   return (
     <div className="cal">
-      <PageHeader title="التقويم" subtitle="الحجوزات ظاهرة على الأيام مباشرة — اضغط حجزًا للتفاصيل" />
+      <PageHeader title="التقويم" subtitle="الحجوزات ظاهرة على الأيام مباشرة — اضغط يوماً لعرض حجوزاته" />
 
       <div className="cal-toolbar">
         <button type="button" className="cal-nav" aria-label="الشهر السابق" onClick={() => shiftMonth(-1)}>
@@ -144,6 +157,10 @@ export function CalendarPage() {
               const events = byDay.get(key) || []
               const inMonth = day.getMonth() === month.getMonth()
               const extra = Math.max(0, events.length - 2)
+              const dots = events.slice(0, 3)
+              const uniqueCars = new Set(events.map((e) => e.vehicle?.plate || e.id)).size
+              const loadPct = fleetSize ? Math.round((uniqueCars / fleetSize) * 100) : events.length
+              const label = `${dayFormatter.format(day)}${events.length ? ` · ${events.length} حجز` : ''}`
               return (
                 <div
                   key={key}
@@ -159,77 +176,104 @@ export function CalendarPage() {
                   <button
                     type="button"
                     className="cal-cell__daybtn"
-                    aria-label={dayFormatter.format(day)}
+                    aria-label={label}
                     aria-selected={key === selectedKey}
                     onClick={() => pickDay(day)}
                   >
-                    <span className="cal-cell__num">{day.getDate()}</span>
+                    <span className="cal-cell__num tabular-nums">{day.getDate()}</span>
+                    {mobile && events.length ? (
+                      fleetSize ? (
+                        <span className="cal-cell__load" aria-hidden>{loadPct}%</span>
+                      ) : (
+                        <span className="cal-cell__dots" aria-hidden>
+                          {dots.map((e) => (
+                            <i key={e.id} className={`cal-dot is-${e.status}`} />
+                          ))}
+                        </span>
+                      )
+                    ) : null}
                   </button>
 
-                  <div className="cal-cell__events">
-                    {events.slice(0, 2).map((e) => (
-                      <button
-                        key={e.id}
-                        type="button"
-                        className={`cal-chip is-${e.status} ${focusId === e.id ? 'is-focus' : ''}`}
-                        title={`${e.number} · ${e.customer?.full_name || ''} · ${statusLabel[e.status] || e.status}`}
-                        onClick={() => pickDay(day, e.id)}
-                      >
-                        <span className="cal-chip__text">{shortLabel(e)}</span>
-                      </button>
-                    ))}
-                    {extra > 0 ? (
-                      <button type="button" className="cal-chip is-more" onClick={() => pickDay(day)}>
-                        +{extra}
-                      </button>
-                    ) : null}
-                  </div>
+                  {!mobile ? (
+                    <div className="cal-cell__events">
+                      {events.slice(0, 2).map((e) => (
+                        <button
+                          key={e.id}
+                          type="button"
+                          className={`cal-chip is-${e.status} ${focusId === e.id ? 'is-focus' : ''}`}
+                          title={`${e.number} · ${e.customer?.full_name || ''} · ${statusLabel[e.status] || e.status}`}
+                          onClick={() => pickDay(day, e.id)}
+                        >
+                          <span className="cal-chip__text">{shortLabel(e)}</span>
+                        </button>
+                      ))}
+                      {extra > 0 ? (
+                        <button type="button" className="cal-chip is-more" onClick={() => pickDay(day)}>
+                          +{extra}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               )
             })}
           </div>
+          <div className="cal-legend" aria-hidden>
+            <span><i className="cal-dot is-active" /> نشط</span>
+            <span><i className="cal-dot is-approved" /> معتمد</span>
+            <span><i className="cal-dot is-pending" /> معلّق</span>
+          </div>
         </div>
       ) : null}
 
-      <div className="cal-legend" aria-hidden>
-        <span><i className="cal-dot is-active" /> نشط</span>
-        <span><i className="cal-dot is-approved" /> معتمد</span>
-        <span><i className="cal-dot is-pending" /> معلّق</span>
-      </div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.section
+          key={selectedKey}
+          className="cal-day"
+          aria-live="polite"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18 }}
+        >
+          <header className="cal-day__head">
+            <h2>{dayFormatter.format(selected)}</h2>
+            <span className="cal-day__count tabular-nums">{selectedEvents.length} حجز</span>
+          </header>
 
-      <section className="cal-day" aria-live="polite">
-        <div className="cal-day__head">
-          <h2>{dayFormatter.format(selected)}</h2>
-          <span>{selectedEvents.length} حجز</span>
-        </div>
+          {!loading && selectedEvents.length === 0 ? (
+            <p className="cal-day__empty">لا حجوزات في هذا اليوم</p>
+          ) : null}
 
-        {focused ? (
-          <article className="cal-event is-featured">
-            <div className="cal-event__top">
-              <strong>{focused.number}</strong>
-              <StatusPill status={focused.status} label={statusLabel[focused.status] || focused.status} />
-            </div>
-            <p>{focused.customer?.full_name}</p>
-            <p className="muted">{focused.vehicle?.brand} {focused.vehicle?.model} · {focused.vehicle?.plate}</p>
-            <p className="muted">{formatDateTime(focused.starts_at)} → {formatDateTime(focused.planned_ends_at)}</p>
-          </article>
-        ) : null}
-
-        {!loading && selectedEvents.length === 0 ? <EmptyState title="لا حجوزات في هذا اليوم" /> : null}
-        {selectedEvents
-          .filter((b) => b.id !== focusId)
-          .map((b) => (
-            <button key={b.id} type="button" className="cal-event" onClick={() => setFocusId(b.id)}>
-              <div className="cal-event__top">
-                <strong>{b.number}</strong>
-                <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />
-              </div>
-              <p>{b.customer?.full_name}</p>
-              <p className="muted">{b.vehicle?.brand} {b.vehicle?.model} · {b.vehicle?.plate}</p>
-              <p className="muted">{formatDateTime(b.starts_at)} → {formatDateTime(b.planned_ends_at)}</p>
-            </button>
-          ))}
-      </section>
+          <div className="cal-day__list">
+            {orderedEvents.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                className={`cal-event is-${b.status} ${focusId === b.id ? 'is-focus' : ''}`}
+                aria-pressed={focusId === b.id}
+                onClick={() => setFocusId(b.id)}
+              >
+                <div className="cal-event__top">
+                  <strong className="tabular-nums">{b.number}</strong>
+                  <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />
+                </div>
+                <p className="cal-event__who">{b.customer?.full_name}</p>
+                <dl className="cal-event__meta">
+                  <div>
+                    <dt>المركبة</dt>
+                    <dd>{b.vehicle?.brand} {b.vehicle?.model} · {b.vehicle?.plate}</dd>
+                  </div>
+                  <div>
+                    <dt>الاستلام / التسليم</dt>
+                    <dd className="tabular-nums">{formatTime(b.starts_at)} – {formatTime(b.planned_ends_at)}</dd>
+                  </div>
+                </dl>
+              </button>
+            ))}
+          </div>
+        </motion.section>
+      </AnimatePresence>
     </div>
   )
 }
