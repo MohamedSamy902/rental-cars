@@ -241,6 +241,15 @@
   font-weight: 700;
 }
 
+.auth-demo {
+  margin: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  opacity: 0.85;
+  word-break: break-all;
+}
+
 @media (max-width: 480px) {
   .auth {
     justify-content: flex-start;

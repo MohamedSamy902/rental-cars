@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/shared/auth/AuthContext'
 import {
   IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart, IconChat,
   IconClipboard, IconClose, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
@@ -11,31 +12,38 @@ import {
 import { useIsMobile, useSheetDrag } from './useSheetDrag'
 import './CommandPalette.css'
 
-type Item = { to: string; label: string; group: string; icon: React.ReactNode }
+type Item = {
+  to: string
+  label: string
+  group: string
+  icon: React.ReactNode
+  permission?: string
+  feature?: string
+}
 
 const ITEMS: Item[] = [
   { to: '/', label: 'لوحة اليوم', group: 'التشغيل', icon: <IconHome /> },
-  { to: '/vehicles', label: 'المركبات', group: 'التشغيل', icon: <IconCar /> },
-  { to: '/bookings', label: 'العقود والحجوزات', group: 'التشغيل', icon: <IconClipboard /> },
-  { to: '/calendar', label: 'التقويم', group: 'التشغيل', icon: <IconCalendar /> },
-  { to: '/waitlist', label: 'قائمة الانتظار', group: 'التشغيل', icon: <IconQueue /> },
-  { to: '/showroom', label: 'وضع عرض المعرض', group: 'التشغيل', icon: <IconStore /> },
-  { to: '/department-notice', label: 'إخطار القسم', group: 'التشغيل', icon: <IconFileText /> },
-  { to: '/maintenance', label: 'أوامر الشغل', group: 'الأسطول', icon: <IconWrench /> },
-  { to: '/inventory', label: 'المخزون', group: 'الأسطول', icon: <IconBox /> },
-  { to: '/petty-cash', label: 'العهدة النقدية', group: 'الأسطول', icon: <IconWallet /> },
-  { to: '/violations', label: 'المخالفات', group: 'الأسطول', icon: <IconAlert /> },
-  { to: '/customers', label: 'العملاء', group: 'المالية', icon: <IconUsers /> },
-  { to: '/accounts', label: 'الحسابات', group: 'المالية', icon: <IconLandmark /> },
-  { to: '/reports', label: 'التقارير', group: 'المالية', icon: <IconChart /> },
-  { to: '/expenses', label: 'المصروفات', group: 'المالية', icon: <IconReceipt /> },
-  { to: '/owners', label: 'ملاك العربيات', group: 'المالية', icon: <IconKey /> },
-  { to: '/staff', label: 'الموظفون والصلاحيات', group: 'النظام', icon: <IconUserCog /> },
-  { to: '/audit-logs', label: 'سجل التعديلات', group: 'النظام', icon: <IconHistory /> },
-  { to: '/notifications', label: 'الإشعارات', group: 'النظام', icon: <IconBell /> },
-  { to: '/hr', label: 'الموارد البشرية', group: 'النظام', icon: <IconBriefcase /> },
-  { to: '/chat', label: 'محادثة التشغيل', group: 'النظام', icon: <IconChat /> },
-  { to: '/settings', label: 'الإعدادات', group: 'النظام', icon: <IconSettings /> },
+  { to: '/vehicles', label: 'المركبات', group: 'التشغيل', icon: <IconCar />, permission: 'vehicles.view' },
+  { to: '/bookings', label: 'العقود والحجوزات', group: 'التشغيل', icon: <IconClipboard />, permission: 'contracts.view' },
+  { to: '/calendar', label: 'التقويم', group: 'التشغيل', icon: <IconCalendar />, permission: 'contracts.view' },
+  { to: '/waitlist', label: 'قائمة الانتظار', group: 'التشغيل', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
+  { to: '/showroom', label: 'وضع عرض المعرض', group: 'التشغيل', icon: <IconStore />, feature: 'showroom', permission: 'showroom.run' },
+  { to: '/department-notice', label: 'إخطار القسم', group: 'التشغيل', icon: <IconFileText />, feature: 'department_notice', permission: 'department_notice.print' },
+  { to: '/maintenance', label: 'أوامر الشغل', group: 'الأسطول', icon: <IconWrench />, permission: 'maintenance.view' },
+  { to: '/inventory', label: 'المخزون', group: 'الأسطول', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
+  { to: '/petty-cash', label: 'العهدة النقدية', group: 'الأسطول', icon: <IconWallet />, feature: 'petty_cash', permission: 'petty_cash.view' },
+  { to: '/violations', label: 'المخالفات', group: 'الأسطول', icon: <IconAlert />, permission: 'violations.view' },
+  { to: '/customers', label: 'العملاء', group: 'المالية', icon: <IconUsers />, permission: 'customers.view' },
+  { to: '/accounts', label: 'الحسابات', group: 'المالية', icon: <IconLandmark />, permission: 'accounting.view' },
+  { to: '/reports', label: 'التقارير', group: 'المالية', icon: <IconChart />, permission: 'reports.view' },
+  { to: '/expenses', label: 'المصروفات', group: 'المالية', icon: <IconReceipt />, permission: 'expenses.view' },
+  { to: '/owners', label: 'ملاك العربيات', group: 'المالية', icon: <IconKey />, permission: 'owners.view' },
+  { to: '/staff', label: 'الموظفون والصلاحيات', group: 'النظام', icon: <IconUserCog />, permission: 'staff.view' },
+  { to: '/audit-logs', label: 'سجل التعديلات', group: 'النظام', icon: <IconHistory />, permission: 'audit.view' },
+  { to: '/notifications', label: 'الإشعارات', group: 'النظام', icon: <IconBell />, permission: 'notifications.view' },
+  { to: '/hr', label: 'الموارد البشرية', group: 'النظام', icon: <IconBriefcase />, feature: 'hr', permission: 'hr.view' },
+  { to: '/chat', label: 'محادثة التشغيل', group: 'النظام', icon: <IconChat />, feature: 'chat' },
+  { to: '/settings', label: 'الإعدادات', group: 'النظام', icon: <IconSettings />, permission: 'settings.view' },
 ]
 
 type Props = { open: boolean; onClose: () => void }
@@ -49,6 +57,7 @@ export function CommandPalette({ open, onClose }: Props) {
 
 function PaletteLayer({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
+  const { can, featureEnabled } = useAuth()
   const mobile = useIsMobile()
   const [q, setQ] = useState('')
   const [active, setActive] = useState(0)
@@ -56,11 +65,21 @@ function PaletteLayer({ onClose }: { onClose: () => void }) {
   const listRef = useRef<HTMLUListElement>(null)
   const { startDrag, dragProps } = useSheetDrag(onClose, mobile)
 
+  const allowed = useMemo(
+    () =>
+      ITEMS.filter((item) => {
+        if (item.feature && !featureEnabled(item.feature)) return false
+        if (item.permission && !can(item.permission)) return false
+        return true
+      }),
+    [can, featureEnabled],
+  )
+
   const filtered = useMemo(() => {
     const needle = q.trim()
-    if (!needle) return ITEMS
-    return ITEMS.filter((i) => i.label.includes(needle) || i.group.includes(needle))
-  }, [q])
+    if (!needle) return allowed
+    return allowed.filter((i) => i.label.includes(needle) || i.group.includes(needle))
+  }, [q, allowed])
 
   useEffect(() => {
     // On touch, focusing immediately pops the keyboard over a sheet that is still animating in

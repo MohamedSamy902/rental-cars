@@ -15,6 +15,8 @@ use App\Models\User;
  */
 class ContractDossierService
 {
+    public function __construct(private readonly RentalProgressService $progress) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -107,6 +109,7 @@ class ContractDossierService
 
         return [
             ...$contract->toArray(),
+            'progress' => $this->progress->forContract($contract),
             'payments' => $payments,
             'documents' => $documents,
             'related' => $related,

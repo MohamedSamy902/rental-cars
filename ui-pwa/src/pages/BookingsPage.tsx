@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable,
+  PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
   useToast, ErrorState, IconClipboard, IconAlert, IconCheck, IconKey,
   type DataColumn,
 } from '@/shared/ui'
@@ -126,6 +126,13 @@ export function BookingsPage() {
       cell: (b) => <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />,
       sortValue: (b) => b.status,
       mobile: 'badge',
+    },
+    {
+      id: 'progress',
+      header: 'التقدّم',
+      cell: (b) => <RentalProgressBar progress={b.progress} compact />,
+      sortValue: (b) => b.progress?.percent ?? 0,
+      wide: true,
     },
   ]
 

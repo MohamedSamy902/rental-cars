@@ -28,15 +28,20 @@ class ContractLifecycleService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function create(array $data, ?int $userId = null): Contract
+    public function create(array $data, ?int $userId = null, bool $allowPriceOverride = false): Contract
     {
-        return DB::transaction(function () use ($data, $userId) {
-            $vehicle = Vehicle::query()->findOrFail($data['vehicle_id']);
+        return DB::transaction(function () use ($data, $userId, $allowPriceOverride) {
+            /** @var Vehicle $vehicle */
+            $vehicle = Vehicle::query()->whereKey($data['vehicle_id'])->lockForUpdate()->firstOrFail();
             if (! $vehicle->is_active) {
                 throw new DomainException('السيارة غير نشطة.');
             }
-            if ($vehicle->manual_status === VehicleAvailabilityService::STATUS_MAINTENANCE) {
-                throw new DomainException('السيارة في صيانة ولا يمكن حجزها.');
+            if (in_array($vehicle->manual_status, [
+                VehicleAvailabilityService::STATUS_MAINTENANCE,
+                VehicleAvailabilityService::STATUS_OUT_OF_SERVICE,
+                VehicleAvailabilityService::STATUS_SOLD,
+            ], true)) {
+                throw new DomainException('السيارة غير متاحة للحجز في حالتها الحالية.');
             }
 
             $customer = Customer::query()->findOrFail($data['customer_id']);
@@ -52,6 +57,20 @@ class ContractLifecycleService
 
             $number = $data['number'] ?? $this->nextNumber();
 
+            // الأسعار تُقترح من السيارة؛ التعديل عند الإنشاء يتطلب صلاحية تجاوز السعر.
+            $dailyRate = $allowPriceOverride && isset($data['daily_rate'])
+                ? (int) $data['daily_rate']
+                : (int) $vehicle->daily_rate;
+            $deposit = $allowPriceOverride && isset($data['deposit'])
+                ? (int) $data['deposit']
+                : (int) $vehicle->default_deposit;
+            $kmAllowance = $allowPriceOverride && isset($data['daily_km_allowance'])
+                ? (int) $data['daily_km_allowance']
+                : 200;
+            $excessRate = $allowPriceOverride && isset($data['excess_km_rate'])
+                ? (int) $data['excess_km_rate']
+                : 5;
+
             $contract = Contract::query()->create([
                 'number' => $number,
                 'customer_id' => $data['customer_id'],
@@ -61,10 +80,10 @@ class ContractLifecycleService
                 'starts_at' => $data['starts_at'],
                 'planned_ends_at' => $data['planned_ends_at'],
                 'min_days' => $data['min_days'] ?? null,
-                'frozen_daily_rate' => $data['daily_rate'] ?? $vehicle->daily_rate,
-                'frozen_daily_km_allowance' => $data['daily_km_allowance'] ?? 200,
-                'frozen_excess_km_rate' => $data['excess_km_rate'] ?? 5,
-                'frozen_agreed_deposit' => $data['deposit'] ?? $vehicle->default_deposit,
+                'frozen_daily_rate' => $dailyRate,
+                'frozen_daily_km_allowance' => $kmAllowance,
+                'frozen_excess_km_rate' => $excessRate,
+                'frozen_agreed_deposit' => $deposit,
                 'frozen_operating_insurance_fee' => $data['operating_insurance_fee'] ?? null,
                 'discount' => $data['discount'] ?? 0,
                 'other_fees' => $data['other_fees'] ?? 0,
@@ -90,39 +109,104 @@ class ContractLifecycleService
 
     public function approve(Contract $contract, ?int $userId = null): Contract
     {
-        if (! in_array($contract->status, ['pending', 'approved'], true)) {
-            throw new DomainException('لا يمكن اعتماد هذا العقد في حالته الحالية.');
-        }
+        return DB::transaction(function () use ($contract, $userId) {
+            /** @var Contract $locked */
+            $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'pending') {
+                throw new DomainException('لا يمكن اعتماد هذا العقد في حالته الحالية.');
+            }
 
-        $this->assertDocumentsAllowApproval($contract);
-        $this->assertNoOverlap(
-            (int) $contract->vehicle_id,
-            $contract->starts_at,
-            $contract->planned_ends_at,
-            $contract->id,
-        );
+            Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
 
-        $days = $this->pricing->countRentalDays($contract->starts_at, $contract->planned_ends_at);
+            $this->assertDocumentsAllowApproval($locked);
+            $this->assertNoOverlap(
+                (int) $locked->vehicle_id,
+                $locked->starts_at,
+                $locked->planned_ends_at,
+                $locked->id,
+            );
 
-        $contract->fill([
-            'status' => 'approved',
-            'approved_days' => $days,
-            'frozen_min_days' => $contract->min_days,
-            'allowed_km' => $this->pricing->allowedKilometers(
-                (int) $contract->frozen_daily_km_allowance,
-                $days,
-            ),
-        ])->save();
+            $days = $this->pricing->countRentalDays($locked->starts_at, $locked->planned_ends_at);
 
-        AuditLog::query()->create([
-            'user_id' => $userId,
-            'action' => 'approved',
-            'record_type' => Contract::class,
-            'record_id' => $contract->id,
-            'after' => ['status' => 'approved', 'approved_days' => $days],
-        ]);
+            // لحظة التجميد الرسمية = الاعتماد (ن٫٥)
+            $locked->fill([
+                'status' => 'approved',
+                'approved_days' => $days,
+                'frozen_min_days' => $locked->min_days,
+                'allowed_km' => $this->pricing->allowedKilometers(
+                    (int) $locked->frozen_daily_km_allowance,
+                    $days,
+                ),
+            ])->save();
 
-        return $contract->fresh(['customer', 'vehicle', 'deposit']);
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'approved',
+                'record_type' => Contract::class,
+                'record_id' => $locked->id,
+                'after' => [
+                    'status' => 'approved',
+                    'approved_days' => $days,
+                    'frozen_daily_rate' => $locked->frozen_daily_rate,
+                    'frozen_agreed_deposit' => $locked->frozen_agreed_deposit,
+                ],
+            ]);
+
+            return $locked->fresh(['customer', 'vehicle', 'deposit']);
+        });
+    }
+
+    /**
+     * تعديل أسعار بعد الاعتماد — يتطلب صلاحية contracts_price.override.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function updateFrozenPricing(Contract $contract, array $data, ?int $userId = null): Contract
+    {
+        return DB::transaction(function () use ($contract, $data, $userId) {
+            /** @var Contract $locked */
+            $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($locked->status, ['approved', 'active'], true)) {
+                throw new DomainException('تعديل الأسعار متاح للعقود المعتمدة أو النشطة فقط.');
+            }
+
+            $before = [
+                'frozen_daily_rate' => $locked->frozen_daily_rate,
+                'frozen_daily_km_allowance' => $locked->frozen_daily_km_allowance,
+                'frozen_excess_km_rate' => $locked->frozen_excess_km_rate,
+                'frozen_agreed_deposit' => $locked->frozen_agreed_deposit,
+                'discount' => $locked->discount,
+                'other_fees' => $locked->other_fees,
+            ];
+
+            $locked->fill([
+                'frozen_daily_rate' => $data['daily_rate'] ?? $locked->frozen_daily_rate,
+                'frozen_daily_km_allowance' => $data['daily_km_allowance'] ?? $locked->frozen_daily_km_allowance,
+                'frozen_excess_km_rate' => $data['excess_km_rate'] ?? $locked->frozen_excess_km_rate,
+                'frozen_agreed_deposit' => $data['deposit'] ?? $locked->frozen_agreed_deposit,
+                'discount' => $data['discount'] ?? $locked->discount,
+                'other_fees' => $data['other_fees'] ?? $locked->other_fees,
+                'other_fees_description' => $data['other_fees_description'] ?? $locked->other_fees_description,
+            ])->save();
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'price_override',
+                'record_type' => Contract::class,
+                'record_id' => $locked->id,
+                'before' => $before,
+                'after' => [
+                    'frozen_daily_rate' => $locked->frozen_daily_rate,
+                    'frozen_daily_km_allowance' => $locked->frozen_daily_km_allowance,
+                    'frozen_excess_km_rate' => $locked->frozen_excess_km_rate,
+                    'frozen_agreed_deposit' => $locked->frozen_agreed_deposit,
+                    'discount' => $locked->discount,
+                    'other_fees' => $locked->other_fees,
+                ],
+            ]);
+
+            return $locked->fresh(['customer', 'vehicle', 'deposit']);
+        });
     }
 
     /**
@@ -135,16 +219,41 @@ class ContractLifecycleService
         }
 
         if ($contract->status === 'pending') {
-            $this->approve($contract, $userId);
-            $contract->refresh();
-        }
-
-        if ($odometerOut < (int) ($contract->vehicle?->odometer ?? 0)) {
-            throw new DomainException('عداد الخروج أقل من عداد السيارة المسجّل.');
+            $contract = $this->approve($contract, $userId);
         }
 
         return DB::transaction(function () use ($contract, $odometerOut, $userId, $inspection) {
-            $this->inspections->record($contract->id, [
+            /** @var Contract $locked */
+            $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'approved') {
+                throw new DomainException('التسليم يتطلب عقداً معتمداً.');
+            }
+
+            /** @var Vehicle $vehicle */
+            $vehicle = Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
+
+            $otherActive = Contract::query()
+                ->where('vehicle_id', $locked->vehicle_id)
+                ->where('status', 'active')
+                ->where('id', '!=', $locked->id)
+                ->lockForUpdate()
+                ->exists();
+            if ($otherActive) {
+                throw new DomainException('لا يمكن التسليم: توجد حيازة نشطة أخرى على نفس السيارة.');
+            }
+
+            $this->assertNoOverlap(
+                (int) $locked->vehicle_id,
+                $locked->starts_at,
+                $locked->planned_ends_at,
+                $locked->id,
+            );
+
+            if ($odometerOut < (int) $vehicle->odometer) {
+                throw new DomainException('عداد الخروج أقل من عداد السيارة المسجّل.');
+            }
+
+            $this->inspections->record($locked->id, [
                 'type' => 'handover',
                 'odometer' => $odometerOut,
                 'fuel_level' => (int) ($inspection['fuel_level'] ?? 50),
@@ -154,22 +263,22 @@ class ContractLifecycleService
                 'damages' => $inspection['damages'] ?? [],
             ], $userId);
 
-            $contract->fill([
+            $locked->fill([
                 'status' => 'active',
                 'odometer_out' => $odometerOut,
             ])->save();
 
-            Vehicle::query()->whereKey($contract->vehicle_id)->update(['odometer' => $odometerOut]);
+            $vehicle->update(['odometer' => $odometerOut]);
 
             AuditLog::query()->create([
                 'user_id' => $userId,
                 'action' => 'handover',
                 'record_type' => Contract::class,
-                'record_id' => $contract->id,
+                'record_id' => $locked->id,
                 'after' => ['status' => 'active', 'odometer_out' => $odometerOut],
             ]);
 
-            return $contract->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
+            return $locked->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
         });
     }
 
@@ -184,15 +293,19 @@ class ContractLifecycleService
         int $damageFee = 0,
         array $inspection = [],
     ): Contract {
-        if ($contract->status !== 'active') {
-            throw new DomainException('الاستلام يتطلب عقداً نشطاً.');
-        }
-        if ($odometerIn < (int) $contract->odometer_out) {
-            throw new DomainException('عداد العودة أقل من عداد الخروج.');
-        }
-
         return DB::transaction(function () use ($contract, $odometerIn, $returnedAt, $userId, $damageFee, $inspection) {
-            $this->inspections->record($contract->id, [
+            /** @var Contract $locked */
+            $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'active') {
+                throw new DomainException('الاستلام يتطلب عقداً نشطاً.');
+            }
+            if ($odometerIn < (int) $locked->odometer_out) {
+                throw new DomainException('عداد العودة أقل من عداد الخروج.');
+            }
+
+            Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
+
+            $this->inspections->record($locked->id, [
                 'type' => 'return',
                 'odometer' => $odometerIn,
                 'fuel_level' => (int) ($inspection['fuel_level'] ?? 50),
@@ -204,32 +317,32 @@ class ContractLifecycleService
             ], $userId);
 
             $end = $returnedAt ?? now();
-            $days = $this->pricing->countRentalDays($contract->starts_at, $end);
-            $minDays = (int) ($contract->frozen_min_days ?? $contract->min_days ?? 0);
+            $days = $this->pricing->countRentalDays($locked->starts_at, $end);
+            $minDays = (int) ($locked->frozen_min_days ?? $locked->min_days ?? 0);
             $billableDays = max($days, $minDays);
 
-            $plannedEnd = $contract->planned_ends_at;
+            $plannedEnd = $locked->planned_ends_at;
             $lateDays = 0;
             if ($end > $plannedEnd) {
                 $lateDays = $this->pricing->countRentalDays($plannedEnd, $end);
             }
 
-            $periodRent = $billableDays * (int) $contract->frozen_daily_rate;
-            $allowed = $this->pricing->allowedKilometers((int) $contract->frozen_daily_km_allowance, $billableDays);
-            $driven = max(0, $odometerIn - (int) $contract->odometer_out);
+            $periodRent = $billableDays * (int) $locked->frozen_daily_rate;
+            $allowed = $this->pricing->allowedKilometers((int) $locked->frozen_daily_km_allowance, $billableDays);
+            $driven = max(0, $odometerIn - (int) $locked->odometer_out);
             $excess = max(0, $driven - $allowed);
-            $excessAmount = $excess * (int) $contract->frozen_excess_km_rate;
+            $excessAmount = $excess * (int) $locked->frozen_excess_km_rate;
 
             $final = $this->pricing->finalTotal([
                 'period_rent' => $periodRent,
-                'discount' => (int) $contract->discount,
+                'discount' => (int) $locked->discount,
                 'excess_km_fee' => $excessAmount,
                 'damage_fee' => $damageFee,
-                'operating_insurance_fee' => (int) ($contract->frozen_operating_insurance_fee ?? 0),
-                'other_fees' => (int) $contract->other_fees,
+                'operating_insurance_fee' => (int) ($locked->frozen_operating_insurance_fee ?? 0),
+                'other_fees' => (int) $locked->other_fees,
             ]);
 
-            $contract->fill([
+            $locked->fill([
                 'status' => 'completed',
                 'actual_ends_at' => $end,
                 'approved_days' => $billableDays,
@@ -243,23 +356,23 @@ class ContractLifecycleService
                 'final_total' => (int) round($final),
             ])->save();
 
-            Vehicle::query()->whereKey($contract->vehicle_id)->update(['odometer' => $odometerIn]);
+            Vehicle::query()->whereKey($locked->vehicle_id)->update(['odometer' => $odometerIn]);
 
-            $this->accounting->postContractClose($contract->fresh(), $userId);
+            $this->accounting->postContractClose($locked->fresh(), $userId);
 
             AuditLog::query()->create([
                 'user_id' => $userId,
                 'action' => 'completed',
                 'record_type' => Contract::class,
-                'record_id' => $contract->id,
+                'record_id' => $locked->id,
                 'after' => [
                     'approved_days' => $billableDays,
                     'tagged_late_days' => $lateDays,
-                    'final_total' => $contract->final_total,
+                    'final_total' => $locked->final_total,
                 ],
             ]);
 
-            return $contract->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
+            return $locked->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
         });
     }
 
@@ -339,7 +452,7 @@ class ContractLifecycleService
             'min_days' => $source->frozen_min_days ?? $source->min_days,
             'notes' => trim(($source->notes ? $source->notes."\n" : '').'تمديد من '.$source->number),
             'extended_from_contract_id' => $source->id,
-        ], $userId);
+        ], $userId, true);
     }
 
     /**
@@ -384,11 +497,18 @@ class ContractLifecycleService
                 'notes' => 'تبديل بسبب عطل من '.$old->number,
                 'swapped_from_contract_id' => $old->id,
                 'swap_reason' => 'عطل',
-                'status' => 'approved',
-            ], $userId);
+                'status' => 'pending',
+            ], $userId, true);
 
             $new = $this->approve($new, $userId);
-            $new = $this->activateOnHandover($new, (int) $data['odometer_out'], $userId);
+            $handoverInspection = [
+                'signature_data' => $data['signature_data'] ?? ('swap-handover-ack:'.str_repeat('0', 48)),
+                'fuel_level' => (int) ($data['fuel_level'] ?? 50),
+                'notes' => 'تسليم تلقائي عند التبديل بسبب عطل',
+                'damages' => $data['damages'] ?? [],
+                'accessories' => $data['accessories'] ?? [],
+            ];
+            $new = $this->activateOnHandover($new, (int) $data['odometer_out'], $userId, $handoverInspection);
 
             if ($remainingDeposit > 0) {
                 $this->receiveDeposit($new, [
@@ -408,37 +528,40 @@ class ContractLifecycleService
      */
     public function receiveDeposit(Contract $contract, array $data, ?int $userId = null): Deposit
     {
-        if ($contract->deposit) {
-            throw new DomainException('يوجد تأمين نقدي مسجّل لهذا العقد.');
-        }
+        return DB::transaction(function () use ($contract, $data, $userId) {
+            Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
+            if (Deposit::query()->where('contract_id', $contract->id)->lockForUpdate()->exists()) {
+                throw new DomainException('يوجد تأمين نقدي مسجّل لهذا العقد.');
+            }
 
-        $amount = (int) ($data['amount'] ?? $contract->frozen_agreed_deposit);
-        if ($amount <= 0) {
-            throw new DomainException('مبلغ التأمين النقدي غير صالح.');
-        }
+            $amount = (int) ($data['amount'] ?? $contract->frozen_agreed_deposit);
+            if ($amount <= 0) {
+                throw new DomainException('مبلغ التأمين النقدي غير صالح.');
+            }
 
-        $deposit = Deposit::query()->create([
-            'contract_id' => $contract->id,
-            'original_amount' => $amount,
-            'status' => 'received',
-            'received_at' => now(),
-            'receipt_number' => $data['receipt_number'],
-            'collection_method' => $data['method'],
-            'collection_ref' => $data['collection_ref'] ?? null,
-            'deductions_total' => 0,
-        ]);
+            $deposit = Deposit::query()->create([
+                'contract_id' => $contract->id,
+                'original_amount' => $amount,
+                'status' => 'received',
+                'received_at' => now(),
+                'receipt_number' => $data['receipt_number'],
+                'collection_method' => $data['method'],
+                'collection_ref' => $data['collection_ref'] ?? null,
+                'deductions_total' => 0,
+            ]);
 
-        $this->accounting->recordPayment([
-            'amount' => $amount,
-            'method' => $data['method'],
-            'direction' => 'in',
-            'reference' => $data['receipt_number'],
-            'link_type' => 'deposit',
-            'link_id' => $deposit->id,
-            'notes' => 'قبض تأمين نقدي للعقد '.$contract->number,
-        ], $userId);
+            $this->accounting->recordPayment([
+                'amount' => $amount,
+                'method' => $data['method'],
+                'direction' => 'in',
+                'reference' => $data['receipt_number'],
+                'link_type' => 'deposit',
+                'link_id' => $deposit->id,
+                'notes' => 'قبض تأمين نقدي للعقد '.$contract->number,
+            ], $userId);
 
-        return $deposit;
+            return $deposit;
+        });
     }
 
     /**

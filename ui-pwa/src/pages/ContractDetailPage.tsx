@@ -4,7 +4,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
-  IconCash, IconWallet, IconClipboard, IconKey,
+  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey,
 } from '@/shared/ui'
 import {
   DepositBadge, inspectionTypeLabel, statusLabel, timelineLabel, type Contract,
@@ -97,6 +97,7 @@ export function ContractDetailPage() {
           </div>
           <h1>{row.customer?.full_name || 'عقد'}</h1>
           <p>{vehicleLabel}</p>
+          <RentalProgressBar progress={row.progress} />
         </div>
         <ContractActionsBar
           contract={row}

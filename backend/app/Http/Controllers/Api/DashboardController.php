@@ -11,13 +11,17 @@ use App\Models\TenantSetting;
 use App\Models\Vehicle;
 use App\Models\Violation;
 use App\Models\WorkOrder;
+use App\Services\Contracts\RentalProgressService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function __construct(private readonly VehicleAvailabilityService $availability) {}
+    public function __construct(
+        private readonly VehicleAvailabilityService $availability,
+        private readonly RentalProgressService $progress,
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
@@ -115,7 +119,14 @@ class DashboardController extends Controller
                 ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
                 ->latest('id')
                 ->limit(5)
-                ->get(),
+                ->get()
+                ->map(function (Contract $c) {
+                    $arr = $c->toArray();
+                    $arr['progress'] = $this->progress->forContract($c);
+
+                    return $arr;
+                })
+                ->values(),
         ]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreViolationRequest;
 use App\Models\Contract;
 use App\Models\Violation;
 use Illuminate\Http\JsonResponse;
@@ -17,20 +18,9 @@ class ViolationController extends Controller
         return response()->json(['data' => $rows->items(), 'meta' => ['total' => $rows->total()]]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreViolationRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'vehicle_id' => ['required', 'exists:vehicles,id'],
-            'occurred_at' => ['required', 'date'],
-            'location' => ['nullable', 'string'],
-            'amount' => ['required', 'integer', 'min:0'],
-            'notes' => ['nullable', 'string'],
-            'contract_id' => ['nullable', 'exists:contracts,id'],
-        ], [], [
-            'vehicle_id' => 'السيارة',
-            'occurred_at' => 'وقت المخالفة',
-            'amount' => 'المبلغ',
-        ]);
+        $data = $request->validated();
 
         $contractId = $data['contract_id'] ?? null;
         $customerId = null;

@@ -73,7 +73,7 @@ class ExpenseService
             $entry = JournalEntry::query()->create([
                 'entry_date' => $spentOn,
                 'narration' => 'مصروف: '.$expense->title,
-                'source' => 'expense',
+                'source' => 'expense:'.$expense->id,
                 'posted_by' => $userId,
             ]);
             JournalLine::query()->create([

@@ -120,7 +120,7 @@ class VehicleOwnerService
             $entry = JournalEntry::query()->create([
                 'entry_date' => $entryDate,
                 'narration' => "استحقاق مالك {$owner->full_name} · {$vehicle->code} · {$yearMonth}",
-                'source' => 'owner_accrual',
+                'source' => "owner_accrual:{$vehicle->id}:{$yearMonth}",
                 'posted_by' => $userId,
             ]);
             JournalLine::query()->create([
@@ -189,10 +189,21 @@ class VehicleOwnerService
             $cashCode = $method === 'transfer' || $method === 'bank' ? '1100' : '1000';
             $cash = Account::query()->where('code', $cashCode)->firstOrFail();
 
+            $payout = OwnerPayout::query()->create([
+                'owner_id' => $owner->id,
+                'vehicle_id' => $vehicleId,
+                'amount' => $amount,
+                'paid_on' => $paidOn,
+                'payment_method' => $method,
+                'notes' => $data['notes'] ?? null,
+                'journal_entry_id' => null,
+                'recorded_by' => $userId,
+            ]);
+
             $entry = JournalEntry::query()->create([
                 'entry_date' => $paidOn,
                 'narration' => "صرف لمالك {$owner->full_name}",
-                'source' => 'owner_payout',
+                'source' => 'owner_payout:'.$payout->id,
                 'posted_by' => $userId,
             ]);
             JournalLine::query()->create([
@@ -210,16 +221,9 @@ class VehicleOwnerService
                 'vehicle_id' => $vehicleId,
             ]);
 
-            return OwnerPayout::query()->create([
-                'owner_id' => $owner->id,
-                'vehicle_id' => $vehicleId,
-                'amount' => $amount,
-                'paid_on' => $paidOn,
-                'payment_method' => $method,
-                'notes' => $data['notes'] ?? null,
-                'journal_entry_id' => $entry->id,
-                'recorded_by' => $userId,
-            ])->load('vehicle');
+            $payout->update(['journal_entry_id' => $entry->id]);
+
+            return $payout->fresh('vehicle');
         });
     }
 

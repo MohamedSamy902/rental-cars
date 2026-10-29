@@ -15,15 +15,25 @@ class MediaController extends Controller
 {
     public function __construct(private readonly MediaUploadService $media) {}
 
+    public function limits(): JsonResponse
+    {
+        return response()->json(['data' => $this->media->clientHints()]);
+    }
+
     public function store(Request $request): JsonResponse
     {
-        $request->validate([
+        $data = $request->validate([
             'file' => ['required', 'file'],
             'collection' => ['nullable', 'string', 'max:40'],
             'purpose' => ['nullable', 'string', 'max:60'],
             'attachable_type' => ['nullable', 'string', 'max:120'],
             'attachable_id' => ['nullable', 'integer', 'min:1'],
-        ], [], [
+            'allow_document' => ['nullable', 'boolean'],
+        ], [
+            'file.required' => 'الملف مطلوب.',
+            'file.uploaded' => 'فشل رفع الملف. تحقق من الحجم والنوع وحاول مرة أخرى.',
+            'file.file' => 'يجب أن يكون الملف صالحاً.',
+        ], [
             'file' => 'الملف',
         ]);
 
@@ -31,10 +41,11 @@ class MediaController extends Controller
             $row = $this->media->store(
                 $request->file('file'),
                 [
-                    'collection' => $request->input('collection', 'general'),
-                    'purpose' => $request->input('purpose'),
-                    'attachable_type' => $this->mapAttachable($request->input('attachable_type')),
-                    'attachable_id' => $request->integer('attachable_id') ?: null,
+                    'collection' => $data['collection'] ?? 'general',
+                    'purpose' => $data['purpose'] ?? null,
+                    'attachable_type' => $this->mapAttachable($data['attachable_type'] ?? null),
+                    'attachable_id' => isset($data['attachable_id']) ? (int) $data['attachable_id'] : null,
+                    'allow_document' => (bool) ($data['allow_document'] ?? false),
                 ],
                 $request->user()?->id,
             );
@@ -60,7 +71,7 @@ class MediaController extends Controller
         $this->authorizeView($request, $medium);
 
         if (! Storage::disk($medium->disk)->exists($medium->path)) {
-            return response()->json(['message' => 'الملف غير موجود على التخزين.'], 404);
+            return response()->json(['message' => __('http.not_found')], 404);
         }
 
         return Storage::disk($medium->disk)->response(
@@ -76,10 +87,15 @@ class MediaController extends Controller
 
     public function destroy(Request $request, MediaFile $medium): JsonResponse
     {
-        if ($medium->uploaded_by && $medium->uploaded_by !== $request->user()?->id && ! $request->user()?->hasPermission('settings.update')) {
-            if (! $request->user()?->hasPermission('vehicles.update') && ! $request->user()?->hasPermission('customers.update')) {
-                return response()->json(['message' => 'ليست لديك صلاحية حذف هذا الملف.'], 403);
-            }
+        $user = $request->user();
+        $isOwner = $medium->uploaded_by && $medium->uploaded_by === $user?->id;
+        $canManage = $user?->hasPermission('media.delete')
+            || $user?->hasPermission('settings.update')
+            || $user?->hasPermission('vehicles.update')
+            || $user?->hasPermission('customers.update');
+
+        if (! $isOwner && ! $canManage) {
+            return response()->json(['message' => __('http.forbidden')], 403);
         }
 
         $this->media->delete($medium);
@@ -89,16 +105,28 @@ class MediaController extends Controller
 
     private function authorizeView(Request $request, MediaFile $medium): void
     {
+        $user = $request->user();
+        if (! $user) {
+            abort(401, __('http.unauthenticated'));
+        }
+
+        if (! $user->hasPermission('media.view') && ! $user->hasPermission('media.upload')) {
+            // allow if user has any module that uses media
+            $ok = $user->hasPermission('customers.view')
+                || $user->hasPermission('vehicles.view')
+                || $user->hasPermission('contracts.view')
+                || $user->hasPermission('maintenance.view')
+                || $user->hasPermission('violations.view');
+            if (! $ok) {
+                abort(403, __('http.forbidden'));
+            }
+        }
+
         if (! $medium->isSensitive()) {
             return;
         }
 
-        $user = $request->user();
-        if (
-            $user?->hasPermission('sensitive.view_id_images')
-            || $user?->hasPermission('customers.view')
-            || $user?->hasPermission('customers.update')
-        ) {
+        if ($user->hasPermission('sensitive.view_id_images')) {
             return;
         }
 
@@ -112,6 +140,8 @@ class MediaController extends Controller
             'vehicle', 'vehicles', \App\Models\Vehicle::class => \App\Models\Vehicle::class,
             'contract', 'contracts', \App\Models\Contract::class => \App\Models\Contract::class,
             'inspection', 'inspections', \App\Models\Inspection::class => \App\Models\Inspection::class,
+            'violation', 'violations', \App\Models\Violation::class => \App\Models\Violation::class,
+            'work_order', 'work_orders', \App\Models\WorkOrder::class => \App\Models\WorkOrder::class,
             null, '' => null,
             default => str_contains((string) $type, '\\') ? $type : null,
         };

@@ -74,6 +74,15 @@ export type Contract = {
   related?: RelatedContract[]
   timeline?: TimelineItem[]
   ledger?: { contract_total: number; paid: number; balance: number; deposit_held: number }
+  progress?: {
+    status: string
+    tone: 'normal' | 'warning' | 'danger' | 'muted'
+    percent: number
+    remaining_label: string
+    overdue_days: number
+    limiting_label?: string | null
+    message: string
+  } | null
 }
 
 export type VehicleOption = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number; odometer?: number }

@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
 import {
   PageHeader, Button, Sheet, Fab, SelectField, TextField, MoneyField, StatusPill, useToast, DataTable, IconCheck,
-  type DataColumn,
+  MediaUpload, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -55,7 +55,7 @@ export function ViolationsPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ vehicle_id: '', occurred_at: '', amount: '', location: '' })
+  const [form, setForm] = useState({ vehicle_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
 
   async function load() {
     setLoading(true)
@@ -78,6 +78,7 @@ export function ViolationsPage() {
           occurred_at: form.occurred_at,
           amount: Number(form.amount),
           location: form.location || undefined,
+          photo_path: form.photo_path || undefined,
         },
       })
       toast.success('تم التسجيل للمتابعة بلا ترحيل محاسبي.')
@@ -129,6 +130,14 @@ export function ViolationsPage() {
           <TextField label="وقت المخالفة" required type="datetime-local" value={form.occurred_at} onChange={(e) => setForm({ ...form, occurred_at: e.target.value })} />
           <MoneyField label="المبلغ (للمتابعة)" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <TextField label="المكان" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          <MediaUpload
+            label="صورة المخالفة"
+            accept="both"
+            collection="violations"
+            purpose="ticket"
+            value={form.photo_path || null}
+            onChange={(path) => setForm({ ...form, photo_path: path || '' })}
+          />
         </div>
       </Sheet>
     </div>

@@ -127,10 +127,16 @@ class AccountingService
         $this->assertMonthOpen($closeYear, $closeMonth);
 
         return DB::transaction(function () use ($contract, $slices, $end, $userId) {
+            $source = 'contract_close:'.$contract->id;
+            $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+            if ($existing) {
+                return $existing->load('lines');
+            }
+
             $entry = JournalEntry::query()->create([
                 'entry_date' => $end->toDateString(),
                 'narration' => 'إقفال عقد '.$contract->number,
-                'source' => 'contract_close:'.$contract->id,
+                'source' => $source,
                 'posted_by' => $userId,
             ]);
 

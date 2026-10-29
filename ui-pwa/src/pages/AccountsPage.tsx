@@ -97,7 +97,7 @@ export function AccountsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="الحسابات"
-        subtitle="توزيع الإيجار على الشهور · إقفال شهر · بلا رصيد دائن وبلا ترحيل مخالفات"
+        subtitle="توزيع الإيجار على الشهور · إقفال شهر — التقارير ليست نهائية بعد (ترحيل التأمين/الدفعات مؤجّل)"
       />
 
       <MetricCardGrid

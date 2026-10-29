@@ -3,18 +3,24 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ExtendContractRequest;
 use App\Http\Requests\StoreContractRequest;
+use App\Http\Requests\UpdateContractPricingRequest;
 use App\Models\Contract;
 use App\Models\TenantSetting;
 use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
+use App\Services\Contracts\RentalProgressService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ContractController extends Controller
 {
-    public function __construct(private readonly ContractLifecycleService $lifecycle) {}
+    public function __construct(
+        private readonly ContractLifecycleService $lifecycle,
+        private readonly RentalProgressService $progress,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -33,9 +39,15 @@ class ContractController extends Controller
         }
 
         $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $data = collect($rows->items())->map(function (Contract $c) {
+            $arr = $c->toArray();
+            $arr['progress'] = $this->progress->forContract($c);
+
+            return $arr;
+        })->all();
 
         return response()->json([
-            'data' => $rows->items(),
+            'data' => $data,
             'meta' => [
                 'current_page' => $rows->currentPage(),
                 'last_page' => $rows->lastPage(),
@@ -55,7 +67,8 @@ class ContractController extends Controller
     public function store(StoreContractRequest $request): JsonResponse
     {
         try {
-            $contract = $this->lifecycle->create($request->validated(), $request->user()?->id);
+            $allowOverride = (bool) $request->user()?->hasPermission('contracts_price.override');
+            $contract = $this->lifecycle->create($request->validated(), $request->user()?->id, $allowOverride);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -77,6 +90,17 @@ class ContractController extends Controller
         }
 
         return response()->json(['data' => $contract, 'message' => 'تم اعتماد العقد وتثبيت الأسعار.']);
+    }
+
+    public function updatePricing(UpdateContractPricingRequest $request, Contract $contract): JsonResponse
+    {
+        try {
+            $contract = $this->lifecycle->updateFrozenPricing($contract, $request->validated(), $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $contract, 'message' => 'تم تعديل الأسعار مع تسجيل في سجل التدقيق.']);
     }
 
     public function handover(Request $request, Contract $contract): JsonResponse
@@ -178,15 +202,10 @@ class ContractController extends Controller
         return response()->json(['data' => $contract, 'message' => 'تم إلغاء العقد.']);
     }
 
-    public function extend(Request $request, Contract $contract): JsonResponse
+    public function extend(ExtendContractRequest $request, Contract $contract): JsonResponse
     {
-        $data = $request->validate([
-            'planned_ends_at' => ['required', 'date'],
-            'starts_at' => ['nullable', 'date'],
-        ], [], ['planned_ends_at' => 'نهاية التمديد']);
-
         try {
-            $created = $this->lifecycle->extend($contract, $data, $request->user()?->id);
+            $created = $this->lifecycle->extend($contract, $request->validated(), $request->user()?->id);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

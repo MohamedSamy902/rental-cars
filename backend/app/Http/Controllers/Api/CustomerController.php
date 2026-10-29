@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreCustomerRequest;
+use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\Customer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,9 +26,12 @@ class CustomerController extends Controller
         }
 
         $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
         return response()->json([
-            'data' => $rows->items(),
+            'data' => collect($rows->items())->map(
+                fn (Customer $c) => $this->presentCustomer($c, $canViewNid)
+            )->values(),
             'meta' => [
                 'current_page' => $rows->currentPage(),
                 'last_page' => $rows->lastPage(),
@@ -35,62 +40,33 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreCustomerRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'full_name' => ['required', 'string', 'max:200'],
-            'phone' => ['required', 'string', 'max:30'],
-            'phone_alt' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email'],
-            'national_id' => ['nullable', 'string', 'max:30'],
-            'national_id_expires_on' => ['nullable', 'date'],
-            'passport_number' => ['nullable', 'string', 'max:50'],
-            'passport_expires_on' => ['nullable', 'date'],
-            'birth_date' => ['required', 'date'],
-            'address' => ['nullable', 'string'],
-            'license_number' => ['required', 'string', 'max:50'],
-            'license_expires_on' => ['required', 'date'],
-            'national_id_image_path' => ['nullable', 'string', 'max:500'],
-            'license_image_path' => ['nullable', 'string', 'max:500'],
-            'notes' => ['nullable', 'string'],
-        ], [], [
-            'full_name' => 'الاسم الكامل',
-            'phone' => 'الهاتف',
-            'birth_date' => 'تاريخ الميلاد',
-            'license_number' => 'رقم الرخصة',
-            'license_expires_on' => 'انتهاء الرخصة',
-        ]);
-
         $customer = Customer::query()->create([
-            ...$data,
+            ...$request->validated(),
             'status' => 'active',
         ]);
 
-        return response()->json(['data' => $customer, 'message' => 'تم تسجيل العميل.'], 201);
+        $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
+
+        return response()->json([
+            'data' => $this->presentCustomer($customer, $canViewNid),
+            'message' => 'تم تسجيل العميل.',
+        ], 201);
     }
 
-    public function show(Customer $customer): JsonResponse
+    public function show(Request $request, Customer $customer): JsonResponse
     {
-        return response()->json(['data' => $customer]);
-    }
+        $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
-    public function update(Request $request, Customer $customer): JsonResponse
-    {
-        $data = $request->validate([
-            'full_name' => ['sometimes', 'string', 'max:200'],
-            'phone' => ['sometimes', 'string', 'max:30'],
-            'phone_alt' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email'],
-            'national_id' => ['nullable', 'string', 'max:30'],
-            'birth_date' => ['sometimes', 'date'],
-            'license_number' => ['sometimes', 'string', 'max:50'],
-            'license_expires_on' => ['sometimes', 'date'],
-            'national_id_image_path' => ['nullable', 'string', 'max:500'],
-            'license_image_path' => ['nullable', 'string', 'max:500'],
-            'notes' => ['nullable', 'string'],
-            'status' => ['sometimes', 'in:active,blacklist'],
-            'blacklist_reason' => ['nullable', 'string'],
+        return response()->json([
+            'data' => $this->presentCustomer($customer, $canViewNid),
         ]);
+    }
+
+    public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
+    {
+        $data = $request->validated();
 
         if (($data['status'] ?? null) === 'blacklist') {
             $data['blacklisted_at'] = now();
@@ -99,6 +75,46 @@ class CustomerController extends Controller
 
         $customer->update($data);
 
-        return response()->json(['data' => $customer->fresh(), 'message' => 'تم تحديث العميل.']);
+        $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
+
+        return response()->json([
+            'data' => $this->presentCustomer($customer->fresh(), $canViewNid),
+            'message' => 'تم تحديث العميل.',
+        ]);
+    }
+
+    public function destroy(Customer $customer): JsonResponse
+    {
+        $hasActive = $customer->contracts()
+            ->whereIn('status', ['pending', 'approved', 'active'])
+            ->exists();
+
+        if ($hasActive) {
+            return response()->json([
+                'message' => 'لا يمكن حذف العميل لوجود عقود نشطة.',
+            ], 422);
+        }
+
+        $customer->delete();
+
+        return response()->json(['message' => 'تم حذف العميل.']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentCustomer(Customer $customer, bool $canViewNationalId): array
+    {
+        $data = $customer->toArray();
+        $nid = $data['national_id'] ?? null;
+
+        if ($nid !== null && $nid !== '' && ! $canViewNationalId) {
+            $nid = (string) $nid;
+            $len = mb_strlen($nid);
+            $visible = min(4, $len);
+            $data['national_id'] = str_repeat('*', max(0, $len - $visible)).mb_substr($nid, -$visible);
+        }
+
+        return $data;
     }
 }

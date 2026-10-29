@@ -8,6 +8,7 @@ import type { ApiError } from '@/shared/api/client'
 import './LoginPage.css'
 
 const REMEMBER_KEY = 'rpm.login.email'
+const IS_DEV = import.meta.env.DEV
 const DEMO = { email: 'admin@rpm.local', password: 'password' }
 
 function readRememberedEmail() {
@@ -79,8 +80,8 @@ export function LoginPage() {
   const { user, loading, login } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
-  const [email, setEmail] = useState(() => readRememberedEmail() || DEMO.email)
-  const [password, setPassword] = useState(DEMO.password)
+  const [email, setEmail] = useState(() => readRememberedEmail() || (IS_DEV ? DEMO.email : ''))
+  const [password, setPassword] = useState(() => (IS_DEV ? DEMO.password : ''))
   const [remember, setRemember] = useState(() => readRememberedEmail() !== '')
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -183,6 +184,12 @@ export function LoginPage() {
           <Button type="submit" variant="accent" size="lg" loading={saving} className="auth-submit">
             دخول
           </Button>
+
+          {IS_DEV ? (
+            <p className="auth-demo" dir="ltr">
+              Demo: {DEMO.email} / {DEMO.password}
+            </p>
+          ) : null}
         </div>
       </motion.form>
     </div>

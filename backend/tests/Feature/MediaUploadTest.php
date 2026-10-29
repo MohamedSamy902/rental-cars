@@ -75,7 +75,8 @@ class MediaUploadTest extends TestCase
 
     public function test_reject_oversized_image(): void
     {
-        // ٦ ميجا > حد الصور (٥ ميجا)
+        // أكبر من حد الصور الحالي (12 ميجا)
+        config(['uploads.image.max_bytes' => 5 * 1024 * 1024]);
         $file = UploadedFile::fake()->create('huge.jpg', 6 * 1024, 'image/jpeg');
 
         $this->post('/api/media', [

@@ -26,17 +26,18 @@ use App\Services\Operations\WaitlistService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
-    Route::get('/dashboard', DashboardController::class);
+    Route::get('/dashboard', DashboardController::class)->middleware('permission:reports.view|contracts.view|vehicles.view');
 
-    Route::post('/media', [MediaController::class, 'store']);
-    Route::get('/media/{medium}', [MediaController::class, 'show']);
-    Route::get('/media/{medium}/file', [MediaController::class, 'file']);
-    Route::delete('/media/{medium}', [MediaController::class, 'destroy']);
+    Route::get('/media/limits', [MediaController::class, 'limits'])->middleware('permission:media.view|media.upload|customers.view|vehicles.view|contracts.view');
+    Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload|customers.create|customers.update|vehicles.update|contracts.update|violations.create|maintenance.create');
+    Route::get('/media/{medium}', [MediaController::class, 'show'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
+    Route::get('/media/{medium}/file', [MediaController::class, 'file'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
+    Route::delete('/media/{medium}', [MediaController::class, 'destroy'])->middleware('permission:media.delete|customers.update|vehicles.update|settings.update');
 
     Route::get('/settings/tenant', function () {
         return response()->json(['data' => TenantSetting::query()->first()]);
@@ -112,6 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/contracts', [ContractController::class, 'store'])->middleware('permission:contracts.create');
     Route::get('/contracts/{contract}', [ContractController::class, 'show'])->middleware('permission:contracts.view');
     Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve'])->middleware('permission:contracts.approve');
+    Route::post('/contracts/{contract}/pricing', [ContractController::class, 'updatePricing'])->middleware('permission:contracts_price.override');
     Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->middleware('permission:contracts_cancel.approve');
@@ -199,8 +201,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::middleware(['feature:chat'])->group(function () {
-        Route::get('/chat', [CollaborationController::class, 'chatIndex']);
-        Route::post('/chat', [CollaborationController::class, 'chatStore']);
+        Route::get('/chat', [CollaborationController::class, 'chatIndex'])->middleware('permission:chat.view');
+        Route::post('/chat', [CollaborationController::class, 'chatStore'])->middleware('permission:chat.create');
     });
     Route::middleware(['feature:evaluations', 'permission:hr.view'])->get('/evaluations', [CollaborationController::class, 'evaluationsIndex']);
     Route::middleware(['feature:evaluations', 'permission:hr.create'])->post('/evaluations', [CollaborationController::class, 'evaluationsStore']);
