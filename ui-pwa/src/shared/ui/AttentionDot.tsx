@@ -44,12 +44,14 @@ export function AttentionDot({
   return dot
 }
 
-/** Resolve the strongest tone from counts: critical wins over warning. */
+/** Resolve the strongest tone from counts: critical wins over warning. Zero/undefined → nothing. */
 export function resolveAttentionTone(input: {
   critical?: number
   warning?: number
 }): AttentionTone | null {
-  if ((input.critical ?? 0) > 0) return 'critical'
-  if ((input.warning ?? 0) > 0) return 'warning'
+  const critical = Number(input.critical)
+  const warning = Number(input.warning)
+  if (Number.isFinite(critical) && critical > 0) return 'critical'
+  if (Number.isFinite(warning) && warning > 0) return 'warning'
   return null
 }

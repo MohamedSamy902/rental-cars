@@ -167,23 +167,13 @@ export function AppShell() {
                     return `shell-rail__link ${isActive || onContracts || onMonth ? 'is-active' : ''}`
                   }}
                 >
-                  <span className={`shell-rail__ico ${!expanded && attention ? 'rpm-attention-host' : ''}`}>
+                  <span className={`shell-rail__ico ${attention ? 'rpm-attention-host' : ''}`}>
                     {item.icon}
-                    {!expanded && attention ? (
+                    {attention ? (
                       <AttentionDot tone={attention.tone} ping={attention.ping} label={attention.label} />
                     ) : null}
                   </span>
-                  <span className="shell-rail__label rpm-attention-inline">
-                    {item.label}
-                    {expanded && attention ? (
-                      <AttentionDot
-                        tone={attention.tone}
-                        ping={attention.ping}
-                        placement="inline"
-                        label={attention.label}
-                      />
-                    ) : null}
-                  </span>
+                  <span className="shell-rail__label">{item.label}</span>
                 </NavLink>
               )
             })}
@@ -317,7 +307,7 @@ export function AppShell() {
                 return `shell-dock__item ${isActive || onContracts ? 'is-active' : ''}`
               }}
             >
-              <span className="shell-dock__icon rpm-attention-host" aria-hidden="true">
+              <span className={`shell-dock__icon ${attention ? 'rpm-attention-host' : ''}`} aria-hidden="true">
                 {item.icon}
                 {attention ? (
                   <AttentionDot tone={attention.tone} ping={attention.ping} label={attention.label} />
@@ -366,18 +356,13 @@ export function AppShell() {
                       }}
                       onClick={closeDrawer}
                     >
-                      <span className="shell-drawer__ico rpm-attention-host">
+                      <span className={`shell-drawer__ico ${attention ? 'rpm-attention-host' : ''}`}>
                         {item.icon}
                         {attention ? (
                           <AttentionDot tone={attention.tone} ping={attention.ping} label={attention.label} />
                         ) : null}
                       </span>
-                      <span className="rpm-attention-inline">
-                        {item.label}
-                        {attention ? (
-                          <AttentionDot tone={attention.tone} placement="inline" label={attention.label} />
-                        ) : null}
-                      </span>
+                      <span>{item.label}</span>
                     </NavLink>
                   )
                 })}

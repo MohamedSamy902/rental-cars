@@ -69,8 +69,9 @@
 
 .rpm-attention-host > .rpm-attention-dot {
   position: absolute;
-  inset-block-start: -0.1rem;
-  inset-inline-end: -0.15rem;
+  inset-block-start: -0.05rem;
+  inset-inline-end: -0.05rem;
+  z-index: 1;
 }
 
 /* Inline next to tab / chip labels */

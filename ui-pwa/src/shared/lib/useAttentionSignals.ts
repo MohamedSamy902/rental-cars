@@ -26,6 +26,25 @@ const EMPTY: AttentionCounts = {
   unread_notifications: 0,
 }
 
+function n(value: unknown): number {
+  const v = Number(value)
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0
+}
+
+function normalizeCounts(raw: Partial<AttentionCounts> | null | undefined): AttentionCounts {
+  return {
+    overdue_returns: n(raw?.overdue_returns),
+    pending_approvals: n(raw?.pending_approvals),
+    returning_today: n(raw?.returning_today),
+    pickups_today: n(raw?.pickups_today),
+    blocking_work_orders: n(raw?.blocking_work_orders),
+    open_work_orders: n(raw?.open_work_orders),
+    open_violations: n(raw?.open_violations),
+    low_stock: n(raw?.low_stock),
+    unread_notifications: n(raw?.unread_notifications),
+  }
+}
+
 export type NavAttention = {
   tone: AttentionTone
   ping?: boolean
@@ -33,7 +52,8 @@ export type NavAttention = {
 }
 
 /**
- * Map route → attention signal for rail / dock / drawer.
+ * Nav dots ONLY for sections with a direct unhandled count.
+ * Never decorate dashboard / fleet / calendar with aggregate noise.
  */
 export function attentionForPath(path: string, c: AttentionCounts): NavAttention | null {
   const map: Record<string, { critical: number; warning: number; label: string; ping?: boolean }> = {
@@ -45,11 +65,6 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
         : 'عقود تحتاج انتباهاً',
       ping: true,
     },
-    '/calendar': {
-      critical: c.overdue_returns,
-      warning: c.returning_today + c.pickups_today,
-      label: 'مواعيد اليوم تحتاج متابعة',
-    },
     '/maintenance': {
       critical: c.blocking_work_orders,
       warning: Math.max(0, c.open_work_orders - c.blocking_work_orders),
@@ -57,11 +72,6 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
         ? `${c.blocking_work_orders} أمر صيانة يوقف الأسطول`
         : 'أوامر شغل مفتوحة',
       ping: true,
-    },
-    '/vehicles': {
-      critical: c.blocking_work_orders,
-      warning: 0,
-      label: 'مركبات في صيانة مانعة',
     },
     '/violations': {
       critical: 0,
@@ -78,19 +88,14 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
       warning: c.unread_notifications,
       label: `${c.unread_notifications} إشعار غير مقروء`,
     },
-    '/': {
-      critical: c.overdue_returns + c.blocking_work_orders,
-      warning: c.pending_approvals + c.returning_today + c.pickups_today + c.open_violations,
-      label: 'لوحة اليوم تحتاج متابعة',
-      ping: true,
-    },
   }
 
   const hit = map[path]
   if (!hit) return null
+  if (hit.critical < 1 && hit.warning < 1) return null
   const tone = resolveAttentionTone({ critical: hit.critical, warning: hit.warning })
   if (!tone) return null
-  return { tone, ping: tone === 'critical' ? hit.ping : false, label: hit.label }
+  return { tone, ping: tone === 'critical' ? Boolean(hit.ping) : false, label: hit.label }
 }
 
 export function useAttentionSignals(enabled: boolean) {
@@ -105,7 +110,7 @@ export function useAttentionSignals(enabled: boolean) {
     const pull = () => {
       api<{ data: AttentionCounts }>('/attention')
         .then((res) => {
-          if (alive && res.data) setCounts({ ...EMPTY, ...res.data })
+          if (alive) setCounts(normalizeCounts(res.data))
         })
         .catch(() => {
           /* ignore — badge is non-blocking */
@@ -124,16 +129,7 @@ export function useAttentionSignals(enabled: boolean) {
 
   const byPath = useMemo(() => {
     const out: Record<string, NavAttention> = {}
-    for (const path of [
-      '/',
-      '/bookings',
-      '/calendar',
-      '/maintenance',
-      '/vehicles',
-      '/violations',
-      '/inventory',
-      '/notifications',
-    ]) {
+    for (const path of ['/bookings', '/maintenance', '/violations', '/inventory', '/notifications']) {
       const signal = attentionForPath(path, counts)
       if (signal) out[path] = signal
     }
