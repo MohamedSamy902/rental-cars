@@ -439,7 +439,19 @@ Query: `filter=all|one|today|week|range`
 ```
 
 ### `GET /reports/summary`
-KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب الشهر · مخالفات مفتوحة · …
+KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب الشهر · مخالفات مفتوحة · `occupancy_pct` (أيام مؤجّرة ÷ سعة الفترة) · …
+
+### تقارير P1 (١٥٫٦)
+| Method | Path | ملاحظة |
+|--------|------|--------|
+| GET | `/reports/profitability-compare?month=YYYY-MM` | مقارنة ربحية شهر بشهر (أسطول + سيارات) |
+| GET | `/reports/trial-balance?from=&to=` | ميزان مراجعة |
+| GET | `/reports/income-statement?from=&to=` | قائمة دخل |
+| GET | `/reports/payment-methods?from=&to=` | أرصدة طرق الدفع |
+| GET | `/reports/customers/{customer}/statement` | كشف عميل + `credit_balance` |
+| GET | `/reports/petty-cash-balances` | أرصدة العهدة |
+
+`GET /dashboard` يضمّن `occupancy_pct` بنفس المعادلة و`profitability_compare` جاهزة لضغطة واحدة.
 
 ---
 
@@ -680,7 +692,12 @@ password: password
 | PUT | `/settings/operational` | `settings.update` — تشغيل يومي فقط |
 | PUT | `/integrator/tenant` | دور `super_admin` فقط |
 | GET/POST | `/expenses` | `expenses.view` / `expenses.create` |
-| GET/POST | `/payroll` · `/payroll/draft` · `/payroll/{id}/approve` | HR |
+| GET/POST | `/payroll` · `/payroll/draft` · `/payroll/{id}/approve` | `hr.salaries` / `hr.payroll_approve` |
+| GET/POST/DELETE | `/salary-advances` | `hr.advances` |
+| GET/POST | `/employee-assignments` · `…/acknowledge` | `hr.custody` — تأكيد استلام الأدمن |
+| GET | `/vehicles/recommend` | ترتيب متاح بأوزان ٦٫٢ |
+| GET/POST | `/vehicles/{id}/tires|batteries|downtime|consumables` | أصول المركبة ٦٫٩–٦٫١١ · ١٤٫١ |
+| GET/POST | `/consumable-templates` | قوالب قطع استهلاكية |
 | GET/POST | `/evaluations` | خلف `feature:evaluations` |
 | GET/POST | `/chat` | خلف `feature:chat` · حد 100/يوم |
 | POST | `/ocr/review` | مراجعة حقول داخلية بلا إرسال خارجي |
@@ -688,3 +705,5 @@ password: password
 | GET | `/vehicles/{id}/estimated-odometer` | عداد تقديري أثناء التأجير |
 
 كل المسارات الحساسة محمية بـ `permission:` و/أو `feature:` و/أو `integrator`.
+
+صلاحيات HR الدقيقة: `hr.salaries` · `hr.custody` · `hr.advances` · `hr.expenses` (حساسة حيث ينطبق).

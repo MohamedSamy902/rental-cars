@@ -40,19 +40,15 @@
 }
 
 .rpm-sheet__close {
-  position: absolute;
-  z-index: 3;
-  inset-block-start: -21px;
-  inset-inline-end: -21px;
-  width: 42px;
-  height: 42px;
+  width: 2.25rem;
+  height: 2.25rem;
   display: none;
   place-items: center;
+  flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text-muted);
-  box-shadow: var(--shadow);
   transition:
     transform var(--motion-fast) ease,
     background-color var(--motion-fast) ease,
@@ -94,6 +90,10 @@
   touch-action: none;
   user-select: none;
   cursor: grab;
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 3;
+  background: var(--surface);
 }
 .rpm-sheet__grab:active {
   cursor: grabbing;
@@ -168,6 +168,22 @@
   align-content: start;
   gap: 0.95rem;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
+}
+
+.rpm-sheet__body::-webkit-scrollbar {
+  width: 6px;
+}
+.rpm-sheet__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.rpm-sheet__body::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
+  border-radius: 999px;
+}
+.rpm-sheet__body::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-muted) 65%, transparent);
 }
 
 .rpm-sheet__foot {
@@ -253,16 +269,21 @@
 
   .rpm-sheet__close--desk {
     display: grid;
+    justify-self: end;
   }
 
   .rpm-sheet__head {
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
     padding-block: 1rem;
     padding-inline: 1.25rem;
   }
 
   .rpm-sheet__head h2 {
+    flex: 1 1 auto;
+    min-width: 0;
     text-align: start;
     font-size: 1.1rem;
   }

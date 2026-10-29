@@ -47,10 +47,39 @@ export function NumberField(props: NumberProps) {
   return <TextField inputMode="decimal" {...props} type="number" />
 }
 
-type MoneyProps = TextProps
+type MoneyProps = TextProps & {
+  /** Currency unit rendered inside the input (inline-start / visual left in RTL). */
+  unit?: string
+}
 
-export function MoneyField({ hint = 'ج.م', ...props }: MoneyProps) {
-  return <NumberField hint={hint} {...props} />
+export function MoneyField({
+  label,
+  error,
+  hint,
+  required,
+  id,
+  className = '',
+  unit = 'ج.م',
+  ...rest
+}: MoneyProps) {
+  const fieldId = id ?? rest.name
+  return (
+    <FieldShell label={label} required={required} error={error} hint={hint} htmlFor={fieldId}>
+      <div className="rpm-money">
+        <input
+          id={fieldId}
+          className={`rpm-input rpm-money__input ${className}`.trim()}
+          required={required}
+          inputMode="decimal"
+          type="number"
+          {...rest}
+        />
+        <span className="rpm-money__unit" aria-hidden>
+          {unit}
+        </span>
+      </div>
+    </FieldShell>
+  )
 }
 
 type AreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
