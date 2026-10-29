@@ -61,14 +61,14 @@ class MediaController extends Controller
 
     public function show(Request $request, MediaFile $medium): JsonResponse
     {
-        $this->authorizeView($request, $medium);
+        $this->authorize('view', $medium);
 
         return response()->json(['data' => $this->present($medium)]);
     }
 
     public function file(Request $request, MediaFile $medium): StreamedResponse|JsonResponse
     {
-        $this->authorizeView($request, $medium);
+        $this->authorize('view', $medium);
 
         if (! Storage::disk($medium->disk)->exists($medium->path)) {
             return response()->json(['message' => __('http.not_found')], 404);
@@ -87,6 +87,7 @@ class MediaController extends Controller
 
     public function destroy(Request $request, MediaFile $medium): JsonResponse
     {
+        $this->authorize('delete', $medium);
         $user = $request->user();
         $isOwner = $medium->uploaded_by && $medium->uploaded_by === $user?->id;
         $canManage = $user?->hasPermission('media.delete')

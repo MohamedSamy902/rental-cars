@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Http\Requests\Concerns\NormalizesDigits;
 use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
+use App\Rules\MediaReference;
 use App\Support\DigitNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -66,8 +67,10 @@ class UpdateCustomerRequest extends FormRequest
             'address' => ['nullable', 'string'],
             'license_number' => ['sometimes', 'string', 'max:50'],
             'license_expires_on' => ['sometimes', 'date'],
-            'national_id_image_path' => ['nullable', 'string', 'max:500'],
-            'license_image_path' => ['nullable', 'string', 'max:500'],
+            'national_id_image_path' => ['nullable', 'string', 'max:500', new MediaReference],
+            'license_image_path' => ['nullable', 'string', 'max:500', new MediaReference],
+            'national_id_media_id' => ['nullable', 'integer', 'exists:media_files,id'],
+            'license_media_id' => ['nullable', 'integer', 'exists:media_files,id'],
             'notes' => ['nullable', 'string'],
             'status' => ['sometimes', 'in:active,blacklist'],
             'blacklist_reason' => ['nullable', 'string', 'max:1000'],

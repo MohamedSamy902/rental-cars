@@ -25,6 +25,10 @@ class ContractController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = Contract::query()->with(['customer', 'vehicle', 'deposit'])->latest('id');
+        $user = $request->user();
+        if ($user && $user->role?->name === 'sales' && ! $user->hasPermission('contracts.approve')) {
+            $q->where('sales_user_id', $user->id);
+        }
         if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);
         }
@@ -76,8 +80,10 @@ class ContractController extends Controller
         return response()->json(['data' => $contract, 'message' => 'تم إنشاء العقد.'], 201);
     }
 
-    public function show(Contract $contract, ContractDossierService $dossier): JsonResponse
+    public function show(Request $request, Contract $contract, ContractDossierService $dossier): JsonResponse
     {
+        $this->authorize('view', $contract);
+
         return response()->json(['data' => $dossier->build($contract)]);
     }
 
@@ -221,10 +227,21 @@ class ContractController extends Controller
             'odometer_out' => ['required', 'integer', 'min:0'],
             'planned_ends_at' => ['nullable', 'date'],
             'damage_fee' => ['nullable', 'integer', 'min:0'],
+            'signature_data' => ['nullable', 'string', 'min:40'],
+            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'damages' => ['nullable', 'array'],
+            'damages.*.position' => ['required_with:damages', 'string', 'max:120'],
+            'damages.*.description' => ['required_with:damages', 'string', 'max:500'],
+            'damages.*.photo_path' => ['nullable', 'string', 'max:500'],
+            'accessories' => ['nullable', 'array'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ], [], [
             'replacement_vehicle_id' => 'السيارة البديلة',
             'odometer_in' => 'عداد السيارة القديمة',
             'odometer_out' => 'عداد السيارة البديلة',
+            'signature_data' => 'توقيع العميل',
+            'fuel_level' => 'مستوى البنزين',
+            'damages' => 'الأضرار',
         ]);
 
         try {

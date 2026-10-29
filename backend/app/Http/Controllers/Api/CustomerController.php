@@ -42,8 +42,9 @@ class CustomerController extends Controller
 
     public function store(StoreCustomerRequest $request): JsonResponse
     {
+        $data = $this->resolveMediaPaths($request->validated());
         $customer = Customer::query()->create([
-            ...$request->validated(),
+            ...$data,
             'status' => 'active',
         ]);
 
@@ -57,6 +58,7 @@ class CustomerController extends Controller
 
     public function show(Request $request, Customer $customer): JsonResponse
     {
+        $this->authorize('view', $customer);
         $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
         return response()->json([
@@ -66,7 +68,7 @@ class CustomerController extends Controller
 
     public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
     {
-        $data = $request->validated();
+        $data = $this->resolveMediaPaths($request->validated());
 
         if (($data['status'] ?? null) === 'blacklist') {
             $data['blacklisted_at'] = now();
@@ -85,6 +87,7 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer): JsonResponse
     {
+        $this->authorize('delete', $customer);
         $hasActive = $customer->contracts()
             ->whereIn('status', ['pending', 'approved', 'active'])
             ->exists();
@@ -98,6 +101,23 @@ class CustomerController extends Controller
         $customer->delete();
 
         return response()->json(['message' => 'تم حذف العميل.']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function resolveMediaPaths(array $data): array
+    {
+        if (! empty($data['national_id_media_id'])) {
+            $data['national_id_image_path'] = '/media/'.(int) $data['national_id_media_id'].'/file';
+        }
+        if (! empty($data['license_media_id'])) {
+            $data['license_image_path'] = '/media/'.(int) $data['license_media_id'].'/file';
+        }
+        unset($data['national_id_media_id'], $data['license_media_id']);
+
+        return $data;
     }
 
     /**

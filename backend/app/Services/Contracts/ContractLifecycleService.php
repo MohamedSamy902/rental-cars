@@ -11,10 +11,13 @@ use App\Models\Payment;
 use App\Models\TenantSetting;
 use App\Models\Vehicle;
 use App\Models\VehicleDocument;
+use App\Models\User;
 use App\Services\Accounting\AccountingService;
 use App\Services\Fleet\VehicleAvailabilityService;
+use App\Services\Notifications\NotificationDispatchService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ContractLifecycleService
 {
@@ -23,6 +26,7 @@ class ContractLifecycleService
         private readonly VehicleAvailabilityService $availability,
         private readonly AccountingService $accounting,
         private readonly InspectionService $inspections,
+        private readonly NotificationDispatchService $notifications,
     ) {}
 
     /**
@@ -107,16 +111,17 @@ class ContractLifecycleService
         });
     }
 
-    public function approve(Contract $contract, ?int $userId = null): Contract
+    public function approve(Contract $contract, ?int $userId = null, bool $reSnapshotRatesFromVehicle = true): Contract
     {
-        return DB::transaction(function () use ($contract, $userId) {
+        return DB::transaction(function () use ($contract, $userId, $reSnapshotRatesFromVehicle) {
             /** @var Contract $locked */
             $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'pending') {
                 throw new DomainException('لا يمكن اعتماد هذا العقد في حالته الحالية.');
             }
 
-            Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
+            /** @var Vehicle $vehicle */
+            $vehicle = Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
 
             $this->assertDocumentsAllowApproval($locked);
             $this->assertNoOverlap(
@@ -128,10 +133,16 @@ class ContractLifecycleService
 
             $days = $this->pricing->countRentalDays($locked->starts_at, $locked->planned_ends_at);
 
-            // لحظة التجميد الرسمية = الاعتماد (ن٫٥)
+            // لحظة التجميد الرسمية = الاعتماد (ن٫٥): لقطة من أسعار السيارة الحالية
+            // التمديد/التبديل يمرّر أسعاراً مُجمَّدة مسبقاً فلا نعيد اللقطة.
+            $rate = $reSnapshotRatesFromVehicle ? (int) $vehicle->daily_rate : (int) $locked->frozen_daily_rate;
+            $deposit = $reSnapshotRatesFromVehicle ? (int) $vehicle->default_deposit : (int) $locked->frozen_agreed_deposit;
+
             $locked->fill([
                 'status' => 'approved',
                 'approved_days' => $days,
+                'frozen_daily_rate' => $rate,
+                'frozen_agreed_deposit' => $deposit,
                 'frozen_min_days' => $locked->min_days,
                 'allowed_km' => $this->pricing->allowedKilometers(
                     (int) $locked->frozen_daily_km_allowance,
@@ -151,6 +162,13 @@ class ContractLifecycleService
                     'frozen_agreed_deposit' => $locked->frozen_agreed_deposit,
                 ],
             ]);
+
+            $this->notifyLifecycle(
+                'تم اعتماد عقد',
+                "العقد {$locked->number} أصبح معتمداً.",
+                $locked,
+                $userId,
+            );
 
             return $locked->fresh(['customer', 'vehicle', 'deposit']);
         });
@@ -278,6 +296,13 @@ class ContractLifecycleService
                 'after' => ['status' => 'active', 'odometer_out' => $odometerOut],
             ]);
 
+            $this->notifyLifecycle(
+                'تم تسليم سيارة',
+                "العقد {$locked->number} أصبح نشطاً بعد التسليم.",
+                $locked,
+                $userId,
+            );
+
             return $locked->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
         });
     }
@@ -372,6 +397,13 @@ class ContractLifecycleService
                 ],
             ]);
 
+            $this->notifyLifecycle(
+                'تم استلام سيارة',
+                "العقد {$locked->number} أُقفل. الإجمالي: {$locked->final_total} ج.م.",
+                $locked,
+                $userId,
+            );
+
             return $locked->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
         });
     }
@@ -412,6 +444,13 @@ class ContractLifecycleService
                         'notes' => 'رد عند إلغاء العقد قبل التسليم',
                     ], $userId);
                 });
+
+            $this->notifyLifecycle(
+                'تم إلغاء عقد',
+                "العقد {$contract->number} أُلغي. السبب: {$reason}",
+                $contract,
+                $userId,
+            );
 
             AuditLog::query()->create([
                 'user_id' => $userId,
@@ -500,7 +539,7 @@ class ContractLifecycleService
                 'status' => 'pending',
             ], $userId, true);
 
-            $new = $this->approve($new, $userId);
+            $new = $this->approve($new, $userId, false);
             $handoverInspection = [
                 'signature_data' => $data['signature_data'] ?? ('swap-handover-ack:'.str_repeat('0', 48)),
                 'fuel_level' => (int) ($data['fuel_level'] ?? 50),
@@ -678,8 +717,53 @@ class ContractLifecycleService
 
     private function nextNumber(): string
     {
-        $seq = Contract::query()->withTrashed()->count() + 1;
+        if (Schema::hasTable('contract_number_sequences')) {
+            $row = DB::table('contract_number_sequences')->where('id', 1)->lockForUpdate()->first();
+            if (! $row) {
+                DB::table('contract_number_sequences')->insert(['id' => 1, 'next_value' => 2, 'updated_at' => now(), 'created_at' => now()]);
+                $seq = 1;
+            } else {
+                $seq = (int) $row->next_value;
+                DB::table('contract_number_sequences')->where('id', 1)->update([
+                    'next_value' => $seq + 1,
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return 'CNT-'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
+        }
+
+        $last = Contract::query()->withTrashed()->orderByDesc('id')->lockForUpdate()->value('number');
+        $seq = 1;
+        if (is_string($last) && preg_match('/(\d+)$/', $last, $m)) {
+            $seq = ((int) $m[1]) + 1;
+        }
 
         return 'CNT-'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
+    }
+
+    private function notifyLifecycle(string $title, string $body, Contract $contract, ?int $actorId = null): void
+    {
+        try {
+            $recipients = User::query()
+                ->where('is_active', true)
+                ->whereHas('role.permissions', fn ($q) => $q->where('key', 'contracts.view'))
+                ->when($actorId, fn ($q) => $q->where('id', '!=', $actorId))
+                ->limit(40)
+                ->get();
+
+            if ($contract->sales_user_id) {
+                $sales = User::query()->find($contract->sales_user_id);
+                if ($sales && $sales->is_active && (! $actorId || $sales->id !== $actorId)) {
+                    $recipients = $recipients->push($sales)->unique('id');
+                }
+            }
+
+            foreach ($recipients as $user) {
+                $this->notifications->notify($user, $title, $body, 'contract', (int) $contract->id);
+            }
+        } catch (\Throwable) {
+            // الإشعار لا يفشل العملية الأساسية
+        }
     }
 }

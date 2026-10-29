@@ -42,7 +42,12 @@ class OperationsController extends Controller
                     'manual_status' => $v->manual_status,
                     'has_active_handover' => $activeIds->has($v->id),
                     'has_approved_covering_date' => $reservedIds->has($v->id),
-                    'open_work_order_blocks' => $v->manual_status === 'maintenance',
+                    'open_work_order_blocks' => $v->manual_status === 'maintenance'
+                        || \App\Models\WorkOrder::query()
+                            ->where('vehicle_id', $v->id)
+                            ->where('puts_in_maintenance', true)
+                            ->whereIn('status', ['open', 'in_progress'])
+                            ->exists(),
                 ]);
 
                 return [

@@ -41,12 +41,18 @@ class DashboardController extends Controller
             'maintenance' => 0,
             'out_of_service' => 0,
         ];
+        $blockingWo = WorkOrder::query()
+            ->where('puts_in_maintenance', true)
+            ->whereIn('status', ['open', 'in_progress'])
+            ->pluck('vehicle_id')
+            ->flip();
+
         foreach ($vehicles as $v) {
             $status = $this->availability->statusOnDate([
                 'manual_status' => $v->manual_status,
                 'has_active_handover' => $activeIds->has($v->id),
                 'has_approved_covering_date' => $reservedIds->has($v->id),
-                'open_work_order_blocks' => $v->manual_status === 'maintenance',
+                'open_work_order_blocks' => $v->manual_status === 'maintenance' || $blockingWo->has($v->id),
             ]);
             if (isset($statusCounts[$status])) {
                 $statusCounts[$status]++;

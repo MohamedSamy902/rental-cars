@@ -94,6 +94,8 @@ class VehicleController extends Controller
 
     public function show(Vehicle $vehicle): JsonResponse
     {
+        $this->authorize('view', $vehicle);
+
         return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents', 'owner']))]);
     }
 
@@ -297,6 +299,28 @@ class VehicleController extends Controller
         ]);
     }
 
+    public function destroy(Vehicle $vehicle): JsonResponse
+    {
+        $this->authorize('delete', $vehicle);
+        $hasActive = $vehicle->contracts()
+            ->whereIn('status', ['pending', 'approved', 'active'])
+            ->exists();
+        if ($hasActive) {
+            return response()->json(['message' => 'لا يمكن أرشفة السيارة لوجود عقود نشطة.'], 422);
+        }
+
+        // تحرير code/plate من الفهرس الفريد الكامل حتى يمكن إعادة استخدامهما بعد الأرشفة (توافق MySQL).
+        $suffix = '__del_'.$vehicle->id;
+        $vehicle->forceFill([
+            'code' => mb_substr($vehicle->code, 0, 40).$suffix,
+            'plate' => mb_substr($vehicle->plate, 0, 40).$suffix,
+            'is_active' => false,
+        ])->save();
+        $vehicle->delete();
+
+        return response()->json(['message' => 'تم أرشفة السيارة.']);
+    }
+
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): JsonResponse
     {
         $data = $request->validated();
@@ -331,7 +355,12 @@ class VehicleController extends Controller
                 ->where('starts_at', '<=', now())
                 ->where('planned_ends_at', '>=', now())
                 ->exists(),
-            'open_work_order_blocks' => $v->manual_status === 'maintenance',
+            'open_work_order_blocks' => $v->manual_status === 'maintenance'
+                || WorkOrder::query()
+                    ->where('vehicle_id', $v->id)
+                    ->where('puts_in_maintenance', true)
+                    ->whereIn('status', ['open', 'in_progress'])
+                    ->exists(),
         ]);
 
         return [
