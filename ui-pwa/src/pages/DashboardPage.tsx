@@ -25,7 +25,7 @@ import {
 import { AnimatedNumber } from '@/shared/ui/AnimatedNumber'
 import { Badge, type BadgeTone } from '@/shared/ui/Badge'
 import { Card, CardContent, CardHeader } from '@/shared/ui/Card'
-import { DropdownMenu, ErrorState, SkeletonBlock, useToast, type MenuItem } from '@/shared/ui'
+import { Button, DropdownMenu, ErrorState, Sheet, SkeletonBlock, useToast, type MenuItem } from '@/shared/ui'
 import {
   IconCalendar,
   IconCar,
@@ -42,10 +42,30 @@ import {
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import './DashboardPage.css'
 
+type ProfitCompare = {
+  current_month: string
+  previous_month: string
+  fleet: {
+    current: { revenue: number; maintenance: number; expenses: number; operating_profit: number }
+    previous: { revenue: number; maintenance: number; expenses: number; operating_profit: number }
+    delta: number
+    delta_pct: number
+  }
+  vehicles: Array<{
+    vehicle_id: number
+    label: string
+    current: { operating_profit: number }
+    previous: { operating_profit: number }
+    delta: number
+    delta_pct: number
+  }>
+}
+
 type Dash = {
   occupancy_pct: number
   fleet_total: number
   fleet_status: Record<string, number>
+  profitability_compare?: ProfitCompare
   kpis: Record<string, number>
   tasks: { id: number; title: string; subtitle: string; status: string; at: string }[]
   recent_contracts: {
@@ -193,9 +213,26 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [revenueRange, setRevenueRange] = useState<RevenueRange>('week')
   const [refreshing, setRefreshing] = useState(false)
+  const [momOpen, setMomOpen] = useState(false)
+  const [mom, setMom] = useState<ProfitCompare | null>(null)
   const navigate = useNavigate()
   const toast = useToast()
   const { openNewContract } = useNewContract()
+
+  const openMom = useCallback(() => {
+    const embedded = data?.profitability_compare
+    if (embedded) {
+      setMom(embedded)
+      setMomOpen(true)
+      return
+    }
+    api<{ data: ProfitCompare }>('/reports/profitability-compare')
+      .then((r) => {
+        setMom(r.data)
+        setMomOpen(true)
+      })
+      .catch((e) => toast.error(e.message || 'تعذّر تحميل مقارنة الربحية'))
+  }, [data?.profitability_compare, toast])
 
   useEffect(() => {
     api<Dash>('/dashboard')
@@ -466,9 +503,10 @@ export function DashboardPage() {
           <Card>
             <CardHeader
               title="صحة الإشغال"
-              description="قراءة لحظية للأسطول النشط"
+              description="أيام مؤجّرة ÷ (أسطول نشط × أيام الفترة)"
               action={
                 <>
+                  <button type="button" className="db-text-action" onClick={openMom}>مقارنة ربحية شهر بشهر</button>
                   <Link to="/vehicles">الأسطول</Link>
                   <CardMenu label="خيارات الإشغال" items={menus.occupancy} />
                 </>
@@ -824,11 +862,60 @@ export function DashboardPage() {
                   <span className="db-quick__label">المتاح</span>
                   <b className="tabular-nums">{formatPercent(100 - data.occupancy_pct)}</b>
                 </Link>
+                <button type="button" className="db-quick__btn" onClick={openMom}>
+                  <span className="db-quick__ico">
+                    <IconTrend size={18} />
+                  </span>
+                  <span className="db-quick__label">ربحية شهر بشهر</span>
+                  <b className="tabular-nums">
+                    {data.profitability_compare
+                      ? `${data.profitability_compare.fleet.delta_pct >= 0 ? '+' : ''}${formatNumber(data.profitability_compare.fleet.delta_pct)}%`
+                      : '—'}
+                  </b>
+                </button>
               </div>
             </CardContent>
           </Card>
         </motion.div>
       </section>
+
+      <Sheet open={momOpen} title="مقارنة ربحية شهر بشهر" onClose={() => setMomOpen(false)}>
+        {mom ? (
+          <div className="rpm-stack">
+            <p className="muted">{mom.current_month} مقابل {mom.previous_month}</p>
+            <div className="db-mom-grid">
+              <div>
+                <span>ربح التشغيل الحالي</span>
+                <strong className="tabular-nums">{formatMoney(mom.fleet.current.operating_profit)}</strong>
+              </div>
+              <div>
+                <span>الشهر السابق</span>
+                <strong className="tabular-nums">{formatMoney(mom.fleet.previous.operating_profit)}</strong>
+              </div>
+              <div>
+                <span>الفرق</span>
+                <strong className="tabular-nums">{formatMoney(mom.fleet.delta)}</strong>
+              </div>
+              <div>
+                <span>نسبة التغيّر</span>
+                <strong className="tabular-nums">{formatNumber(mom.fleet.delta_pct)}%</strong>
+              </div>
+            </div>
+            <ul className="db-mom-vehicles">
+              {mom.vehicles.slice(0, 12).map((v) => (
+                <li key={v.vehicle_id}>
+                  <span>{v.label}</span>
+                  <b className="tabular-nums">{formatMoney(v.current.operating_profit)}</b>
+                  <em className="tabular-nums">{formatNumber(v.delta_pct)}%</em>
+                </li>
+              ))}
+            </ul>
+            <Button variant="secondary" onClick={() => navigate('/reports')}>فتح التقارير</Button>
+          </div>
+        ) : (
+          <SkeletonBlock rows={3} />
+        )}
+      </Sheet>
     </div>
   )
 }

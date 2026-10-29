@@ -142,6 +142,39 @@ type Dossier = {
     maintenance_by_month: ChartPoint[]
     revenue_by_month: ChartPoint[]
   }
+  tires?: Array<{
+    id: number
+    position: string
+    brand?: string | null
+    installed_on?: string | null
+    odometer_at_install: number
+    expected_life_km: number
+    cost?: number | null
+  }>
+  batteries?: Array<{
+    id: number
+    brand?: string | null
+    installed_on?: string | null
+    odometer_at_install: number
+    expected_life_km: number
+    cost?: number | null
+  }>
+  downtime?: Array<{
+    id: number
+    reason: string
+    starts_at?: string | null
+    ends_at?: string | null
+    days_count?: number | null
+    lost_revenue_estimate?: number | null
+  }>
+  consumables?: Array<{
+    id: number
+    status: string
+    due_on?: string | null
+    due_odometer?: number | null
+    template?: { id: number; name: string } | null
+  }>
+  asset_defaults?: { tire_life_km: number; battery_life_km: number; lost_income_daily_basis: number }
   totals: {
     contracts: number
     work_orders: number
@@ -152,10 +185,19 @@ type Dossier = {
     revenue_amount?: number
     accessories?: number
     documents?: number
+    lost_revenue?: number
   }
 }
 
-type TabId = 'overview' | 'charts' | 'accessories' | 'bookings' | 'maintenance' | 'expenses' | 'docs' | 'owner'
+type TabId = 'overview' | 'charts' | 'accessories' | 'assets' | 'bookings' | 'maintenance' | 'expenses' | 'docs' | 'owner'
+
+const tirePosLabel: Record<string, string> = {
+  front_right: 'أمامي يمين',
+  front_left: 'أمامي يسار',
+  rear_right: 'خلفي يمين',
+  rear_left: 'خلفي يسار',
+  spare: 'احتياطي',
+}
 
 const statusLabel: Record<string, string> = {
   available: 'متاحة', reserved: 'محجوزة', rented: 'مؤجرة', maintenance: 'في صيانة',
@@ -228,7 +270,64 @@ export function VehicleDetailPage() {
   const [estimatedKm, setEstimatedKm] = useState<number | null>(null)
   const [woOpen, setWoOpen] = useState(false)
   const [expOpen, setExpOpen] = useState(false)
+  const [assetSheet, setAssetSheet] = useState<'tire' | 'battery' | 'downtime' | null>(null)
+  const [assetSaving, setAssetSaving] = useState(false)
+  const [tireForm, setTireForm] = useState({
+    position: 'front_right', brand: '', installed_on: new Date().toISOString().slice(0, 10), odometer_at_install: '', expected_life_km: '',
+  })
+  const [batteryForm, setBatteryForm] = useState({
+    brand: '', installed_on: new Date().toISOString().slice(0, 10), odometer_at_install: '', expected_life_km: '',
+  })
+  const [downtimeForm, setDowntimeForm] = useState({
+    reason: 'maintenance', starts_at: new Date().toISOString().slice(0, 16), ends_at: '',
+  })
 
+  async function saveAsset() {
+    if (!dossier || !assetSheet) return
+    setAssetSaving(true)
+    try {
+      if (assetSheet === 'tire') {
+        await api(`/vehicles/${dossier.vehicle.id}/tires`, {
+          method: 'POST',
+          json: {
+            position: tireForm.position,
+            brand: tireForm.brand || undefined,
+            installed_on: tireForm.installed_on,
+            odometer_at_install: Number(tireForm.odometer_at_install || dossier.vehicle.odometer),
+            expected_life_km: tireForm.expected_life_km ? Number(tireForm.expected_life_km) : undefined,
+          },
+        })
+        toast.success('تم تسجيل الإطار.')
+      } else if (assetSheet === 'battery') {
+        await api(`/vehicles/${dossier.vehicle.id}/batteries`, {
+          method: 'POST',
+          json: {
+            brand: batteryForm.brand || undefined,
+            installed_on: batteryForm.installed_on,
+            odometer_at_install: Number(batteryForm.odometer_at_install || dossier.vehicle.odometer),
+            expected_life_km: batteryForm.expected_life_km ? Number(batteryForm.expected_life_km) : undefined,
+          },
+        })
+        toast.success('تم تسجيل البطارية.')
+      } else {
+        await api(`/vehicles/${dossier.vehicle.id}/downtime`, {
+          method: 'POST',
+          json: {
+            reason: downtimeForm.reason,
+            starts_at: downtimeForm.starts_at,
+            ends_at: downtimeForm.ends_at || undefined,
+          },
+        })
+        toast.success('تم تسجيل أيام التوقف.')
+      }
+      setAssetSheet(null)
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setAssetSaving(false)
+    }
+  }
 
   const revenueSeries = useMemo(
     () => (dossier?.charts.revenue_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
@@ -559,10 +658,18 @@ export function VehicleDetailPage() {
     (c) => c.status === 'active' && c.planned_ends_at && new Date(c.planned_ends_at).getTime() < Date.now(),
   ).length
 
+  const assetCount = (dossier.tires?.length || 0) + (dossier.batteries?.length || 0) + (dossier.downtime?.length || 0) + (dossier.consumables?.length || 0)
   const tabs: Array<{ id: TabId; label: string; count?: number; attention?: AttentionTone | null; attentionLabel?: string }> = [
     { id: 'overview', label: 'التفاصيل' },
     { id: 'charts', label: 'الشارتات' },
     { id: 'accessories', label: 'المستلزمات', count: accessories.length },
+    {
+      id: 'assets',
+      label: 'إطارات وبطارية',
+      count: assetCount,
+      attention: (dossier.totals.lost_revenue || 0) > 0 ? 'warning' : null,
+      attentionLabel: 'دخل ضائع من التوقف',
+    },
     {
       id: 'bookings',
       label: 'الحجوزات',
@@ -1049,10 +1156,86 @@ export function VehicleDetailPage() {
     </section>
   )
 
+  const assetsPanel = (
+    <section className="vd-panel" key="assets">
+      <div className="vd-panel__head">
+        <h2>الإطارات · البطارية · التوقف · القطع</h2>
+        <p>دخل ضائع تقديري {formatMoney(dossier.totals.lost_revenue || 0)}</p>
+      </div>
+
+      <div className="vd-panel__head"><h3>الإطارات</h3></div>
+      {(dossier.tires || []).length === 0 ? <Empty>لا إطارات مسجّلة</Empty> : (
+        <div className="rpm-card-list">
+          {(dossier.tires || []).map((t) => (
+            <article key={t.id} className="rpm-card">
+              <div className="rpm-card__row">
+                <strong>{tirePosLabel[t.position] || t.position}</strong>
+                <span className="tabular-nums">{formatNumber(t.expected_life_km)} كم عمر</span>
+              </div>
+              <p className="muted">{t.brand || '—'} · تركيب {shortDate(t.installed_on)} · عداد {formatNumber(t.odometer_at_install)}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <div className="vd-panel__head" style={{ marginBlockStart: '1rem' }}><h3>البطارية</h3></div>
+      {(dossier.batteries || []).length === 0 ? <Empty>لا بطارية مسجّلة</Empty> : (
+        <div className="rpm-card-list">
+          {(dossier.batteries || []).map((b) => (
+            <article key={b.id} className="rpm-card">
+              <div className="rpm-card__row">
+                <strong>{b.brand || 'بطارية'}</strong>
+                <span className="tabular-nums">{formatNumber(b.expected_life_km)} كم</span>
+              </div>
+              <p className="muted">تركيب {shortDate(b.installed_on)} · عداد {formatNumber(b.odometer_at_install)}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <div className="vd-panel__head" style={{ marginBlockStart: '1rem' }}><h3>أيام التوقف</h3></div>
+      {(dossier.downtime || []).length === 0 ? <Empty>لا توقف مسجّل</Empty> : (
+        <div className="rpm-card-list">
+          {(dossier.downtime || []).map((d) => (
+            <article key={d.id} className="rpm-card">
+              <div className="rpm-card__row">
+                <strong>{d.reason === 'maintenance' ? 'صيانة' : d.reason === 'out_of_service' ? 'خارج الخدمة' : 'أخرى'}</strong>
+                <strong className="tabular-nums">{formatMoney(d.lost_revenue_estimate || 0)}</strong>
+              </div>
+              <p className="muted">{shortDate(d.starts_at)} → {shortDate(d.ends_at)} · {formatNumber(d.days_count || 0)} يوم</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <div className="vd-panel__head" style={{ marginBlockStart: '1rem' }}><h3>قطع استهلاكية</h3></div>
+      {(dossier.consumables || []).length === 0 ? <Empty>لا قوالب مربوطة بهذه المركبة</Empty> : (
+        <div className="rpm-card-list">
+          {(dossier.consumables || []).map((c) => (
+            <article key={c.id} className="rpm-card">
+              <div className="rpm-card__row">
+                <strong>{c.template?.name || 'قطعة'}</strong>
+                <span>{c.status}</span>
+              </div>
+              <p className="muted">استحقاق {shortDate(c.due_on)}{c.due_odometer != null ? ` · عداد ${formatNumber(c.due_odometer)}` : ''}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <div className="rpm-card__actions" style={{ marginBlockStart: '1rem' }}>
+        <Button size="sm" variant="secondary" onClick={() => setAssetSheet('tire')}>تسجيل إطار</Button>
+        <Button size="sm" variant="secondary" onClick={() => setAssetSheet('battery')}>تسجيل بطارية</Button>
+        <Button size="sm" variant="secondary" onClick={() => setAssetSheet('downtime')}>تسجيل توقف</Button>
+      </div>
+    </section>
+  )
+
   const panelByTab: Record<TabId, ReactNode> = {
     overview: overviewPanel,
     charts: chartsPanel,
     accessories: accessoriesPanel,
+    assets: assetsPanel,
     bookings: bookingsPanel,
     maintenance: maintenancePanel,
     expenses: expensesPanel,
@@ -1143,8 +1326,54 @@ export function VehicleDetailPage() {
 
       <div className="vd-no-print">{panelByTab[tab]}</div>
       <div className="vd-print-all">
-        {overviewPanel}{chartsPanel}{accessoriesPanel}{bookingsPanel}{maintenancePanel}{expensesPanel}{docsPanel}{ownerPanel}
+        {overviewPanel}{chartsPanel}{accessoriesPanel}{assetsPanel}{bookingsPanel}{maintenancePanel}{expensesPanel}{docsPanel}{ownerPanel}
       </div>
+
+      <Sheet
+        open={!!assetSheet}
+        title={assetSheet === 'tire' ? 'تسجيل إطار' : assetSheet === 'battery' ? 'تسجيل بطارية' : 'تسجيل توقف'}
+        onClose={() => setAssetSheet(null)}
+        footer={<><Button loading={assetSaving} onClick={() => void saveAsset()}>حفظ</Button><Button variant="secondary" onClick={() => setAssetSheet(null)}>إلغاء</Button></>}
+      >
+        {assetSheet === 'tire' ? (
+          <div className="rpm-form-grid">
+            <SelectField
+              label="الموضع"
+              value={tireForm.position}
+              onChange={(e) => setTireForm({ ...tireForm, position: e.target.value })}
+              options={Object.entries(tirePosLabel).map(([value, label]) => ({ value, label }))}
+            />
+            <TextField label="الماركة" value={tireForm.brand} onChange={(e) => setTireForm({ ...tireForm, brand: e.target.value })} />
+            <TextField label="تاريخ التركيب" type="date" value={tireForm.installed_on} onChange={(e) => setTireForm({ ...tireForm, installed_on: e.target.value })} />
+            <NumberField label="العداد عند التركيب" value={tireForm.odometer_at_install} onChange={(e) => setTireForm({ ...tireForm, odometer_at_install: e.target.value })} />
+            <NumberField label="العمر المتوقع (كم)" value={tireForm.expected_life_km} onChange={(e) => setTireForm({ ...tireForm, expected_life_km: e.target.value })} />
+          </div>
+        ) : null}
+        {assetSheet === 'battery' ? (
+          <div className="rpm-form-grid">
+            <TextField label="الماركة" value={batteryForm.brand} onChange={(e) => setBatteryForm({ ...batteryForm, brand: e.target.value })} />
+            <TextField label="تاريخ التركيب" type="date" value={batteryForm.installed_on} onChange={(e) => setBatteryForm({ ...batteryForm, installed_on: e.target.value })} />
+            <NumberField label="العداد عند التركيب" value={batteryForm.odometer_at_install} onChange={(e) => setBatteryForm({ ...batteryForm, odometer_at_install: e.target.value })} />
+            <NumberField label="العمر المتوقع (كم)" value={batteryForm.expected_life_km} onChange={(e) => setBatteryForm({ ...batteryForm, expected_life_km: e.target.value })} />
+          </div>
+        ) : null}
+        {assetSheet === 'downtime' ? (
+          <div className="rpm-form-grid">
+            <SelectField
+              label="السبب"
+              value={downtimeForm.reason}
+              onChange={(e) => setDowntimeForm({ ...downtimeForm, reason: e.target.value })}
+              options={[
+                { value: 'maintenance', label: 'صيانة' },
+                { value: 'out_of_service', label: 'خارج الخدمة' },
+                { value: 'other', label: 'أخرى' },
+              ]}
+            />
+            <TextField label="بداية التوقف" type="datetime-local" value={downtimeForm.starts_at} onChange={(e) => setDowntimeForm({ ...downtimeForm, starts_at: e.target.value })} />
+            <TextField label="نهاية التوقف" type="datetime-local" value={downtimeForm.ends_at} onChange={(e) => setDowntimeForm({ ...downtimeForm, ends_at: e.target.value })} />
+          </div>
+        ) : null}
+      </Sheet>
 
       <Sheet
         open={editOpen}

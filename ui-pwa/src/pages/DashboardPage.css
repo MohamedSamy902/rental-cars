@@ -806,6 +806,72 @@
   pointer-events: none;
 }
 
+.db-text-action {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+}
+.db-text-action:hover { text-decoration: underline; }
+
+.db-quick__btn {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  text-align: start;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  padding-block: 0.75rem;
+  padding-inline: 0.85rem;
+  cursor: pointer;
+}
+.db-quick__btn:hover { background: var(--surface-hover); }
+
+.db-mom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.db-mom-grid > div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.db-mom-grid span { color: var(--text-muted); font-size: 0.78rem; }
+.db-mom-grid strong { font-size: 1.05rem; }
+
+.db-mom-vehicles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.db-mom-vehicles li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding-block: 0.55rem;
+  padding-inline: 0.75rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 0.86rem;
+}
+.db-mom-vehicles em { color: var(--text-muted); font-style: normal; }
+
 @media (max-width: 980px) {
   .db-card-menu {
     width: 2.25rem;
