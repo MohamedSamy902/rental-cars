@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { api } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
 import { useNewContract } from '@/shared/contracts/newContractContext'
+import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
+import { AttentionDot } from './AttentionDot'
 import { BrandLogo } from './BrandLogo'
 import { CommandPalette } from './CommandPalette'
 import { useSheetDrag } from './useSheetDrag'
+import './AttentionDot.css'
 import {
   IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart, IconChat,
   IconChevron, IconClipboard, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
@@ -71,6 +73,7 @@ export function AppShell() {
   const [cmdOpen, setCmdOpen] = useState(false)
   const [drawer, setDrawer] = useState(false)
   const [unread, setUnread] = useState(0)
+  const { byPath: attentionByPath, counts: attentionCounts } = useAttentionSignals(Boolean(user))
 
   const visibleRail = railNav.filter((item) => {
     if (item.feature && !featureEnabled(item.feature)) return false
@@ -127,30 +130,8 @@ export function AppShell() {
   }, [drawer, closeDrawer])
 
   useEffect(() => {
-    if (!user) {
-      setUnread(0)
-      return
-    }
-    let alive = true
-    const pull = () => {
-      api<{ unread: number }>('/notifications/unread-count')
-        .then((res) => {
-          if (alive) setUnread(res.unread || 0)
-        })
-        .catch(() => {
-          /* ignore badge errors */
-        })
-    }
-    pull()
-    const t = window.setInterval(pull, 60000)
-    const onFocus = () => pull()
-    window.addEventListener('focus', onFocus)
-    return () => {
-      alive = false
-      window.clearInterval(t)
-      window.removeEventListener('focus', onFocus)
-    }
-  }, [user, location.pathname])
+    setUnread(attentionCounts.unread_notifications || 0)
+  }, [attentionCounts.unread_notifications])
 
   return (
     <div className={`shell ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
@@ -172,22 +153,40 @@ export function AppShell() {
           </div>
 
           <nav className="shell-rail__nav">
-            {visibleRail.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                title={item.label}
-                className={({ isActive }) => {
-                  const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
-                  const onMonth = item.to === '/accounts' && location.pathname.startsWith('/accounts/months/')
-                  return `shell-rail__link ${isActive || onContracts || onMonth ? 'is-active' : ''}`
-                }}
-              >
-                <span className="shell-rail__ico">{item.icon}</span>
-                <span className="shell-rail__label">{item.label}</span>
-              </NavLink>
-            ))}
+            {visibleRail.map((item) => {
+              const attention = attentionByPath[item.to]
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  title={attention ? `${item.label} · ${attention.label}` : item.label}
+                  className={({ isActive }) => {
+                    const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
+                    const onMonth = item.to === '/accounts' && location.pathname.startsWith('/accounts/months/')
+                    return `shell-rail__link ${isActive || onContracts || onMonth ? 'is-active' : ''}`
+                  }}
+                >
+                  <span className={`shell-rail__ico ${!expanded && attention ? 'rpm-attention-host' : ''}`}>
+                    {item.icon}
+                    {!expanded && attention ? (
+                      <AttentionDot tone={attention.tone} ping={attention.ping} label={attention.label} />
+                    ) : null}
+                  </span>
+                  <span className="shell-rail__label rpm-attention-inline">
+                    {item.label}
+                    {expanded && attention ? (
+                      <AttentionDot
+                        tone={attention.tone}
+                        ping={attention.ping}
+                        placement="inline"
+                        label={attention.label}
+                      />
+                    ) : null}
+                  </span>
+                </NavLink>
+              )
+            })}
           </nav>
 
           <div className="shell-rail__foot">
@@ -306,20 +305,28 @@ export function AppShell() {
       </div>
 
       <nav className="shell-dock" aria-label="تنقّل الموبايل">
-        {visibleMobile.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) => {
-              const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
-              return `shell-dock__item ${isActive || onContracts ? 'is-active' : ''}`
-            }}
-          >
-            <span className="shell-dock__icon" aria-hidden="true">{item.icon}</span>
-            <span className="shell-dock__label">{item.label}</span>
-          </NavLink>
-        ))}
+        {visibleMobile.map((item) => {
+          const attention = attentionByPath[item.to]
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) => {
+                const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
+                return `shell-dock__item ${isActive || onContracts ? 'is-active' : ''}`
+              }}
+            >
+              <span className="shell-dock__icon rpm-attention-host" aria-hidden="true">
+                {item.icon}
+                {attention ? (
+                  <AttentionDot tone={attention.tone} ping={attention.ping} label={attention.label} />
+                ) : null}
+              </span>
+              <span className="shell-dock__label">{item.label}</span>
+            </NavLink>
+          )
+        })}
       </nav>
 
       <AnimatePresence>
@@ -345,22 +352,35 @@ export function AppShell() {
                 </div>
               </div>
               <div className="shell-drawer__grid">
-                {visibleRail.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) => {
-                      const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
-                      const onMonth = item.to === '/accounts' && location.pathname.startsWith('/accounts/months/')
-                      return `shell-drawer__link ${isActive || onContracts || onMonth ? 'is-active' : ''}`
-                    }}
-                    onClick={closeDrawer}
-                  >
-                    <span className="shell-drawer__ico">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </NavLink>
-                ))}
+                {visibleRail.map((item) => {
+                  const attention = attentionByPath[item.to]
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) => {
+                        const onContracts = item.to === '/bookings' && location.pathname.startsWith('/contracts/')
+                        const onMonth = item.to === '/accounts' && location.pathname.startsWith('/accounts/months/')
+                        return `shell-drawer__link ${isActive || onContracts || onMonth ? 'is-active' : ''}`
+                      }}
+                      onClick={closeDrawer}
+                    >
+                      <span className="shell-drawer__ico rpm-attention-host">
+                        {item.icon}
+                        {attention ? (
+                          <AttentionDot tone={attention.tone} ping={attention.ping} label={attention.label} />
+                        ) : null}
+                      </span>
+                      <span className="rpm-attention-inline">
+                        {item.label}
+                        {attention ? (
+                          <AttentionDot tone={attention.tone} placement="inline" label={attention.label} />
+                        ) : null}
+                      </span>
+                    </NavLink>
+                  )
+                })}
               </div>
               <div className="shell-drawer__foot">
                 <button type="button" className="shell-drawer__action" onClick={toggleTheme}>

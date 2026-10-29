@@ -7,10 +7,12 @@ import {
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  Button, StatusPill, Sheet,
+  Button, StatusPill, Sheet, AttentionDot,
   TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField, MediaUpload,
   useToast, SkeletonBlock, ErrorState, QrCode,
+  type AttentionTone,
 } from '@/shared/ui'
+import '@/shared/ui/AttentionDot.css'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
@@ -551,12 +553,30 @@ export function VehicleDetailPage() {
   const accessories = v.accessories || []
   const ownerInitial = (v.owner?.full_name || 'م').trim().charAt(0)
 
-  const tabs: Array<{ id: TabId; label: string; count?: number }> = [
+  const openMaintenance = dossier.work_orders.filter((w) => ['open', 'in_progress'].includes(String(w.status))).length
+  const activeBookings = dossier.contracts.filter((c) => ['pending', 'approved', 'active'].includes(String(c.status))).length
+  const overdueBookings = dossier.contracts.filter(
+    (c) => c.status === 'active' && c.planned_ends_at && new Date(c.planned_ends_at).getTime() < Date.now(),
+  ).length
+
+  const tabs: Array<{ id: TabId; label: string; count?: number; attention?: AttentionTone | null; attentionLabel?: string }> = [
     { id: 'overview', label: 'التفاصيل' },
     { id: 'charts', label: 'الشارتات' },
     { id: 'accessories', label: 'المستلزمات', count: accessories.length },
-    { id: 'bookings', label: 'الحجوزات', count: dossier.totals.contracts },
-    { id: 'maintenance', label: 'الصيانة', count: dossier.totals.work_orders },
+    {
+      id: 'bookings',
+      label: 'الحجوزات',
+      count: dossier.totals.contracts,
+      attention: overdueBookings > 0 ? 'critical' : activeBookings > 0 ? 'warning' : null,
+      attentionLabel: overdueBookings > 0 ? 'عقد متأخر' : 'عقود جارية',
+    },
+    {
+      id: 'maintenance',
+      label: 'الصيانة',
+      count: dossier.totals.work_orders,
+      attention: openMaintenance > 0 ? (v.manual_status === 'maintenance' ? 'critical' : 'warning') : null,
+      attentionLabel: 'أوامر شغل مفتوحة',
+    },
     { id: 'expenses', label: 'المصروفات', count: dossier.expenses.length },
     { id: 'docs', label: 'المستندات', count: (v.documents?.length || 0) + dossier.totals.media },
     { id: 'owner', label: 'المالك' },
@@ -1105,7 +1125,17 @@ export function VehicleDetailPage() {
       <nav className="vd-tabs vd-no-print" aria-label="أقسام ملف المركبة">
         {tabs.map((t) => (
           <button key={t.id} type="button" className={`vd-tab${tab === t.id ? ' is-active' : ''}`} onClick={() => setTab(t.id)}>
-            {t.label}
+            <span className="rpm-attention-inline">
+              {t.label}
+              {t.attention ? (
+                <AttentionDot
+                  tone={t.attention}
+                  placement="inline"
+                  ping={t.attention === 'critical'}
+                  label={t.attentionLabel}
+                />
+              ) : null}
+            </span>
             {t.count != null ? <span className="vd-tab__count">{t.count}</span> : null}
           </button>
         ))}

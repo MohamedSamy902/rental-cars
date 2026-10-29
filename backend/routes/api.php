@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CollaborationController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\AttentionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
@@ -32,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/dashboard', DashboardController::class)->middleware('permission:reports.view|contracts.view|vehicles.view');
+    Route::get('/attention', AttentionController::class);
 
     Route::get('/media/limits', [MediaController::class, 'limits'])->middleware('permission:media.view|media.upload|customers.view|vehicles.view|contracts.view');
     Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload|customers.create|customers.update|vehicles.update|contracts.update|violations.create|maintenance.create');

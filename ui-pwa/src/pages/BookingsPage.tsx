@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
   useToast, ErrorState, IconClipboard, IconAlert, IconCheck, IconKey,
@@ -16,13 +17,6 @@ import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { printContract } from '@/shared/contracts/printContract'
 import './pages.css'
 
-const chips = [
-  { id: 'all', label: 'الكل' },
-  { id: 'pending', label: 'معلّق' },
-  { id: 'approved', label: 'معتمد' },
-  { id: 'active', label: 'نشط' },
-  { id: 'completed', label: 'مكتمل' },
-]
 
 export function BookingsPage() {
   const toast = useToast()
@@ -36,6 +30,38 @@ export function BookingsPage() {
   const [error, setError] = useState('')
   const { openNewContract, createdVersion } = useNewContract()
   const life = useContractLifecycle(() => void load())
+  const { counts: attention } = useAttentionSignals(true)
+
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      {
+        id: 'pending',
+        label: 'معلّق',
+        attention: summary.pending > 0 ? ('warning' as const) : null,
+        attentionLabel: 'اعتماد معلّق',
+      },
+      {
+        id: 'approved',
+        label: 'معتمد',
+        attention: attention.pickups_today > 0 ? ('warning' as const) : null,
+        attentionLabel: 'تسليمات اليوم',
+      },
+      {
+        id: 'active',
+        label: 'نشط',
+        attention:
+          attention.overdue_returns > 0
+            ? ('critical' as const)
+            : attention.returning_today > 0
+              ? ('warning' as const)
+              : null,
+        attentionLabel: attention.overdue_returns > 0 ? 'عقود متأخرة' : 'استلامات اليوم',
+      },
+      { id: 'completed', label: 'مكتمل' },
+    ],
+    [summary.pending, attention.pickups_today, attention.overdue_returns, attention.returning_today],
+  )
 
   async function load() {
     setLoading(true)

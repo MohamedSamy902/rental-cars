@@ -1,6 +1,13 @@
+import { AttentionDot, type AttentionTone } from './AttentionDot'
 import './FilterBar.css'
+import './AttentionDot.css'
 
-type Chip = { id: string; label: string }
+type Chip = {
+  id: string
+  label: string
+  attention?: AttentionTone | null
+  attentionLabel?: string
+}
 
 type Props = {
   search: string
@@ -39,7 +46,17 @@ export function FilterBar({
             className={`rpm-chip ${activeChip === chip.id ? 'is-active' : ''}`}
             onClick={() => onChipChange(chip.id)}
           >
-            {chip.label}
+            <span className="rpm-attention-inline">
+              {chip.label}
+              {chip.attention ? (
+                <AttentionDot
+                  tone={chip.attention}
+                  placement="inline"
+                  ping={chip.attention === 'critical'}
+                  label={chip.attentionLabel}
+                />
+              ) : null}
+            </span>
           </button>
         ))}
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
@@ -44,13 +44,6 @@ const statusLabel: Record<string, string> = {
   out_of_service: 'خارج الخدمة',
 }
 
-const chips = [
-  { id: 'all', label: 'الكل' },
-  { id: 'available', label: 'متاحة' },
-  { id: 'rented', label: 'مؤجرة' },
-  { id: 'reserved', label: 'محجوزة' },
-  { id: 'maintenance', label: 'صيانة' },
-]
 
 const emptyForm = {
   code: '', plate: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
@@ -72,6 +65,26 @@ export function VehiclesPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'available', label: 'متاحة' },
+      { id: 'rented', label: 'مؤجرة' },
+      {
+        id: 'reserved',
+        label: 'محجوزة',
+        attention: summary.reserved > 0 ? ('warning' as const) : null,
+        attentionLabel: 'حجوزات معتمدة',
+      },
+      {
+        id: 'maintenance',
+        label: 'صيانة',
+        attention: summary.maintenance > 0 ? ('critical' as const) : null,
+        attentionLabel: 'مركبات في الصيانة',
+      },
+    ],
+    [summary.reserved, summary.maintenance],
+  )
   const [owners, setOwners] = useState<OwnerOption[]>([])
 
   useEffect(() => {
