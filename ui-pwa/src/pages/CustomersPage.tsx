@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { formatMoney } from '@/shared/lib/format'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, TextField, TextAreaField,
   MediaUpload, useToast, EmptyState, SkeletonBlock, IconChevron,
@@ -21,6 +22,16 @@ type Customer = {
   status: string
   notes?: string | null
   blacklist_reason?: string | null
+  credit_balance?: number
+}
+
+type CreditMovement = {
+  id: number
+  direction: string
+  amount: number
+  reason: string
+  moved_at: string
+  notes?: string | null
 }
 
 const emptyForm = {
@@ -37,6 +48,7 @@ export function CustomersPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<Customer | null>(null)
+  const [creditLedger, setCreditLedger] = useState<CreditMovement[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -66,8 +78,9 @@ export function CustomersPage() {
     setEditing(false)
     setBlacklistReason('')
     try {
-      const res = await api<{ data: Customer }>(`/customers/${id}`)
+      const res = await api<{ data: Customer; credit_ledger?: CreditMovement[] }>(`/customers/${id}`)
       setDetail(res.data)
+      setCreditLedger(res.credit_ledger || [])
       setForm({
         full_name: res.data.full_name,
         phone: res.data.phone,
@@ -178,7 +191,7 @@ export function CustomersPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العملاء"
-        subtitle="بلا رصيد دائن على النظام · قائمة سوداء بصلاحية"
+        subtitle="رصيد دائن من الإنهاء المبكر · قائمة سوداء بصلاحية"
         action={<Button onClick={() => setOpen(true)}>إضافة عميل</Button>}
         mobileFab
       />
@@ -207,6 +220,7 @@ export function CustomersPage() {
             <p>{c.phone}</p>
             <div className="rpm-card__meta">
               <span className="muted">رخصة {c.license_number} · تنتهي {c.license_expires_on}</span>
+              {(c.credit_balance || 0) > 0 ? <span>رصيد دائن {formatMoney(c.credit_balance || 0)}</span> : null}
               <IconChevron size={16} className="rpm-card__chev" />
             </div>
           </button>
@@ -255,10 +269,25 @@ export function CustomersPage() {
                 { label: 'انتهاء الرخصة', value: detail.license_expires_on },
                 { label: 'صورة البطاقة', value: detail.national_id_image_path ? 'مرفوعة' : '—' },
                 { label: 'صورة الرخصة', value: detail.license_image_path ? 'مرفوعة' : '—' },
+                { label: 'الرصيد الدائن', value: formatMoney(detail.credit_balance || 0) },
                 { label: 'سبب القائمة السوداء', value: detail.blacklist_reason || '—' },
                 { label: 'ملاحظات', value: detail.notes || '—' },
               ]}
             />
+            {creditLedger.length > 0 ? (
+              <div className="rpm-card-list" style={{ marginTop: '0.75rem' }}>
+                <strong>حركة الرصيد الدائن</strong>
+                {creditLedger.slice(0, 8).map((m) => (
+                  <article key={m.id} className="rpm-card">
+                    <div className="rpm-card__row">
+                      <span>{m.direction === 'credit' ? 'إضافة' : 'خصم'} · {m.reason}</span>
+                      <strong>{formatMoney(m.amount)}</strong>
+                    </div>
+                    <p className="muted">{m.moved_at}{m.notes ? ` · ${m.notes}` : ''}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
             {(detail.national_id_image_path || detail.license_image_path) ? (
               <div className="rpm-form-grid" style={{ marginTop: '0.75rem' }}>
                 {detail.national_id_image_path ? (

@@ -279,7 +279,7 @@ export function BookingsPage() {
             damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
           },
         })
-        toast.success('تم التبديل بسبب عطل.')
+        toast.success('تم التبديل بسبب عطل على نفس العقد.')
       } else if (action === 'deposit') {
         await api(`/contracts/${selected.id}/deposit`, {
           method: 'POST',
@@ -324,7 +324,7 @@ export function BookingsPage() {
     return: 'استلام وإقفال',
     cancel: 'إلغاء العقد',
     extend: 'تمديد (عقد جديد)',
-    swap: 'تبديل بسبب عطل',
+    swap: 'تبديل بسبب عطل (نفس العقد)',
     deposit: 'قبض التأمين النقدي',
     deduct: 'خصم من التأمين',
     refund: 'رد متبقي التأمين',
@@ -414,7 +414,7 @@ export function BookingsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العقود والحجوزات"
-        subtitle="تمديد = عقد جديد · تبديل عطل = عقد جديد · بلا رصيد دائن"
+        subtitle="تمديد = عقد جديد · تبديل عطل = نفس العقد · رصيد دائن عند الإنهاء المبكر"
         action={<Button onClick={openSheet}>إضافة حجز</Button>}
         mobileFab
       />

@@ -58,7 +58,7 @@ class WorkOrderController extends Controller
         ]);
 
         try {
-            $order = $this->service->open($data, $data['lines'] ?? []);
+            $order = $this->service->open($data, $data['lines'] ?? [], $request->user()?->id);
         } catch (\DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

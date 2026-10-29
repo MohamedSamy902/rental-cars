@@ -2,12 +2,15 @@
 
 namespace App\Services\Maintenance;
 
+use App\Models\InventoryBatch;
+use App\Models\PettyCashAccount;
+use App\Models\PettyCashMovement;
 use App\Models\Vehicle;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
+use App\Services\Accounting\AccountingService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Inventory\FifoConsumptionService;
-use App\Models\InventoryBatch;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -16,15 +19,16 @@ class WorkOrderService
     public function __construct(
         private readonly FifoConsumptionService $fifo,
         private readonly VehicleAvailabilityService $availability,
+        private readonly AccountingService $accounting,
     ) {}
 
     /**
      * @param  array<string, mixed>  $data
      * @param  list<array<string, mixed>>  $lines
      */
-    public function open(array $data, array $lines = []): WorkOrder
+    public function open(array $data, array $lines = [], ?int $userId = null): WorkOrder
     {
-        return DB::transaction(function () use ($data, $lines) {
+        return DB::transaction(function () use ($data, $lines, $userId) {
             $vehicle = Vehicle::query()->findOrFail($data['vehicle_id']);
 
             if (! empty($data['puts_in_maintenance'])) {
@@ -51,7 +55,7 @@ class WorkOrderService
 
             $parts = 0;
             foreach ($lines as $line) {
-                $created = $this->addLine($order, $line);
+                $created = $this->addLine($order, $line, $userId);
                 $parts += $created->quantity * $created->unit_price;
             }
             $order->update(['parts_cost' => $parts]);
@@ -63,11 +67,14 @@ class WorkOrderService
     /**
      * @param  array<string, mixed>  $line
      */
-    public function addLine(WorkOrder $order, array $line): WorkOrderLine
+    public function addLine(WorkOrder $order, array $line, ?int $userId = null): WorkOrderLine
     {
         $source = $line['part_source'] ?? 'purchase';
         $unitPrice = (int) ($line['unit_price'] ?? 0);
         $qty = (int) ($line['quantity'] ?? 1);
+        $fromPetty = (bool) ($line['from_petty_cash'] ?? false);
+        $pettyEmployeeId = isset($line['petty_cash_employee_id']) ? (int) $line['petty_cash_employee_id'] : null;
+        $pettyAmount = (int) ($line['petty_cash_amount'] ?? 0);
 
         if ($source === 'stock') {
             $itemId = $line['inventory_item_id'] ?? null;
@@ -94,6 +101,31 @@ class WorkOrderService
                 $cost += $a['qty'] * $a['unit_cost'];
             }
             $unitPrice = (int) round($cost / max(1, $qty));
+            $total = (int) round($cost);
+
+            // Purchase/receipt stays unposted; usage posts Dr maintenance / Cr inventory.
+            if ($total > 0) {
+                $this->accounting->postInventoryUsage(
+                    $total,
+                    (int) $order->vehicle_id,
+                    'صرف مخزون لأمر شغل #'.$order->id,
+                    $userId,
+                    $order->opened_on?->toDateString() ?? now()->toDateString(),
+                );
+            }
+        } elseif ($fromPetty) {
+            $lineTotal = $unitPrice * $qty;
+            $spend = $pettyAmount > 0 ? $pettyAmount : $lineTotal;
+            $this->spendFromCustody(
+                $pettyEmployeeId,
+                $spend,
+                (int) $order->vehicle_id,
+                'شراء قطعة لأمر شغل #'.$order->id,
+                $userId,
+                $order->opened_on?->toDateString() ?? now()->toDateString(),
+                $order->id,
+            );
+            $pettyAmount = $spend;
         }
 
         return WorkOrderLine::query()->create([
@@ -103,9 +135,9 @@ class WorkOrderService
             'inventory_item_id' => $line['inventory_item_id'] ?? null,
             'quantity' => $qty,
             'unit_price' => $unitPrice,
-            'from_petty_cash' => (bool) ($line['from_petty_cash'] ?? false),
-            'petty_cash_employee_id' => $line['petty_cash_employee_id'] ?? null,
-            'petty_cash_amount' => (int) ($line['petty_cash_amount'] ?? 0),
+            'from_petty_cash' => $fromPetty,
+            'petty_cash_employee_id' => $pettyEmployeeId,
+            'petty_cash_amount' => $pettyAmount,
         ]);
     }
 
@@ -132,5 +164,54 @@ class WorkOrderService
 
             return $order->fresh(['vehicle', 'lines']);
         });
+    }
+
+    private function spendFromCustody(
+        ?int $employeeId,
+        int $amount,
+        int $vehicleId,
+        string $notes,
+        ?int $userId,
+        string $date,
+        ?int $workOrderId = null,
+    ): void {
+        if (! $employeeId || $employeeId < 1) {
+            throw new DomainException('موظف العهدة مطلوب عند الصرف من العهدة.');
+        }
+        if ($amount <= 0) {
+            throw new DomainException('مبلغ العهدة غير صالح.');
+        }
+
+        $account = PettyCashAccount::query()
+            ->where('employee_id', $employeeId)
+            ->where('is_active', true)
+            ->lockForUpdate()
+            ->first();
+        if (! $account) {
+            throw new DomainException('لا توجد عهدة نشطة لهذا الموظف.');
+        }
+        if ($amount > (int) $account->balance) {
+            throw new DomainException('رصيد العهدة غير كافٍ.');
+        }
+
+        $account->update(['balance' => (int) $account->balance - $amount]);
+        PettyCashMovement::query()->create([
+            'petty_cash_account_id' => $account->id,
+            'type' => 'spend',
+            'amount' => $amount,
+            'moved_on' => $date,
+            'work_order_id' => $workOrderId,
+            'performed_by' => $userId,
+            'notes' => $notes,
+        ]);
+
+        $this->accounting->postCustodySpend(
+            $amount,
+            '5300',
+            $vehicleId,
+            $notes,
+            $userId,
+            $date,
+        );
     }
 }

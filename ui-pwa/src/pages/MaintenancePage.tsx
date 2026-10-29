@@ -31,9 +31,12 @@ export function MaintenancePage() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [fromStock, setFromStock] = useState(true)
+  const [fromPetty, setFromPetty] = useState(false)
   const [putsInMaintenance, setPutsInMaintenance] = useState(true)
+  const [employees, setEmployees] = useState<{ id: number; name: string }[]>([])
   const [form, setForm] = useState({
     vehicle_id: '', odometer: '', workshop: '', labor_cost: '0', description: 'صيانة', inventory_item_id: '', quantity: '1', unit_price: '0',
+    petty_cash_employee_id: '',
   })
 
   async function load() {
@@ -51,12 +54,14 @@ export function MaintenancePage() {
 
   async function openSheet() {
     setOpen(true)
-    const [v, i] = await Promise.all([
+    const [v, i, e] = await Promise.all([
       api<{ data: Vehicle[] }>('/vehicles'),
-      api<{ data: Item[] }>('/inventory'),
+      api<{ data: Item[] }>('/inventory').catch(() => ({ data: [] as Item[] })),
+      api<{ data: { id: number; name: string }[] }>('/employees').catch(() => ({ data: [] as { id: number; name: string }[] })),
     ])
     setVehicles(v.data)
     setItems(i.data)
+    setEmployees(e.data)
   }
 
   async function onSave() {
@@ -77,11 +82,13 @@ export function MaintenancePage() {
               inventory_item_id: fromStock ? Number(form.inventory_item_id) : undefined,
               quantity: Number(form.quantity || 1),
               unit_price: fromStock ? undefined : Number(form.unit_price || 0),
+              from_petty_cash: !fromStock && fromPetty,
+              petty_cash_employee_id: !fromStock && fromPetty ? Number(form.petty_cash_employee_id) : undefined,
             },
           ],
         },
       })
-      toast.success('تم فتح أمر الشغل.')
+      toast.success(fromStock ? 'تم فتح أمر الشغل مع ترحيل صرف المخزون.' : 'تم فتح أمر الشغل.')
       setOpen(false)
       await load()
     } catch (e) {
@@ -101,7 +108,7 @@ export function MaintenancePage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="أوامر الشغل" subtitle="صرف FIFO أو شراء · تعارض الصيانة مع الحجوزات" action={<Button onClick={openSheet}>أمر شغل</Button>} mobileFab />
+      <PageHeader title="أوامر الشغل" subtitle="صرف FIFO بترحيل محاسبي · شراء من العهدة اختياري" action={<Button onClick={() => void openSheet()}>أمر شغل</Button>} mobileFab />
       <Fab label="أمر شغل" onClick={openSheet} />
       <SummaryStrip items={[
         { label: 'مفتوحة', value: String(summary.open), tone: 'warning' },
@@ -132,11 +139,23 @@ export function MaintenancePage() {
           <TextField label="الورشة" value={form.workshop} onChange={(e) => setForm({ ...form, workshop: e.target.value })} />
           <NumberField label="العداد" required value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
           <SwitchField label="يضع السيارة في صيانة" checked={putsInMaintenance} onChange={setPutsInMaintenance} />
-          <SwitchField label="القطعة من المخزون (FIFO)" checked={fromStock} onChange={setFromStock} />
+          <SwitchField label="القطعة من المخزون (FIFO)" checked={fromStock} onChange={(v) => { setFromStock(v); if (v) setFromPetty(false) }} />
           {fromStock ? (
             <SelectField label="صنف المخزون" required options={items.map((i) => ({ value: String(i.id), label: `${i.code} · ${i.name}` }))} value={form.inventory_item_id} onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })} />
           ) : (
-            <MoneyField label="سعر شراء الوحدة" required value={form.unit_price} onChange={(e) => setForm({ ...form, unit_price: e.target.value })} />
+            <>
+              <MoneyField label="سعر شراء الوحدة" required value={form.unit_price} onChange={(e) => setForm({ ...form, unit_price: e.target.value })} />
+              <SwitchField label="الدفع من عهدة موظف" checked={fromPetty} onChange={setFromPetty} />
+              {fromPetty ? (
+                <SelectField
+                  label="موظف العهدة"
+                  required
+                  options={employees.map((e) => ({ value: String(e.id), label: e.name }))}
+                  value={form.petty_cash_employee_id}
+                  onChange={(e) => setForm({ ...form, petty_cash_employee_id: e.target.value })}
+                />
+              ) : null}
+            </>
           )}
           <NumberField label="الكمية" required value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
           <MoneyField label="تكلفة العمالة" value={form.labor_cost} onChange={(e) => setForm({ ...form, labor_cost: e.target.value })} />

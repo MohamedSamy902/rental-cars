@@ -88,7 +88,7 @@ export function AccountsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="الحسابات"
-        subtitle="توزيع الإيجار على الشهور · إقفال شهر · بلا رصيد دائن وبلا ترحيل مخالفات"
+        subtitle="توزيع الإيجار على الشهور · إقفال شهر · رصيد دائن للعملاء · بلا ترحيل مخالفات"
       />
 
       <SummaryStrip
