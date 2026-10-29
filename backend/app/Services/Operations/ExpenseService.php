@@ -27,16 +27,22 @@ class ExpenseService
         $this->accounting->ensureChartOfAccounts();
 
         return DB::transaction(function () use ($data, $userId, $spentOn) {
-            if (! empty($data['from_petty_cash'])) {
+            $fromPetty = ! empty($data['from_petty_cash']);
+            $amount = (int) $data['amount'];
+
+            if ($fromPetty) {
                 $employeeId = (int) ($data['employee_id'] ?? 0);
                 if ($employeeId < 1) {
                     throw new DomainException('موظف العهدة مطلوب عند الصرف من العهدة.');
                 }
-                $account = PettyCashAccount::query()->where('employee_id', $employeeId)->where('is_active', true)->first();
+                $account = PettyCashAccount::query()
+                    ->where('employee_id', $employeeId)
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->first();
                 if (! $account) {
                     throw new DomainException('لا توجد عهدة نشطة لهذا الموظف.');
                 }
-                $amount = (int) $data['amount'];
                 if ($amount > (int) $account->balance) {
                     throw new DomainException('رصيد العهدة غير كافٍ.');
                 }
@@ -54,41 +60,53 @@ class ExpenseService
             $expense = Expense::query()->create([
                 'title' => $data['title'],
                 'category' => $data['category'] ?? 'تشغيل',
-                'amount' => (int) $data['amount'],
+                'amount' => $amount,
                 'spent_on' => $spentOn,
-                'payment_method' => $data['payment_method'] ?? 'cash',
+                'payment_method' => $fromPetty ? 'petty_cash' : ($data['payment_method'] ?? 'cash'),
                 'vehicle_id' => $data['vehicle_id'] ?? null,
                 'employee_id' => $data['employee_id'] ?? null,
-                'from_petty_cash' => (bool) ($data['from_petty_cash'] ?? false),
+                'from_petty_cash' => $fromPetty,
                 'recorded_by' => $userId,
                 'notes' => $data['notes'] ?? null,
             ]);
 
-            $cash = Account::query()->where('code', '1000')->firstOrFail();
             $expenseAcc = Account::query()->firstOrCreate(
                 ['code' => '5100'],
                 ['name' => 'مصروفات تشغيل', 'type' => 'expense', 'is_system' => true, 'is_active' => true],
             );
 
-            $entry = JournalEntry::query()->create([
-                'entry_date' => $spentOn,
-                'narration' => 'مصروف: '.$expense->title,
-                'source' => 'expense:'.$expense->id,
-                'posted_by' => $userId,
-            ]);
-            JournalLine::query()->create([
-                'journal_entry_id' => $entry->id,
-                'account_id' => $expenseAcc->id,
-                'debit' => $expense->amount,
-                'credit' => 0,
-                'vehicle_id' => $expense->vehicle_id,
-            ]);
-            JournalLine::query()->create([
-                'journal_entry_id' => $entry->id,
-                'account_id' => $cash->id,
-                'debit' => 0,
-                'credit' => $expense->amount,
-            ]);
+            if ($fromPetty) {
+                // Concrete action: post expense against custody (not cash).
+                $this->accounting->postCustodySpend(
+                    $amount,
+                    '5100',
+                    $expense->vehicle_id,
+                    'مصروف من العهدة: '.$expense->title,
+                    $userId,
+                    $spentOn,
+                );
+            } else {
+                $cash = Account::query()->where('code', '1000')->firstOrFail();
+                $entry = JournalEntry::query()->create([
+                    'entry_date' => $spentOn,
+                    'narration' => 'مصروف: '.$expense->title,
+                    'source' => 'expense',
+                    'posted_by' => $userId,
+                ]);
+                JournalLine::query()->create([
+                    'journal_entry_id' => $entry->id,
+                    'account_id' => $expenseAcc->id,
+                    'debit' => $expense->amount,
+                    'credit' => 0,
+                    'vehicle_id' => $expense->vehicle_id,
+                ]);
+                JournalLine::query()->create([
+                    'journal_entry_id' => $entry->id,
+                    'account_id' => $cash->id,
+                    'debit' => 0,
+                    'credit' => $expense->amount,
+                ]);
+            }
 
             return $expense->load(['vehicle', 'employee']);
         });

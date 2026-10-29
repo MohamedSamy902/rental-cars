@@ -252,7 +252,7 @@ class ContractController extends Controller
 
         return response()->json([
             'data' => $result,
-            'message' => 'تم التبديل بسبب عطل: أُغلق العقد القديم وأنشئ عقد جديد.',
+            'message' => 'تم التبديل بسبب عطل على نفس العقد مع فتح أمر صيانة للسيارة السابقة.',
         ]);
     }
 

@@ -164,14 +164,6 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
         transition={sheetSpring}
         {...dragProps}
       >
-        <button
-          type="button"
-          className="rpm-sheet__close rpm-sheet__close--desk"
-          aria-label="إغلاق"
-          onClick={close}
-        >
-          <IconClose size={16} />
-        </button>
         <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
           <div className="rpm-sheet__grab" onPointerDown={startDrag}>
             <div className="rpm-sheet__handle" aria-hidden />
@@ -180,6 +172,14 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
                 {closeLabel}
               </button>
               <h2 id={titleId}>{title}</h2>
+              <button
+                type="button"
+                className="rpm-sheet__close rpm-sheet__close--desk"
+                aria-label="إغلاق"
+                onClick={close}
+              >
+                <IconClose size={16} />
+              </button>
               <span className="rpm-sheet__head-spacer" aria-hidden />
             </header>
           </div>

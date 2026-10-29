@@ -52,4 +52,9 @@ class Contract extends Model
     {
         return $this->hasMany(Inspection::class);
     }
+
+    public function vehicleSwaps(): HasMany
+    {
+        return $this->hasMany(ContractVehicleSwap::class);
+    }
 }

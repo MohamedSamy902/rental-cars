@@ -4,16 +4,19 @@ namespace App\Services\Contracts;
 
 use App\Models\AuditLog;
 use App\Models\Contract;
+use App\Models\ContractVehicleSwap;
 use App\Models\Customer;
 use App\Models\Deposit;
 use App\Models\DepositDeduction;
 use App\Models\Payment;
 use App\Models\TenantSetting;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleDocument;
-use App\Models\User;
 use App\Services\Accounting\AccountingService;
+use App\Services\Customers\CustomerCreditService;
 use App\Services\Fleet\VehicleAvailabilityService;
+use App\Services\Maintenance\WorkOrderService;
 use App\Services\Notifications\NotificationDispatchService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +30,23 @@ class ContractLifecycleService
         private readonly AccountingService $accounting,
         private readonly InspectionService $inspections,
         private readonly NotificationDispatchService $notifications,
+        private readonly CustomerCreditService $credits,
+        private readonly WorkOrderService $workOrders,
     ) {}
+
+    private function fractionDayThreshold(): ?int
+    {
+        $ops = TenantSetting::query()->first()?->operational ?? [];
+        if (! is_array($ops)) {
+            return null;
+        }
+        $hours = $ops['rental_fraction_extra_day_hours'] ?? null;
+        if ($hours === null || $hours === '' || (int) $hours <= 0) {
+            return null;
+        }
+
+        return (int) $hours;
+    }
 
     /**
      * @param  array<string, mixed>  $data
@@ -131,7 +150,11 @@ class ContractLifecycleService
                 $locked->id,
             );
 
-            $days = $this->pricing->countRentalDays($locked->starts_at, $locked->planned_ends_at);
+            $days = $this->pricing->countRentalDays(
+                $locked->starts_at,
+                $locked->planned_ends_at,
+                $this->fractionDayThreshold(),
+            );
 
             // لحظة التجميد الرسمية = الاعتماد (ن٫٥): لقطة من أسعار السيارة الحالية
             // التمديد/التبديل يمرّر أسعاراً مُجمَّدة مسبقاً فلا نعيد اللقطة.
@@ -341,20 +364,21 @@ class ContractLifecycleService
                 'damage_fee' => $damageFee,
             ], $userId);
 
+            $threshold = $this->fractionDayThreshold();
             $end = $returnedAt ?? now();
-            $days = $this->pricing->countRentalDays($locked->starts_at, $end);
+            $days = $this->pricing->countRentalDays($locked->starts_at, $end, $threshold);
             $minDays = (int) ($locked->frozen_min_days ?? $locked->min_days ?? 0);
             $billableDays = max($days, $minDays);
 
             $plannedEnd = $locked->planned_ends_at;
             $lateDays = 0;
             if ($end > $plannedEnd) {
-                $lateDays = $this->pricing->countRentalDays($plannedEnd, $end);
+                $lateDays = $this->pricing->countRentalDays($plannedEnd, $end, $threshold);
             }
 
             $periodRent = $billableDays * (int) $locked->frozen_daily_rate;
             $allowed = $this->pricing->allowedKilometers((int) $locked->frozen_daily_km_allowance, $billableDays);
-            $driven = max(0, $odometerIn - (int) $locked->odometer_out);
+            $driven = $this->accumulatedDrivenKm($locked, $odometerIn);
             $excess = max(0, $driven - $allowed);
             $excessAmount = $excess * (int) $locked->frozen_excess_km_rate;
 
@@ -366,6 +390,7 @@ class ContractLifecycleService
                 'operating_insurance_fee' => (int) ($locked->frozen_operating_insurance_fee ?? 0),
                 'other_fees' => (int) $locked->other_fees,
             ]);
+            $finalInt = (int) round($final);
 
             $locked->fill([
                 'status' => 'completed',
@@ -378,12 +403,36 @@ class ContractLifecycleService
                 'excess_km_amount' => $excessAmount,
                 'period_rent' => $periodRent,
                 'damage_fee' => $damageFee,
-                'final_total' => (int) round($final),
+                'final_total' => $finalInt,
             ])->save();
 
             Vehicle::query()->whereKey($locked->vehicle_id)->update(['odometer' => $odometerIn]);
 
             $this->accounting->postContractClose($locked->fresh(), $userId);
+
+            // Early termination surplus → client credit balance (P0 / 3.5 · 8.2).
+            if ($end < $plannedEnd) {
+                $paidIn = (int) Payment::query()
+                    ->where('link_type', 'contract')
+                    ->where('link_id', $locked->id)
+                    ->where('direction', 'in')
+                    ->sum('amount');
+                $paidOut = (int) Payment::query()
+                    ->where('link_type', 'contract')
+                    ->where('link_id', $locked->id)
+                    ->where('direction', 'out')
+                    ->sum('amount');
+                $netPaid = max(0, $paidIn - $paidOut);
+                $surplus = $netPaid - $finalInt;
+                if ($surplus > 0) {
+                    $customer = Customer::query()->findOrFail($locked->customer_id);
+                    $this->credits->credit($customer, $surplus, [
+                        'reason' => 'early_termination',
+                        'contract_id' => $locked->id,
+                        'notes' => 'فائض إنهاء مبكر للعقد '.$locked->number,
+                    ], $userId);
+                }
+            }
 
             AuditLog::query()->create([
                 'user_id' => $userId,
@@ -404,7 +453,7 @@ class ContractLifecycleService
                 $userId,
             );
 
-            return $locked->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
+            return $locked->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages', 'vehicleSwaps']);
         });
     }
 
@@ -495,71 +544,158 @@ class ContractLifecycleService
     }
 
     /**
-     * Fault swap: close old possession + new contract for replacement (RSD 3.17).
+     * Fault swap on the SAME contract (client-approved 3.17): swap vehicle, log segment,
+     * put old car in maintenance, keep payments/billing ledger on the original contract id.
      *
-     * @param  array{replacement_vehicle_id: int, odometer_in: int, odometer_out: int, planned_ends_at?: string}  $data
-     * @return array{old: Contract, new: Contract}
+     * @param  array{
+     *   replacement_vehicle_id: int,
+     *   odometer_in: int,
+     *   odometer_out: int,
+     *   fault_description?: string,
+     *   notes?: string,
+     *   signature_data?: string
+     * }  $data
      */
-    public function swapDueToFault(Contract $source, array $data, ?int $userId = null): array
+    public function swapDueToFault(Contract $source, array $data, ?int $userId = null): Contract
     {
         if ($source->status !== 'active') {
             throw new DomainException('التبديل بسبب عطل يتطلب عقداً نشطاً.');
         }
 
-        return DB::transaction(function () use ($source, $data, $userId) {
-            $old = $this->completeOnReturn(
-                $source,
-                (int) $data['odometer_in'],
+        $replacementId = (int) $data['replacement_vehicle_id'];
+        if ($replacementId === (int) $source->vehicle_id) {
+            throw new DomainException('السيارة البديلة يجب أن تختلف عن السيارة الحالية.');
+        }
+
+        $odometerIn = (int) $data['odometer_in'];
+        $odometerOut = (int) $data['odometer_out'];
+        $segmentStart = $this->currentSegmentStartOdometer($source);
+        if ($odometerIn < $segmentStart) {
+            throw new DomainException('عداد إرجاع السيارة القديمة أقل من عداد بداية الحيازة.');
+        }
+
+        return DB::transaction(function () use ($source, $data, $userId, $replacementId, $odometerIn, $odometerOut, $segmentStart) {
+            $locked = Contract::query()->whereKey($source->id)->lockForUpdate()->firstOrFail();
+
+            $this->assertNoOverlap(
+                $replacementId,
                 now(),
-                $userId,
-                (int) ($data['damage_fee'] ?? 0),
+                $locked->planned_ends_at,
+                $locked->id,
             );
 
-            Vehicle::query()->whereKey($old->vehicle_id)->update([
+            $replacement = Vehicle::query()->findOrFail($replacementId);
+            if (! $replacement->is_active) {
+                throw new DomainException('السيارة البديلة غير نشطة.');
+            }
+            if ($replacement->manual_status === VehicleAvailabilityService::STATUS_MAINTENANCE) {
+                throw new DomainException('السيارة البديلة في صيانة.');
+            }
+            if ($odometerOut < (int) $replacement->odometer) {
+                throw new DomainException('عداد خروج البديلة أقل من عدادها المسجّل.');
+            }
+
+            $oldVehicleId = (int) $locked->vehicle_id;
+
+            Vehicle::query()->whereKey($oldVehicleId)->update([
+                'odometer' => $odometerIn,
                 'manual_status' => VehicleAvailabilityService::STATUS_MAINTENANCE,
             ]);
 
-            $remainingDeposit = $old->deposit?->remaining() ?? (int) $old->frozen_agreed_deposit;
+            $wo = $this->workOrders->open([
+                'vehicle_id' => $oldVehicleId,
+                'odometer' => $odometerIn,
+                'puts_in_maintenance' => true,
+                'force_after_resolution' => true,
+                'workshop' => 'تبديل بسبب عطل — '.$locked->number,
+                'notes' => $data['fault_description'] ?? 'عطل أثناء الإيجار',
+                'labor_cost' => 0,
+            ], [[
+                'description' => 'فحص عطل بعد التبديل من العقد '.$locked->number,
+                'part_source' => 'purchase',
+                'quantity' => 1,
+                'unit_price' => 0,
+            ]], $userId);
 
-            $new = $this->create([
-                'customer_id' => $old->customer_id,
-                'vehicle_id' => $data['replacement_vehicle_id'],
-                'guarantor_customer_id' => $old->guarantor_customer_id,
-                'starts_at' => now()->format('Y-m-d H:i:s'),
-                'planned_ends_at' => $data['planned_ends_at'] ?? $old->planned_ends_at->format('Y-m-d H:i:s'),
-                'daily_rate' => $old->frozen_daily_rate,
-                'daily_km_allowance' => $old->frozen_daily_km_allowance,
-                'excess_km_rate' => $old->frozen_excess_km_rate,
-                'deposit' => $remainingDeposit,
-                'operating_insurance_fee' => $old->frozen_operating_insurance_fee,
-                'min_days' => $old->frozen_min_days ?? $old->min_days,
-                'notes' => 'تبديل بسبب عطل من '.$old->number,
-                'swapped_from_contract_id' => $old->id,
+            ContractVehicleSwap::query()->create([
+                'contract_id' => $locked->id,
+                'from_vehicle_id' => $oldVehicleId,
+                'to_vehicle_id' => $replacementId,
+                'segment_start_odometer' => $segmentStart,
+                'odometer_in' => $odometerIn,
+                'odometer_out' => $odometerOut,
+                'reason' => 'عطل',
+                'fault_description' => $data['fault_description'] ?? null,
+                'work_order_id' => $wo->id,
+                'performed_by' => $userId,
+                'swapped_at' => now(),
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            $locked->fill([
+                'vehicle_id' => $replacementId,
                 'swap_reason' => 'عطل',
-                'status' => 'pending',
-            ], $userId, true);
+                // Current segment start for the replacement vehicle.
+                'odometer_out' => $odometerOut,
+                'notes' => trim(($locked->notes ? $locked->notes."\n" : '').'تم تبديل سيارة بسبب عطل'),
+            ])->save();
 
-            $new = $this->approve($new, $userId, false);
-            $handoverInspection = [
-                'signature_data' => $data['signature_data'] ?? ('swap-handover-ack:'.str_repeat('0', 48)),
+            Vehicle::query()->whereKey($replacementId)->update(['odometer' => $odometerOut]);
+
+            $this->inspections->record($locked->id, [
+                'type' => 'handover',
+                'odometer' => $odometerOut,
                 'fuel_level' => (int) ($data['fuel_level'] ?? 50),
-                'notes' => 'تسليم تلقائي عند التبديل بسبب عطل',
-                'damages' => $data['damages'] ?? [],
+                'notes' => 'تسليم البديلة عند التبديل بسبب عطل',
+                'signature_data' => $data['signature_data'] ?? ('swap-ack:'.str_repeat('0', 48)),
                 'accessories' => $data['accessories'] ?? [],
-            ];
-            $new = $this->activateOnHandover($new, (int) $data['odometer_out'], $userId, $handoverInspection);
+                'damages' => $data['damages'] ?? [],
+            ], $userId);
 
-            if ($remainingDeposit > 0) {
-                $this->receiveDeposit($new, [
-                    'amount' => $remainingDeposit,
-                    'method' => 'transfer',
-                    'receipt_number' => 'TRF-'.$old->number,
-                    'collection_ref' => 'ترحيل وديعة من '.$old->number,
-                ], $userId);
-            }
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'vehicle_swapped_fault',
+                'record_type' => Contract::class,
+                'record_id' => $locked->id,
+                'after' => [
+                    'from_vehicle_id' => $oldVehicleId,
+                    'to_vehicle_id' => $replacementId,
+                    'odometer_in' => $odometerIn,
+                    'odometer_out' => $odometerOut,
+                    'same_contract' => true,
+                ],
+            ]);
 
-            return ['old' => $old->fresh(['customer', 'vehicle', 'deposit']), 'new' => $new->fresh(['customer', 'vehicle', 'deposit'])];
+            return $locked->fresh(['customer', 'vehicle', 'deposit', 'vehicleSwaps', 'inspections.damages']);
         });
+    }
+
+    private function currentSegmentStartOdometer(Contract $contract): int
+    {
+        $lastSwap = ContractVehicleSwap::query()
+            ->where('contract_id', $contract->id)
+            ->orderByDesc('id')
+            ->first();
+
+        return (int) ($lastSwap?->odometer_out ?? $contract->odometer_out ?? 0);
+    }
+
+    private function accumulatedDrivenKm(Contract $contract, int $finalOdometerIn): int
+    {
+        $swaps = ContractVehicleSwap::query()
+            ->where('contract_id', $contract->id)
+            ->orderBy('id')
+            ->get();
+
+        $driven = 0;
+        foreach ($swaps as $swap) {
+            $driven += $swap->drivenKm();
+        }
+
+        $segmentStart = $this->currentSegmentStartOdometer($contract);
+        $driven += max(0, $finalOdometerIn - $segmentStart);
+
+        return $driven;
     }
 
     /**

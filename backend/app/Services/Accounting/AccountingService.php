@@ -27,12 +27,16 @@ class AccountingService
             ['code' => '1100', 'name' => 'البنك', 'type' => 'asset'],
             ['code' => '1200', 'name' => 'ذمم العملاء', 'type' => 'asset'],
             ['code' => '1300', 'name' => 'تأمينات نقدية محتجزة', 'type' => 'liability'],
+            ['code' => '1400', 'name' => 'مخزون قطع وزيوت', 'type' => 'asset'],
+            ['code' => '1500', 'name' => 'عهد موظفين', 'type' => 'asset'],
             ['code' => '2100', 'name' => 'مستحقات ملاك العربيات', 'type' => 'liability'],
             ['code' => '4000', 'name' => 'إيراد الإيجار', 'type' => 'income'],
             ['code' => '4100', 'name' => 'إيراد كيلومترات زيادة', 'type' => 'income'],
             ['code' => '4200', 'name' => 'إيراد أضرار', 'type' => 'income'],
             ['code' => '4300', 'name' => 'إيراد رسوم تشغيل', 'type' => 'income'],
+            ['code' => '5100', 'name' => 'مصروفات تشغيل', 'type' => 'expense'],
             ['code' => '5200', 'name' => 'مصروف إيجار ملاك', 'type' => 'expense'],
+            ['code' => '5300', 'name' => 'مصروف صيانة وقطع', 'type' => 'expense'],
         ];
 
         $rows = [];
@@ -213,6 +217,111 @@ class AccountingService
                     'customer_id' => $contract->customer_id,
                 ]);
             }
+
+            return $entry->load('lines.account');
+        });
+    }
+
+    /**
+     * Inventory purchase stays off the books; post only on actual usage/issuance.
+     * Dr مصروف صيانة وقطع / Cr مخزون قطع وزيوت
+     */
+    public function postInventoryUsage(
+        int $amount,
+        ?int $vehicleId = null,
+        ?string $narration = null,
+        ?int $userId = null,
+        ?string $entryDate = null,
+    ): JournalEntry {
+        if ($amount <= 0) {
+            throw new DomainException('مبلغ صرف المخزون غير صالح.');
+        }
+        $this->ensureChartOfAccounts();
+        $date = $entryDate ?? now()->toDateString();
+        $dt = new \DateTimeImmutable($date);
+        $this->assertMonthOpen((int) $dt->format('Y'), (int) $dt->format('n'));
+
+        $expense = Account::query()->where('code', '5300')->firstOrFail();
+        $inventory = Account::query()->where('code', '1400')->firstOrFail();
+
+        return DB::transaction(function () use ($amount, $vehicleId, $narration, $userId, $date, $expense, $inventory) {
+            $entry = JournalEntry::query()->create([
+                'entry_date' => $date,
+                'narration' => $narration ?: 'صرف مخزون لصيانة',
+                'source' => 'inventory_usage',
+                'posted_by' => $userId,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $expense->id,
+                'debit' => $amount,
+                'credit' => 0,
+                'vehicle_id' => $vehicleId,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $inventory->id,
+                'debit' => 0,
+                'credit' => $amount,
+                'vehicle_id' => $vehicleId,
+            ]);
+
+            return $entry->load('lines.account');
+        });
+    }
+
+    /**
+     * Custody handovers do not post. Concrete spend from custody posts:
+     * Dr expense / Cr عهد موظفين
+     */
+    public function postCustodySpend(
+        int $amount,
+        string $expenseAccountCode,
+        ?int $vehicleId = null,
+        ?string $narration = null,
+        ?int $userId = null,
+        ?string $entryDate = null,
+    ): JournalEntry {
+        if ($amount <= 0) {
+            throw new DomainException('مبلغ الصرف من العهدة غير صالح.');
+        }
+        $this->ensureChartOfAccounts();
+        $date = $entryDate ?? now()->toDateString();
+        $dt = new \DateTimeImmutable($date);
+        $this->assertMonthOpen((int) $dt->format('Y'), (int) $dt->format('n'));
+
+        $expense = Account::query()->firstOrCreate(
+            ['code' => $expenseAccountCode],
+            [
+                'name' => $expenseAccountCode === '5300' ? 'مصروف صيانة وقطع' : 'مصروفات تشغيل',
+                'type' => 'expense',
+                'is_system' => true,
+                'is_active' => true,
+            ],
+        );
+        $custody = Account::query()->where('code', '1500')->firstOrFail();
+
+        return DB::transaction(function () use ($amount, $vehicleId, $narration, $userId, $date, $expense, $custody) {
+            $entry = JournalEntry::query()->create([
+                'entry_date' => $date,
+                'narration' => $narration ?: 'صرف من عهدة موظف',
+                'source' => 'custody_spend',
+                'posted_by' => $userId,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $expense->id,
+                'debit' => $amount,
+                'credit' => 0,
+                'vehicle_id' => $vehicleId,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $custody->id,
+                'debit' => 0,
+                'credit' => $amount,
+                'vehicle_id' => $vehicleId,
+            ]);
 
             return $entry->load('lines.account');
         });

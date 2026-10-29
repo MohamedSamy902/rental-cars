@@ -11,7 +11,9 @@ use App\Models\TenantSetting;
 use App\Models\Vehicle;
 use App\Models\Violation;
 use App\Models\WorkOrder;
+use App\Services\Accounting\ProfitabilityService;
 use App\Services\Contracts\RentalProgressService;
+use App\Services\Fleet\OccupancyService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,6 +22,8 @@ class DashboardController extends Controller
 {
     public function __construct(
         private readonly VehicleAvailabilityService $availability,
+        private readonly OccupancyService $occupancy,
+        private readonly ProfitabilityService $profitability,
         private readonly RentalProgressService $progress,
     ) {}
 
@@ -100,11 +104,15 @@ class DashboardController extends Controller
 
         $center = TenantSetting::query()->value('center_name') ?: 'مركز التأجير';
 
+        $occupancyPct = $this->occupancy->percent(now()->startOfMonth(), now());
+
         return response()->json([
             'center_name' => $center,
-            'occupancy_pct' => $vehicles->count() ? (int) round(($statusCounts['rented'] / $vehicles->count()) * 100) : 0,
+            'occupancy_pct' => (int) round($occupancyPct),
+            'occupancy_pct_precise' => $occupancyPct,
             'fleet_total' => $vehicles->count(),
             'fleet_status' => $statusCounts,
+            'profitability_compare' => $this->profitability->monthOverMonth(),
             'kpis' => [
                 'available' => $statusCounts['available'],
                 'rented' => $statusCounts['rented'],

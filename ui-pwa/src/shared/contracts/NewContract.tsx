@@ -7,6 +7,11 @@ import { NewContractContext, type NewContractOptions } from './newContractContex
 
 type Customer = { id: number; full_name: string; phone: string }
 type Vehicle = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number }
+type RankedVehicle = Vehicle & {
+  category?: string
+  rental_priority?: number
+  scores?: { underuse: number; availability: number; manual: number; display: number }
+}
 
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
@@ -19,7 +24,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [createdVersion, setCreatedVersion] = useState(0)
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [vehicles, setVehicles] = useState<RankedVehicle[]>([])
+  const [weights, setWeights] = useState<{ underuse: number; availability: number; manual: number } | null>(null)
   const [inlineCustomer, setInlineCustomer] = useState(false)
   const [newCustomer, setNewCustomer] = useState(emptyCustomer)
   const [saving, setSaving] = useState(false)
@@ -34,11 +40,13 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     })
     Promise.all([
       api<{ data: Customer[] }>('/customers?per_page=100'),
-      api<{ data: Vehicle[] }>('/vehicles?per_page=100'),
+      api<{ data: RankedVehicle[]; weights?: { underuse: number; availability: number; manual: number } }>('/vehicles/recommend')
+        .catch(() => api<{ data: Vehicle[] }>('/vehicles?per_page=100').then((r) => ({ data: r.data as RankedVehicle[], weights: undefined }))),
     ])
       .then(([c, v]) => {
         setCustomers(c.data)
         setVehicles(v.data)
+        setWeights(v.weights ?? null)
         if (opts?.vehicleId) {
           const picked = v.data.find((x) => x.id === opts.vehicleId)
           if (picked) {
@@ -49,6 +57,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               deposit: String(picked.default_deposit),
             }))
           }
+        } else if (v.data[0] && !opts?.vehicleId) {
+          // keep empty selection; ranking only informs the list order
         }
       })
       .catch((e) => toast.error((e as ApiError).message))
@@ -107,6 +117,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(() => ({ openNewContract, createdVersion }), [openNewContract, createdVersion])
+  const selected = vehicles.find((v) => String(v.id) === form.vehicle_id)
 
   return (
     <NewContractContext.Provider value={value}>
@@ -148,9 +159,14 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           ) : null}
 
           <SelectField
-            label="السيارة"
+            label="السيارة (مرتّبة بالتوصية)"
             required
-            options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))}
+            options={vehicles.map((v) => ({
+              value: String(v.id),
+              label: v.scores
+                ? `${v.brand} ${v.model} · ${v.plate} · درجة ${Math.round(v.scores.display)}`
+                : `${v.brand} ${v.model} · ${v.plate}`,
+            }))}
             value={form.vehicle_id}
             error={errors.vehicle_id}
             onChange={(e) => {
@@ -164,6 +180,14 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               })
             }}
           />
+          {selected?.scores || weights ? (
+            <p className="muted" style={{ margin: 0 }}>
+              {selected?.scores
+                ? `درجة الظهور ${Math.round(selected.scores.display)} · قلة استخدام ${selected.scores.underuse} · توفر ${selected.scores.availability} · أولوية يدوية ${selected.scores.manual}`
+                : null}
+              {weights ? ` · أوزان ${weights.underuse}/${weights.availability}/${weights.manual}` : null}
+            </p>
+          ) : null}
           <TextField label="وقت البداية" required type="datetime-local" value={form.starts_at} error={errors.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
           <TextField label="وقت النهاية المخطط" required type="datetime-local" value={form.planned_ends_at} error={errors.planned_ends_at} onChange={(e) => setForm({ ...form, planned_ends_at: e.target.value })} />
           <MoneyField label="السعر اليومي" value={form.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
