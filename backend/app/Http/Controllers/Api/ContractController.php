@@ -207,13 +207,13 @@ class ContractController extends Controller
         ]);
 
         try {
-            $result = $this->lifecycle->swapDueToFault($contract, $data, $request->user()?->id);
+            $updated = $this->lifecycle->swapDueToFault($contract, $data, $request->user()?->id);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
         return response()->json([
-            'data' => $result,
+            'data' => $updated,
             'message' => 'تم التبديل بسبب عطل: أُغلق العقد القديم وأنشئ عقد جديد.',
         ]);
     }

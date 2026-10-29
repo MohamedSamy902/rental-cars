@@ -99,6 +99,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/customers', [CustomerController::class, 'index'])->middleware('permission:customers.view');
     Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.create');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->middleware('permission:customers.view');
+    Route::post('/customers/{customer}/apply-credit', [CustomerController::class, 'applyCredit'])
+        ->middleware('permission:payments.create,contracts.update');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])
         ->middleware('permission:customers.update,blacklist.manage');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->middleware('permission:customers.update');
