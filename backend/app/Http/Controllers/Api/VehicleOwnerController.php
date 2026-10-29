@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreVehicleOwnerRequest;
+use App\Http\Requests\UpdateVehicleOwnerRequest;
 use App\Models\OwnerPayout;
 use App\Models\VehicleOwner;
 use App\Services\Fleet\VehicleOwnerService;
@@ -17,6 +19,7 @@ class VehicleOwnerController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = VehicleOwner::query()->withCount('vehicles')->latest('id');
+        $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
         if ($search = $request->string('search')->toString()) {
             $q->where(function ($qq) use ($search) {
                 $qq->where('full_name', 'like', "%{$search}%")
@@ -29,7 +32,7 @@ class VehicleOwnerController extends Controller
         }
 
         $rows = $q->paginate((int) $request->integer('per_page', 50));
-        $data = collect($rows->items())->map(function (VehicleOwner $o) {
+        $data = collect($rows->items())->map(function (VehicleOwner $o) use ($canViewNid) {
             // قائمة خفيفة: رصيد من القيود الحالية دون إعادة استحقاق جماعي
             $accrued = (int) $o->monthDues()->sum('amount');
             $paid = (int) $o->payouts()->sum('amount');
@@ -45,7 +48,7 @@ class VehicleOwnerController extends Controller
                     ->whereBetween('paid_on', [now()->format('Y-m-01'), now()->format('Y-m-t')])
                     ->sum('amount'),
                 'vehicles_monthly_total' => $monthly,
-            ]);
+            ], $canViewNid);
         });
 
         return response()->json([
@@ -58,23 +61,13 @@ class VehicleOwnerController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreVehicleOwnerRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'full_name' => ['required', 'string', 'max:200'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'phone_alt' => ['nullable', 'string', 'max:30'],
-            'national_id' => ['nullable', 'string', 'max:30'],
-            'notes' => ['nullable', 'string'],
-            'is_active' => ['nullable', 'boolean'],
-        ], [], [
-            'full_name' => 'اسم المالك',
-            'phone' => 'الهاتف',
-        ]);
+        $owner = $this->owners->createOwner($request->validated());
 
-        $owner = $this->owners->createOwner($data);
+        $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
-        return response()->json(['data' => $this->present($owner), 'message' => 'تم تسجيل المالك.'], 201);
+        return response()->json(['data' => $this->present($owner, null, $canViewNid), 'message' => 'تم تسجيل المالك.'], 201);
     }
 
     public function show(Request $request, VehicleOwner $owner): JsonResponse
@@ -84,10 +77,11 @@ class VehicleOwnerController extends Controller
         $balance = $this->owners->balance($owner, $ym);
         $dues = $owner->monthDues()->with('vehicle:id,code,plate,brand,model')->orderByDesc('year_month')->limit(24)->get();
         $payouts = $owner->payouts()->with('vehicle:id,code,plate')->orderByDesc('paid_on')->orderByDesc('id')->limit(50)->get();
+        $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
         return response()->json([
             'data' => [
-                ...$this->present($owner, $balance),
+                ...$this->present($owner, $balance, $canViewNid),
                 'vehicles' => $owner->vehicles->map(fn ($v) => [
                     'id' => $v->id,
                     'code' => $v->code,
@@ -104,20 +98,12 @@ class VehicleOwnerController extends Controller
         ]);
     }
 
-    public function update(Request $request, VehicleOwner $owner): JsonResponse
+    public function update(UpdateVehicleOwnerRequest $request, VehicleOwner $owner): JsonResponse
     {
-        $data = $request->validate([
-            'full_name' => ['sometimes', 'string', 'max:200'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'phone_alt' => ['nullable', 'string', 'max:30'],
-            'national_id' => ['nullable', 'string', 'max:30'],
-            'notes' => ['nullable', 'string'],
-            'is_active' => ['nullable', 'boolean'],
-        ]);
+        $owner = $this->owners->updateOwner($owner, $request->validated());
+        $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
-        $owner = $this->owners->updateOwner($owner, $data);
-
-        return response()->json(['data' => $this->present($owner), 'message' => 'تم تحديث المالك.']);
+        return response()->json(['data' => $this->present($owner, null, $canViewNid), 'message' => 'تم تحديث المالك.']);
     }
 
     public function balance(Request $request, VehicleOwner $owner): JsonResponse
@@ -172,14 +158,22 @@ class VehicleOwnerController extends Controller
      * @param  array<string, mixed>|null  $balance
      * @return array<string, mixed>
      */
-    private function present(VehicleOwner $o, ?array $balance = null): array
+    private function present(VehicleOwner $o, ?array $balance = null, bool $canViewNationalId = false): array
     {
+        $nid = $o->national_id;
+        if ($nid !== null && $nid !== '' && ! $canViewNationalId) {
+            $nid = (string) $nid;
+            $len = mb_strlen($nid);
+            $visible = min(4, $len);
+            $nid = str_repeat('*', max(0, $len - $visible)).mb_substr($nid, -$visible);
+        }
+
         return [
             'id' => $o->id,
             'full_name' => $o->full_name,
             'phone' => $o->phone,
             'phone_alt' => $o->phone_alt,
-            'national_id' => $o->national_id,
+            'national_id' => $nid,
             'notes' => $o->notes,
             'is_active' => $o->is_active,
             'vehicles_count' => $o->vehicles_count ?? $o->vehicles()->count(),

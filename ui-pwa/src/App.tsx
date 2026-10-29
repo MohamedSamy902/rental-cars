@@ -2,11 +2,14 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/shared/auth/AuthContext'
 import { ThemeProvider } from '@/shared/theme/ThemeContext'
 import { AppShell, ToastProvider, SkeletonBlock } from '@/shared/ui'
+import { NewContractProvider } from '@/shared/contracts/NewContract'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { VehiclesPage } from '@/pages/VehiclesPage'
 import { VehicleDetailPage } from '@/pages/VehicleDetailPage'
 import { BookingsPage } from '@/pages/BookingsPage'
+import { ContractDetailPage } from '@/pages/ContractDetailPage'
+import { MonthLedgerPage } from '@/pages/MonthLedgerPage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { MaintenancePage } from '@/pages/MaintenancePage'
 import { CustomersPage } from '@/pages/CustomersPage'
@@ -53,7 +56,9 @@ export default function App() {
               <Route
                 element={
                   <Protected>
-                    <AppShell />
+                    <NewContractProvider>
+                      <AppShell />
+                    </NewContractProvider>
                   </Protected>
                 }
               >
@@ -61,6 +66,8 @@ export default function App() {
                 <Route path="vehicles" element={<VehiclesPage />} />
                 <Route path="vehicles/:id" element={<VehicleDetailPage />} />
                 <Route path="bookings" element={<BookingsPage />} />
+                <Route path="bookings/:id" element={<ContractDetailPage />} />
+                <Route path="contracts/:id" element={<ContractDetailPage />} />
                 <Route path="calendar" element={<CalendarPage />} />
                 <Route path="maintenance" element={<MaintenancePage />} />
                 <Route path="inventory" element={<InventoryPage />} />
@@ -70,6 +77,7 @@ export default function App() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
+                <Route path="accounts/months/:monthId" element={<MonthLedgerPage />} />
                 <Route path="expenses" element={<ExpensesPage />} />
                 <Route path="owners" element={<OwnersPage />} />
                 <Route path="petty-cash" element={<PettyCashPage />} />

@@ -5,19 +5,20 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CollaborationController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\AttentionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\OperationsController;
-use App\Http\Controllers\Api\PushSubscriptionController;
-use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\PayrollController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\WorkOrderController;
 use App\Models\Notification;
@@ -26,17 +27,19 @@ use App\Services\Operations\WaitlistService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
-    Route::get('/dashboard', DashboardController::class);
+    Route::get('/dashboard', DashboardController::class)->middleware('permission:reports.view|contracts.view|vehicles.view');
+    Route::get('/attention', AttentionController::class);
 
-    Route::post('/media', [MediaController::class, 'store']);
-    Route::get('/media/{medium}', [MediaController::class, 'show']);
-    Route::get('/media/{medium}/file', [MediaController::class, 'file']);
-    Route::delete('/media/{medium}', [MediaController::class, 'destroy']);
+    Route::get('/media/limits', [MediaController::class, 'limits'])->middleware('permission:media.view|media.upload|customers.view|vehicles.view|contracts.view');
+    Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload|customers.create|customers.update|vehicles.update|contracts.update|violations.create|maintenance.create');
+    Route::get('/media/{medium}', [MediaController::class, 'show'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
+    Route::get('/media/{medium}/file', [MediaController::class, 'file'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
+    Route::delete('/media/{medium}', [MediaController::class, 'destroy'])->middleware('permission:media.delete|customers.update|vehicles.update|settings.update');
 
     Route::get('/settings/tenant', function () {
         return response()->json(['data' => TenantSetting::query()->first()]);
@@ -65,15 +68,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:hr.view')->group(function () {
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/payroll', [PayrollController::class, 'index']);
+        Route::get('/salary-advances', [PayrollController::class, 'advances']);
     });
     Route::middleware('permission:hr.create')->group(function () {
         Route::post('/employees', [EmployeeController::class, 'store']);
         Route::post('/payroll/draft', [PayrollController::class, 'draft']);
+        Route::post('/salary-advances', [PayrollController::class, 'storeAdvance']);
+        Route::delete('/salary-advances/{salaryAdvance}', [PayrollController::class, 'destroyAdvance']);
     });
     Route::put('/employees/{employee}', [EmployeeController::class, 'update'])
         ->middleware('permission:hr.update');
-    Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve'])
-        ->middleware('permission:hr.payroll_approve');
+    Route::middleware('permission:hr.payroll_approve')->group(function () {
+        Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve']);
+        Route::post('/payroll/lines/{payrollLine}/payout', [PayrollController::class, 'payout']);
+    });
 
     Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
@@ -107,6 +115,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/contracts', [ContractController::class, 'store'])->middleware('permission:contracts.create');
     Route::get('/contracts/{contract}', [ContractController::class, 'show'])->middleware('permission:contracts.view');
     Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve'])->middleware('permission:contracts.approve');
+    Route::post('/contracts/{contract}/pricing', [ContractController::class, 'updatePricing'])->middleware('permission:contracts_price.override');
     Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->middleware('permission:contracts_cancel.approve');
@@ -154,6 +163,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:owners.payout')->post('/owners/{owner}/payouts', [VehicleOwnerController::class, 'payout']);
 
     Route::get('/accounting/overview', [AccountingController::class, 'overview'])->middleware('permission:accounting.view');
+    Route::get('/accounting/months/{year}/{month}', [AccountingController::class, 'month'])
+        ->whereNumber(['year', 'month'])
+        ->middleware('permission:accounting.view');
     Route::post('/accounting/lock-month', [AccountingController::class, 'lockMonth'])->middleware('permission:accounting.lock_month');
     Route::post('/accounting/reopen-month', [AccountingController::class, 'reopenMonth'])->middleware('permission:accounting.reopen_month');
     Route::get('/accounting/payments', [AccountingController::class, 'payments'])->middleware('permission:payments.view');
@@ -191,8 +203,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::middleware(['feature:chat'])->group(function () {
-        Route::get('/chat', [CollaborationController::class, 'chatIndex']);
-        Route::post('/chat', [CollaborationController::class, 'chatStore']);
+        Route::get('/chat', [CollaborationController::class, 'chatIndex'])->middleware('permission:chat.view');
+        Route::post('/chat', [CollaborationController::class, 'chatStore'])->middleware('permission:chat.create');
     });
     Route::middleware(['feature:evaluations', 'permission:hr.view'])->get('/evaluations', [CollaborationController::class, 'evaluationsIndex']);
     Route::middleware(['feature:evaluations', 'permission:hr.create'])->post('/evaluations', [CollaborationController::class, 'evaluationsStore']);

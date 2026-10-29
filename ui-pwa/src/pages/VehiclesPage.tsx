@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  PageHeader, SummaryStrip, FilterBar, Button, StatusPill, Sheet, Fab,
+  PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Sheet, Fab, DataTable,
   TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
-  useToast, EmptyState, SkeletonBlock, ErrorState, IconChevron,
+  useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench,
+  type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -43,13 +44,6 @@ const statusLabel: Record<string, string> = {
   out_of_service: 'خارج الخدمة',
 }
 
-const chips = [
-  { id: 'all', label: 'الكل' },
-  { id: 'available', label: 'متاحة' },
-  { id: 'rented', label: 'مؤجرة' },
-  { id: 'reserved', label: 'محجوزة' },
-  { id: 'maintenance', label: 'صيانة' },
-]
 
 const emptyForm = {
   code: '', plate: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
@@ -71,6 +65,26 @@ export function VehiclesPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'available', label: 'متاحة' },
+      { id: 'rented', label: 'مؤجرة' },
+      {
+        id: 'reserved',
+        label: 'محجوزة',
+        attention: summary.reserved > 0 ? ('warning' as const) : null,
+        attentionLabel: 'حجوزات معتمدة',
+      },
+      {
+        id: 'maintenance',
+        label: 'صيانة',
+        attention: summary.maintenance > 0 ? ('critical' as const) : null,
+        attentionLabel: 'مركبات في الصيانة',
+      },
+    ],
+    [summary.reserved, summary.maintenance],
+  )
   const [owners, setOwners] = useState<OwnerOption[]>([])
 
   useEffect(() => {
@@ -136,22 +150,71 @@ export function VehiclesPage() {
     }
   }
 
-  function VehicleCard({ v }: { v: Vehicle }) {
-    return (
-      <button type="button" className="rpm-card is-clickable" onClick={() => navigate(`/vehicles/${v.id}`)}>
-        <div className="rpm-card__row">
-          <strong>{v.brand} {v.model}</strong>
-          <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
-        </div>
-        <p>{v.code} · {v.plate}</p>
-        <p className="muted">{v.year} · {v.category} · {v.fuel_type}</p>
-        <div className="rpm-card__meta">
-          <span>{formatMoney(v.daily_rate)} / يوم</span>
-          <span>{formatNumber(v.odometer)} كم</span>
-          <IconChevron size={16} className="rpm-card__chev" />
-        </div>
-      </button>
-    )
+  const columns: DataColumn<Vehicle>[] = [
+    {
+      id: 'vehicle',
+      header: 'المركبة',
+      cell: (v) => (
+        <>
+          <strong className="rpm-table__primary">{v.brand} {v.model}</strong>
+          <span className="rpm-table__sub">{v.year} · {v.fuel_type}</span>
+        </>
+      ),
+      sortValue: (v) => `${v.brand} ${v.model}`,
+      mobile: 'title',
+    },
+    {
+      id: 'code',
+      header: 'الكود',
+      cell: (v) => <span className="rpm-table__code">{v.code}</span>,
+      sortValue: (v) => v.code,
+    },
+    { id: 'plate', header: 'اللوحة', cell: (v) => v.plate, sortValue: (v) => v.plate },
+    { id: 'category', header: 'الفئة', cell: (v) => v.category, sortValue: (v) => v.category, mobile: 'hidden' },
+    {
+      id: 'status',
+      header: 'الحالة',
+      cell: (v) => <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />,
+      sortValue: (v) => v.status,
+      mobile: 'badge',
+    },
+    {
+      id: 'odometer',
+      header: 'العداد',
+      cell: (v) => `${formatNumber(v.odometer)} كم`,
+      sortValue: (v) => Number(v.odometer),
+    },
+    {
+      id: 'rate',
+      header: 'اليومي',
+      cell: (v) => formatMoney(v.daily_rate),
+      sortValue: (v) => Number(v.daily_rate),
+    },
+    {
+      id: 'owner',
+      header: 'المالك',
+      cell: (v) => v.owner?.full_name || 'المركز',
+      sortValue: (v) => v.owner?.full_name || 'المركز',
+      mobile: 'hidden',
+    },
+  ]
+
+  function vehicleMenu(v: Vehicle): MenuItem[] {
+    return [
+      { id: 'open', label: 'فتح الملف الكامل', icon: <IconEye size={16} />, onSelect: () => navigate(`/vehicles/${v.id}`) },
+      { id: 'calendar', label: 'تقويم الأسطول', icon: <IconCalendar size={16} />, onSelect: () => navigate('/calendar') },
+      {
+        id: 'copy',
+        label: 'نسخ رقم اللوحة',
+        icon: <IconClipboard size={16} />,
+        onSelect: () => {
+          void navigator.clipboard?.writeText(v.plate).then(
+            () => toast.success('تم نسخ رقم اللوحة.'),
+            () => toast.error('تعذّر النسخ.'),
+          )
+        },
+      },
+    ]
   }
 
   const formFields = (
@@ -161,7 +224,7 @@ export function VehiclesPage() {
       <TextField label="الماركة" required value={form.brand} error={errors.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
       <TextField label="الموديل" required value={form.model} error={errors.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
       <NumberField label="سنة الصنع" required value={form.year} error={errors.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
-      <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'SUV', label: 'SUV' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+      <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'دفع رباعي', label: 'دفع رباعي' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
       <SelectField label="نوع الوقود" required options={[{ value: 'بنزين', label: 'بنزين' }, { value: 'ديزل', label: 'ديزل' }, { value: 'هجين', label: 'هجين' }]} value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} />
       <NumberField label="العداد الفعلي" required value={form.odometer} error={errors.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
       <MoneyField label="الإيجار اليومي الافتراضي" required value={form.daily_rate} error={errors.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
@@ -203,12 +266,20 @@ export function VehiclesPage() {
       />
       <Fab label="إضافة مركبة" onClick={() => setOpen(true)} />
 
-      <SummaryStrip
+      <MetricCardGrid
+        label="ملخص الأسطول"
         items={[
-          { label: 'الإجمالي', value: String(summary.total) },
-          { label: 'متاحة', value: String(summary.available), tone: 'success' },
-          { label: 'مؤجرة', value: String(summary.rented) },
-          { label: 'صيانة', value: String(summary.maintenance), tone: 'danger' },
+          { id: 'total', label: 'إجمالي الأسطول', value: summary.total, icon: <IconCar size={16} /> },
+          {
+            id: 'available', label: 'متاحة', value: summary.available, tone: 'success', icon: <IconCheck size={16} />,
+            hint: summary.total ? `${Math.round((summary.available / summary.total) * 100)}% من الأسطول` : undefined,
+          },
+          {
+            id: 'rented', label: 'مؤجرة', value: summary.rented, tone: 'info', icon: <IconKey size={16} />,
+            hint: summary.total ? `إشغال ${Math.round((summary.rented / summary.total) * 100)}%` : undefined,
+          },
+          { id: 'reserved', label: 'محجوزة', value: summary.reserved, tone: 'warning', icon: <IconCalendar size={16} /> },
+          { id: 'maintenance', label: 'في الصيانة', value: summary.maintenance, tone: 'danger', icon: <IconWrench size={16} /> },
         ]}
       />
 
@@ -221,55 +292,22 @@ export function VehiclesPage() {
         placeholder="بحث بالكود أو اللوحة أو الموديل…"
       />
 
-      {loading ? <SkeletonBlock rows={6} /> : null}
-      {!loading && error ? <ErrorState title="تعذّر تحميل المركبات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} /> : null}
-      {!loading && !error && rows.length === 0 ? <EmptyState title="لا توجد مركبات مطابقة" /> : null}
-
-      {!loading && !error && rows.length > 0 ? (
-        <>
-          <div className="rpm-card-list rpm-mobile-only">
-            {rows.map((v) => <VehicleCard key={v.id} v={v} />)}
-          </div>
-          <div className="rpm-table-wrap rpm-desktop-only">
-            <table className="rpm-table">
-              <thead>
-                <tr>
-                  <th>الكود</th><th>اللوحة</th><th>المركبة</th><th>الفئة</th><th>الحالة</th><th>العداد</th><th>اليومي</th><th>المالك</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((v) => (
-                  <tr key={v.id} className="is-clickable" onClick={() => navigate(`/vehicles/${v.id}`)}>
-                    <td><span className="rpm-table__code">{v.code}</span></td>
-                    <td>{v.plate}</td>
-                    <td>
-                      <strong className="rpm-table__primary">{v.brand} {v.model}</strong>
-                      <span className="rpm-table__sub">{v.year}</span>
-                    </td>
-                    <td>{v.category}</td>
-                    <td><StatusPill status={v.status} label={statusLabel[v.status] || v.status} /></td>
-                    <td>{formatNumber(v.odometer)}</td>
-                    <td>{formatMoney(v.daily_rate)}</td>
-                    <td>{v.owner?.full_name || 'المركز'}</td>
-                    <td>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigate(`/vehicles/${v.id}`)
-                        }}
-                      >
-                        عرض
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : null}
+      {error ? (
+        <ErrorState title="تعذّر تحميل المركبات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
+      ) : (
+        <DataTable
+          label="المركبات"
+          rows={rows}
+          columns={columns}
+          rowKey={(v) => v.id}
+          rowLabel={(v) => `${v.brand} ${v.model} · ${v.plate}`}
+          loading={loading}
+          onRowClick={(v) => navigate(`/vehicles/${v.id}`)}
+          rowActions={vehicleMenu}
+          emptyTitle="لا توجد مركبات مطابقة"
+          emptyDescription="جرّب كلمة بحث أخرى أو غيّر فلتر الحالة."
+        />
+      )}
 
       <Sheet
         open={open}

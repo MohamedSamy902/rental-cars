@@ -10,8 +10,7 @@
   touch-action: none;
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, var(--brand)), var(--surface));
+  background: var(--surface-2);
   cursor: crosshair;
 }
 

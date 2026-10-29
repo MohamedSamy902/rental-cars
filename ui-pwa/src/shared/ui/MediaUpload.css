@@ -83,3 +83,9 @@
   font-weight: 500;
   color: var(--text-muted);
 }
+
+.rpm-media__progress {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}

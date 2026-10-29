@@ -5,17 +5,32 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\Accounting\AccountingService;
+use App\Services\Accounting\MonthLedgerService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AccountingController extends Controller
 {
-    public function __construct(private readonly AccountingService $accounting) {}
+    public function __construct(
+        private readonly AccountingService $accounting,
+        private readonly MonthLedgerService $ledger,
+    ) {}
 
     public function overview(): JsonResponse
     {
         return response()->json(['data' => $this->accounting->overview()]);
+    }
+
+    public function month(int $year, int $month): JsonResponse
+    {
+        try {
+            $data = $this->ledger->build($year, $month);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $data]);
     }
 
     public function lockMonth(Request $request): JsonResponse

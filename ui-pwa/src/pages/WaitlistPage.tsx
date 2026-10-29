@@ -1,10 +1,31 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { PageHeader, Button, Sheet, Fab, SelectField, TextField, StatusPill, useToast, SkeletonBlock, EmptyState } from '@/shared/ui'
+import {
+  PageHeader, Button, Sheet, Fab, SelectField, TextField, StatusPill, useToast, DataTable, type DataColumn,
+} from '@/shared/ui'
 import './pages.css'
 
 type Row = { id: number; category: string; status: string; customer?: { full_name: string; phone: string } }
 type Customer = { id: number; full_name: string; phone: string }
+
+const columns: DataColumn<Row>[] = [
+  {
+    id: 'customer',
+    header: 'العميل',
+    cell: (r) => <strong className="rpm-table__primary">{r.customer?.full_name || '—'}</strong>,
+    sortValue: (r) => r.customer?.full_name,
+    mobile: 'title',
+  },
+  { id: 'phone', header: 'الهاتف', cell: (r) => <span dir="ltr">{r.customer?.phone || '—'}</span>, sortValue: (r) => r.customer?.phone, mobile: 'subtitle' },
+  { id: 'category', header: 'الفئة المطلوبة', cell: (r) => r.category, sortValue: (r) => r.category },
+  {
+    id: 'status',
+    header: 'الحالة',
+    cell: (r) => <StatusPill status="pending" label={r.status === 'waiting' ? 'منتظر' : r.status} />,
+    sortValue: (r) => r.status,
+    mobile: 'badge',
+  },
+]
 
 export function WaitlistPage() {
   const toast = useToast()
@@ -41,19 +62,15 @@ export function WaitlistPage() {
     <div className="rpm-stack">
       <PageHeader title="قائمة الانتظار" subtitle="إشعار عند التوفر — بلا إنشاء عقد تلقائي" action={<Button onClick={async () => { setOpen(true); const c = await api<{ data: Customer[] }>('/customers'); setCustomers(c.data) }}>طلب جديد</Button>} mobileFab />
       <Fab label="طلب جديد" onClick={async () => { setOpen(true); const c = await api<{ data: Customer[] }>('/customers'); setCustomers(c.data) }} />
-      {loading ? <SkeletonBlock rows={3} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا توجد طلبات انتظار" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((r) => (
-          <article key={r.id} className="rpm-card">
-            <div className="rpm-card__row">
-              <strong>{r.customer?.full_name}</strong>
-              <StatusPill status="pending" label={r.status === 'waiting' ? 'منتظر' : r.status} />
-            </div>
-            <p className="muted">{r.category} · {r.customer?.phone}</p>
-          </article>
-        ))}
-      </div>
+      <DataTable
+        label="قائمة الانتظار"
+        rows={rows}
+        columns={columns}
+        rowKey={(r) => r.id}
+        loading={loading}
+        emptyTitle="لا طلبات انتظار"
+        emptyDescription="سجّل طلب عميل لفئة غير متاحة حالياً."
+      />
       <Sheet open={open} title="طلب انتظار" onClose={() => setOpen(false)} footer={<><Button onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
           <SelectField label="العميل" required options={customers.map((c) => ({ value: String(c.id), label: `${c.full_name} · ${c.phone}` }))} value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })} />

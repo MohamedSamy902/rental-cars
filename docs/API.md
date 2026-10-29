@@ -2,8 +2,8 @@
 
 | البند | القيمة |
 |--------|--------|
-| الإصدار | ١٫٠ |
-| التاريخ | ٢٨ أكتوبر ٢٠٢٦ |
+| الإصدار | ١٫١ |
+| التاريخ | ٢٩ أكتوبر ٢٠٢٦ |
 | القاعدة | `https://{host}/api` |
 | المصادقة | Laravel Sanctum — Bearer Token |
 | اللغة | رسائل الخطأ والعقود عربية |
@@ -419,6 +419,7 @@ Query: `filter=all|one|today|week|range`
 | Method | Path |
 |--------|------|
 | GET | `/accounting/overview` | شهور · حسابات · مدفوعات |
+| GET | `/accounting/months/{year}/{month}` | دفتر الشهر: إيجار · رسوم · مصروفات · تأمينات · مدفوعات عملاء · رواتب · مخالفات متابعة · سجل إقفال |
 | POST | `/accounting/lock-month` | `{ year, month }` |
 | POST | `/accounting/reopen-month` | `{ year, month, reason }` |
 | GET | `/accounting/payments` | آخر ١٠٠ |
@@ -669,7 +670,7 @@ password: password
 
 ---
 
-*نهاية وثائق API — الإصدار ١٫٠ — يُحدَّث مع أي مسار جديد في نفس الـ PR*
+*نهاية وثائق API — الإصدار ١٫١ — يُحدَّث مع أي مسار جديد في نفس الـ PR*
 
 ---
 
@@ -681,6 +682,8 @@ password: password
 | PUT | `/integrator/tenant` | دور `super_admin` فقط |
 | GET/POST | `/expenses` | `expenses.view` / `expenses.create` |
 | GET/POST | `/payroll` · `/payroll/draft` · `/payroll/{id}/approve` | HR |
+| GET/POST/DELETE | `/salary-advances` · `/salary-advances/{id}` | سلف الشهر — تُخصم من المسودة |
+| POST | `/payroll/lines/{id}/payout` | صرف جزئي أو كامل بعد الاعتماد؛ المتبقي يُرحَّل |
 | GET/POST | `/evaluations` | خلف `feature:evaluations` |
 | GET/POST | `/chat` | خلف `feature:chat` · حد 100/يوم |
 | POST | `/ocr/review` | مراجعة حقول داخلية بلا إرسال خارجي |

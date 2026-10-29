@@ -1,25 +1,37 @@
-import './StatusPill.css'
+import { Badge, type BadgeTone } from './Badge'
 
-const tones = {
+const tones: Record<string, BadgeTone> = {
   available: 'success',
   reserved: 'warning',
-  rented: 'brand',
-  maintenance: 'danger',
+  rented: 'steel',
+  maintenance: 'warning',
   pending: 'warning',
-  approved: 'brand',
-  active: 'success',
+  approved: 'success',
+  active: 'steel',
   completed: 'muted',
   cancelled: 'danger',
-} as const
-
-type ToneKey = keyof typeof tones
-
-type Props = {
-  status: ToneKey | string
-  label: string
+  ok: 'success',
+  warn: 'warning',
+  danger: 'danger',
+  steel: 'steel',
+  brand: 'brand',
+  muted: 'muted',
+  accent: 'accent',
 }
 
-export function StatusPill({ status, label }: Props) {
-  const tone = (tones as Record<string, string>)[status] ?? 'muted'
-  return <span className={`rpm-pill rpm-pill--${tone}`}>{label}</span>
+type Props = {
+  status: string
+  label: string
+  tone?: BadgeTone
+  dot?: boolean
+}
+
+/** Status mapping helper — renders the shared Badge with a status dot. */
+export function StatusPill({ status, label, tone, dot = true }: Props) {
+  const resolved = tone ?? tones[status] ?? 'muted'
+  return (
+    <Badge tone={resolved} dot={dot}>
+      {label}
+    </Badge>
+  )
 }

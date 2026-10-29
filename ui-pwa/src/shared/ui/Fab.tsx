@@ -48,16 +48,19 @@ export function Fab({ label, icon, className = '', disabled, onClick, ...rest }:
   }
 
   return (
-    <button
-      type="button"
-      className={`rpm-fab ${className}`.trim()}
-      aria-label={label}
-      disabled={locked}
-      aria-busy={busy || undefined}
-      onClick={handleClick}
-      {...rest}
-    >
-      {icon ?? <IconPlus size={22} />}
-    </button>
+    <div className="rpm-fab-dock">
+      <button
+        type="button"
+        className={`rpm-fab ${className}`.trim()}
+        aria-label={label}
+        title={label}
+        disabled={locked}
+        aria-busy={busy || undefined}
+        onClick={handleClick}
+        {...rest}
+      >
+        {icon ?? <IconPlus size={22} />}
+      </button>
+    </div>
   )
 }

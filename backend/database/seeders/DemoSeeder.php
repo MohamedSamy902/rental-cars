@@ -37,6 +37,81 @@ class DemoSeeder extends Seeder
             ],
         );
 
+        $roleUsers = [
+            'ops_manager' => ['ops@rpm.local', 'مدير التشغيل'],
+            'sales' => ['sales@rpm.local', 'موظف مبيعات'],
+            'fleet' => ['fleet@rpm.local', 'مسؤول أسطول'],
+            'maintenance' => ['maint@rpm.local', 'مسؤول صيانة'],
+            'accounts' => ['accounts@rpm.local', 'محاسب'],
+            'hr' => ['hr@rpm.local', 'موارد بشرية'],
+            'viewer' => ['viewer@rpm.local', 'مشاهدة فقط'],
+        ];
+        foreach ($roleUsers as $roleName => [$email, $name]) {
+            $role = Role::query()->where('name', $roleName)->first();
+            if (! $role) {
+                continue;
+            }
+            // امنح أدوار التشغيل صلاحيات عملية أساسية للمعاينة
+            if (in_array($roleName, ['ops_manager', 'sales', 'fleet'], true)) {
+                $role->permissions()->syncWithoutDetaching(
+                    \App\Models\Permission::query()
+                        ->where(function ($q) {
+                            $q->where('key', 'like', 'contracts.%')
+                                ->orWhere('key', 'like', 'customers.%')
+                                ->orWhere('key', 'like', 'vehicles.%')
+                                ->orWhere('key', 'like', 'violations.%')
+                                ->orWhere('key', 'like', 'deposits.%')
+                                ->orWhere('key', 'like', 'media.%')
+                                ->orWhere('key', 'like', 'notifications.%')
+                                ->orWhere('key', 'like', 'reports.%')
+                                ->orWhere('key', 'like', 'chat.%');
+                        })
+                        ->pluck('id')
+                );
+            }
+            if ($roleName === 'maintenance') {
+                $role->permissions()->syncWithoutDetaching(
+                    \App\Models\Permission::query()
+                        ->where(function ($q) {
+                            $q->where('key', 'like', 'maintenance.%')
+                                ->orWhere('key', 'like', 'vehicles.view')
+                                ->orWhere('key', 'like', 'media.%')
+                                ->orWhere('key', 'like', 'inventory.%');
+                        })
+                        ->pluck('id')
+                );
+            }
+            if ($roleName === 'accounts') {
+                $role->permissions()->syncWithoutDetaching(
+                    \App\Models\Permission::query()
+                        ->where(function ($q) {
+                            $q->where('key', 'like', 'accounting.%')
+                                ->orWhere('key', 'like', 'payments.%')
+                                ->orWhere('key', 'like', 'expenses.%')
+                                ->orWhere('key', 'like', 'reports.%')
+                                ->orWhere('key', 'like', 'owners.%');
+                        })
+                        ->pluck('id')
+                );
+            }
+            if ($roleName === 'hr') {
+                $role->permissions()->syncWithoutDetaching(
+                    \App\Models\Permission::query()->where('key', 'like', 'hr.%')->pluck('id')
+                );
+            }
+
+            User::query()->updateOrCreate(
+                ['email' => $email],
+                [
+                    'name' => $name,
+                    'password' => Hash::make('password'),
+                    'phone' => '010'.str_pad((string) random_int(10000000, 99999999), 8, '0', STR_PAD_LEFT),
+                    'role_id' => $role->id,
+                    'is_active' => true,
+                ],
+            );
+        }
+
         $tenant = TenantSetting::query()->firstOrCreate([]);
         $tenant->fill([
             'center_name' => 'مركز آر بي إم للتأجير',

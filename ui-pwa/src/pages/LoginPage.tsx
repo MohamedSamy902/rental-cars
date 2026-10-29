@@ -1,16 +1,89 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
-import { Button, TextField, useToast } from '@/shared/ui'
+import { BrandLogo, Button, useToast } from '@/shared/ui'
+import { IconCheck, IconEye, IconEyeOff, IconLock, IconMail } from '@/shared/ui/Icons'
 import type { ApiError } from '@/shared/api/client'
-import './pages.css'
+import './LoginPage.css'
+
+const REMEMBER_KEY = 'rpm.login.email'
+const IS_DEV = import.meta.env.DEV
+const DEMO = { email: 'admin@rpm.local', password: 'password' }
+
+function readRememberedEmail() {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function persistRememberedEmail(remember: boolean, email: string) {
+  try {
+    if (remember) localStorage.setItem(REMEMBER_KEY, email)
+    else localStorage.removeItem(REMEMBER_KEY)
+  } catch {
+    /* private mode */
+  }
+}
+
+type AuthInputProps = {
+  label: string
+  icon: ReactNode
+  type: string
+  value: string
+  autoComplete: string
+  error?: string
+  onChange: (value: string) => void
+  trailing?: ReactNode
+  inputMode?: 'email' | 'text'
+}
+
+function AuthInput({ label, icon, type, value, autoComplete, error, onChange, trailing, inputMode }: AuthInputProps) {
+  const id = useId()
+  const errorId = `${id}-error`
+  return (
+    <div className={`auth-field ${error ? 'has-error' : ''}`}>
+      <label className="auth-field__label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="auth-field__control">
+        <span className="auth-field__icon" aria-hidden>
+          {icon}
+        </span>
+        <input
+          id={id}
+          className="auth-field__input"
+          type={type}
+          dir="ltr"
+          required
+          value={value}
+          autoComplete={autoComplete}
+          inputMode={inputMode}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {trailing}
+      </div>
+      {error ? (
+        <span className="auth-field__error" id={errorId}>
+          {error}
+        </span>
+      ) : null}
+    </div>
+  )
+}
 
 export function LoginPage() {
   const { user, loading, login } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
-  const [email, setEmail] = useState('admin@rpm.local')
-  const [password, setPassword] = useState('password')
+  const [email, setEmail] = useState(() => readRememberedEmail() || (IS_DEV ? DEMO.email : ''))
+  const [password, setPassword] = useState(() => (IS_DEV ? DEMO.password : ''))
+  const [remember, setRemember] = useState(() => readRememberedEmail() !== '')
+  const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -22,6 +95,7 @@ export function LoginPage() {
     setErrors({})
     try {
       await login(email, password)
+      persistRememberedEmail(remember, email)
       toast.success('مرحباً بك في آر بي إم')
       navigate('/')
     } catch (err) {
@@ -38,35 +112,86 @@ export function LoginPage() {
   }
 
   return (
-    <div className="rpm-login">
-      <form className="rpm-login__card" onSubmit={onSubmit}>
-        <div className="rpm-login__brand">
-          <strong>RPM</strong>
-          <span>نظام إدارة تأجير السيارات</span>
+    <div className="auth">
+      <motion.form
+        className="auth-card"
+        onSubmit={onSubmit}
+        noValidate={false}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+      >
+        <header className="auth-card__head">
+          <BrandLogo variant="full" bare />
+          <span className="auth-card__tagline">نظام إدارة تأجير السيارات</span>
+        </header>
+
+        <div className="auth-card__body">
+          <div className="auth-card__intro">
+            <h1>تسجيل الدخول</h1>
+            <p>أدخل بيانات حسابك للوصول إلى لوحة التشغيل.</p>
+          </div>
+
+          <AuthInput
+            label="البريد الإلكتروني"
+            icon={<IconMail size={18} />}
+            type="email"
+            inputMode="email"
+            autoComplete="username"
+            value={email}
+            error={errors.email}
+            onChange={setEmail}
+          />
+
+          <AuthInput
+            label="كلمة المرور"
+            icon={<IconLock size={18} />}
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            value={password}
+            error={errors.password}
+            onChange={setPassword}
+            trailing={
+              <button
+                type="button"
+                className="auth-field__toggle"
+                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+              </button>
+            }
+          />
+
+          <div className="auth-row">
+            <label className="auth-check">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              <span className="auth-check__box" aria-hidden>
+                <IconCheck size={12} />
+              </span>
+              <span>تذكرني</span>
+            </label>
+            <button
+              type="button"
+              className="auth-link"
+              onClick={() => toast.info('لإعادة تعيين كلمة المرور تواصل مع مدير النظام في فرعك.')}
+            >
+              نسيت كلمة المرور؟
+            </button>
+          </div>
+
+          <Button type="submit" variant="accent" size="lg" loading={saving} className="auth-submit">
+            دخول
+          </Button>
+
+          {IS_DEV ? (
+            <p className="auth-demo" dir="ltr">
+              Demo: {DEMO.email} / {DEMO.password}
+            </p>
+          ) : null}
         </div>
-        <h1>تسجيل الدخول</h1>
-        <p className="muted">واجهة التشغيل العربية — فرع واحد افتراضياً</p>
-        <TextField
-          label="البريد الإلكتروني"
-          required
-          type="email"
-          value={email}
-          error={errors.email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <TextField
-          label="كلمة المرور"
-          required
-          type="password"
-          value={password}
-          error={errors.password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <Button type="submit" loading={saving}>
-          دخول
-        </Button>
-        <p className="rpm-login__hint">تجريبي: admin@rpm.local / password</p>
-      </form>
+      </motion.form>
     </div>
   )
 }

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, DetailList, TextField, MoneyField,
-  SelectField, TextAreaField, StatusPill, useToast, EmptyState, SkeletonBlock, IconChevron,
+  PageHeader, FilterBar, Button, Sheet, Fab, DetailList, DataTable, TextField, MoneyField,
+  SelectField, TextAreaField, StatusPill, useToast, SkeletonBlock, IconEye,
+  type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -68,6 +69,7 @@ export function OwnersPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [detail, setDetail] = useState<(Owner & { vehicles?: OwnerVehicle[]; dues?: Due[]; payouts?: Payout[] }) | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -116,8 +118,19 @@ export function OwnersPage() {
     }
   }
 
+  function mapApiErrors(e: unknown) {
+    const apiErr = e as ApiError
+    const next: Record<string, string> = {}
+    if (apiErr.errors) {
+      for (const [k, v] of Object.entries(apiErr.errors)) next[k] = v[0]
+    }
+    setFieldErrors(next)
+    toast.error(apiErr.message)
+  }
+
   async function onSave() {
     setSaving(true)
+    setFieldErrors({})
     try {
       await api('/owners', { method: 'POST', json: form })
       toast.success('تم تسجيل المالك.')
@@ -125,7 +138,7 @@ export function OwnersPage() {
       setForm(emptyForm)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      mapApiErrors(e)
     } finally {
       setSaving(false)
     }
@@ -134,6 +147,7 @@ export function OwnersPage() {
   async function onUpdate() {
     if (!detail) return
     setSaving(true)
+    setFieldErrors({})
     try {
       const res = await api<{ data: Owner; message: string }>(`/owners/${detail.id}`, {
         method: 'PUT',
@@ -144,7 +158,7 @@ export function OwnersPage() {
       await openDetail(detail.id)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      mapApiErrors(e)
     } finally {
       setSaving(false)
     }
@@ -180,12 +194,43 @@ export function OwnersPage() {
 
   const formFields = (
     <div className="rpm-form-grid">
-      <TextField label="اسم المالك" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-      <TextField label="الهاتف" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-      <TextField label="الرقم القومي" value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <TextField label="اسم المالك" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+      <TextField label="الهاتف" error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
     </div>
   )
+
+  const ownerColumns: DataColumn<Owner>[] = [
+    {
+      id: 'name',
+      header: 'المالك',
+      cell: (o) => <strong className="rpm-table__primary">{o.full_name}</strong>,
+      sortValue: (o) => o.full_name,
+      mobile: 'title',
+    },
+    { id: 'phone', header: 'الهاتف', cell: (o) => <span dir="ltr">{o.phone || '—'}</span>, sortValue: (o) => o.phone, mobile: 'subtitle' },
+    { id: 'vehicles', header: 'العربيات', cell: (o) => o.vehicles_count ?? 0, sortValue: (o) => o.vehicles_count ?? 0 },
+    {
+      id: 'monthly',
+      header: 'الشهري',
+      cell: (o) => formatMoney(o.balance?.vehicles_monthly_total || 0),
+      sortValue: (o) => Number(o.balance?.vehicles_monthly_total || 0),
+    },
+    {
+      id: 'remaining',
+      header: 'المتبقي',
+      cell: (o) => formatMoney(o.balance?.remaining || 0),
+      sortValue: (o) => Number(o.balance?.remaining || 0),
+    },
+    {
+      id: 'status',
+      header: 'الحالة',
+      cell: (o) => <StatusPill status={o.is_active ? 'active' : 'cancelled'} tone={o.is_active ? 'success' : 'muted'} label={o.is_active ? 'نشط' : 'موقوف'} />,
+      sortValue: (o) => (o.is_active ? 1 : 0),
+      mobile: 'badge',
+    },
+  ]
 
   const bal = detail?.balance
 
@@ -199,25 +244,20 @@ export function OwnersPage() {
       />
       <Fab label="إضافة مالك" onClick={() => setOpen(true)} />
       <FilterBar search={search} onSearchChange={setSearch} placeholder="بحث بالاسم أو الهاتف…" chips={[]} activeChip="" onChipChange={() => undefined} />
-      {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا ملاك بعد" description="أضف مالكاً ثم اربطه من شاشة المركبات مع المبلغ الشهري" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((o) => (
-          <button key={o.id} type="button" className="rpm-card is-clickable" onClick={() => void openDetail(o.id)}>
-            <div className="rpm-card__row">
-              <strong>{o.full_name}</strong>
-              <StatusPill status={o.is_active ? 'active' : 'cancelled'} label={o.is_active ? 'نشط' : 'موقوف'} />
-            </div>
-            <p>{o.phone || '—'} · {(o.vehicles_count ?? 0)} عربية</p>
-            <div className="rpm-card__meta">
-              <span className="muted">
-                شهري {formatMoney(o.balance?.vehicles_monthly_total || 0)} · متبقي {formatMoney(o.balance?.remaining || 0)}
-              </span>
-              <IconChevron size={16} className="rpm-card__chev" />
-            </div>
-          </button>
-        ))}
-      </div>
+      <DataTable
+        label="الملاك"
+        rows={rows}
+        columns={ownerColumns}
+        rowKey={(o) => o.id}
+        rowLabel={(o) => o.full_name}
+        loading={loading}
+        onRowClick={(o) => void openDetail(o.id)}
+        rowActions={(o) => [
+          { id: 'view', label: 'كشف الحساب', icon: <IconEye size={16} />, onSelect: () => void openDetail(o.id) },
+        ]}
+        emptyTitle="لا ملاك بعد"
+        emptyDescription="أضف مالكاً ثم اربطه من شاشة المركبات مع المبلغ الشهري"
+      />
 
       <Sheet open={open} title="إضافة مالك" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         {formFields}

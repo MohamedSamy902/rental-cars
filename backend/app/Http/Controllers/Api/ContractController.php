@@ -3,20 +3,32 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ExtendContractRequest;
 use App\Http\Requests\StoreContractRequest;
+use App\Http\Requests\UpdateContractPricingRequest;
 use App\Models\Contract;
+use App\Models\TenantSetting;
+use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
+use App\Services\Contracts\RentalProgressService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ContractController extends Controller
 {
-    public function __construct(private readonly ContractLifecycleService $lifecycle) {}
+    public function __construct(
+        private readonly ContractLifecycleService $lifecycle,
+        private readonly RentalProgressService $progress,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
         $q = Contract::query()->with(['customer', 'vehicle', 'deposit'])->latest('id');
+        $user = $request->user();
+        if ($user && $user->role?->name === 'sales' && ! $user->hasPermission('contracts.approve')) {
+            $q->where('sales_user_id', $user->id);
+        }
         if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);
         }
@@ -31,9 +43,15 @@ class ContractController extends Controller
         }
 
         $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $data = collect($rows->items())->map(function (Contract $c) {
+            $arr = $c->toArray();
+            $arr['progress'] = $this->progress->forContract($c);
+
+            return $arr;
+        })->all();
 
         return response()->json([
-            'data' => $rows->items(),
+            'data' => $data,
             'meta' => [
                 'current_page' => $rows->currentPage(),
                 'last_page' => $rows->lastPage(),
@@ -53,7 +71,8 @@ class ContractController extends Controller
     public function store(StoreContractRequest $request): JsonResponse
     {
         try {
-            $contract = $this->lifecycle->create($request->validated(), $request->user()?->id);
+            $allowOverride = (bool) $request->user()?->hasPermission('contracts_price.override');
+            $contract = $this->lifecycle->create($request->validated(), $request->user()?->id, $allowOverride);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -61,9 +80,11 @@ class ContractController extends Controller
         return response()->json(['data' => $contract, 'message' => 'تم إنشاء العقد.'], 201);
     }
 
-    public function show(Contract $contract): JsonResponse
+    public function show(Request $request, Contract $contract, ContractDossierService $dossier): JsonResponse
     {
-        return response()->json(['data' => $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections'])]);
+        $this->authorize('view', $contract);
+
+        return response()->json(['data' => $dossier->build($contract)]);
     }
 
     public function approve(Request $request, Contract $contract): JsonResponse
@@ -75,6 +96,17 @@ class ContractController extends Controller
         }
 
         return response()->json(['data' => $contract, 'message' => 'تم اعتماد العقد وتثبيت الأسعار.']);
+    }
+
+    public function updatePricing(UpdateContractPricingRequest $request, Contract $contract): JsonResponse
+    {
+        try {
+            $contract = $this->lifecycle->updateFrozenPricing($contract, $request->validated(), $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $contract, 'message' => 'تم تعديل الأسعار مع تسجيل في سجل التدقيق.']);
     }
 
     public function handover(Request $request, Contract $contract): JsonResponse
@@ -148,7 +180,7 @@ class ContractController extends Controller
     public function printData(Contract $contract): JsonResponse
     {
         $contract->load(['customer', 'vehicle.documents', 'vehicle.accessories', 'deposit.deductions', 'inspections.damages']);
-        $tenant = \App\Models\TenantSetting::query()->first();
+        $tenant = TenantSetting::query()->first();
 
         return response()->json([
             'data' => [
@@ -176,15 +208,10 @@ class ContractController extends Controller
         return response()->json(['data' => $contract, 'message' => 'تم إلغاء العقد.']);
     }
 
-    public function extend(Request $request, Contract $contract): JsonResponse
+    public function extend(ExtendContractRequest $request, Contract $contract): JsonResponse
     {
-        $data = $request->validate([
-            'planned_ends_at' => ['required', 'date'],
-            'starts_at' => ['nullable', 'date'],
-        ], [], ['planned_ends_at' => 'نهاية التمديد']);
-
         try {
-            $created = $this->lifecycle->extend($contract, $data, $request->user()?->id);
+            $created = $this->lifecycle->extend($contract, $request->validated(), $request->user()?->id);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -200,10 +227,21 @@ class ContractController extends Controller
             'odometer_out' => ['required', 'integer', 'min:0'],
             'planned_ends_at' => ['nullable', 'date'],
             'damage_fee' => ['nullable', 'integer', 'min:0'],
+            'signature_data' => ['nullable', 'string', 'min:40'],
+            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'damages' => ['nullable', 'array'],
+            'damages.*.position' => ['required_with:damages', 'string', 'max:120'],
+            'damages.*.description' => ['required_with:damages', 'string', 'max:500'],
+            'damages.*.photo_path' => ['nullable', 'string', 'max:500'],
+            'accessories' => ['nullable', 'array'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ], [], [
             'replacement_vehicle_id' => 'السيارة البديلة',
             'odometer_in' => 'عداد السيارة القديمة',
             'odometer_out' => 'عداد السيارة البديلة',
+            'signature_data' => 'توقيع العميل',
+            'fuel_level' => 'مستوى البنزين',
+            'damages' => 'الأضرار',
         ]);
 
         try {

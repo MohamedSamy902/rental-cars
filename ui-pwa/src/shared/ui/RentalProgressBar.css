@@ -1,0 +1,67 @@
+.rpm-rental-progress {
+  display: grid;
+  gap: 0.35rem;
+  margin-block: 0.5rem;
+}
+
+.rpm-rental-progress__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.rpm-rental-progress__label {
+  font-weight: 700;
+}
+
+.rpm-rental-progress.is-warning .rpm-rental-progress__label {
+  color: var(--rpm-warning, #b45309);
+}
+
+.rpm-rental-progress.is-danger .rpm-rental-progress__label {
+  color: var(--rpm-danger, #b91c1c);
+}
+
+.rpm-rental-progress__limit {
+  color: var(--rpm-muted, #64748b);
+}
+
+.rpm-rental-progress__track {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rpm-border, #cbd5e1) 70%, transparent);
+  overflow: hidden;
+  direction: rtl;
+}
+
+.rpm-rental-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--rpm-brand, #0d9488);
+  transition: width 0.35s ease;
+  margin-inline-start: auto;
+}
+
+.rpm-rental-progress.is-warning .rpm-rental-progress__fill {
+  background: var(--rpm-warning, #d97706);
+}
+
+.rpm-rental-progress.is-danger .rpm-rental-progress__fill {
+  background: var(--rpm-danger, #dc2626);
+}
+
+.rpm-rental-progress.is-muted .rpm-rental-progress__fill {
+  background: #94a3b8;
+}
+
+.rpm-rental-progress__msg {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--rpm-muted, #64748b);
+}
+
+.rpm-rental-progress.is-compact .rpm-rental-progress__track {
+  height: 0.4rem;
+}

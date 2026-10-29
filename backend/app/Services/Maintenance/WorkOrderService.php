@@ -29,10 +29,15 @@ class WorkOrderService
 
             if (! empty($data['puts_in_maintenance'])) {
                 $conflicts = $vehicle->contracts()
-                    ->whereIn('status', ['pending', 'approved'])
-                    ->where('planned_ends_at', '>=', now())
-                    ->get(['id', 'number'])
-                    ->map(fn ($c) => ['id' => $c->id, 'number' => $c->number])
+                    ->where(function ($q) {
+                        $q->where('status', 'active')
+                            ->orWhere(function ($qq) {
+                                $qq->whereIn('status', ['pending', 'approved'])
+                                    ->where('planned_ends_at', '>=', now());
+                            });
+                    })
+                    ->get(['id', 'number', 'status'])
+                    ->map(fn ($c) => ['id' => $c->id, 'number' => $c->number, 'status' => $c->status])
                     ->all();
                 $this->availability->assertCanEnterMaintenance($conflicts, (bool) ($data['force_after_resolution'] ?? false));
                 $vehicle->update(['manual_status' => VehicleAvailabilityService::STATUS_MAINTENANCE]);

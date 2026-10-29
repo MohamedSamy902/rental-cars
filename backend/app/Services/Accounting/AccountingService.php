@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\Contract;
+use App\Models\Expense;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\MonthLock;
@@ -126,10 +127,16 @@ class AccountingService
         $this->assertMonthOpen($closeYear, $closeMonth);
 
         return DB::transaction(function () use ($contract, $slices, $end, $userId) {
+            $source = 'contract_close:'.$contract->id;
+            $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+            if ($existing) {
+                return $existing->load('lines');
+            }
+
             $entry = JournalEntry::query()->create([
                 'entry_date' => $end->toDateString(),
                 'narration' => 'إقفال عقد '.$contract->number,
-                'source' => 'contract_close:'.$contract->id,
+                'source' => $source,
                 'posted_by' => $userId,
             ]);
 
@@ -261,6 +268,10 @@ class AccountingService
                 'label' => $dt->translatedFormat('F Y'),
                 'locked' => $lock?->isLocked() ?? false,
                 'rent_revenue' => (int) $rentCredit,
+                'expenses' => (int) Expense::query()
+                    ->whereYear('spent_on', $year)
+                    ->whereMonth('spent_on', $month)
+                    ->sum('amount'),
                 'completed_contracts' => Contract::query()
                     ->where('status', 'completed')
                     ->whereYear('actual_ends_at', $year)
