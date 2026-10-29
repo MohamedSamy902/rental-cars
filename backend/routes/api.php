@@ -175,7 +175,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/work-orders/{workOrder}/close', [WorkOrderController::class, 'close'])->middleware('permission:maintenance.close');
 
     Route::get('/violations', [ViolationController::class, 'index'])->middleware('permission:violations.view');
+    Route::get('/violations/portal', [ViolationController::class, 'portalInfo'])->middleware('permission:violations.view');
+    Route::get('/violations/sync-runs', [ViolationController::class, 'syncRuns'])->middleware('permission:violations.view');
     Route::post('/violations', [ViolationController::class, 'store'])->middleware('permission:violations.create');
+    Route::post('/violations/assisted', [ViolationController::class, 'assistedStore'])->middleware('permission:violations.create');
+    Route::post('/violations/import-csv', [ViolationController::class, 'importCsv'])->middleware('permission:violations.create');
     Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment'])->middleware('permission:violations.update');
 
     Route::middleware(['feature:waitlist', 'permission:waitlist.view'])->get('/waitlist', function (WaitlistService $service) {

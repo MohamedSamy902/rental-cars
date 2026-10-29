@@ -13,6 +13,7 @@ class Violation extends Model
     protected $fillable = [
         'vehicle_id', 'occurred_at', 'location', 'amount', 'photo_path', 'contract_id',
         'customer_id', 'status', 'collection_note', 'confirmed_by', 'confirmed_at', 'notes',
+        'source', 'external_number', 'needs_review', 'sync_run_id',
     ];
 
     protected function casts(): array
@@ -20,6 +21,7 @@ class Violation extends Model
         return [
             'occurred_at' => 'datetime',
             'confirmed_at' => 'datetime',
+            'needs_review' => 'boolean',
         ];
     }
 

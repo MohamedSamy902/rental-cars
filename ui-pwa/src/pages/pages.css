@@ -190,6 +190,20 @@
   gap: 0.65rem;
 }
 
+.rpm-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.rpm-card--soft {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--rpm-surface, #fff) 88%, var(--rpm-accent, #0d9488) 12%);
+  border: 1px solid color-mix(in srgb, var(--rpm-border, #e5e7eb) 70%, transparent);
+}
+
 .rpm-card {
   display: grid;
   gap: 0.45rem;
