@@ -81,6 +81,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:hr.update,hr.salaries');
     Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve'])
         ->middleware('permission:hr.payroll_approve,hr.salaries');
+    Route::post('/payroll/lines/{line}/payout', [PayrollController::class, 'payout'])
+        ->middleware('permission:hr.salaries,hr.payroll_approve');
 
     Route::middleware('permission:hr.custody,hr.view')->group(function () {
         Route::get('/employee-assignments', [EmployeeAssignmentController::class, 'index']);

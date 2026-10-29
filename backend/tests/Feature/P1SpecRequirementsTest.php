@@ -158,7 +158,28 @@ class P1SpecRequirementsTest extends TestCase
             'year' => (int) now()->format('Y'),
             'month' => (int) now()->format('n'),
         ])->assertCreated()->assertJsonPath('data.lines.0.deductions', 1000)
-            ->assertJsonPath('data.lines.0.net_amount', 4000);
+            ->assertJsonPath('data.lines.0.net_amount', 4000)
+            ->assertJsonPath('data.lines.0.advances', 1000);
+
+        $runId = (int) \App\Models\PayrollRun::query()->value('id');
+        $lineId = (int) \App\Models\PayrollLine::query()->value('id');
+        $this->postJson("/api/payroll/{$runId}/approve")->assertOk();
+
+        $this->postJson("/api/payroll/lines/{$lineId}/payout", [
+            'amount' => 1500,
+            'paid_on' => now()->toDateString(),
+            'method' => 'cash',
+        ])->assertOk()
+            ->assertJsonPath('data.paid_amount', 1500)
+            ->assertJsonPath('data.carried_over', 2500);
+
+        $this->postJson("/api/payroll/lines/{$lineId}/payout", [
+            'amount' => 2500,
+            'paid_on' => now()->toDateString(),
+            'method' => 'transfer',
+        ])->assertOk()
+            ->assertJsonPath('data.paid_amount', 4000)
+            ->assertJsonPath('data.carried_over', 0);
 
         $advId = SalaryAdvance::query()->value('id');
         $this->deleteJson("/api/salary-advances/{$advId}")->assertOk();

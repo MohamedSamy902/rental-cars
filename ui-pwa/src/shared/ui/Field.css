@@ -61,6 +61,29 @@
   color: var(--text-muted);
 }
 
+.rpm-money {
+  position: relative;
+  width: 100%;
+}
+
+.rpm-money__input {
+  padding-inline-end: 0.85rem;
+  padding-inline-start: 3.1rem;
+}
+
+.rpm-money__unit {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 0.75rem;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  pointer-events: none;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .rpm-textarea {
   min-height: 96px;
   resize: vertical;

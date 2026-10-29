@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\PayrollLine;
 use App\Models\PayrollRun;
 use App\Services\Operations\PayrollService;
 use DomainException;
@@ -16,7 +17,11 @@ class PayrollController extends Controller
     public function index(): JsonResponse
     {
         return response()->json([
-            'data' => PayrollRun::query()->with('lines.employee')->latest('id')->limit(24)->get(),
+            'data' => PayrollRun::query()
+                ->with(['lines.employee', 'lines.payouts'])
+                ->latest('id')
+                ->limit(24)
+                ->get(),
         ]);
     }
 
@@ -46,5 +51,30 @@ class PayrollController extends Controller
         }
 
         return response()->json(['data' => $run, 'message' => 'تم اعتماد مسير الرواتب.']);
+    }
+
+    public function payout(Request $request, PayrollLine $line): JsonResponse
+    {
+        $data = $request->validate([
+            'amount' => ['required', 'integer', 'min:1'],
+            'paid_on' => ['required', 'date'],
+            'method' => ['nullable', 'in:cash,transfer,card'],
+            'notes' => ['nullable', 'string'],
+        ], [], [
+            'amount' => 'المبلغ المصروف',
+            'paid_on' => 'تاريخ الصرف',
+        ]);
+
+        try {
+            $row = $this->service->payout($line, $data, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $msg = $row->carried_over > 0
+            ? 'تم الصرف وترحيل المتبقي للمسير التالي.'
+            : 'تم صرف كامل المتبقي.';
+
+        return response()->json(['data' => $row, 'message' => $msg]);
     }
 }
