@@ -5,6 +5,7 @@ namespace App\Services\Operations;
 use App\Models\Employee;
 use App\Models\PayrollLine;
 use App\Models\PayrollRun;
+use App\Models\SalaryAdvance;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -30,17 +31,26 @@ class PayrollService
             );
             $run->lines()->delete();
 
+            $advancesByEmployee = SalaryAdvance::query()
+                ->where('year', $year)
+                ->where('month', $month)
+                ->get()
+                ->groupBy('employee_id')
+                ->map(fn ($rows) => (int) $rows->sum('amount'));
+
             $total = 0;
             foreach (Employee::query()->where('status', 'active')->get() as $employee) {
                 $base = (int) $employee->base_salary;
-                $net = $base;
+                $advanceDeduction = (int) ($advancesByEmployee[$employee->id] ?? 0);
+                $net = max(0, $base - $advanceDeduction);
                 PayrollLine::query()->create([
                     'payroll_run_id' => $run->id,
                     'employee_id' => $employee->id,
                     'base_salary' => $base,
                     'allowances' => 0,
-                    'deductions' => 0,
+                    'deductions' => $advanceDeduction,
                     'net_amount' => $net,
+                    'notes' => $advanceDeduction > 0 ? "خصم سلف {$advanceDeduction}" : null,
                 ]);
                 $total += $net;
             }

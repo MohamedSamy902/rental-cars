@@ -11,13 +11,29 @@ use App\Models\OwnerPayout;
 use App\Models\Vehicle;
 use App\Models\Violation;
 use App\Models\WorkOrder;
+use App\Services\Fleet\VehicleAssetService;
 use App\Services\Fleet\VehicleAvailabilityService;
+use App\Services\Fleet\VehicleRecommendationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class VehicleController extends Controller
 {
-    public function __construct(private readonly VehicleAvailabilityService $availability) {}
+    public function __construct(
+        private readonly VehicleAvailabilityService $availability,
+        private readonly VehicleRecommendationService $recommendation,
+        private readonly VehicleAssetService $assets,
+    ) {}
+
+    public function recommend(Request $request): JsonResponse
+    {
+        $category = $request->string('category')->toString() ?: null;
+
+        return response()->json([
+            'data' => $this->recommendation->rankAvailable($category ?: null),
+            'weights' => $this->recommendation->weights(),
+        ]);
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -298,6 +314,8 @@ class VehicleController extends Controller
             return ['month' => $ym, 'amount' => (int) $sum];
         });
 
+        $assetExtras = $this->assets->dossierExtras($vehicle);
+
         return response()->json([
             'data' => [
                 'vehicle' => $this->present($vehicle),
@@ -308,6 +326,11 @@ class VehicleController extends Controller
                 'media' => $media->values(),
                 'owner_dues' => $ownerDues->values(),
                 'owner_payouts' => $ownerPayouts->values(),
+                'tires' => $assetExtras['tires'],
+                'batteries' => $assetExtras['batteries'],
+                'downtime' => $assetExtras['downtime'],
+                'consumables' => $assetExtras['consumables'],
+                'asset_defaults' => $assetExtras['defaults'],
                 'qr' => [
                     'payload' => $qr,
                     'label' => $qrLabel,
@@ -330,6 +353,7 @@ class VehicleController extends Controller
                         ->sum(fn ($c) => (int) ($c['final_total'] ?? $c['period_rent'] ?? 0)),
                     'accessories' => $vehicle->accessories->count(),
                     'documents' => $vehicle->documents->count(),
+                    'lost_revenue' => collect($assetExtras['downtime'])->sum(fn ($d) => (int) ($d->lost_revenue_estimate ?? 0)),
                 ],
             ],
         ]);
