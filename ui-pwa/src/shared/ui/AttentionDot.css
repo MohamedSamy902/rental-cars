@@ -67,10 +67,11 @@
   place-items: center;
 }
 
+/* Physical top-end of the icon: inline-start in RTL (= visual top-right). */
 .rpm-attention-host > .rpm-attention-dot {
   position: absolute;
   inset-block-start: -0.05rem;
-  inset-inline-end: -0.05rem;
+  inset-inline-start: -0.05rem;
   z-index: 1;
 }
 
