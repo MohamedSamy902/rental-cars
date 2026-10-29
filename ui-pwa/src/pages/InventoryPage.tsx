@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  PageHeader, Button, Sheet, Fab, TextField, NumberField, MoneyField, SelectField, StatusPill, useToast, DataTable, IconBox,
+  PageHeader, FilterBar, Button, Sheet, Fab, TextField, NumberField, MoneyField, SelectField, StatusPill, useToast, DataTable, IconBox,
   type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -44,8 +44,32 @@ export function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [openItem, setOpenItem] = useState(false)
   const [openBatch, setOpenBatch] = useState(false)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useState('all')
   const [itemForm, setItemForm] = useState({ code: '', name: '', category: 'زيوت', unit: 'لتر', reorder_level: '5' })
   const [batchForm, setBatchForm] = useState({ inventory_item_id: '', received_on: new Date().toISOString().slice(0, 10), quantity: '', unit_cost: '', supplier: '' })
+
+  const lowCount = useMemo(() => rows.filter((i) => i.is_low).length, [rows])
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      {
+        id: 'low',
+        label: 'تحت حد التنبيه',
+        attention: lowCount > 0 ? ('warning' as const) : null,
+        attentionLabel: `${lowCount} صنف تحت حد إعادة الطلب`,
+      },
+    ],
+    [lowCount],
+  )
+  const filtered = useMemo(() => {
+    const q = search.trim()
+    return rows.filter((i) => {
+      if (chip === 'low' && !i.is_low) return false
+      if (!q) return true
+      return `${i.name} ${i.code} ${i.category}`.includes(q)
+    })
+  }, [rows, chip, search])
 
   async function load() {
     setLoading(true)
@@ -103,9 +127,17 @@ export function InventoryPage() {
         mobileFab
       />
       <Fab label="صنف جديد" onClick={() => setOpenItem(true)} />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="بحث بالصنف أو الكود…"
+      />
       <DataTable
         label="أصناف المخزون"
-        rows={rows}
+        rows={filtered}
         columns={columns}
         rowKey={(i) => i.id}
         rowLabel={(i) => i.name}

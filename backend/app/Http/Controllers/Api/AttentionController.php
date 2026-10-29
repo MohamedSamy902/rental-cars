@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Contract;
+use App\Models\Customer;
+use App\Models\EmployeeAssignment;
 use App\Models\InventoryItem;
 use App\Models\Notification;
+use App\Models\PayrollRun;
 use App\Models\Violation;
 use App\Models\WorkOrder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * عدّادات انتباه خفيفة للقائمة والتبويبات — بدون حمولة لوحة اليوم الكاملة.
@@ -62,6 +66,14 @@ class AttentionController extends Controller
             ->whereNull('read_at')
             ->count();
 
+        $pendingHrAcks = Schema::hasTable('employee_assignments')
+            ? EmployeeAssignment::query()->where('status', 'pending_ack')->count()
+            : 0;
+
+        $draftPayroll = PayrollRun::query()->where('status', 'draft')->count();
+
+        $blacklistedCustomers = Customer::query()->where('status', 'blacklist')->count();
+
         return response()->json([
             'data' => [
                 'overdue_returns' => $overdueReturns,
@@ -73,6 +85,9 @@ class AttentionController extends Controller
                 'open_violations' => $openViolations,
                 'low_stock' => $lowStock,
                 'unread_notifications' => $unread,
+                'pending_hr_acks' => $pendingHrAcks,
+                'draft_payroll_runs' => $draftPayroll,
+                'blacklisted_customers' => $blacklistedCustomers,
             ],
         ]);
     }

@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/shared/api/client'
 import { resolveAttentionTone, type AttentionTone } from '@/shared/ui/AttentionDot'
 
+export const ATTENTION_INVALIDATE_EVENT = 'rpm:attention-invalidate'
+
+/** Call after local mutations so sidebar/tab dots refresh immediately. */
+export function invalidateAttentionSignals(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(ATTENTION_INVALIDATE_EVENT))
+}
+
 export type AttentionCounts = {
   overdue_returns: number
   pending_approvals: number
@@ -12,6 +20,9 @@ export type AttentionCounts = {
   open_violations: number
   low_stock: number
   unread_notifications: number
+  pending_hr_acks: number
+  draft_payroll_runs: number
+  blacklisted_customers: number
 }
 
 const EMPTY: AttentionCounts = {
@@ -24,6 +35,9 @@ const EMPTY: AttentionCounts = {
   open_violations: 0,
   low_stock: 0,
   unread_notifications: 0,
+  pending_hr_acks: 0,
+  draft_payroll_runs: 0,
+  blacklisted_customers: 0,
 }
 
 function n(value: unknown): number {
@@ -42,6 +56,9 @@ function normalizeCounts(raw: Partial<AttentionCounts> | null | undefined): Atte
     open_violations: n(raw?.open_violations),
     low_stock: n(raw?.low_stock),
     unread_notifications: n(raw?.unread_notifications),
+    pending_hr_acks: n(raw?.pending_hr_acks),
+    draft_payroll_runs: n(raw?.draft_payroll_runs),
+    blacklisted_customers: n(raw?.blacklisted_customers),
   }
 }
 
@@ -52,14 +69,8 @@ export type NavAttention = {
 }
 
 /**
- * Nav dots ONLY for sections with a direct unhandled count.
+ * Sidebar dots ONLY for sections with a direct unhandled count.
  * Never decorate dashboard / fleet / calendar with aggregate noise.
- *
- * Tone rules (live counts):
- * - العقود: red when overdue OR pending > 0
- * - maintenance: red when open work orders > 0
- * - inventory: amber when low stock > 0
- * - violations / notifications: amber when open/unread > 0
  */
 export function attentionForPath(path: string, c: AttentionCounts): NavAttention | null {
   const map: Record<string, { critical: number; warning: number; label: string; ping?: boolean }> = {
@@ -76,25 +87,36 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
     '/maintenance': {
       critical: c.open_work_orders,
       warning: 0,
-      label: c.open_work_orders
-        ? `${c.open_work_orders} أمر شغل مفتوح`
-        : 'أوامر شغل مفتوحة',
+      label: c.open_work_orders ? `${c.open_work_orders} أمر شغل مفتوح` : 'أوامر شغل مفتوحة',
       ping: true,
-    },
-    '/violations': {
-      critical: 0,
-      warning: c.open_violations,
-      label: `${c.open_violations} مخالفة مفتوحة`,
     },
     '/inventory': {
       critical: 0,
       warning: c.low_stock,
       label: `${c.low_stock} صنف تحت حد إعادة الطلب`,
     },
+    '/violations': {
+      critical: 0,
+      warning: c.open_violations,
+      label: `${c.open_violations} مخالفة مفتوحة`,
+    },
     '/notifications': {
       critical: 0,
       warning: c.unread_notifications,
       label: `${c.unread_notifications} إشعار غير مقروء`,
+    },
+    '/hr': {
+      critical: c.pending_hr_acks,
+      warning: c.draft_payroll_runs,
+      label: c.pending_hr_acks
+        ? `${c.pending_hr_acks} إسناد بانتظار تأكيد الاستلام`
+        : `${c.draft_payroll_runs} مسير بانتظار الاعتماد`,
+      ping: true,
+    },
+    '/customers': {
+      critical: 0,
+      warning: c.blacklisted_customers,
+      label: `${c.blacklisted_customers} عميل في القائمة السوداء`,
     },
   }
 
@@ -106,6 +128,16 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
   return { tone, ping: tone === 'critical' ? Boolean(hit.ping) : false, label: hit.label }
 }
 
+const NAV_PATHS = [
+  '/bookings',
+  '/maintenance',
+  '/inventory',
+  '/violations',
+  '/notifications',
+  '/hr',
+  '/customers',
+] as const
+
 export function useAttentionSignals(enabled: boolean, refreshKey?: string) {
   const [counts, setCounts] = useState<AttentionCounts>(EMPTY)
 
@@ -115,6 +147,7 @@ export function useAttentionSignals(enabled: boolean, refreshKey?: string) {
       return
     }
     let alive = true
+    let debounceTimer: number | null = null
     const pull = () => {
       api<{ data: AttentionCounts }>('/attention')
         .then((res) => {
@@ -124,20 +157,36 @@ export function useAttentionSignals(enabled: boolean, refreshKey?: string) {
           /* ignore — badge is non-blocking */
         })
     }
+    const pullSoon = () => {
+      if (debounceTimer != null) window.clearTimeout(debounceTimer)
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = null
+        pull()
+      }, 120)
+    }
     pull()
-    const t = window.setInterval(pull, 60000)
+    const interval = window.setInterval(pull, 30000)
     const onFocus = () => pull()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') pull()
+    }
+    const onInvalidate = () => pullSoon()
     window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener(ATTENTION_INVALIDATE_EVENT, onInvalidate)
     return () => {
       alive = false
-      window.clearInterval(t)
+      if (debounceTimer != null) window.clearTimeout(debounceTimer)
+      window.clearInterval(interval)
       window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener(ATTENTION_INVALIDATE_EVENT, onInvalidate)
     }
   }, [enabled, refreshKey])
 
   const byPath = useMemo(() => {
     const out: Record<string, NavAttention> = {}
-    for (const path of ['/bookings', '/maintenance', '/violations', '/inventory', '/notifications']) {
+    for (const path of NAV_PATHS) {
       const signal = attentionForPath(path, counts)
       if (signal) out[path] = signal
     }

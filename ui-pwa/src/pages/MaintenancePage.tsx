@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, MetricCardGrid, Button, Fab, DataTable, StatusPill, useToast,
+  PageHeader, MetricCardGrid, FilterBar, Button, Fab, DataTable, StatusPill, useToast,
   IconCheck, IconWrench, IconCash, type DataColumn,
 } from '@/shared/ui'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
@@ -52,6 +52,8 @@ export function MaintenancePage() {
   const [summary, setSummary] = useState({ open: 0, closed: 0 })
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useState('open')
 
   async function load() {
     setLoading(true)
@@ -65,6 +67,31 @@ export function MaintenancePage() {
   }
 
   useEffect(() => { void load() }, [])
+
+  const chips = useMemo(
+    () => [
+      {
+        id: 'open',
+        label: 'مفتوح',
+        attention: summary.open > 0 ? ('critical' as const) : null,
+        attentionLabel: `${summary.open} أمر شغل مفتوح`,
+      },
+      { id: 'closed', label: 'مغلق' },
+      { id: 'all', label: 'الكل' },
+    ],
+    [summary.open],
+  )
+
+  const filtered = useMemo(() => {
+    const q = search.trim()
+    return rows.filter((r) => {
+      if (chip === 'open' && !['open', 'in_progress'].includes(r.status)) return false
+      if (chip === 'closed' && r.status !== 'closed') return false
+      if (!q) return true
+      const hay = `${r.vehicle?.brand ?? ''} ${r.vehicle?.model ?? ''} ${r.vehicle?.plate ?? ''} ${r.workshop ?? ''}`
+      return hay.includes(q)
+    })
+  }, [rows, chip, search])
 
   async function closeOrder(id: number) {
     try {
@@ -92,9 +119,17 @@ export function MaintenancePage() {
           },
         ]}
       />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="بحث بالمركبة أو الورشة…"
+      />
       <DataTable
         label="أوامر الشغل"
-        rows={rows}
+        rows={filtered}
         columns={columns}
         rowKey={(r) => r.id}
         rowLabel={(r) => `أمر شغل · ${r.vehicle?.plate ?? ''}`}
