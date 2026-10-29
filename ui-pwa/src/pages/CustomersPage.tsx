@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, TextField, TextAreaField,
-  MediaUpload, useToast, EmptyState, SkeletonBlock, IconChevron,
+  PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
+  MediaUpload, useToast, SkeletonBlock, Badge, IconEye, IconEdit, IconClipboard,
+  type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -52,6 +53,7 @@ export function CustomersPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [blacklistReason, setBlacklistReason] = useState('')
 
   async function load() {
@@ -100,8 +102,19 @@ export function CustomersPage() {
     }
   }
 
+  function mapApiErrors(e: unknown) {
+    const apiErr = e as ApiError
+    const next: Record<string, string> = {}
+    if (apiErr.errors) {
+      for (const [k, v] of Object.entries(apiErr.errors)) next[k] = v[0]
+    }
+    setFieldErrors(next)
+    toast.error(apiErr.message)
+  }
+
   async function onSave() {
     setSaving(true)
+    setFieldErrors({})
     try {
       await api('/customers', { method: 'POST', json: form })
       toast.success('تم تسجيل العميل.')
@@ -109,7 +122,7 @@ export function CustomersPage() {
       setForm(emptyForm)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      mapApiErrors(e)
     } finally {
       setSaving(false)
     }
@@ -118,6 +131,7 @@ export function CustomersPage() {
   async function onUpdate() {
     if (!detail) return
     setSaving(true)
+    setFieldErrors({})
     try {
       const res = await api<{ data: Customer; message: string }>(`/customers/${detail.id}`, {
         method: 'PUT',
@@ -128,7 +142,7 @@ export function CustomersPage() {
       setEditing(false)
       await load()
     } catch (e) {
-      toast.error((e as ApiError).message)
+      mapApiErrors(e)
     } finally {
       setSaving(false)
     }
@@ -155,14 +169,74 @@ export function CustomersPage() {
     }
   }
 
+  async function openEdit(id: number) {
+    await openDetail(id)
+    setEditing(true)
+  }
+
+  const statusPill = (c: Customer) => (
+    <StatusPill
+      status={c.status === 'blacklist' ? 'cancelled' : 'active'}
+      tone={c.status === 'blacklist' ? 'danger' : 'success'}
+      label={c.status === 'blacklist' ? 'قائمة سوداء' : 'نشط'}
+    />
+  )
+
+  const columns: DataColumn<Customer>[] = [
+    {
+      id: 'name',
+      header: 'العميل',
+      cell: (c) => (
+        <>
+          <strong className="rpm-table__primary">{c.full_name}</strong>
+          {(c.credit_balance || 0) > 0 ? (
+            <span className="rpm-table__sub">رصيد دائن {formatMoney(c.credit_balance || 0)}</span>
+          ) : null}
+        </>
+      ),
+      sortValue: (c) => c.full_name,
+      mobile: 'title',
+    },
+    { id: 'phone', header: 'الهاتف', cell: (c) => <span dir="ltr">{c.phone}</span>, sortValue: (c) => c.phone, mobile: 'subtitle' },
+    { id: 'license', header: 'رقم الرخصة', cell: (c) => c.license_number, sortValue: (c) => c.license_number },
+    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => c.license_expires_on, sortValue: (c) => c.license_expires_on },
+    {
+      id: 'credit',
+      header: 'رصيد دائن',
+      cell: (c) => ((c.credit_balance || 0) > 0
+        ? <Badge tone="accent" dot={false}>{formatMoney(c.credit_balance || 0)}</Badge>
+        : <span className="muted">—</span>),
+      sortValue: (c) => Number(c.credit_balance || 0),
+    },
+    { id: 'status', header: 'الحالة', cell: statusPill, sortValue: (c) => c.status, mobile: 'badge' },
+  ]
+
+  function customerMenu(c: Customer): MenuItem[] {
+    return [
+      { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: () => void openDetail(c.id) },
+      { id: 'edit', label: 'تعديل البيانات', icon: <IconEdit size={16} />, onSelect: () => void openEdit(c.id) },
+      {
+        id: 'copy',
+        label: 'نسخ رقم الهاتف',
+        icon: <IconClipboard size={16} />,
+        onSelect: () => {
+          void navigator.clipboard?.writeText(c.phone).then(
+            () => toast.success('تم نسخ الرقم.'),
+            () => toast.error('تعذّر النسخ.'),
+          )
+        },
+      },
+    ]
+  }
+
   const formFields = (
     <div className="rpm-form-grid">
-      <TextField label="الاسم الكامل" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-      <TextField label="الهاتف" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-      <TextField label="الرقم القومي" value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
-      <TextField label="تاريخ الميلاد" required type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
-      <TextField label="رقم الرخصة" required value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
-      <TextField label="انتهاء الرخصة" required type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
+      <TextField label="الاسم الكامل" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+      <TextField label="الهاتف" required error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <TextField label="تاريخ الميلاد" required error={fieldErrors.birth_date} type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
+      <TextField label="رقم الرخصة" required error={fieldErrors.license_number} value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
+      <TextField label="انتهاء الرخصة" required error={fieldErrors.license_expires_on} type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       <MediaUpload
         label="صورة البطاقة"
@@ -170,6 +244,7 @@ export function CustomersPage() {
         collection="customers_id"
         purpose="national_id"
         accept="image"
+        error={fieldErrors.national_id_image_path}
         attachableType={editing && detail ? 'customer' : undefined}
         attachableId={editing && detail ? detail.id : undefined}
         onChange={(path) => setForm({ ...form, national_id_image_path: path || '' })}
@@ -180,6 +255,7 @@ export function CustomersPage() {
         collection="customers_id"
         purpose="license"
         accept="image"
+        error={fieldErrors.license_image_path}
         attachableType={editing && detail ? 'customer' : undefined}
         attachableId={editing && detail ? detail.id : undefined}
         onChange={(path) => setForm({ ...form, license_image_path: path || '' })}
@@ -208,24 +284,18 @@ export function CustomersPage() {
         onChipChange={setChip}
         placeholder="بحث بالاسم أو الهاتف…"
       />
-      {loading ? <SkeletonBlock rows={5} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا يوجد عملاء" /> : null}
-      <div className="rpm-card-list">
-        {rows.map((c) => (
-          <button key={c.id} type="button" className="rpm-card is-clickable" onClick={() => void openDetail(c.id)}>
-            <div className="rpm-card__row">
-              <strong>{c.full_name}</strong>
-              <StatusPill status={c.status === 'blacklist' ? 'cancelled' : 'active'} label={c.status === 'blacklist' ? 'قائمة سوداء' : 'نشط'} />
-            </div>
-            <p>{c.phone}</p>
-            <div className="rpm-card__meta">
-              <span className="muted">رخصة {c.license_number} · تنتهي {c.license_expires_on}</span>
-              {(c.credit_balance || 0) > 0 ? <span>رصيد دائن {formatMoney(c.credit_balance || 0)}</span> : null}
-              <IconChevron size={16} className="rpm-card__chev" />
-            </div>
-          </button>
-        ))}
-      </div>
+      <DataTable
+        label="العملاء"
+        rows={rows}
+        columns={columns}
+        rowKey={(c) => c.id}
+        rowLabel={(c) => c.full_name}
+        loading={loading}
+        onRowClick={(c) => void openDetail(c.id)}
+        rowActions={customerMenu}
+        emptyTitle="لا يوجد عملاء"
+        emptyDescription="أضف أول عميل أو غيّر كلمة البحث."
+      />
       <Sheet open={open} title="إضافة عميل" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         {formFields}
       </Sheet>
@@ -258,24 +328,23 @@ export function CustomersPage() {
           <>
             <DetailList
               rows={[
-                { label: 'الحالة', value: <StatusPill status={detail.status === 'blacklist' ? 'cancelled' : 'active'} label={detail.status === 'blacklist' ? 'قائمة سوداء' : 'نشط'} /> },
-                { label: 'الاسم', value: detail.full_name },
-                { label: 'الهاتف', value: detail.phone },
+                { label: 'الحالة', value: statusPill(detail) },
+                { label: 'الهاتف', value: <span dir="ltr">{detail.phone}</span> },
                 { label: 'هاتف بديل', value: detail.phone_alt || '—' },
                 { label: 'البريد', value: detail.email || '—' },
                 { label: 'الرقم القومي', value: detail.national_id || '—' },
                 { label: 'تاريخ الميلاد', value: detail.birth_date || '—' },
                 { label: 'رقم الرخصة', value: detail.license_number },
                 { label: 'انتهاء الرخصة', value: detail.license_expires_on },
+                { label: 'الرصيد الدائن', value: formatMoney(detail.credit_balance || 0) },
                 { label: 'صورة البطاقة', value: detail.national_id_image_path ? 'مرفوعة' : '—' },
                 { label: 'صورة الرخصة', value: detail.license_image_path ? 'مرفوعة' : '—' },
-                { label: 'الرصيد الدائن', value: formatMoney(detail.credit_balance || 0) },
-                { label: 'سبب القائمة السوداء', value: detail.blacklist_reason || '—' },
-                { label: 'ملاحظات', value: detail.notes || '—' },
+                { label: 'سبب القائمة السوداء', value: detail.blacklist_reason || '—', wide: true },
+                { label: 'ملاحظات', value: detail.notes || '—', wide: true },
               ]}
             />
             {creditLedger.length > 0 ? (
-              <div className="rpm-card-list" style={{ marginTop: '0.75rem' }}>
+              <div className="rpm-card-list" style={{ marginBlockStart: '0.75rem' }}>
                 <strong>حركة الرصيد الدائن</strong>
                 {creditLedger.slice(0, 8).map((m) => (
                   <article key={m.id} className="rpm-card">

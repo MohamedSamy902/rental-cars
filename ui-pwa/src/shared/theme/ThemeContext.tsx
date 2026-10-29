@@ -35,7 +35,7 @@ function readInitialTheme(): ThemeMode {
 function applyTheme(mode: ThemeMode) {
   document.documentElement.setAttribute('data-theme', mode)
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', mode === 'dark' ? '#0b0e14' : '#f1f5f9')
+  if (meta) meta.setAttribute('content', mode === 'dark' ? '#09090b' : '#f4f4f5')
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

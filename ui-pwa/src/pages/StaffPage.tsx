@@ -7,6 +7,7 @@ import {
   useToast, EmptyState, ErrorState, SkeletonBlock, StatusPill,
   IconPlus, IconShield, IconBadge, IconUsers, IconSearch,
 } from '@/shared/ui'
+import { IconEdit, IconMail, IconPhone } from '@/shared/ui/Icons'
 import './StaffPage.css'
 
 type Role = {
@@ -460,24 +461,35 @@ export function StaffPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(i, 8) * 0.03, duration: 0.3, ease }}
                 >
-                  <div className="st-user__top">
+                  <header className="st-user__head">
                     <span className="st-user__avatar" aria-hidden>{u.name.slice(0, 1)}</span>
-                    <div className="st-user__meta">
+                    <div className="st-user__id">
                       <strong>{u.name}</strong>
-                      <em>{u.email}</em>
+                      <span className="st-user__role">
+                        <IconShield size={13} />
+                        {u.role?.label || 'بدون دور'}
+                      </span>
                     </div>
                     <StatusPill
                       status={u.is_active ? 'active' : 'cancelled'}
                       label={u.is_active ? 'نشط' : 'موقوف'}
                     />
-                  </div>
-                  <div className="st-user__row">
-                    <span>{u.role?.label || 'بدون دور'}</span>
-                    <span>{u.phone || '—'}</span>
-                  </div>
-                  <div className="st-user__actions">
-                    <Button size="sm" variant="secondary" onClick={() => openEditUser(u)}>تعديل</Button>
-                  </div>
+                  </header>
+                  <dl className="st-user__contact">
+                    <div>
+                      <dt><IconMail size={14} /><span>البريد</span></dt>
+                      <dd dir="ltr">{u.email}</dd>
+                    </div>
+                    <div>
+                      <dt><IconPhone size={14} /><span>الهاتف</span></dt>
+                      <dd dir="ltr" className="tabular-nums">{u.phone || '—'}</dd>
+                    </div>
+                  </dl>
+                  <footer className="st-user__foot">
+                    <Button size="sm" variant="secondary" iconStart={<IconEdit size={15} />} onClick={() => openEditUser(u)}>
+                      تعديل الحساب
+                    </Button>
+                  </footer>
                 </motion.article>
               ))}
             </div>

@@ -61,6 +61,9 @@ export const IconSearch = (p: Props) => (
 export const IconPlus = (p: Props) => (
   <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>
 )
+export const IconRefresh = (p: Props) => (
+  <Svg {...p}><path d="M20 11a8 8 0 0 0-14.6-4.5L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0 0 14.6 4.5L20 16" /><path d="M20 20v-4h-4" /></Svg>
+)
 export const IconLogout = (p: Props) => (
   <Svg {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></Svg>
 )
@@ -99,4 +102,76 @@ export const IconBadge = (p: Props) => (
 )
 export const IconClose = (p: Props) => (
   <Svg {...p}><path d="M6 6l12 12M18 6 6 18" /></Svg>
+)
+export const IconCheck = (p: Props) => (
+  <Svg {...p}><path d="m5 12.5 4.5 4.5L19 7.5" /></Svg>
+)
+export const IconSortNone = (p: Props) => (
+  <Svg {...p}><path d="m8 9 4-4 4 4M8 15l4 4 4-4" /></Svg>
+)
+export const IconSortAsc = (p: Props) => (
+  <Svg {...p}><path d="M12 19V5M6 11l6-6 6 6" /></Svg>
+)
+export const IconSortDesc = (p: Props) => (
+  <Svg {...p}><path d="M12 5v14M6 13l6 6 6-6" /></Svg>
+)
+export const IconEye = (p: Props) => (
+  <Svg {...p}><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></Svg>
+)
+export const IconEdit = (p: Props) => (
+  <Svg {...p}><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></Svg>
+)
+export const IconPrinter = (p: Props) => (
+  <Svg {...p}><path d="M7 9V3h10v6" /><rect x="3" y="9" width="18" height="8" rx="2" /><path d="M7 14h10v7H7z" /></Svg>
+)
+export const IconBan = (p: Props) => (
+  <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></Svg>
+)
+export const IconCash = (p: Props) => (
+  <Svg {...p}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></Svg>
+)
+export const IconKey = (p: Props) => (
+  <Svg {...p}><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9.2-9.2M17 6l3 3M15 8l2 2" /></Svg>
+)
+export const IconStore = (p: Props) => (
+  <Svg {...p}><path d="M3 9 4.5 4h15L21 9" /><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" /><path d="M5 11.5V21h14v-9.5" /><path d="M10 21v-5h4v5" /></Svg>
+)
+export const IconReceipt = (p: Props) => (
+  <Svg {...p}><path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21z" /><path d="M9 8h6M9 12h6M9 16h3" /></Svg>
+)
+export const IconLandmark = (p: Props) => (
+  <Svg {...p}><path d="M3 21h18M4 18h16M12 3 3 8h18z" /><path d="M6 11v7M10 11v7M14 11v7M18 11v7" /></Svg>
+)
+export const IconBriefcase = (p: Props) => (
+  <Svg {...p}><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18" /></Svg>
+)
+export const IconFileText = (p: Props) => (
+  <Svg {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6M9 9h2" /></Svg>
+)
+export const IconChat = (p: Props) => (
+  <Svg {...p}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z" /><path d="M8.5 12h.01M12 12h.01M15.5 12h.01" /></Svg>
+)
+export const IconUserCog = (p: Props) => (
+  <Svg {...p}><circle cx="9" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 9.5-4.9" /><circle cx="18" cy="17" r="2.5" /><path d="M18 13v1.5M18 19.5V21M14.5 17H16M20 17h1.5M15.5 14.5l1 1M19.5 18.5l1 1M20.5 14.5l-1 1M16.5 18.5l-1 1" /></Svg>
+)
+export const IconHistory = (p: Props) => (
+  <Svg {...p}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3.5 2" /></Svg>
+)
+export const IconMail = (p: Props) => (
+  <Svg {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></Svg>
+)
+export const IconLock = (p: Props) => (
+  <Svg {...p}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></Svg>
+)
+export const IconEyeOff = (p: Props) => (
+  <Svg {...p}><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" /></Svg>
+)
+export const IconDownload = (p: Props) => (
+  <Svg {...p}><path d="M12 3v12M7 10l5 5 5-5M4 21h16" /></Svg>
+)
+export const IconZap = (p: Props) => (
+  <Svg {...p}><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></Svg>
+)
+export const IconPhone = (p: Props) => (
+  <Svg {...p}><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" /></Svg>
 )

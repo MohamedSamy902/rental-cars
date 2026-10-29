@@ -6,10 +6,19 @@
   box-sizing: border-box;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
 html {
   direction: rtl;
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
   overflow-x: clip;
+  /* Installed PWA: no browser pull-to-refresh / overscroll reload */
+  overscroll-behavior-y: none;
+  background: var(--bg);
 }
 
 body {
@@ -17,15 +26,12 @@ body {
   min-height: 100dvh;
   max-width: 100%;
   overflow-x: clip;
+  overscroll-behavior-y: none;
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.55;
   color: var(--text);
-  background:
-    radial-gradient(980px 520px at 88% -8%, var(--bg-mesh-1), transparent 58%),
-    radial-gradient(820px 460px at 4% 100%, var(--bg-mesh-2), transparent 52%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
@@ -67,6 +73,16 @@ button {
   background: none;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
+}
+
+hr {
+  border: 0;
+  border-block-start: 1px solid var(--border);
+}
+
 img {
   max-width: 100%;
   display: block;
@@ -79,6 +95,17 @@ img {
 
 ::selection {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+@keyframes rpm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tabular-nums {

@@ -1,0 +1,101 @@
+.rp-bento {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 981px) {
+  .rp-bento {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    align-items: start;
+  }
+}
+
+.rp-chip {
+  padding-block: 0.2rem;
+  padding-inline: 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.rp-fleet__stack {
+  display: flex;
+  gap: 3px;
+  height: 0.85rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.rp-fleet__seg {
+  flex-basis: 0;
+  min-width: 4px;
+  background: var(--border-strong);
+}
+
+.rp-fleet__seg.is-success, .rp-dot.is-success { background: var(--success); }
+.rp-fleet__seg.is-info, .rp-dot.is-info { background: var(--steel); }
+.rp-fleet__seg.is-warning, .rp-dot.is-warning { background: var(--warning); }
+.rp-fleet__seg.is-danger, .rp-dot.is-danger { background: var(--danger); }
+
+.rp-fleet__legend {
+  list-style: none;
+  margin: 0;
+  margin-block-start: 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.rp-fleet__legend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding-block: 0.55rem;
+  padding-inline: 0.75rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 0.875rem;
+}
+.rp-fleet__legend li.is-total {
+  grid-template-columns: minmax(0, 1fr) auto;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+}
+.rp-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+}
+
+.rp-rent__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.rp-rent__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-block-end: 0.35rem;
+  font-size: 0.875rem;
+}
+.rp-rent__meta span {
+  color: var(--text-muted);
+}
+.rp-rent__track {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.rp-rent__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-solid);
+}

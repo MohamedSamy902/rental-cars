@@ -1,24 +1,56 @@
-.rpm-fab {
+/* Phone-only primary action: a 48px circle in its own floating dock above the bottom nav */
+.rpm-fab-dock {
   display: none;
 }
 
 @media (max-width: 980px) {
+  .rpm-fab-dock {
+    position: fixed;
+    z-index: 45;
+    inset-inline-end: 1rem;
+    inset-block-end: calc(var(--bottom-nav-height) + 0.875rem + var(--safe-bottom));
+    display: block;
+    pointer-events: none;
+  }
+
   .rpm-fab {
+    pointer-events: auto;
     display: grid;
     place-items: center;
-    position: fixed;
-    inset-inline-end: 1rem;
-    inset-block-end: calc(4.6rem + var(--safe-bottom));
-    z-index: 45;
-    width: 56px;
-    height: 56px;
-    border-radius: 18px;
-    background: var(--accent);
-    color: #fff;
-    box-shadow: 0 14px 32px color-mix(in srgb, var(--accent) 32%, transparent);
+    width: 3rem;
+    height: 3rem;
+    border-radius: 999px;
+    border: 0;
+    background: var(--fab-bg);
+    color: #ffffff;
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform var(--motion-fast) ease,
+      background-color var(--motion-fast) ease;
+  }
+
+  .rpm-fab:hover,
+  .rpm-fab:active {
+    background: var(--fab-hover);
   }
 
   .rpm-fab:active {
-    transform: scale(0.96);
+    transform: scale(0.98);
+  }
+
+  .rpm-fab:focus-visible {
+    outline: 2px solid var(--ring-strong);
+    outline-offset: 3px;
+  }
+
+  .rpm-fab:disabled {
+    opacity: 0.6;
+  }
+
+  /* The FAB's top edge sits nav + 3.875rem up; keep the last card just clear of it */
+  .shell-main:has(.rpm-fab-dock) {
+    padding-block-end: calc(var(--bottom-nav-height) + 4.75rem + var(--safe-bottom));
   }
 }
