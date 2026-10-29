@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
@@ -55,6 +55,28 @@ export function CustomersPage() {
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [blacklistReason, setBlacklistReason] = useState('')
+  const [blacklistTotal, setBlacklistTotal] = useState(0)
+  const [creditTotal, setCreditTotal] = useState(0)
+
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'active', label: 'نشط' },
+      {
+        id: 'blacklist',
+        label: 'قائمة سوداء',
+        attention: blacklistTotal > 0 ? ('critical' as const) : null,
+        attentionLabel: `${blacklistTotal} عميل في القائمة السوداء`,
+      },
+      {
+        id: 'credit',
+        label: 'رصيد دائن',
+        attention: creditTotal > 0 ? ('warning' as const) : null,
+        attentionLabel: `${creditTotal} عميل برصيد دائن`,
+      },
+    ],
+    [blacklistTotal, creditTotal],
+  )
 
   async function load() {
     setLoading(true)
@@ -64,7 +86,14 @@ export function CustomersPage() {
       if (chip === 'blacklist') qs.set('status', 'blacklist')
       if (chip === 'active') qs.set('status', 'active')
       const res = await api<{ data: Customer[] }>(`/customers?${qs}`)
-      setRows(res.data)
+      let data = res.data
+      if (chip === 'credit') data = data.filter((c) => Number(c.credit_balance || 0) > 0)
+      setRows(data)
+      if (chip === 'all' || chip === 'credit') {
+        setCreditTotal(res.data.filter((c) => Number(c.credit_balance || 0) > 0).length)
+      }
+      if (chip === 'all') setBlacklistTotal(res.data.filter((c) => c.status === 'blacklist').length)
+      if (chip === 'blacklist') setBlacklistTotal(res.data.length)
     } finally {
       setLoading(false)
     }
@@ -275,11 +304,7 @@ export function CustomersPage() {
       <FilterBar
         search={search}
         onSearchChange={setSearch}
-        chips={[
-          { id: 'all', label: 'الكل' },
-          { id: 'active', label: 'نشط' },
-          { id: 'blacklist', label: 'قائمة سوداء' },
-        ]}
+        chips={chips}
         activeChip={chip}
         onChipChange={setChip}
         placeholder="بحث بالاسم أو الهاتف…"

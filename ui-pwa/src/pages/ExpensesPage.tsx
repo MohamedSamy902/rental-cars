@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatDateTime } from '@/shared/lib/format'
 import {
-  PageHeader, Button, Fab, MetricCardGrid, useToast, DataTable, Badge,
+  PageHeader, FilterBar, Button, Fab, MetricCardGrid, useToast, DataTable, Badge,
   IconReceipt, IconCalendar, IconWallet, IconChart, type DataColumn,
 } from '@/shared/ui'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
@@ -49,6 +49,8 @@ export function ExpensesPage() {
   const toast = useToast()
   const [rows, setRows] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useState('all')
   const [open, setOpen] = useState(false)
 
   async function load() {
@@ -71,14 +73,42 @@ export function ExpensesPage() {
     const byCategory = new Map<string, number>()
     for (const r of rows) byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + Number(r.amount))
     const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0]
+    const pettyCount = rows.filter((r) => r.from_petty_cash).length
     return {
       monthTotal: month.reduce((s, r) => s + Number(r.amount), 0),
       monthCount: month.length,
       total: rows.reduce((s, r) => s + Number(r.amount), 0),
       petty: rows.filter((r) => r.from_petty_cash).reduce((s, r) => s + Number(r.amount), 0),
+      pettyCount,
       top,
     }
   }, [rows])
+
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'تشغيل', label: 'تشغيل' },
+      { id: 'صيانة', label: 'صيانة' },
+      { id: 'أخرى', label: 'أخرى' },
+      {
+        id: 'petty',
+        label: 'من العهدة',
+        attention: stats.pettyCount > 0 ? ('warning' as const) : null,
+        attentionLabel: `${stats.pettyCount} مصروف من العهدة`,
+      },
+    ],
+    [stats.pettyCount],
+  )
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return rows.filter((r) => {
+      if (chip === 'petty' && !r.from_petty_cash) return false
+      if (chip !== 'all' && chip !== 'petty' && r.category !== chip) return false
+      if (!q) return true
+      return r.title.toLowerCase().includes(q) || (r.notes || '').toLowerCase().includes(q)
+    })
+  }, [rows, chip, search])
 
   return (
     <div className="rpm-stack">
@@ -98,9 +128,18 @@ export function ExpensesPage() {
         ]}
       />
 
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="بحث بعنوان المصروف…"
+      />
+
       <DataTable
         label="المصروفات"
-        rows={rows}
+        rows={visible}
         columns={columns}
         rowKey={(r) => r.id}
         loading={loading}

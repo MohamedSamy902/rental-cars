@@ -6,13 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreContractRequest;
 use App\Models\Contract;
 use App\Services\Contracts\ContractLifecycleService;
+use App\Services\Contracts\RentalProgressService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ContractController extends Controller
 {
-    public function __construct(private readonly ContractLifecycleService $lifecycle) {}
+    public function __construct(
+        private readonly ContractLifecycleService $lifecycle,
+        private readonly RentalProgressService $progress,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -31,9 +35,15 @@ class ContractController extends Controller
         }
 
         $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $data = collect($rows->items())->map(function (Contract $c) {
+            $arr = $c->toArray();
+            $arr['progress'] = $this->progress->forContract($c);
+
+            return $arr;
+        })->all();
 
         return response()->json([
-            'data' => $rows->items(),
+            'data' => $data,
             'meta' => [
                 'current_page' => $rows->currentPage(),
                 'last_page' => $rows->lastPage(),
@@ -63,7 +73,11 @@ class ContractController extends Controller
 
     public function show(Contract $contract): JsonResponse
     {
-        return response()->json(['data' => $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections'])]);
+        $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections']);
+        $arr = $contract->toArray();
+        $arr['progress'] = $this->progress->forContract($contract);
+
+        return response()->json(['data' => $arr]);
     }
 
     public function approve(Request $request, Contract $contract): JsonResponse

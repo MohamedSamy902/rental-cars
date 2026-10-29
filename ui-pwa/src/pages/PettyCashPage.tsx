@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, Button, Sheet, Fab, NumberField, MoneyField, SelectField, TextAreaField,
+  PageHeader, FilterBar, Button, Sheet, Fab, NumberField, MoneyField, SelectField, TextAreaField,
   useToast, DataTable, IconWallet, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -36,11 +36,40 @@ export function PettyCashPage() {
   const [rows, setRows] = useState<Account[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useState('all')
   const [open, setOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState<Account | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ employee_id: '', limit_amount: '1000', balance: '' })
   const [move, setMove] = useState({ type: 'spend', amount: '', notes: '' })
+
+  const lowBalanceCount = useMemo(
+    () => rows.filter((a) => Number(a.balance) <= Number(a.limit_amount) * 0.2).length,
+    [rows],
+  )
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'active', label: 'نشطة' },
+      {
+        id: 'low',
+        label: 'رصيد منخفض',
+        attention: lowBalanceCount > 0 ? ('warning' as const) : null,
+        attentionLabel: `${lowBalanceCount} عهدة رصيدها منخفض`,
+      },
+    ],
+    [lowBalanceCount],
+  )
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return rows.filter((a) => {
+      if (chip === 'active' && !a.is_active) return false
+      if (chip === 'low' && Number(a.balance) > Number(a.limit_amount) * 0.2) return false
+      if (!q) return true
+      return (a.employee?.name || '').toLowerCase().includes(q) || (a.employee?.job_title || '').toLowerCase().includes(q)
+    })
+  }, [rows, chip, search])
 
   async function load() {
     setLoading(true)
@@ -120,9 +149,17 @@ export function PettyCashPage() {
         mobileFab
       />
       <Fab label="عهدة جديدة" onClick={() => void openCreate()} />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="بحث باسم الموظف…"
+      />
       <DataTable
         label="العهد"
-        rows={rows}
+        rows={visible}
         columns={columns}
         rowKey={(a) => a.id}
         rowLabel={(a) => `عهدة ${a.employee?.name ?? ''}`}

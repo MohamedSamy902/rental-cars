@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, MetricCardGrid, Button, Fab, DataTable, StatusPill, useToast,
+  PageHeader, MetricCardGrid, FilterBar, Button, Fab, DataTable, StatusPill, useToast,
   IconCheck, IconWrench, IconCash, type DataColumn,
 } from '@/shared/ui'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
@@ -49,22 +49,64 @@ const columns: DataColumn<WorkOrder>[] = [
 export function MaintenancePage() {
   const toast = useToast()
   const [rows, setRows] = useState<WorkOrder[]>([])
-  const [summary, setSummary] = useState({ open: 0, closed: 0 })
+  const [summary, setSummary] = useState({ open: 0, open_only: 0, in_progress: 0, closed: 0 })
+  const [chip, setChip] = useState('all')
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      {
+        id: 'open',
+        label: 'مفتوح',
+        attention: summary.open_only > 0 ? ('critical' as const) : null,
+        attentionLabel: `${summary.open_only} أمر مفتوح`,
+      },
+      {
+        id: 'in_progress',
+        label: 'قيد التنفيذ',
+        attention: summary.in_progress > 0 ? ('warning' as const) : null,
+        attentionLabel: `${summary.in_progress} أمر قيد التنفيذ`,
+      },
+      { id: 'closed', label: 'مغلق' },
+    ],
+    [summary.open_only, summary.in_progress],
+  )
 
   async function load() {
     setLoading(true)
     try {
-      const res = await api<{ data: WorkOrder[]; summary: typeof summary }>('/work-orders')
-      setRows(res.data)
-      setSummary(res.summary)
+      const qs = new URLSearchParams()
+      if (chip !== 'all') qs.set('status', chip)
+      const res = await api<{ data: WorkOrder[]; summary: typeof summary }>(`/work-orders?${qs}`)
+      const data = res.data.filter((r) => {
+        if (!search.trim()) return true
+        const q = search.trim().toLowerCase()
+        return (
+          (r.vehicle?.plate || '').toLowerCase().includes(q)
+          || (r.vehicle?.brand || '').toLowerCase().includes(q)
+          || (r.vehicle?.model || '').toLowerCase().includes(q)
+          || (r.workshop || '').toLowerCase().includes(q)
+        )
+      })
+      setRows(data)
+      setSummary({
+        open: res.summary.open ?? 0,
+        open_only: res.summary.open_only ?? 0,
+        in_progress: res.summary.in_progress ?? 0,
+        closed: res.summary.closed ?? 0,
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    const t = window.setTimeout(() => void load(), 200)
+    return () => window.clearTimeout(t)
+  }, [chip, search])
 
   async function closeOrder(id: number) {
     try {
@@ -91,6 +133,14 @@ export function MaintenancePage() {
             value: rows.reduce((sum, r) => sum + Number(r.parts_cost) + Number(r.labor_cost), 0),
           },
         ]}
+      />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="بحث باللوحة أو الورشة…"
       />
       <DataTable
         label="أوامر الشغل"

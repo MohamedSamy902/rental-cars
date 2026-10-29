@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
@@ -77,6 +77,30 @@ export function OwnersPage() {
   const [payoutForm, setPayoutForm] = useState({
     amount: '', paid_on: new Date().toISOString().slice(0, 10), payment_method: 'cash', vehicle_id: '', notes: '',
   })
+  const [chip, setChip] = useState('all')
+
+  const dueCount = useMemo(
+    () => rows.filter((o) => Number(o.balance?.remaining || 0) > 0).length,
+    [rows],
+  )
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'active', label: 'نشط' },
+      {
+        id: 'due',
+        label: 'مستحق',
+        attention: dueCount > 0 ? ('warning' as const) : null,
+        attentionLabel: `${dueCount} مالك برصيد مستحق`,
+      },
+    ],
+    [dueCount],
+  )
+  const visible = useMemo(() => {
+    if (chip === 'active') return rows.filter((o) => o.is_active)
+    if (chip === 'due') return rows.filter((o) => Number(o.balance?.remaining || 0) > 0)
+    return rows
+  }, [rows, chip])
 
   async function load() {
     setLoading(true)
@@ -243,10 +267,17 @@ export function OwnersPage() {
         mobileFab
       />
       <Fab label="إضافة مالك" onClick={() => setOpen(true)} />
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="بحث بالاسم أو الهاتف…" chips={[]} activeChip="" onChipChange={() => undefined} />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="بحث بالاسم أو الهاتف…"
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+      />
       <DataTable
         label="الملاك"
-        rows={rows}
+        rows={visible}
         columns={ownerColumns}
         rowKey={(o) => o.id}
         rowLabel={(o) => o.full_name}

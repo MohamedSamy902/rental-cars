@@ -28,6 +28,8 @@ class WorkOrderController extends Controller
             'meta' => ['total' => $rows->total()],
             'summary' => [
                 'open' => WorkOrder::query()->whereIn('status', ['open', 'in_progress'])->count(),
+                'open_only' => WorkOrder::query()->where('status', 'open')->count(),
+                'in_progress' => WorkOrder::query()->where('status', 'in_progress')->count(),
                 'closed' => WorkOrder::query()->where('status', 'closed')->count(),
             ],
         ]);
