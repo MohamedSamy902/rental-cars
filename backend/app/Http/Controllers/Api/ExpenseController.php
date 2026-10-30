@@ -34,6 +34,7 @@ class ExpenseController extends Controller
             'spent_on' => ['required', 'date'],
             'payment_method' => ['nullable', 'string', 'max:50'],
             'vehicle_id' => ['nullable', 'exists:vehicles,id'],
+            'work_order_id' => ['nullable', 'exists:work_orders,id'],
             'employee_id' => ['nullable', 'exists:employees,id'],
             'from_petty_cash' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
@@ -41,6 +42,9 @@ class ExpenseController extends Controller
             'title' => 'العنوان',
             'amount' => 'المبلغ',
             'spent_on' => 'تاريخ الصرف',
+            'vehicle_id' => 'المركبة',
+            'work_order_id' => 'أمر الشغل',
+            'employee_id' => 'موظف العهدة',
         ]);
 
         try {

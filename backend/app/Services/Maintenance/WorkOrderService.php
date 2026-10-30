@@ -11,6 +11,7 @@ use App\Models\WorkOrderLine;
 use App\Services\Accounting\AccountingService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Inventory\FifoConsumptionService;
+use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -47,15 +48,24 @@ class WorkOrderService
                 $vehicle->update(['manual_status' => VehicleAvailabilityService::STATUS_MAINTENANCE]);
             }
 
+            $openedAt = isset($data['opened_at'])
+                ? Carbon::parse((string) $data['opened_at'])
+                : now();
+
             $order = WorkOrder::query()->create([
                 'vehicle_id' => $vehicle->id,
                 'workshop' => $data['workshop'] ?? null,
-                'opened_on' => $data['opened_on'] ?? now()->toDateString(),
+                'opened_on' => $data['opened_on'] ?? $openedAt->toDateString(),
+                'opened_at' => $openedAt,
                 'odometer' => $data['odometer'],
                 'status' => 'open',
                 'puts_in_maintenance' => (bool) ($data['puts_in_maintenance'] ?? true),
                 'labor_cost' => (int) ($data['labor_cost'] ?? 0),
                 'notes' => $data['notes'] ?? null,
+                'next_service_on' => $data['next_service_on'] ?? null,
+                'next_service_odometer' => isset($data['next_service_odometer'])
+                    ? (int) $data['next_service_odometer']
+                    : null,
             ]);
 
             $parts = 0;

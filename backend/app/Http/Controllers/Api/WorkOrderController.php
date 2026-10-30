@@ -40,11 +40,15 @@ class WorkOrderController extends Controller
         $data = $request->validate([
             'vehicle_id' => ['required', 'exists:vehicles,id'],
             'workshop' => ['nullable', 'string'],
+            'opened_on' => ['nullable', 'date'],
+            'opened_at' => ['nullable', 'date'],
             'odometer' => ['required', 'integer', 'min:0'],
             'puts_in_maintenance' => ['nullable', 'boolean'],
             'force_after_resolution' => ['nullable', 'boolean'],
             'labor_cost' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
+            'next_service_on' => ['nullable', 'date'],
+            'next_service_odometer' => ['nullable', 'integer', 'min:0'],
             'lines' => ['nullable', 'array'],
             'lines.*.description' => ['required_with:lines', 'string'],
             'lines.*.part_source' => ['required_with:lines', 'in:stock,purchase'],
@@ -57,6 +61,9 @@ class WorkOrderController extends Controller
         ], [], [
             'vehicle_id' => 'السيارة',
             'odometer' => 'العداد',
+            'opened_at' => 'تاريخ ووقت الصيانة',
+            'next_service_on' => 'موعد الصيانة التالية',
+            'next_service_odometer' => 'عداد الصيانة التالية',
         ]);
 
         try {
