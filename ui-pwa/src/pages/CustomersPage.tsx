@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
   MediaUpload, useToast, SkeletonBlock, IconEye, IconEdit, IconClipboard,
@@ -43,6 +44,21 @@ export function CustomersPage() {
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [blacklistReason, setBlacklistReason] = useState('')
+  const { counts: attention } = useAttentionSignals(true)
+
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'active', label: 'نشط' },
+      {
+        id: 'blacklist',
+        label: 'قائمة سوداء',
+        attention: attention.blacklisted_customers > 0 ? ('warning' as const) : null,
+        attentionLabel: `${attention.blacklisted_customers} عميل في القائمة السوداء`,
+      },
+    ],
+    [attention.blacklisted_customers],
+  )
 
   async function load() {
     setLoading(true)
@@ -247,11 +263,7 @@ export function CustomersPage() {
       <FilterBar
         search={search}
         onSearchChange={setSearch}
-        chips={[
-          { id: 'all', label: 'الكل' },
-          { id: 'active', label: 'نشط' },
-          { id: 'blacklist', label: 'قائمة سوداء' },
-        ]}
+        chips={chips}
         activeChip={chip}
         onChipChange={setChip}
         placeholder="بحث بالاسم أو الهاتف…"

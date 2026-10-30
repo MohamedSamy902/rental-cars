@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime } from '@/shared/lib/format'
-import { PageHeader, SkeletonBlock, EmptyState, Button, useToast } from '@/shared/ui'
+import { PageHeader, FilterBar, SkeletonBlock, EmptyState, Button, useToast } from '@/shared/ui'
 import { disableWebPush, enableWebPush, pushSupported, sendTestPush } from '@/shared/push/webPush'
 import './pages.css'
 import './NotificationsPage.css'
@@ -46,6 +46,20 @@ export function NotificationsPage() {
   const [devices, setDevices] = useState(0)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [chip, setChip] = useState('unread')
+
+  const chips = useMemo(
+    () => [
+      {
+        id: 'unread',
+        label: 'غير مقروء',
+        attention: unread > 0 ? ('warning' as const) : null,
+        attentionLabel: `${unread} إشعار غير مقروء`,
+      },
+      { id: 'all', label: 'الكل' },
+    ],
+    [unread],
+  )
 
   async function load() {
     setLoading(true)
@@ -133,16 +147,21 @@ export function NotificationsPage() {
     if (go) navigate(go.to)
   }
 
+  const visibleRows = useMemo(
+    () => (chip === 'unread' ? rows.filter((n) => !n.read_at) : rows),
+    [rows, chip],
+  )
+
   const grouped = useMemo(() => {
     const map = new Map<string, Note[]>()
-    for (const n of rows) {
+    for (const n of visibleRows) {
       const key = relativeDay(n.created_at)
       const list = map.get(key) ?? []
       list.push(n)
       map.set(key, list)
     }
     return [...map.entries()]
-  }, [rows])
+  }, [visibleRows])
 
   return (
     <div className="rpm-stack nf">
@@ -175,8 +194,19 @@ export function NotificationsPage() {
         </div>
       </section>
 
+      <FilterBar
+        search=""
+        onSearchChange={() => undefined}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="فلترة الإشعارات"
+      />
+
       {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="لا توجد إشعارات" /> : null}
+      {!loading && visibleRows.length === 0 ? (
+        <EmptyState title={chip === 'unread' ? 'لا إشعارات غير مقروءة' : 'لا توجد إشعارات'} />
+      ) : null}
 
       <div className="nf-feed" role="feed" aria-label="سجل الإشعارات">
         {grouped.map(([day, items]) => (

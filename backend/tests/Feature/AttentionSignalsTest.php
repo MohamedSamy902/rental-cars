@@ -100,5 +100,21 @@ class AttentionSignalsTest extends TestCase
         $res->assertJsonPath('data.pending_approvals', 1);
         $this->assertGreaterThanOrEqual(1, (int) $res->json('data.blocking_work_orders'));
         $this->assertGreaterThanOrEqual(1, (int) $res->json('data.open_work_orders'));
+        $res->assertJsonStructure([
+            'data' => [
+                'overdue_returns',
+                'pending_approvals',
+                'returning_today',
+                'pickups_today',
+                'blocking_work_orders',
+                'open_work_orders',
+                'open_violations',
+                'low_stock',
+                'unread_notifications',
+                'pending_hr_acks',
+                'draft_payroll_runs',
+                'blacklisted_customers',
+            ],
+        ]);
     }
 }

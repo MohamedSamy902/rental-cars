@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, Button, Sheet, Fab, SelectField, TextField, MoneyField, StatusPill, useToast, DataTable, IconCheck,
+  PageHeader, FilterBar, Button, Sheet, Fab, SelectField, TextField, MoneyField, StatusPill, useToast, DataTable, IconCheck,
   MediaUpload, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -55,8 +55,38 @@ export function ViolationsPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useState('open')
   const [form, setForm] = useState({ vehicle_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const openCount = useMemo(
+    () => rows.filter((r) => !['paid', 'confirmed'].includes(r.status)).length,
+    [rows],
+  )
+  const chips = useMemo(
+    () => [
+      {
+        id: 'open',
+        label: 'مفتوحة',
+        attention: openCount > 0 ? ('warning' as const) : null,
+        attentionLabel: `${openCount} مخالفة مفتوحة`,
+      },
+      { id: 'done', label: 'مغلقة' },
+      { id: 'all', label: 'الكل' },
+    ],
+    [openCount],
+  )
+  const filtered = useMemo(() => {
+    const q = search.trim()
+    return rows.filter((r) => {
+      if (chip === 'open' && ['paid', 'confirmed'].includes(r.status)) return false
+      if (chip === 'done' && !['paid', 'confirmed'].includes(r.status)) return false
+      if (!q) return true
+      const hay = `${r.vehicle?.plate ?? ''} ${r.vehicle?.brand ?? ''} ${r.customer?.full_name ?? ''} ${r.location ?? ''}`
+      return hay.includes(q)
+    })
+  }, [rows, chip, search])
 
   async function load() {
     setLoading(true)
@@ -116,9 +146,17 @@ export function ViolationsPage() {
         mobileFab
       />
       <Fab label="تسجيل مخالفة" onClick={async () => { setOpen(true); const v = await api<{ data: Vehicle[] }>('/vehicles'); setVehicles(v.data) }} />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="بحث باللوحة أو العميل…"
+      />
       <DataTable
         label="المخالفات"
-        rows={rows}
+        rows={filtered}
         columns={columns}
         rowKey={(r) => r.id}
         rowLabel={(r) => `مخالفة · ${r.vehicle?.plate ?? ''}`}

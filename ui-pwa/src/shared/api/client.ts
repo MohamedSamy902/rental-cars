@@ -80,9 +80,12 @@ export async function api<T>(
       throw err
     }
 
+    if (isMutatingMethod(method) && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('rpm:attention-invalidate'))
+    }
+
     return data as T
   })()
-
   if (idemKey) {
     inflightMutations.set(idemKey, run)
     void run.finally(() => {
