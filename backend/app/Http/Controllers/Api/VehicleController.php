@@ -44,9 +44,11 @@ class VehicleController extends Controller
     public function recommend(Request $request): JsonResponse
     {
         $category = $request->string('category')->toString() ?: null;
+        $from = $request->filled('from') ? \Carbon\Carbon::parse((string) $request->input('from')) : null;
+        $to = $request->filled('to') ? \Carbon\Carbon::parse((string) $request->input('to')) : null;
 
         return response()->json([
-            'data' => $this->recommendation->rankAvailable($category ?: null),
+            'data' => $this->recommendation->rankAvailable($category ?: null, null, $from, $to),
             'weights' => $this->recommendation->weights(),
         ]);
     }

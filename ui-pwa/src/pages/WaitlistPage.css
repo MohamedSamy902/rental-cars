@@ -1,0 +1,8 @@
+.wl .rpm-table__primary {
+  display: block;
+}
+
+.wl .rpm-table__sub {
+  display: block;
+  margin-block-start: 0.15rem;
+}

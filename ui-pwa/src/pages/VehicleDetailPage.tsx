@@ -34,6 +34,7 @@ type Document = {
   id: number
   type: string
   file_path?: string | null
+  file_path_back?: string | null
   expires_on?: string | null
   issued_on?: string | null
   notes?: string | null
@@ -264,7 +265,7 @@ export function VehicleDetailPage() {
   const [form, setForm] = useState(emptyForm)
   const [owners, setOwners] = useState<OwnerOption[]>([])
   const [brands, setBrands] = useState<Array<{ id: number; name: string }>>([])
-  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '' })
+  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
   const [docEdit, setDocEdit] = useState<Document | null>(null)
   const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
   const [accOpen, setAccOpen] = useState(false)
@@ -545,13 +546,14 @@ export function VehicleDetailPage() {
         json: {
           type: docForm.type,
           file_path: docForm.file_path || undefined,
+          file_path_back: docForm.file_path_back || undefined,
           expires_on: docForm.expires_on || undefined,
           issued_on: docForm.issued_on || undefined,
           notes: docForm.notes || undefined,
         },
       })
       toast.success('تم تسجيل المستند.')
-      setDocForm({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '' })
+      setDocForm({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -570,6 +572,7 @@ export function VehicleDetailPage() {
         json: {
           type: docEdit.type,
           file_path: docEdit.file_path || undefined,
+          file_path_back: docEdit.file_path_back || undefined,
           expires_on: docEdit.expires_on || undefined,
           issued_on: docEdit.issued_on || undefined,
           notes: docEdit.notes || undefined,
@@ -1056,7 +1059,13 @@ export function VehicleDetailPage() {
             <div key={d.id} className="vd-doc">
               <div>
                 <strong>{d.type}</strong>
-                <div><span>صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}{d.file_path ? ' · مرفق' : ''}</span></div>
+                <div>
+                  <span>
+                    صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}
+                    {d.file_path ? ' · وجه' : ''}
+                    {d.file_path_back ? ' · ظهر' : ''}
+                  </span>
+                </div>
               </div>
               <div className="rpm-actions-row vd-no-print">
                 <Button size="sm" variant="ghost" onClick={() => setDocEdit({ ...d })}>تعديل</Button>
@@ -1082,7 +1091,7 @@ export function VehicleDetailPage() {
           <DateField label="تاريخ الإصدار" value={docForm.issued_on} onChange={(e) => setDocForm({ ...docForm, issued_on: e.target.value })} />
           <DateField label="تاريخ الانتهاء" value={docForm.expires_on} onChange={(e) => setDocForm({ ...docForm, expires_on: e.target.value })} />
           <MediaUpload
-            label="ملف المستند"
+            label="وجه المستند (وش)"
             value={docForm.file_path || null}
             collection="vehicle_docs"
             purpose="document"
@@ -1090,6 +1099,16 @@ export function VehicleDetailPage() {
             attachableType="vehicle"
             attachableId={v.id}
             onChange={(path) => setDocForm({ ...docForm, file_path: path || '' })}
+          />
+          <MediaUpload
+            label="ظهر المستند (ضهر)"
+            value={docForm.file_path_back || null}
+            collection="vehicle_docs"
+            purpose="document"
+            accept="both"
+            attachableType="vehicle"
+            attachableId={v.id}
+            onChange={(path) => setDocForm({ ...docForm, file_path_back: path || '' })}
           />
           <Button size="sm" loading={saving} onClick={() => addDocument()}>إضافة مستند</Button>
         </div>
@@ -1317,12 +1336,12 @@ export function VehicleDetailPage() {
         <div className="vd-hero__top">
           <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>رجوع للأسطول</button>
           <div className="vd-hero__actions vd-no-print">
-            <Button size="sm" onClick={() => openNewContract({ vehicleId: v.id })}>إنشاء حجز</Button>
+            <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>إنشاء حجز</Button>
             <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>إضافة صيانة</Button>
             <Button size="sm" variant="secondary" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
             <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
-            <Button size="sm" onClick={() => window.print()}>طباعة</Button>
+            <Button size="sm" variant="primary" onClick={() => window.print()}>طباعة</Button>
           </div>
         </div>
         <div className="vd-hero__body">
@@ -1508,8 +1527,28 @@ export function VehicleDetailPage() {
                 { value: 'أخرى', label: 'أخرى' },
               ]}
             />
-            <TextField label="تاريخ الإصدار" type="date" value={docEdit.issued_on || ''} onChange={(e) => setDocEdit({ ...docEdit, issued_on: e.target.value })} />
-            <TextField label="تاريخ الانتهاء" type="date" value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />
+            <DateField label="تاريخ الإصدار" value={docEdit.issued_on || ''} onChange={(e) => setDocEdit({ ...docEdit, issued_on: e.target.value })} />
+            <DateField label="تاريخ الانتهاء" value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />
+            <MediaUpload
+              label="وجه المستند (وش)"
+              value={docEdit.file_path || null}
+              collection="vehicle_docs"
+              purpose="document"
+              accept="both"
+              attachableType="vehicle"
+              attachableId={v.id}
+              onChange={(path) => setDocEdit({ ...docEdit, file_path: path || '' })}
+            />
+            <MediaUpload
+              label="ظهر المستند (ضهر)"
+              value={docEdit.file_path_back || null}
+              collection="vehicle_docs"
+              purpose="document"
+              accept="both"
+              attachableType="vehicle"
+              attachableId={v.id}
+              onChange={(path) => setDocEdit({ ...docEdit, file_path_back: path || '' })}
+            />
             <TextAreaField label="ملاحظات" value={docEdit.notes || ''} onChange={(e) => setDocEdit({ ...docEdit, notes: e.target.value })} />
           </div>
         ) : null}

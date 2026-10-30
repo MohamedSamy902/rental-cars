@@ -268,14 +268,16 @@ class OperationsController extends Controller
         $data = $request->validate([
             'type' => ['required', 'string', 'max:100'],
             'file_path' => ['nullable', 'string', 'max:500'],
+            'file_path_back' => ['nullable', 'string', 'max:500'],
             'issued_on' => ['nullable', 'date'],
             'expires_on' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
-        ], [], ['type' => 'نوع المستند']);
+        ], [], ['type' => 'نوع المستند', 'file_path' => 'وجه المستند', 'file_path_back' => 'ظهر المستند']);
 
         $doc = $vehicle->documents()->create([
             'type' => $data['type'],
             'file_path' => $data['file_path'] ?? 'manual/'.$data['type'],
+            'file_path_back' => $data['file_path_back'] ?? null,
             'issued_on' => $data['issued_on'] ?? null,
             'expires_on' => $data['expires_on'] ?? null,
             'notes' => $data['notes'] ?? null,
@@ -338,11 +340,12 @@ class OperationsController extends Controller
         $data = $request->validate([
             'type' => ['sometimes', 'string', 'max:100'],
             'file_path' => ['nullable', 'string', 'max:500'],
+            'file_path_back' => ['nullable', 'string', 'max:500'],
             'issued_on' => ['nullable', 'date'],
             'expires_on' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'archive_previous' => ['nullable', 'boolean'],
-        ], [], ['type' => 'نوع المستند']);
+        ], [], ['type' => 'نوع المستند', 'file_path' => 'وجه المستند', 'file_path_back' => 'ظهر المستند']);
 
         $type = strtolower((string) ($data['type'] ?? $row->type));
         $isLicense = str_contains($type, 'license') || str_contains($type, 'رخص');

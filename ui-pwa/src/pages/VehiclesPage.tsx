@@ -124,6 +124,13 @@ export function VehiclesPage() {
     { id: 'plate', header: 'اللوحة', cell: (v) => v.plate, sortValue: (v) => v.plate },
     { id: 'category', header: 'الفئة', cell: (v) => v.category, sortValue: (v) => v.category, mobile: 'hidden' },
     {
+      id: 'year',
+      header: 'السنة',
+      cell: (v) => <span className="tabular-nums">{v.year}</span>,
+      sortValue: (v) => v.year,
+      mobile: 'hidden',
+    },
+    {
       id: 'status',
       header: 'الحالة',
       cell: (v) => <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />,
@@ -135,6 +142,13 @@ export function VehiclesPage() {
       header: 'العداد',
       cell: (v) => `${formatNumber(v.odometer)} كم`,
       sortValue: (v) => Number(v.odometer),
+    },
+    {
+      id: 'deposit',
+      header: 'التأمين',
+      cell: (v) => formatMoney(v.default_deposit),
+      sortValue: (v) => Number(v.default_deposit),
+      mobile: 'hidden',
     },
     {
       id: 'rate',

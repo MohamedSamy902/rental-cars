@@ -205,6 +205,7 @@ class VehicleService
                 'vehicle_document_id' => $document->id,
                 'type' => $document->type,
                 'file_path' => $document->file_path,
+                'file_path_back' => $document->file_path_back,
                 'issued_on' => $document->issued_on,
                 'expires_on' => $document->expires_on,
                 'notes' => $document->notes,
@@ -215,6 +216,7 @@ class VehicleService
             $document->update([
                 'type' => $data['type'] ?? $document->type,
                 'file_path' => $data['file_path'] ?? $document->file_path,
+                'file_path_back' => $data['file_path_back'] ?? $document->file_path_back,
                 'issued_on' => $data['issued_on'] ?? $document->issued_on,
                 'expires_on' => $data['expires_on'] ?? null,
                 'notes' => $data['notes'] ?? $document->notes,

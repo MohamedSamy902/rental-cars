@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class VehicleDocumentHistory extends Model
 {
     protected $fillable = [
-        'vehicle_id', 'vehicle_document_id', 'type', 'file_path', 'issued_on', 'expires_on',
+        'vehicle_id', 'vehicle_document_id', 'type', 'file_path', 'file_path_back', 'issued_on', 'expires_on',
         'notes', 'archived_at', 'archived_by',
     ];
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
@@ -126,8 +126,8 @@ export function BookingsPage() {
       header: 'الفترة',
       cell: (b) => (
         <>
-          <span className="rpm-table__primary">{formatDateTime(b.starts_at)}</span>
-          <span className="rpm-table__sub">حتى {formatDateTime(b.planned_ends_at)}</span>
+          <span className="rpm-table__primary">{formatDate(b.starts_at)}</span>
+          <span className="rpm-table__sub">حتى {formatDate(b.planned_ends_at)}</span>
         </>
       ),
       sortValue: (b) => b.starts_at,
@@ -142,8 +142,8 @@ export function BookingsPage() {
     {
       id: 'deposit',
       header: 'التأمين',
-      cell: (b) => <DepositBadge deposit={b.deposit} />,
-      sortValue: (b) => b.deposit?.status ?? '',
+      cell: (b) => <DepositBadge deposit={b.deposit} agreedAmount={b.frozen_agreed_deposit} />,
+      sortValue: (b) => b.deposit?.original_amount ?? b.frozen_agreed_deposit ?? 0,
     },
     {
       id: 'status',

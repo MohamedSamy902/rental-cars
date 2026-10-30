@@ -167,26 +167,21 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
         />
 
         {form.funding === 'stock' ? (
-          <>
-            <SelectField
-              label="صنف المخزون"
-              required
-              options={items.map((i) => ({
-                value: String(i.id),
-                label: `${i.code} · ${i.name}${i.remaining != null ? ` · متبقي ${i.remaining}` : ''}${i.unit_cost != null ? ` · ${formatMoney(i.unit_cost)}` : ''}`,
-              }))}
-              value={form.inventory_item_id}
-              onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })}
-            />
-            {selectedItem?.unit_cost != null ? (
-              <TextField
-                label="سعر الوحدة من المخزون"
-                value={formatMoney(selectedItem.unit_cost)}
-                disabled
-                hint="يُحسب تلقائياً من أقدم دفعة (FIFO) ولا يُدخل يدوياً"
-              />
-            ) : null}
-          </>
+          <SelectField
+            label="صنف المخزون"
+            required
+            hint={
+              selectedItem?.unit_cost != null
+                ? `السعر من المخزون (FIFO): ${formatMoney(selectedItem.unit_cost)} — بلا إدخال يدوي`
+                : 'يُسحب السعر تلقائياً من أقدم دفعة عند الحفظ'
+            }
+            options={items.map((i) => ({
+              value: String(i.id),
+              label: `${i.code} · ${i.name}${i.remaining != null ? ` · متبقي ${i.remaining}` : ''}${i.unit_cost != null ? ` · ${formatMoney(i.unit_cost)}` : ''}`,
+            }))}
+            value={form.inventory_item_id}
+            onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })}
+          />
         ) : (
           <>
             <SelectField

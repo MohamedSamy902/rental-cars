@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
   RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey,
@@ -92,7 +92,7 @@ export function ContractDetailPage() {
         <div className="cd-identity">
           <div className="cd-identity__pills">
             <StatusPill status={row.status} label={statusLabel[row.status] || row.status} />
-            <DepositBadge deposit={row.deposit} />
+            <DepositBadge deposit={row.deposit} agreedAmount={row.frozen_agreed_deposit} />
             <span className="cd-code">{row.number}</span>
           </div>
           <h1>{row.customer?.full_name || 'عقد'}</h1>
@@ -132,9 +132,9 @@ export function ContractDetailPage() {
           rows={[
             { label: 'العميل', value: row.customer?.full_name || '—', wide: true },
             { label: 'المركبة', value: vehicleLabel, wide: true },
-            { label: 'البداية', value: formatDateTime(row.starts_at) },
-            { label: 'النهاية المخططة', value: formatDateTime(row.planned_ends_at) },
-            { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDateTime(row.actual_ends_at) : '—' },
+            { label: 'البداية', value: formatDate(row.starts_at) },
+            { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },
+            { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },
             { label: 'التأمين المتفق', value: formatMoney(row.frozen_agreed_deposit || 0) },
             { label: 'عداد الخروج', value: row.odometer_out != null ? `${formatNumber(row.odometer_out)} كم` : '—' },
             { label: 'عداد العودة', value: row.odometer_in != null ? `${formatNumber(row.odometer_in)} كم` : '—' },

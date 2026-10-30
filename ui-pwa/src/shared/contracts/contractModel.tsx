@@ -126,10 +126,39 @@ export const timelineLabel: Record<string, string> = {
   swapped: 'تبديل عطل',
 }
 
-export function DepositBadge({ deposit }: { deposit?: Deposit | null }) {
-  if (!deposit) return <StatusPill status="none" tone="danger" label="غير مقبوض" />
-  const meta = depositLabel[deposit.status] ?? { label: deposit.status, tone: 'muted' as const }
-  return <StatusPill status={deposit.status} tone={meta.tone} label={meta.label} />
+/** Shows the deposit amount first; status is a secondary caption only. */
+export function DepositBadge({
+  deposit,
+  agreedAmount,
+}: {
+  deposit?: Deposit | null
+  /** Fallback when deposit row not yet received (frozen/agreed on contract). */
+  agreedAmount?: number | null
+}) {
+  const amount = deposit?.original_amount ?? agreedAmount ?? null
+  const meta = deposit
+    ? (depositLabel[deposit.status] ?? { label: deposit.status, tone: 'muted' as const })
+    : { label: 'غير مقبوض', tone: 'danger' as const }
+
+  if (amount == null) {
+    return <StatusPill status={deposit?.status || 'none'} tone={meta.tone} label={meta.label} />
+  }
+
+  return (
+    <span className="rpm-deposit-amount">
+      <strong className="rpm-table__primary tabular-nums">{formatMoneyLocal(amount)}</strong>
+      <span className="rpm-table__sub">{meta.label}</span>
+    </span>
+  )
+}
+
+function formatMoneyLocal(value: number): string {
+  return new Intl.NumberFormat('ar-EG', {
+    style: 'currency',
+    currency: 'EGP',
+    maximumFractionDigits: 0,
+    numberingSystem: 'latn',
+  }).format(value)
 }
 
 export function contractMenu(
