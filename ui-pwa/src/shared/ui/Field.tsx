@@ -47,6 +47,16 @@ export function NumberField(props: NumberProps) {
   return <TextField inputMode="decimal" {...props} type="number" />
 }
 
+/** Native date input styled like other dashboard fields. */
+export function DateField(props: TextProps) {
+  return <TextField {...props} type="date" />
+}
+
+/** Native datetime-local input for maintenance / operational timestamps. */
+export function DateTimeField(props: TextProps) {
+  return <TextField {...props} type="datetime-local" />
+}
+
 type MoneyProps = TextProps & {
   /** Currency unit rendered inside the input (inline-start / visual left in RTL). */
   unit?: string

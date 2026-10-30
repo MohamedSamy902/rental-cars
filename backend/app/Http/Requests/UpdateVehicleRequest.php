@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
+use App\Support\DigitNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,7 +34,20 @@ class UpdateVehicleRequest extends FormRequest
             'owner_monthly_amount',
             'owner_since',
             'tracker_sim_number',
+            'plate_numbers',
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $payload = $this->all();
+        if (! empty($payload['plate_letters'])) {
+            $payload['plate_letters'] = preg_replace('/[^\p{L}]+/u', '', (string) $payload['plate_letters']) ?? '';
+        }
+        if (! empty($payload['plate_numbers'])) {
+            $payload['plate_numbers'] = preg_replace('/\D+/', '', (string) $payload['plate_numbers']) ?? '';
+        }
+        $this->merge(DigitNormalizer::fields($payload, $this->digitKeys()));
     }
 
     /**
@@ -56,6 +70,8 @@ class UpdateVehicleRequest extends FormRequest
                 'max:50',
                 Rule::unique('vehicles', 'plate')->whereNull('deleted_at')->ignore($vehicleId),
             ],
+            'plate_letters' => ['nullable', 'string', 'min:2', 'max:3'],
+            'plate_numbers' => ['nullable', 'string', 'max:4'],
             'brand' => ['sometimes', 'string', 'max:100'],
             'model' => ['sometimes', 'string', 'max:100'],
             'year' => ['sometimes', 'integer', 'min:1990', 'max:2100'],

@@ -1,0 +1,24 @@
+.rpm-plate {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.rpm-plate__letters,
+.rpm-plate__numbers {
+  text-align: center;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.rpm-plate__sep {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.rpm-field.has-error .rpm-plate__letters,
+.rpm-field.has-error .rpm-plate__numbers {
+  border-color: var(--danger);
+}

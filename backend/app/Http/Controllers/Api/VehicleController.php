@@ -16,6 +16,8 @@ use App\Models\WorkOrder;
 use App\Services\Fleet\VehicleAssetService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Fleet\VehicleRecommendationService;
+use App\Services\Fleet\VehicleService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,7 +27,19 @@ class VehicleController extends Controller
         private readonly VehicleAvailabilityService $availability,
         private readonly VehicleRecommendationService $recommendation,
         private readonly VehicleAssetService $assets,
+        private readonly VehicleService $vehicles,
     ) {}
+
+    public function catalogs(): JsonResponse
+    {
+        return response()->json([
+            'data' => [
+                'brands' => $this->vehicles->brandOptions(),
+                'addons' => $this->vehicles->addonCatalog(),
+                'next_code' => $this->vehicles->nextInternalCode(),
+            ],
+        ]);
+    }
 
     public function recommend(Request $request): JsonResponse
     {
@@ -89,23 +103,17 @@ class VehicleController extends Controller
     public function store(StoreVehicleRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $ownerInline = $data['owner_inline'] ?? null;
+        $addonIds = $data['addon_ids'] ?? [];
+        unset($data['owner_inline'], $data['addon_ids']);
 
-        if (! empty($data['owner_id']) && empty($data['owner_since'])) {
-            $data['owner_since'] = now()->toDateString();
+        try {
+            $vehicle = $this->vehicles->create($data, is_array($ownerInline) ? $ownerInline : null, is_array($addonIds) ? $addonIds : []);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-        if (empty($data['owner_id'])) {
-            $data['owner_id'] = null;
-            $data['owner_monthly_amount'] = $data['owner_monthly_amount'] ?? null;
-        }
 
-        $vehicle = Vehicle::query()->create([
-            ...$data,
-            'odometer_source' => 'manual',
-            'rental_priority' => $data['rental_priority'] ?? 50,
-            'is_active' => $data['is_active'] ?? true,
-        ]);
-
-        return response()->json(['data' => $this->present($vehicle->load('owner')), 'message' => 'تم إضافة السيارة.'], 201);
+        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم إضافة السيارة.'], 201);
     }
 
     public function show(Vehicle $vehicle): JsonResponse
@@ -347,23 +355,13 @@ class VehicleController extends Controller
 
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): JsonResponse
     {
-        $data = $request->validated();
-
-        if (array_key_exists('owner_id', $data)) {
-            if ($data['owner_id'] && ! $vehicle->owner_id) {
-                $data['owner_since'] = $data['owner_since'] ?? now()->toDateString();
-            }
-            if (! $data['owner_id']) {
-                $data['owner_id'] = null;
-                if (! array_key_exists('owner_monthly_amount', $data)) {
-                    $data['owner_monthly_amount'] = null;
-                }
-            }
+        try {
+            $vehicle = $this->vehicles->update($vehicle, $request->validated());
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        $vehicle->update($data);
-
-        return response()->json(['data' => $this->present($vehicle->fresh()->load('owner')), 'message' => 'تم تحديث السيارة.']);
+        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم تحديث السيارة.']);
     }
 
     /**

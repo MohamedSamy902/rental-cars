@@ -102,9 +102,12 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
+    Route::get('/vehicles/catalogs', [VehicleController::class, 'catalogs'])->middleware('permission:vehicles.view,vehicles.create,vehicles.update');
     Route::get('/vehicles/recommend', [VehicleController::class, 'recommend'])->middleware('permission:vehicles.view,contracts.create');
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
     Route::get('/vehicles/{vehicle}/dossier', [VehicleController::class, 'dossier'])->middleware('permission:vehicles.view');
+    Route::get('/vehicles/{vehicle}/document-history', [OperationsController::class, 'vehicleDocumentHistory'])
+        ->middleware('permission:vehicles.view');
     Route::get('/vehicles/{vehicle}/assets', [VehicleAssetController::class, 'extras'])->middleware('permission:vehicles.view');
     Route::post('/vehicles/{vehicle}/tires', [VehicleAssetController::class, 'storeTire'])->middleware('permission:vehicles.update');
     Route::post('/vehicles/{vehicle}/batteries', [VehicleAssetController::class, 'storeBattery'])->middleware('permission:vehicles.update');

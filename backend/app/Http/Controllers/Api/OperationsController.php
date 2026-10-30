@@ -4,16 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
+use App\Models\PrintSnapshot;
 use App\Models\TenantSetting;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessory;
-use App\Models\VehicleDocument;
+use App\Models\VehicleDocumentHistory;
+use App\Models\WorkOrder;
 use App\Services\Fleet\VehicleAvailabilityService;
-use App\Models\PrintSnapshot;
+use App\Services\Fleet\VehicleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,8 +30,8 @@ class OperationsController extends Controller
         $flags = $settings?->feature_flags ?? [];
         abort_unless(($flags['showroom'] ?? true) === true, 403, 'وضع المعرض غير مفعّل.');
 
-        $activeIds = \App\Models\Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip();
-        $reservedIds = \App\Models\Contract::query()
+        $activeIds = Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip();
+        $reservedIds = Contract::query()
             ->where('status', 'approved')
             ->where('starts_at', '<=', now())
             ->where('planned_ends_at', '>=', now())
@@ -43,7 +45,7 @@ class OperationsController extends Controller
                     'has_active_handover' => $activeIds->has($v->id),
                     'has_approved_covering_date' => $reservedIds->has($v->id),
                     'open_work_order_blocks' => $v->manual_status === 'maintenance'
-                        || \App\Models\WorkOrder::query()
+                        || WorkOrder::query()
                             ->where('vehicle_id', $v->id)
                             ->where('puts_in_maintenance', true)
                             ->whereIn('status', ['open', 'in_progress'])
@@ -339,11 +341,39 @@ class OperationsController extends Controller
             'issued_on' => ['nullable', 'date'],
             'expires_on' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
+            'archive_previous' => ['nullable', 'boolean'],
         ], [], ['type' => 'نوع المستند']);
 
+        $type = strtolower((string) ($data['type'] ?? $row->type));
+        $isLicense = str_contains($type, 'license') || str_contains($type, 'رخص');
+        $shouldArchive = $isLicense || ! empty($data['archive_previous']);
+
+        if ($shouldArchive) {
+            unset($data['archive_previous']);
+            $row = app(VehicleService::class)
+                ->renewLicense($vehicle, $row, $data, $request->user()?->id);
+
+            return response()->json([
+                'data' => $row,
+                'message' => 'تم تحديث الرخصة مع حفظ السجل السابق.',
+            ]);
+        }
+
+        unset($data['archive_previous']);
         $row->update($data);
 
         return response()->json(['data' => $row->fresh(), 'message' => 'تم تحديث المستند.']);
+    }
+
+    public function vehicleDocumentHistory(Vehicle $vehicle): JsonResponse
+    {
+        $rows = VehicleDocumentHistory::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->latest('archived_at')
+            ->limit(100)
+            ->get();
+
+        return response()->json(['data' => $rows]);
     }
 
     public function destroyVehicleDocument(Vehicle $vehicle, int $document): JsonResponse
