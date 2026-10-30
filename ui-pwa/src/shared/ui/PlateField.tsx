@@ -54,8 +54,9 @@ export function PlateField({
 
   return (
     <FieldShell label={label} required={required} error={error} hint={hint || 'حرف لكل خانة (٢–٣) ثم الأرقام'}>
-      <div className="rpm-plate" dir="ltr">
-        <div className="rpm-plate__letters" role="group" aria-label="حروف اللوحة">
+      {/* RTL: letters sit on the inline-start (right), numbers after (left) — Egyptian portal order */}
+      <div className="rpm-plate" dir="rtl">
+        <div className="rpm-plate__letters" role="group" aria-label="حروف اللوحة" dir="rtl">
           {[0, 1, 2].map((i) => (
             <input
               key={i}
@@ -78,6 +79,7 @@ export function PlateField({
         <input
           ref={numberRef}
           className="rpm-input rpm-plate__numbers"
+          dir="ltr"
           value={numbers}
           maxLength={4}
           inputMode="numeric"
