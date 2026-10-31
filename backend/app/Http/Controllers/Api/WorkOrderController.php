@@ -52,18 +52,33 @@ class WorkOrderController extends Controller
             'lines' => ['nullable', 'array'],
             'lines.*.description' => ['required_with:lines', 'string'],
             'lines.*.part_source' => ['required_with:lines', 'in:stock,purchase'],
-            'lines.*.inventory_item_id' => ['nullable', 'exists:inventory_items,id'],
+            'lines.*.inventory_item_id' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'required_if:lines.*.part_source,stock',
+                'exists:inventory_items,id',
+            ],
             'lines.*.quantity' => ['nullable', 'integer', 'min:1'],
             'lines.*.unit_price' => ['nullable', 'integer', 'min:0'],
             'lines.*.from_petty_cash' => ['nullable', 'boolean'],
             'lines.*.petty_cash_employee_id' => ['nullable', 'integer'],
             'lines.*.petty_cash_amount' => ['nullable', 'integer', 'min:0'],
-        ], [], [
+        ], [
+            'lines.*.inventory_item_id.required_if' => 'اختر صنف المخزون عند التمويل من المخزون.',
+            'lines.*.inventory_item_id.exists' => 'صنف المخزون المحدد غير موجود.',
+            'lines.*.inventory_item_id.min' => 'اختر صنف المخزون.',
+            'lines.*.inventory_item_id.integer' => 'اختر صنف المخزون.',
+        ], [
             'vehicle_id' => 'السيارة',
             'odometer' => 'العداد',
             'opened_at' => 'تاريخ ووقت الصيانة',
             'next_service_on' => 'موعد الصيانة التالية',
             'next_service_odometer' => 'عداد الصيانة التالية',
+            'lines.*.inventory_item_id' => 'صنف المخزون',
+            'lines.*.part_source' => 'مصدر القطع',
+            'lines.*.description' => 'وصف البند',
+            'lines.*.quantity' => 'الكمية',
         ]);
 
         try {

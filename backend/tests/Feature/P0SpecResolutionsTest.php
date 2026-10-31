@@ -200,7 +200,7 @@ class P0SpecResolutionsTest extends TestCase
             'supplier' => 'مورد',
         ]);
 
-        $before = JournalEntry::query()->where('source', 'inventory_usage')->count();
+        $before = JournalEntry::query()->where('source', 'like', 'inventory_usage%')->count();
 
         $this->postJson('/api/work-orders', [
             'vehicle_id' => $this->vehicle->id,
@@ -215,8 +215,8 @@ class P0SpecResolutionsTest extends TestCase
             ]],
         ])->assertCreated();
 
-        $this->assertSame($before + 1, JournalEntry::query()->where('source', 'inventory_usage')->count());
-        $entry = JournalEntry::query()->where('source', 'inventory_usage')->latest('id')->first();
+        $this->assertSame($before + 1, JournalEntry::query()->where('source', 'like', 'inventory_usage%')->count());
+        $entry = JournalEntry::query()->where('source', 'like', 'inventory_usage%')->latest('id')->first();
         $expense = Account::query()->where('code', '5300')->firstOrFail();
         $inventory = Account::query()->where('code', '1400')->firstOrFail();
         $this->assertTrue(JournalLine::query()->where('journal_entry_id', $entry->id)->where('account_id', $expense->id)->where('debit', 200)->exists());

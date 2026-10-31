@@ -91,8 +91,12 @@ class WorkOrderService
         $pettyEmployeeId = isset($line['petty_cash_employee_id']) ? (int) $line['petty_cash_employee_id'] : null;
         $pettyAmount = (int) ($line['petty_cash_amount'] ?? 0);
 
+        $itemId = isset($line['inventory_item_id']) ? (int) $line['inventory_item_id'] : null;
+        if ($itemId !== null && $itemId < 1) {
+            $itemId = null;
+        }
+
         if ($source === 'stock') {
-            $itemId = $line['inventory_item_id'] ?? null;
             if (! $itemId) {
                 throw new DomainException('صنف المخزون مطلوب عند الصرف من المخزون.');
             }
@@ -117,8 +121,27 @@ class WorkOrderService
             }
             $unitPrice = (int) round($cost / max(1, $qty));
             $total = (int) round($cost);
+        } elseif ($fromPetty) {
+            $lineTotal = $unitPrice * $qty;
+            $spend = $pettyAmount > 0 ? $pettyAmount : $lineTotal;
+            $pettyAmount = $spend;
+        }
 
-            // Purchase/receipt stays unposted; usage posts Dr maintenance / Cr inventory.
+        $created = WorkOrderLine::query()->create([
+            'work_order_id' => $order->id,
+            'description' => $line['description'],
+            'part_source' => $source,
+            'inventory_item_id' => $itemId,
+            'quantity' => $qty,
+            'unit_price' => $unitPrice,
+            'from_petty_cash' => $fromPetty,
+            'petty_cash_employee_id' => $pettyEmployeeId,
+            'petty_cash_amount' => $pettyAmount,
+        ]);
+
+        // Post journals after the line exists so source keys stay unique + idempotent.
+        if ($source === 'stock') {
+            $total = (int) ($created->quantity * $created->unit_price);
             if ($total > 0) {
                 $this->accounting->postInventoryUsage(
                     $total,
@@ -126,34 +149,23 @@ class WorkOrderService
                     'صرف مخزون لأمر شغل #'.$order->id,
                     $userId,
                     $order->opened_on?->toDateString() ?? now()->toDateString(),
+                    'wol:'.$created->id,
                 );
             }
         } elseif ($fromPetty) {
-            $lineTotal = $unitPrice * $qty;
-            $spend = $pettyAmount > 0 ? $pettyAmount : $lineTotal;
             $this->spendFromCustody(
                 $pettyEmployeeId,
-                $spend,
+                (int) $created->petty_cash_amount,
                 (int) $order->vehicle_id,
                 'شراء قطعة لأمر شغل #'.$order->id,
                 $userId,
                 $order->opened_on?->toDateString() ?? now()->toDateString(),
                 $order->id,
+                $created->id,
             );
-            $pettyAmount = $spend;
         }
 
-        return WorkOrderLine::query()->create([
-            'work_order_id' => $order->id,
-            'description' => $line['description'],
-            'part_source' => $source,
-            'inventory_item_id' => $line['inventory_item_id'] ?? null,
-            'quantity' => $qty,
-            'unit_price' => $unitPrice,
-            'from_petty_cash' => $fromPetty,
-            'petty_cash_employee_id' => $pettyEmployeeId,
-            'petty_cash_amount' => $pettyAmount,
-        ]);
+        return $created;
     }
 
     public function close(WorkOrder $order): WorkOrder
@@ -189,6 +201,7 @@ class WorkOrderService
         ?int $userId,
         string $date,
         ?int $workOrderId = null,
+        ?int $workOrderLineId = null,
     ): void {
         if (! $employeeId || $employeeId < 1) {
             throw new DomainException('موظف العهدة مطلوب عند الصرف من العهدة.');
@@ -210,7 +223,7 @@ class WorkOrderService
         }
 
         $account->update(['balance' => (int) $account->balance - $amount]);
-        PettyCashMovement::query()->create([
+        $movement = PettyCashMovement::query()->create([
             'petty_cash_account_id' => $account->id,
             'type' => 'spend',
             'amount' => $amount,
@@ -227,6 +240,9 @@ class WorkOrderService
             $notes,
             $userId,
             $date,
+            $workOrderLineId
+                ? 'wol:'.$workOrderLineId
+                : 'pcm:'.$movement->id,
         );
     }
 }

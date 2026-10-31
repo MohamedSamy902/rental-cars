@@ -103,13 +103,14 @@ class ExpenseService
                     'مصروف من العهدة: '.$expense->title,
                     $userId,
                     $spentOn,
+                    'expense:'.$expense->id,
                 );
             } else {
                 $cash = Account::query()->where('code', '1000')->firstOrFail();
                 $entry = JournalEntry::query()->create([
                     'entry_date' => $spentOn,
                     'narration' => 'مصروف: '.$expense->title,
-                    'source' => 'expense',
+                    'source' => 'expense:'.$expense->id,
                     'posted_by' => $userId,
                 ]);
                 JournalLine::query()->create([
