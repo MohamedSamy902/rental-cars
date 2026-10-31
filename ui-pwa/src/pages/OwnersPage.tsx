@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
+import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, DetailList, DataTable, TextField, MoneyField,
   SelectField, TextAreaField, StatusPill, useToast, SkeletonBlock, IconEye,
@@ -77,6 +78,25 @@ export function OwnersPage() {
   const [payoutForm, setPayoutForm] = useState({
     amount: '', paid_on: new Date().toISOString().slice(0, 10), payment_method: 'cash', vehicle_id: '', notes: '',
   })
+  const [chip, setChip] = useState('all')
+  const { counts: attention } = useAttentionSignals(true)
+
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      {
+        id: 'due',
+        label: 'مستحق',
+        attention: attention.owners_unpaid > 0 ? ('warning' as const) : null,
+        attentionLabel: `${attention.owners_unpaid} مالك له رصيد متبقٍ`,
+      },
+    ],
+    [attention.owners_unpaid],
+  )
+  const visible = useMemo(
+    () => (chip === 'due' ? rows.filter((o) => Number(o.balance?.remaining || 0) > 0) : rows),
+    [rows, chip],
+  )
 
   async function load() {
     setLoading(true)
@@ -243,10 +263,10 @@ export function OwnersPage() {
         mobileFab
       />
       <Fab label="إضافة مالك" onClick={() => setOpen(true)} />
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="بحث بالاسم أو الهاتف…" chips={[]} activeChip="" onChipChange={() => undefined} />
+      <FilterBar search={search} onSearchChange={setSearch} placeholder="بحث بالاسم أو الهاتف…" chips={chips} activeChip={chip} onChipChange={setChip} />
       <DataTable
         label="الملاك"
-        rows={rows}
+        rows={visible}
         columns={ownerColumns}
         rowKey={(o) => o.id}
         rowLabel={(o) => o.full_name}

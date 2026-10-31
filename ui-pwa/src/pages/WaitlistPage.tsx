@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
-  PageHeader, Button, Sheet, Fab, SelectField, TextField, StatusPill, useToast, DataTable, type DataColumn,
+  PageHeader, Button, FilterBar, Sheet, Fab, SelectField, TextField, StatusPill, useToast, DataTable, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -33,7 +34,33 @@ export function WaitlistPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useState('all')
   const [form, setForm] = useState({ customer_id: '', category: 'اقتصادي' })
+  const { counts: attention } = useAttentionSignals(true)
+
+  const waitingCount = attention.waiting_requests
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      {
+        id: 'waiting',
+        label: 'منتظر',
+        attention: waitingCount > 0 ? ('warning' as const) : null,
+        attentionLabel: `${waitingCount} طلب انتظار قائم`,
+      },
+    ],
+    [waitingCount],
+  )
+  const visible = useMemo(() => {
+    const q = search.trim()
+    return rows.filter((r) => {
+      if (chip === 'waiting' && r.status !== 'waiting') return false
+      if (!q) return true
+      const hay = `${r.customer?.full_name ?? ''} ${r.customer?.phone ?? ''} ${r.category}`
+      return hay.includes(q)
+    })
+  }, [rows, chip, search])
 
   async function load() {
     setLoading(true)
@@ -62,9 +89,17 @@ export function WaitlistPage() {
     <div className="rpm-stack">
       <PageHeader title="قائمة الانتظار" subtitle="إشعار عند التوفر — بلا إنشاء عقد تلقائي" action={<Button onClick={async () => { setOpen(true); const c = await api<{ data: Customer[] }>('/customers'); setCustomers(c.data) }}>طلب جديد</Button>} mobileFab />
       <Fab label="طلب جديد" onClick={async () => { setOpen(true); const c = await api<{ data: Customer[] }>('/customers'); setCustomers(c.data) }} />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+        placeholder="بحث بالعميل أو الفئة…"
+      />
       <DataTable
         label="قائمة الانتظار"
-        rows={rows}
+        rows={visible}
         columns={columns}
         rowKey={(r) => r.id}
         loading={loading}

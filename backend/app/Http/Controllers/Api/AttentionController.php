@@ -10,9 +10,11 @@ use App\Models\InventoryItem;
 use App\Models\Notification;
 use App\Models\PayrollRun;
 use App\Models\Violation;
+use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -74,6 +76,12 @@ class AttentionController extends Controller
 
         $blacklistedCustomers = Customer::query()->where('status', 'blacklist')->count();
 
+        $waitingRequests = Schema::hasTable('waitlist_requests')
+            ? WaitlistRequest::query()->where('status', 'waiting')->count()
+            : 0;
+
+        $ownersUnpaid = $this->ownersWithUnpaidBalance();
+
         return response()->json([
             'data' => [
                 'overdue_returns' => $overdueReturns,
@@ -88,7 +96,27 @@ class AttentionController extends Controller
                 'pending_hr_acks' => $pendingHrAcks,
                 'draft_payroll_runs' => $draftPayroll,
                 'blacklisted_customers' => $blacklistedCustomers,
+                'waiting_requests' => $waitingRequests,
+                'owners_unpaid' => $ownersUnpaid,
             ],
         ]);
+    }
+
+    /**
+     * ملاك لهم رصيد مستحق مسجّل (استحقاقات − صرف) دون إعادة استحقاق جماعي.
+     */
+    private function ownersWithUnpaidBalance(): int
+    {
+        if (! Schema::hasTable('vehicle_owners') || ! Schema::hasTable('owner_month_dues') || ! Schema::hasTable('owner_payouts')) {
+            return 0;
+        }
+
+        return (int) DB::table('vehicle_owners as o')
+            ->whereNull('o.deleted_at')
+            ->whereRaw(
+                '(SELECT COALESCE(SUM(d.amount), 0) FROM owner_month_dues d WHERE d.owner_id = o.id)
+                 > (SELECT COALESCE(SUM(p.amount), 0) FROM owner_payouts p WHERE p.owner_id = o.id)'
+            )
+            ->count();
     }
 }

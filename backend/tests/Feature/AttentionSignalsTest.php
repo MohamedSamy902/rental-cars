@@ -4,10 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\Contract;
 use App\Models\Customer;
+use App\Models\OwnerMonthDue;
+use App\Models\OwnerPayout;
 use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\VehicleOwner;
+use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
 use App\Support\PermissionCatalog;
@@ -114,7 +118,87 @@ class AttentionSignalsTest extends TestCase
                 'pending_hr_acks',
                 'draft_payroll_runs',
                 'blacklisted_customers',
+                'waiting_requests',
+                'owners_unpaid',
             ],
+        ]);
+    }
+
+    public function test_attention_counts_open_waitlist_and_unpaid_owners(): void
+    {
+        $customer = Customer::query()->create([
+            'full_name' => 'منتظر',
+            'phone' => '01033334444',
+            'birth_date' => '1992-02-02',
+            'license_number' => 'L-WAIT',
+            'license_expires_on' => now()->addYear()->toDateString(),
+            'status' => 'active',
+        ]);
+
+        WaitlistRequest::query()->create([
+            'customer_id' => $customer->id,
+            'category' => 'اقتصادي',
+            'status' => 'waiting',
+        ]);
+        WaitlistRequest::query()->create([
+            'customer_id' => $customer->id,
+            'category' => 'عائلي',
+            'status' => 'fulfilled',
+        ]);
+        $gone = WaitlistRequest::query()->create([
+            'customer_id' => $customer->id,
+            'category' => 'فاخر',
+            'status' => 'waiting',
+        ]);
+        $gone->delete();
+
+        $dueOwner = VehicleOwner::query()->create(['full_name' => 'مالك مستحق', 'is_active' => true]);
+        $paidOwner = VehicleOwner::query()->create(['full_name' => 'مالك مسدد', 'is_active' => true]);
+        $vehicle = $this->vehicle('OWN-DUE', $dueOwner->id);
+        $paidVehicle = $this->vehicle('OWN-PAID', $paidOwner->id);
+
+        OwnerMonthDue::query()->create([
+            'owner_id' => $dueOwner->id,
+            'vehicle_id' => $vehicle->id,
+            'year_month' => now()->format('Y-m'),
+            'amount' => 5000,
+        ]);
+        OwnerMonthDue::query()->create([
+            'owner_id' => $paidOwner->id,
+            'vehicle_id' => $paidVehicle->id,
+            'year_month' => now()->format('Y-m'),
+            'amount' => 2000,
+        ]);
+        OwnerPayout::query()->create([
+            'owner_id' => $paidOwner->id,
+            'vehicle_id' => $paidVehicle->id,
+            'amount' => 2000,
+            'paid_on' => now()->toDateString(),
+            'payment_method' => 'cash',
+        ]);
+
+        $res = $this->getJson('/api/attention')->assertOk();
+        $res->assertJsonPath('data.waiting_requests', 1);
+        $res->assertJsonPath('data.owners_unpaid', 1);
+    }
+
+    private function vehicle(string $code, int $ownerId): Vehicle
+    {
+        return Vehicle::query()->create([
+            'code' => $code,
+            'plate' => $code,
+            'brand' => 'تويوتا',
+            'model' => 'كورولا',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 800,
+            'default_deposit' => 2000,
+            'is_active' => true,
+            'rental_priority' => 50,
+            'owner_id' => $ownerId,
+            'owner_monthly_amount' => 2000,
         ]);
     }
 }

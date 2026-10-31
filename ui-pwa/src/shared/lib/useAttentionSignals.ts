@@ -23,6 +23,8 @@ export type AttentionCounts = {
   pending_hr_acks: number
   draft_payroll_runs: number
   blacklisted_customers: number
+  waiting_requests: number
+  owners_unpaid: number
 }
 
 const EMPTY: AttentionCounts = {
@@ -38,6 +40,8 @@ const EMPTY: AttentionCounts = {
   pending_hr_acks: 0,
   draft_payroll_runs: 0,
   blacklisted_customers: 0,
+  waiting_requests: 0,
+  owners_unpaid: 0,
 }
 
 function n(value: unknown): number {
@@ -59,6 +63,8 @@ function normalizeCounts(raw: Partial<AttentionCounts> | null | undefined): Atte
     pending_hr_acks: n(raw?.pending_hr_acks),
     draft_payroll_runs: n(raw?.draft_payroll_runs),
     blacklisted_customers: n(raw?.blacklisted_customers),
+    waiting_requests: n(raw?.waiting_requests),
+    owners_unpaid: n(raw?.owners_unpaid),
   }
 }
 
@@ -118,6 +124,16 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
       warning: c.blacklisted_customers,
       label: `${c.blacklisted_customers} عميل في القائمة السوداء`,
     },
+    '/waitlist': {
+      critical: 0,
+      warning: c.waiting_requests,
+      label: `${c.waiting_requests} طلب انتظار قائم`,
+    },
+    '/owners': {
+      critical: 0,
+      warning: c.owners_unpaid,
+      label: `${c.owners_unpaid} مالك له رصيد متبقٍ`,
+    },
   }
 
   const hit = map[path]
@@ -136,6 +152,8 @@ const NAV_PATHS = [
   '/notifications',
   '/hr',
   '/customers',
+  '/waitlist',
+  '/owners',
 ] as const
 
 export function useAttentionSignals(enabled: boolean, refreshKey?: string) {
