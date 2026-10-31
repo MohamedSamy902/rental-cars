@@ -12,16 +12,20 @@ class WorkOrder extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'vehicle_id', 'workshop', 'opened_on', 'closed_on', 'odometer', 'status',
+        'vehicle_id', 'workshop', 'opened_on', 'opened_at', 'closed_on', 'odometer', 'status',
         'puts_in_maintenance', 'parts_cost', 'labor_cost', 'invoice_path', 'notes',
+        'next_service_on', 'next_service_odometer',
     ];
 
     protected function casts(): array
     {
         return [
             'opened_on' => 'date',
+            'opened_at' => 'datetime',
             'closed_on' => 'date',
+            'next_service_on' => 'date',
             'puts_in_maintenance' => 'boolean',
+            'next_service_odometer' => 'integer',
         ];
     }
 

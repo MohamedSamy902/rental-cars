@@ -28,11 +28,23 @@ export function formatPercent(value: number): string {
 }
 
 export function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
   return new Intl.DateTimeFormat('ar-EG', {
     dateStyle: 'medium',
     timeStyle: 'short',
     ...latn,
-  }).format(new Date(iso))
+  }).format(d)
+}
+
+/** Date only as YYYY/MM/DD (Western digits) — contracts period display. */
+export function formatDate(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}/${m}/${day}`
 }
 
 export function formatTime(iso: string): string {

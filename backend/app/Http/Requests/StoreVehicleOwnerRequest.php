@@ -34,6 +34,8 @@ class StoreVehicleOwnerRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId],
+            'id_front_path' => ['nullable', 'string', 'max:500'],
+            'id_back_path' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
         ];
@@ -49,6 +51,8 @@ class StoreVehicleOwnerRequest extends FormRequest
             'phone' => 'الهاتف',
             'phone_alt' => 'هاتف بديل',
             'national_id' => 'الرقم القومي',
+            'id_front_path' => 'وجه البطاقة',
+            'id_back_path' => 'ظهر البطاقة',
             'notes' => 'الملاحظات',
         ];
     }

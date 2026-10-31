@@ -194,22 +194,31 @@ Query شائع: `?per_page=50&page=1&search=...`
 | Method | Path | وصف |
 |--------|------|-----|
 | GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&per_page=` |
-| POST | `/vehicles` | إضافة |
+| GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
+| POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
-| PUT | `/vehicles/{vehicle}` | تعديل |
+| PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) |
 | DELETE | `/vehicles/{vehicle}` | أرشفة ناعمة (apiResource) |
 | POST | `/vehicles/{vehicle}/documents` | مستند |
+| PUT | `/vehicles/{vehicle}/documents/{id}` | تحديث؛ رخصة تسيير مع `archive_previous` تؤرشف السجل القديم |
+| GET | `/vehicles/{vehicle}/document-history` | سجل الرخص/المستندات المؤرشفة |
 | POST | `/vehicles/{vehicle}/accessories` | مستلزم |
 
 **حالات مشتقة `status`:** `available` | `reserved` | `rented` | `maintenance` | `out_of_service`
 
 **POST /vehicles — حقول أساسية**
-`code`, `plate`, `brand`, `model`, `year`, `category`, `fuel_type`, `odometer`, `daily_rate`, `default_deposit`  
-اختياري: `rental_priority`, `tracker_device_number`, `tracker_sim_number`, `color`, `transmission`, `notes`, `is_active`
+`plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit`  
+الكود: يُولَّد تلقائياً إن لم يُرسل.  
+اختياري: `chassis_number`, `engine_number`, `rental_priority`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_inline{full_name,phone,…}`, `addon_ids[]`
 
 **POST documents**
 ```json
 { "type": "رخصة تسيير", "file_path": "manual/...", "issued_on": "2025-01-01", "expires_on": "2027-01-01", "notes": null }
+```
+
+**PUT documents (تجديد رخصة)**
+```json
+{ "type": "رخصة تسيير", "issued_on": "2026-01-01", "expires_on": "2027-01-01", "archive_previous": true }
 ```
 
 **POST accessories**
@@ -470,8 +479,12 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 {
   "vehicle_id": 1,
   "workshop": "ورشة النور",
+  "opened_at": "2026-10-30T14:30:00",
+  "opened_on": "2026-10-30",
   "odometer": 89000,
   "puts_in_maintenance": true,
+  "next_service_on": "2027-04-30",
+  "next_service_odometer": 95000,
   "force_after_resolution": false,
   "labor_cost": 300,
   "notes": null,
@@ -713,7 +726,7 @@ password: password
 |--------|------|------------------|
 | PUT | `/settings/operational` | `settings.update` — تشغيل يومي فقط |
 | PUT | `/integrator/tenant` | دور `super_admin` فقط |
-| GET/POST | `/expenses` | `expenses.view` / `expenses.create` |
+| GET/POST | `/expenses` | `expenses.view` / `expenses.create` — صيانة ↔ `work_order_id` · عهدة `from_petty_cash`+`employee_id` |
 | GET/POST | `/payroll` · `/payroll/draft` · `/payroll/{id}/approve` | `hr.salaries` / `hr.payroll_approve` |
 | GET/POST/DELETE | `/salary-advances` · `/salary-advances/{id}` | `hr.advances` — سلف الشهر تُخصم من المسودة |
 | POST | `/payroll/lines/{id}/payout` | صرف جزئي أو كامل بعد الاعتماد؛ المتبقي يُرحَّل |

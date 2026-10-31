@@ -52,7 +52,8 @@ class MonthLedgerService
 
         $expenses = Expense::query()
             ->with('vehicle:id,brand,model,plate')
-            ->whereBetween('spent_on', $dateRange)
+            ->whereDate('spent_on', '>=', $dateRange[0])
+            ->whereDate('spent_on', '<=', $dateRange[1])
             ->orderBy('spent_on')
             ->get()
             ->map(fn (Expense $e) => [
@@ -136,7 +137,8 @@ class MonthLedgerService
 
         $payroll = PayrollPayout::query()
             ->with('line.employee:id,name')
-            ->whereBetween('paid_on', $dateRange)
+            ->whereDate('paid_on', '>=', $dateRange[0])
+            ->whereDate('paid_on', '<=', $dateRange[1])
             ->orderBy('paid_on')
             ->get()
             ->map(fn (PayrollPayout $p) => [
@@ -223,7 +225,10 @@ class MonthLedgerService
         $lines = JournalLine::query()
             ->with(['entry', 'account'])
             ->whereHas('account', fn ($q) => $q->whereIn('code', $codes))
-            ->whereHas('entry', fn ($q) => $q->whereBetween('entry_date', $dateRange))
+            ->whereHas('entry', function ($q) use ($dateRange) {
+                $q->whereDate('entry_date', '>=', $dateRange[0])
+                    ->whereDate('entry_date', '<=', $dateRange[1]);
+            })
             ->get();
 
         $contractIds = $lines

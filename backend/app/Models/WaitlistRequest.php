@@ -29,4 +29,9 @@ class WaitlistRequest extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    public function preferredVehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class, 'preferred_vehicle_id');
+    }
 }

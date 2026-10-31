@@ -4,7 +4,7 @@ import { formatMoney } from '@/shared/lib/format'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, DetailList, DataTable, TextField, MoneyField,
-  SelectField, TextAreaField, StatusPill, useToast, SkeletonBlock, IconEye,
+  SelectField, TextAreaField, StatusPill, useToast, SkeletonBlock, IconEye, MediaUpload,
   type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -25,6 +25,8 @@ type Owner = {
   phone?: string | null
   phone_alt?: string | null
   national_id?: string | null
+  id_front_path?: string | null
+  id_back_path?: string | null
   notes?: string | null
   is_active: boolean
   vehicles_count?: number
@@ -59,7 +61,7 @@ type Due = {
 }
 
 const emptyForm = {
-  full_name: '', phone: '', national_id: '', notes: '', is_active: true,
+  full_name: '', phone: '', national_id: '', id_front_path: '', id_back_path: '', notes: '', is_active: true,
 }
 
 export function OwnersPage() {
@@ -128,6 +130,8 @@ export function OwnersPage() {
         full_name: res.data.full_name,
         phone: res.data.phone || '',
         national_id: res.data.national_id || '',
+        id_front_path: res.data.id_front_path || '',
+        id_back_path: res.data.id_back_path || '',
         notes: res.data.notes || '',
         is_active: res.data.is_active !== false,
       })
@@ -217,6 +221,26 @@ export function OwnersPage() {
       <TextField label="اسم المالك" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
       <TextField label="الهاتف" error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <MediaUpload
+        label="بطاقة الرقم القومي — الوجه (وش)"
+        value={form.id_front_path || null}
+        collection="owner_ids"
+        purpose="national_id"
+        accept="both"
+        attachableType={detail ? 'vehicle_owner' : undefined}
+        attachableId={detail?.id}
+        onChange={(path) => setForm({ ...form, id_front_path: path || '' })}
+      />
+      <MediaUpload
+        label="بطاقة الرقم القومي — الظهر (ضهر)"
+        value={form.id_back_path || null}
+        collection="owner_ids"
+        purpose="national_id"
+        accept="both"
+        attachableType={detail ? 'vehicle_owner' : undefined}
+        attachableId={detail?.id}
+        onChange={(path) => setForm({ ...form, id_back_path: path || '' })}
+      />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
     </div>
   )

@@ -86,6 +86,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState('')
 
   if (!loading && user) return <Navigate to="/" replace />
 
@@ -93,6 +94,7 @@ export function LoginPage() {
     e.preventDefault()
     setSaving(true)
     setErrors({})
+    setFormError('')
     try {
       await login(email, password)
       persistRememberedEmail(remember, email)
@@ -100,12 +102,16 @@ export function LoginPage() {
       navigate('/')
     } catch (err) {
       const apiErr = err as ApiError
+      const topMessage = apiErr.message || 'تعذّر الدخول. تحقق من البريد وكلمة المرور.'
+      // Auth failures stay in the top alert only — avoid duplicating the same text under fields.
       const fieldErrors: Record<string, string> = {}
       if (apiErr.errors) {
-        for (const [k, v] of Object.entries(apiErr.errors)) fieldErrors[k] = v[0]
+        for (const [k, v] of Object.entries(apiErr.errors)) {
+          if (v[0] && v[0] !== topMessage) fieldErrors[k] = v[0]
+        }
       }
       setErrors(fieldErrors)
-      toast.error(apiErr.message || 'تعذّر الدخول')
+      setFormError(topMessage)
     } finally {
       setSaving(false)
     }
@@ -131,6 +137,12 @@ export function LoginPage() {
             <h1>تسجيل الدخول</h1>
             <p>أدخل بيانات حسابك للوصول إلى لوحة التشغيل.</p>
           </div>
+
+          {formError ? (
+            <div className="auth-alert" role="alert">
+              {formError}
+            </div>
+          ) : null}
 
           <AuthInput
             label="البريد الإلكتروني"
@@ -172,13 +184,6 @@ export function LoginPage() {
               </span>
               <span>تذكرني</span>
             </label>
-            <button
-              type="button"
-              className="auth-link"
-              onClick={() => toast.info('لإعادة تعيين كلمة المرور تواصل مع مدير النظام في فرعك.')}
-            >
-              نسيت كلمة المرور؟
-            </button>
           </div>
 
           <Button type="submit" variant="accent" size="lg" loading={saving} className="auth-submit">

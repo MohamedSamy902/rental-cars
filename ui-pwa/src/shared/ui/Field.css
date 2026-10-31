@@ -61,6 +61,41 @@
   color: var(--text-muted);
 }
 
+/* Date / time: prevent native picker chrome from overflowing the sheet */
+.rpm-datetime {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.rpm-input--date,
+.rpm-input--time,
+input.rpm-input[type='date'],
+input.rpm-input[type='time'],
+input.rpm-input[type='datetime-local'] {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+input.rpm-input[type='date'],
+input.rpm-input[type='time'],
+input.rpm-input[type='datetime-local'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+@media (max-width: 420px) {
+  .rpm-datetime {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .rpm-money {
   position: relative;
   width: 100%;
