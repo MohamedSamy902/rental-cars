@@ -18,8 +18,12 @@ class VehicleRecommendationService
     /**
      * @return list<array<string, mixed>>
      */
-    public function rankAvailable(?string $category = null, ?Carbon $asOf = null): array
-    {
+    public function rankAvailable(
+        ?string $category = null,
+        ?Carbon $asOf = null,
+        ?Carbon $periodFrom = null,
+        ?Carbon $periodTo = null,
+    ): array {
         $asOf = $asOf ? $asOf->copy() : now();
         $weights = $this->weights();
 
@@ -36,18 +40,42 @@ class VehicleRecommendationService
             ->pluck('vehicle_id')
             ->flip();
 
+        $busyInPeriod = collect();
+        if ($periodFrom && $periodTo && $periodTo->gte($periodFrom)) {
+            $busyInPeriod = Contract::query()
+                ->whereIn('status', ['pending', 'approved', 'active'])
+                ->where('starts_at', '<', $periodTo)
+                ->where(function ($q) use ($periodFrom) {
+                    $q->where(function ($qq) use ($periodFrom) {
+                        $qq->whereNull('actual_ends_at')->where('planned_ends_at', '>', $periodFrom);
+                    })->orWhere('actual_ends_at', '>', $periodFrom);
+                })
+                ->pluck('vehicle_id')
+                ->flip();
+        }
+
         $usageDays = $this->usageDaysLast90($vehicles->pluck('id'), $asOf);
         $maxUsage = max(1, (int) ($usageDays->max() ?: 0));
 
         $rows = [];
         foreach ($vehicles as $v) {
+            if ($busyInPeriod->has($v->id)) {
+                continue;
+            }
+
             $status = $this->availability->statusOnDate([
                 'manual_status' => $v->manual_status,
                 'has_active_handover' => $activeIds->has($v->id),
                 'has_approved_covering_date' => $reservedIds->has($v->id),
                 'open_work_order_blocks' => $v->manual_status === 'maintenance',
             ]);
-            if ($status !== 'available') {
+            // With an explicit booking window, period overlap already excludes busy cars;
+            // still hide maintenance / out-of-service / sold. Without a window, only "available".
+            if ($periodFrom && $periodTo) {
+                if (in_array($status, ['maintenance', 'out_of_service', 'sold'], true)) {
+                    continue;
+                }
+            } elseif ($status !== 'available') {
                 continue;
             }
 

@@ -24,6 +24,13 @@ class WaitlistService
      */
     public function list(): array
     {
-        return WaitlistRequest::query()->with('customer')->latest('id')->get()->all();
+        return WaitlistRequest::query()
+            ->with(['customer:id,full_name,phone', 'preferredVehicle:id,brand,model,plate'])
+            ->orderByRaw('desired_start is null')
+            ->orderBy('desired_start')
+            ->orderBy('priority', 'desc')
+            ->orderBy('id')
+            ->get()
+            ->all();
     }
 }

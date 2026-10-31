@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
+use App\Support\DigitNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,7 +34,20 @@ class StoreVehicleRequest extends FormRequest
             'owner_monthly_amount',
             'owner_since',
             'tracker_sim_number',
+            'plate_numbers',
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $payload = $this->all();
+        if (! empty($payload['plate_letters'])) {
+            $payload['plate_letters'] = preg_replace('/[^\p{L}]+/u', '', (string) $payload['plate_letters']) ?? '';
+        }
+        if (! empty($payload['plate_numbers'])) {
+            $payload['plate_numbers'] = preg_replace('/\D+/', '', (string) $payload['plate_numbers']) ?? '';
+        }
+        $this->merge(DigitNormalizer::fields($payload, $this->digitKeys()));
     }
 
     /**
@@ -43,17 +57,19 @@ class StoreVehicleRequest extends FormRequest
     {
         return [
             'code' => [
-                'required',
+                'nullable',
                 'string',
                 'max:50',
                 Rule::unique('vehicles', 'code')->whereNull('deleted_at'),
             ],
             'plate' => [
-                'required',
+                'nullable',
                 'string',
                 'max:50',
                 Rule::unique('vehicles', 'plate')->whereNull('deleted_at'),
             ],
+            'plate_letters' => ['nullable', 'string', 'min:2', 'max:3'],
+            'plate_numbers' => ['nullable', 'string', 'max:4'],
             'brand' => ['required', 'string', 'max:100'],
             'model' => ['required', 'string', 'max:100'],
             'year' => ['required', 'integer', 'min:1990', 'max:2100'],
@@ -78,6 +94,14 @@ class StoreVehicleRequest extends FormRequest
             'owner_id' => ['nullable', 'integer', 'exists:vehicle_owners,id'],
             'owner_monthly_amount' => ['nullable', 'integer', 'min:0'],
             'owner_since' => ['nullable', 'date'],
+            'owner_inline' => ['nullable', 'array'],
+            'owner_inline.full_name' => ['required_with:owner_inline', 'string', 'max:150'],
+            'owner_inline.phone' => ['nullable', 'string', 'max:30'],
+            'owner_inline.phone_alt' => ['nullable', 'string', 'max:30'],
+            'owner_inline.national_id' => ['nullable', 'string', 'max:30'],
+            'owner_inline.notes' => ['nullable', 'string'],
+            'addon_ids' => ['nullable', 'array'],
+            'addon_ids.*' => ['integer', 'exists:vehicle_addon_catalog,id'],
         ];
     }
 
@@ -111,10 +135,10 @@ class StoreVehicleRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'code.required' => 'الكود الداخلي مطلوب.',
             'code.unique' => 'الكود الداخلي مستخدم مسبقاً.',
-            'plate.required' => 'رقم اللوحة مطلوب.',
             'plate.unique' => 'رقم اللوحة مستخدم مسبقاً.',
+            'plate_letters.min' => 'حروف اللوحة حرفان على الأقل.',
+            'plate_letters.max' => 'حروف اللوحة ثلاثة أحرف كحد أقصى.',
             'brand.required' => 'الماركة مطلوبة.',
             'model.required' => 'الموديل مطلوب.',
             'year.required' => 'سنة الصنع مطلوبة.',

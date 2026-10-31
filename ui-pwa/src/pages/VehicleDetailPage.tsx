@@ -9,6 +9,7 @@ import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, StatusPill, Sheet, AttentionDot,
   TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField, MediaUpload,
+  PlateField, splitPlate, DateField,
   useToast, SkeletonBlock, ErrorState, QrCode,
   type AttentionTone,
 } from '@/shared/ui'
@@ -33,6 +34,7 @@ type Document = {
   id: number
   type: string
   file_path?: string | null
+  file_path_back?: string | null
   expires_on?: string | null
   issued_on?: string | null
   notes?: string | null
@@ -209,7 +211,7 @@ const statusLabel: Record<string, string> = {
 const chartColors = ['#dc2626', '#64748b', '#f59e0b', '#059669', '#a1a1aa', '#b91c1c', '#475569']
 
 const emptyForm = {
-  code: '', plate: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
+  code: '', plate_letters: '', plate_numbers: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
   color: '', transmission: 'أوتوماتيك', chassis_number: '', engine_number: '', engine_capacity: '',
   seats: '5', odometer: '', daily_rate: '', default_deposit: '', rental_priority: '50',
   target_monthly_income: '', purchase_value_estimate: '',
@@ -262,8 +264,10 @@ export function VehicleDetailPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [owners, setOwners] = useState<OwnerOption[]>([])
-  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '' })
+  const [brands, setBrands] = useState<Array<{ id: number; name: string }>>([])
+  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
   const [docEdit, setDocEdit] = useState<Document | null>(null)
+  const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
   const [accOpen, setAccOpen] = useState(false)
   const [accEdit, setAccEdit] = useState<Accessory | null>(null)
   const [accForm, setAccForm] = useState(emptyAcc)
@@ -353,9 +357,11 @@ export function VehicleDetailPage() {
   )
 
   function fillForm(v: Vehicle) {
+    const plateParts = splitPlate(v.plate)
     setForm({
       code: v.code,
-      plate: v.plate,
+      plate_letters: plateParts.letters,
+      plate_numbers: plateParts.numbers,
       brand: v.brand,
       model: v.model,
       year: String(v.year),
@@ -406,12 +412,27 @@ export function VehicleDetailPage() {
     void api<{ data: OwnerOption[] }>('/owners?active_only=1&per_page=100')
       .then((res) => setOwners(res.data))
       .catch(() => setOwners([]))
+    void api<{ data: { brands: Array<{ id: number; name: string }> } }>('/vehicles/catalogs')
+      .then((res) => setBrands(res.data.brands || []))
+      .catch(() => setBrands([]))
   }, [])
+
+  useEffect(() => {
+    if (!Number.isFinite(vehicleId) || vehicleId <= 0) return
+    void api<{ data: typeof docHistory }>(`/vehicles/${vehicleId}/document-history`)
+      .then((res) => setDocHistory(res.data || []))
+      .catch(() => setDocHistory([]))
+  }, [vehicleId, dossier?.vehicle.documents?.length])
 
   function vehiclePayload() {
     return {
-      ...form,
+      plate_letters: form.plate_letters,
+      plate_numbers: form.plate_numbers,
+      brand: form.brand,
+      model: form.model,
       year: Number(form.year),
+      category: form.category,
+      fuel_type: form.fuel_type,
       odometer: Number(form.odometer),
       daily_rate: Number(form.daily_rate),
       default_deposit: Number(form.default_deposit),
@@ -424,6 +445,10 @@ export function VehicleDetailPage() {
       chassis_number: form.chassis_number || null,
       engine_number: form.engine_number || null,
       engine_capacity: form.engine_capacity || null,
+      tracker_device_number: form.tracker_device_number || null,
+      tracker_sim_number: form.tracker_sim_number || null,
+      notes: form.notes || null,
+      is_active: form.is_active,
       owner_id: form.owner_id ? Number(form.owner_id) : null,
       owner_monthly_amount: form.owner_id && form.owner_monthly_amount !== ''
         ? Number(form.owner_monthly_amount)
@@ -521,13 +546,14 @@ export function VehicleDetailPage() {
         json: {
           type: docForm.type,
           file_path: docForm.file_path || undefined,
+          file_path_back: docForm.file_path_back || undefined,
           expires_on: docForm.expires_on || undefined,
           issued_on: docForm.issued_on || undefined,
           notes: docForm.notes || undefined,
         },
       })
       toast.success('تم تسجيل المستند.')
-      setDocForm({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '' })
+      setDocForm({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -540,19 +566,24 @@ export function VehicleDetailPage() {
     if (!dossier || !docEdit) return
     setSaving(true)
     try {
-      await api(`/vehicles/${dossier.vehicle.id}/documents/${docEdit.id}`, {
+      const isLicense = /رخص|license/i.test(docEdit.type)
+      const res = await api<{ message?: string }>(`/vehicles/${dossier.vehicle.id}/documents/${docEdit.id}`, {
         method: 'PUT',
         json: {
           type: docEdit.type,
           file_path: docEdit.file_path || undefined,
+          file_path_back: docEdit.file_path_back || undefined,
           expires_on: docEdit.expires_on || undefined,
           issued_on: docEdit.issued_on || undefined,
           notes: docEdit.notes || undefined,
+          archive_previous: isLicense,
         },
       })
-      toast.success('تم تحديث المستند.')
+      toast.success(res.message || (isLicense ? 'تم تحديث الرخصة مع حفظ السجل السابق.' : 'تم تحديث المستند.'))
       setDocEdit(null)
       await load()
+      const hist = await api<{ data: typeof docHistory }>(`/vehicles/${dossier.vehicle.id}/document-history`)
+      setDocHistory(hist.data || [])
     } catch (e) {
       toast.error((e as ApiError).message)
     } finally {
@@ -589,9 +620,21 @@ export function VehicleDetailPage() {
 
   const formFields = (
     <div className="rpm-form-grid">
-      <TextField label="الكود الداخلي" required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-      <TextField label="رقم اللوحة" required value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} />
-      <TextField label="الماركة" required value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+      <TextField label="الكود الداخلي" value={form.code} disabled hint="يُدار تلقائياً ولا يُعدَّل يدوياً" />
+      <PlateField
+        required
+        letters={form.plate_letters}
+        numbers={form.plate_numbers}
+        onLettersChange={(plate_letters) => setForm({ ...form, plate_letters })}
+        onNumbersChange={(plate_numbers) => setForm({ ...form, plate_numbers })}
+      />
+      <SelectField
+        label="الماركة"
+        required
+        value={form.brand}
+        options={(brands.length ? brands.map((b) => b.name) : [form.brand].filter(Boolean)).map((name) => ({ value: name, label: name }))}
+        onChange={(e) => setForm({ ...form, brand: e.target.value })}
+      />
       <TextField label="الموديل" required value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
       <NumberField label="سنة الصنع" required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
       <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'دفع رباعي', label: 'دفع رباعي' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
@@ -599,8 +642,8 @@ export function VehicleDetailPage() {
       <TextField label="اللون" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
       <SelectField label="ناقل الحركة" options={[{ value: 'أوتوماتيك', label: 'أوتوماتيك' }, { value: 'مانيوال', label: 'مانيوال' }]} value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} />
       <NumberField label="عدد المقاعد" value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
-      <TextField label="رقم الشاسيه" value={form.chassis_number} onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} />
-      <TextField label="رقم المحرك" value={form.engine_number} onChange={(e) => setForm({ ...form, engine_number: e.target.value })} />
+      <TextField label="رقم الشاسيه" value={form.chassis_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} />
+      <TextField label="رقم المحرك" value={form.engine_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, engine_number: e.target.value })} />
       <TextField label="سعة المحرك" value={form.engine_capacity} onChange={(e) => setForm({ ...form, engine_capacity: e.target.value })} />
       <NumberField label="العداد الفعلي" required value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
       <MoneyField label="الإيجار اليومي" required value={form.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
@@ -1016,7 +1059,13 @@ export function VehicleDetailPage() {
             <div key={d.id} className="vd-doc">
               <div>
                 <strong>{d.type}</strong>
-                <div><span>صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}{d.file_path ? ' · مرفق' : ''}</span></div>
+                <div>
+                  <span>
+                    صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}
+                    {d.file_path ? ' · وجه' : ''}
+                    {d.file_path_back ? ' · ظهر' : ''}
+                  </span>
+                </div>
               </div>
               <div className="rpm-actions-row vd-no-print">
                 <Button size="sm" variant="ghost" onClick={() => setDocEdit({ ...d })}>تعديل</Button>
@@ -1039,10 +1088,10 @@ export function VehicleDetailPage() {
               { value: 'أخرى', label: 'أخرى' },
             ]}
           />
-          <TextField label="تاريخ الإصدار" type="date" value={docForm.issued_on} onChange={(e) => setDocForm({ ...docForm, issued_on: e.target.value })} />
-          <TextField label="تاريخ الانتهاء" type="date" value={docForm.expires_on} onChange={(e) => setDocForm({ ...docForm, expires_on: e.target.value })} />
+          <DateField label="تاريخ الإصدار" value={docForm.issued_on} onChange={(e) => setDocForm({ ...docForm, issued_on: e.target.value })} />
+          <DateField label="تاريخ الانتهاء" value={docForm.expires_on} onChange={(e) => setDocForm({ ...docForm, expires_on: e.target.value })} />
           <MediaUpload
-            label="ملف المستند"
+            label="وجه المستند (وش)"
             value={docForm.file_path || null}
             collection="vehicle_docs"
             purpose="document"
@@ -1051,9 +1100,42 @@ export function VehicleDetailPage() {
             attachableId={v.id}
             onChange={(path) => setDocForm({ ...docForm, file_path: path || '' })}
           />
+          <MediaUpload
+            label="ظهر المستند (ضهر)"
+            value={docForm.file_path_back || null}
+            collection="vehicle_docs"
+            purpose="document"
+            accept="both"
+            attachableType="vehicle"
+            attachableId={v.id}
+            onChange={(path) => setDocForm({ ...docForm, file_path_back: path || '' })}
+          />
           <Button size="sm" loading={saving} onClick={() => addDocument()}>إضافة مستند</Button>
         </div>
       </div>
+
+      <div className="vd-panel__head" style={{ marginTop: '0.75rem' }}>
+        <h2>سجل الرخص والمستندات السابقة</h2>
+        <p>{docHistory.length} أرشيف</p>
+      </div>
+      {docHistory.length === 0 ? (
+        <Empty>لا يوجد سجل سابق — عند تحديث رخصة تُحفظ النسخة القديمة هنا تلقائياً</Empty>
+      ) : (
+        <div className="vd-docs">
+          {docHistory.map((h) => (
+            <div key={h.id} className="vd-doc">
+              <div>
+                <strong>{h.type}</strong>
+                <div>
+                  <span>
+                    صدر {h.issued_on || '—'} · ينتهي {h.expires_on || '—'} · أُرشف {h.archived_at ? h.archived_at.slice(0, 16).replace('T', ' ') : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="vd-panel__head" style={{ marginTop: '0.5rem' }}>
         <h2>المرفقات والوسائط</h2>
@@ -1254,12 +1336,12 @@ export function VehicleDetailPage() {
         <div className="vd-hero__top">
           <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>رجوع للأسطول</button>
           <div className="vd-hero__actions vd-no-print">
-            <Button size="sm" onClick={() => openNewContract({ vehicleId: v.id })}>إنشاء حجز</Button>
+            <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>إنشاء حجز</Button>
             <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>إضافة صيانة</Button>
             <Button size="sm" variant="secondary" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
             <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
-            <Button size="sm" onClick={() => window.print()}>طباعة</Button>
+            <Button size="sm" variant="primary" onClick={() => window.print()}>طباعة</Button>
           </div>
         </div>
         <div className="vd-hero__body">
@@ -1445,8 +1527,28 @@ export function VehicleDetailPage() {
                 { value: 'أخرى', label: 'أخرى' },
               ]}
             />
-            <TextField label="تاريخ الإصدار" type="date" value={docEdit.issued_on || ''} onChange={(e) => setDocEdit({ ...docEdit, issued_on: e.target.value })} />
-            <TextField label="تاريخ الانتهاء" type="date" value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />
+            <DateField label="تاريخ الإصدار" value={docEdit.issued_on || ''} onChange={(e) => setDocEdit({ ...docEdit, issued_on: e.target.value })} />
+            <DateField label="تاريخ الانتهاء" value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />
+            <MediaUpload
+              label="وجه المستند (وش)"
+              value={docEdit.file_path || null}
+              collection="vehicle_docs"
+              purpose="document"
+              accept="both"
+              attachableType="vehicle"
+              attachableId={v.id}
+              onChange={(path) => setDocEdit({ ...docEdit, file_path: path || '' })}
+            />
+            <MediaUpload
+              label="ظهر المستند (ضهر)"
+              value={docEdit.file_path_back || null}
+              collection="vehicle_docs"
+              purpose="document"
+              accept="both"
+              attachableType="vehicle"
+              attachableId={v.id}
+              onChange={(path) => setDocEdit({ ...docEdit, file_path_back: path || '' })}
+            />
             <TextAreaField label="ملاحظات" value={docEdit.notes || ''} onChange={(e) => setDocEdit({ ...docEdit, notes: e.target.value })} />
           </div>
         ) : null}

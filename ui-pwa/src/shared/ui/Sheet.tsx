@@ -78,55 +78,67 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
     }
   }, [close])
 
-  // Pin the overlay to the visual viewport and pad the sticky footer by the keyboard inset.
+  // Pin the overlay to the visual viewport. Available height already excludes
+  // the keyboard (interactive-widget=overlays-content) — body/footer only use
+  // safe-area padding, never a second keyboard inset (that caused the blank void).
   useEffect(() => {
     const root = rootRef.current
-    const wrap = wrapRef.current
     const vv = window.visualViewport
     if (!root) return
 
     const sync = () => {
       const layoutH = window.innerHeight
-      const height = vv?.height ?? layoutH
-      const offsetTop = vv?.offsetTop ?? 0
-      const keyboard = Math.max(0, Math.round(layoutH - height - offsetTop))
-      root.style.height = `${Math.round(height)}px`
-      root.style.top = `${Math.round(offsetTop)}px`
-      root.style.bottom = 'auto'
-      root.style.setProperty('--kb-inset', `${keyboard}px`)
-      wrap?.style.setProperty('--kb-inset', `${keyboard}px`)
+      const height = Math.round(vv?.height ?? layoutH)
+      const offsetTop = Math.round(vv?.offsetTop ?? 0)
+      // dvh does not shrink with interactive-widget=overlays-content, so cap
+      // the sheet against the visual viewport explicitly. Use full vv height
+      // when the keyboard is open; 90% when closed (classic bottom-sheet gap).
+      const keyboardOpen = height < layoutH - 40
+      const sheetMax = Math.round(height * (keyboardOpen ? 1 : 0.9))
+      root.style.setProperty('--vv-height', `${height}px`)
+      root.style.setProperty('--vv-top', `${offsetTop}px`)
+      root.style.setProperty('--sheet-max-h', `${sheetMax}px`)
+      // Keep page scroll locked to the visual viewport origin on iOS.
+      if (offsetTop > 0 || (vv && vv.pageTop > 0)) {
+        window.scrollTo(0, 0)
+      }
     }
 
     sync()
     vv?.addEventListener('resize', sync)
     vv?.addEventListener('scroll', sync)
     window.addEventListener('resize', sync)
+    window.addEventListener('orientationchange', sync)
     return () => {
       vv?.removeEventListener('resize', sync)
       vv?.removeEventListener('scroll', sync)
       window.removeEventListener('resize', sync)
-      root.style.height = ''
-      root.style.top = ''
-      root.style.bottom = ''
-      root.style.removeProperty('--kb-inset')
+      window.removeEventListener('orientationchange', sync)
+      root.style.removeProperty('--vv-height')
+      root.style.removeProperty('--vv-top')
+      root.style.removeProperty('--sheet-max-h')
     }
   }, [])
 
-  // Scroll the focused field into the sheet body — never the page.
+  // Scroll the focused field inside the sheet body — never the page.
   useEffect(() => {
     const body = bodyRef.current
     if (!body) return
     const reveal = (target: HTMLElement) => {
-      window.setTimeout(() => {
+      const run = () => {
+        // Prefer native scroll so the field lands in the visible body band.
+        target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
         const bodyRect = body.getBoundingClientRect()
         const targetRect = target.getBoundingClientRect()
-        const pad = 24
+        const pad = 20
         if (targetRect.bottom > bodyRect.bottom - pad) {
           body.scrollTop += targetRect.bottom - bodyRect.bottom + pad
         } else if (targetRect.top < bodyRect.top + pad) {
           body.scrollTop -= bodyRect.top + pad - targetRect.top
         }
-      }, 280)
+      }
+      window.setTimeout(run, 50)
+      window.setTimeout(run, 320)
     }
     const onFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement | null

@@ -134,11 +134,11 @@ export function AccountsPage() {
                   </div>
                 </dl>
                 <div className="ac-month__actions">
-                  <Button size="sm" variant="secondary" onClick={() => navigate(`/accounts/months/${monthKey(m)}`)}>
+                  <Button size="sm" variant="primary" onClick={() => navigate(`/accounts/months/${monthKey(m)}`)}>
                     دفتر الشهر
                   </Button>
                   {!m.locked ? (
-                    <Button size="sm" variant="secondary" onClick={() => void lockMonth(m)}>إقفال</Button>
+                    <Button size="sm" variant="danger" onClick={() => void lockMonth(m)}>إقفال</Button>
                   ) : (
                     <Button size="sm" variant="secondary" onClick={() => setReopen(m)}>إعادة فتح</Button>
                   )}

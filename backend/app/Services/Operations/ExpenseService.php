@@ -8,6 +8,7 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
+use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -57,40 +58,59 @@ class ExpenseService
                 ]);
             }
 
+            $category = (string) ($data['category'] ?? 'تشغيل');
+            $workOrderId = isset($data['work_order_id']) ? (int) $data['work_order_id'] : null;
+            $vehicleId = isset($data['vehicle_id']) ? (int) $data['vehicle_id'] : null;
+
+            if ($category === 'صيانة') {
+                if (! $vehicleId) {
+                    throw new DomainException('المركبة مطلوبة عند تصنيف المصروف كصيانة.');
+                }
+                if ($workOrderId) {
+                    $wo = WorkOrder::query()->find($workOrderId);
+                    if (! $wo || (int) $wo->vehicle_id !== $vehicleId) {
+                        throw new DomainException('أمر الشغل غير مرتبط بهذه المركبة.');
+                    }
+                }
+            }
+
             $expense = Expense::query()->create([
                 'title' => $data['title'],
-                'category' => $data['category'] ?? 'تشغيل',
+                'category' => $category,
                 'amount' => $amount,
                 'spent_on' => $spentOn,
                 'payment_method' => $fromPetty ? 'petty_cash' : ($data['payment_method'] ?? 'cash'),
-                'vehicle_id' => $data['vehicle_id'] ?? null,
+                'vehicle_id' => $vehicleId ?: null,
+                'work_order_id' => $workOrderId ?: null,
                 'employee_id' => $data['employee_id'] ?? null,
                 'from_petty_cash' => $fromPetty,
                 'recorded_by' => $userId,
                 'notes' => $data['notes'] ?? null,
             ]);
 
+            $expenseCode = $category === 'صيانة' ? '5300' : '5100';
+            $expenseName = $category === 'صيانة' ? 'مصروف صيانة وقطع' : 'مصروفات تشغيل';
             $expenseAcc = Account::query()->firstOrCreate(
-                ['code' => '5100'],
-                ['name' => 'مصروفات تشغيل', 'type' => 'expense', 'is_system' => true, 'is_active' => true],
+                ['code' => $expenseCode],
+                ['name' => $expenseName, 'type' => 'expense', 'is_system' => true, 'is_active' => true],
             );
 
             if ($fromPetty) {
-                // Concrete action: post expense against custody (not cash).
                 $this->accounting->postCustodySpend(
                     $amount,
-                    '5100',
+                    $expenseCode,
                     $expense->vehicle_id,
                     'مصروف من العهدة: '.$expense->title,
                     $userId,
                     $spentOn,
+                    'expense:'.$expense->id,
                 );
             } else {
                 $cash = Account::query()->where('code', '1000')->firstOrFail();
                 $entry = JournalEntry::query()->create([
                     'entry_date' => $spentOn,
                     'narration' => 'مصروف: '.$expense->title,
-                    'source' => 'expense',
+                    'source' => 'expense:'.$expense->id,
                     'posted_by' => $userId,
                 ]);
                 JournalLine::query()->create([
@@ -108,7 +128,7 @@ class ExpenseService
                 ]);
             }
 
-            return $expense->load(['vehicle', 'employee']);
+            return $expense->load(['vehicle', 'employee', 'workOrder']);
         });
     }
 }

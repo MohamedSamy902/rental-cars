@@ -389,7 +389,7 @@ export function DashboardPage() {
     return <ErrorState title="تعذّر تحميل لوحة اليوم" description={error} />
   }
 
-  const firstName = (user?.name || 'مستخدم').split(' ')[0]
+  const displayName = (user?.name || '').trim() || 'مستخدم'
   const openTasks = data.tasks.length
   const ring = Math.PI * 2 * 54
 
@@ -454,7 +454,7 @@ export function DashboardPage() {
       >
         <div className="db-hero__copy">
           <p className="db-hero__eyebrow">لوحة التشغيل · RPM</p>
-          <h1>مرحباً، {firstName}</h1>
+          <h1>مرحباً، {displayName}</h1>
           <p className="db-hero__sub">
             لديك <strong className="tabular-nums">{formatNumber(openTasks)}</strong> مهام تحتاج متابعة
             و <strong className="tabular-nums">{formatNumber(data.kpis.returning_today || 0)}</strong>{' '}
