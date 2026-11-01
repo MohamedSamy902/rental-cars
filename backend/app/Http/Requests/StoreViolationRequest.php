@@ -56,8 +56,8 @@ class StoreViolationRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'vehicle_id' => 'السيارة',
-            'occurred_at' => 'وقت المخالفة',
+            'vehicle_id' => 'العربية',
+            'occurred_at' => 'تاريخ المخالفة',
             'location' => 'الموقع',
             'amount' => 'المبلغ',
             'notes' => 'الملاحظات',
@@ -71,10 +71,10 @@ class StoreViolationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'vehicle_id.required' => 'السيارة مطلوبة.',
-            'vehicle_id.exists' => 'السيارة المحدّدة غير صالحة.',
-            'occurred_at.required' => 'وقت المخالفة مطلوب.',
-            'occurred_at.date' => 'وقت المخالفة غير صالح.',
+            'vehicle_id.required' => 'العربية مطلوبة.',
+            'vehicle_id.exists' => 'العربية المحدّدة غير صالحة.',
+            'occurred_at.required' => 'تاريخ المخالفة مطلوب.',
+            'occurred_at.date' => 'تاريخ المخالفة غير صالح.',
             'amount.required' => 'المبلغ مطلوب.',
             'amount.integer' => 'يجب أن يكون المبلغ عدداً صحيحاً.',
             'amount.min' => 'لا يجوز أن يكون المبلغ سالباً.',

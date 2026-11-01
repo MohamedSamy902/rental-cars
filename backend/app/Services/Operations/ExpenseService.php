@@ -64,12 +64,12 @@ class ExpenseService
 
             if ($category === 'صيانة') {
                 if (! $vehicleId) {
-                    throw new DomainException('المركبة مطلوبة عند تصنيف المصروف كصيانة.');
+                    throw new DomainException('العربية مطلوبة عند تصنيف المصروف كصيانة.');
                 }
                 if ($workOrderId) {
                     $wo = WorkOrder::query()->find($workOrderId);
                     if (! $wo || (int) $wo->vehicle_id !== $vehicleId) {
-                        throw new DomainException('أمر الشغل غير مرتبط بهذه المركبة.');
+                        throw new DomainException('أمر الشغل غير مرتبط بهذه العربية.');
                     }
                 }
             }

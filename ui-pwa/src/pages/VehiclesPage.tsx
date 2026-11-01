@@ -62,7 +62,7 @@ export function VehiclesPage() {
         id: 'rented',
         label: 'مؤجرة',
         attention: summary.rented > 0 ? ('warning' as const) : null,
-        attentionLabel: `${summary.rented} مركبة مؤجرة`,
+        attentionLabel: `${summary.rented} عربية مؤجرة`,
       },
       {
         id: 'reserved',
@@ -74,7 +74,7 @@ export function VehiclesPage() {
         id: 'maintenance',
         label: 'صيانة',
         attention: summary.maintenance > 0 ? ('critical' as const) : null,
-        attentionLabel: 'مركبات في الصيانة',
+        attentionLabel: 'عربيات في الصيانة',
       },
     ],
     [summary.rented, summary.reserved, summary.maintenance],
@@ -105,7 +105,7 @@ export function VehiclesPage() {
   const columns: DataColumn<Vehicle>[] = [
     {
       id: 'vehicle',
-      header: 'المركبة',
+      header: 'العربية',
       cell: (v) => (
         <>
           <strong className="rpm-table__primary">{v.brand} {v.model}</strong>
@@ -186,12 +186,12 @@ export function VehiclesPage() {
   return (
     <div className="rpm-stack">
       <PageHeader
-        title="المركبات"
+        title="العربيات"
         subtitle="أسطول التشغيل — اضغط عرض لفتح الملف الكامل"
-        action={<Button onClick={() => setOpen(true)}>إضافة مركبة</Button>}
+        action={<Button onClick={() => setOpen(true)}>إضافة عربية</Button>}
         mobileFab
       />
-      <Fab label="إضافة مركبة" onClick={() => setOpen(true)} />
+      <Fab label="إضافة عربية" onClick={() => setOpen(true)} />
 
       <MetricCardGrid
         label="ملخص الأسطول"
@@ -220,10 +220,10 @@ export function VehiclesPage() {
       />
 
       {error ? (
-        <ErrorState title="تعذّر تحميل المركبات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
+        <ErrorState title="تعذّر تحميل العربيات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
       ) : (
         <DataTable
-          label="المركبات"
+          label="العربيات"
           rows={rows}
           columns={columns}
           rowKey={(v) => v.id}
@@ -231,7 +231,7 @@ export function VehiclesPage() {
           loading={loading}
           onRowClick={(v) => navigate(`/vehicles/${v.id}`)}
           rowActions={vehicleMenu}
-          emptyTitle="لا توجد مركبات مطابقة"
+          emptyTitle="لا توجد عربيات مطابقة"
           emptyDescription="جرّب كلمة بحث أخرى أو غيّر فلتر الحالة."
         />
       )}

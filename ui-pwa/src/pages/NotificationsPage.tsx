@@ -20,7 +20,7 @@ type Note = {
 function shortcut(type?: string | null, id?: number | null): { to: string; label: string } | null {
   if (!type) return null
   if (type === 'contract' && id) return { to: `/contracts/${id}`, label: 'فتح العقد' }
-  if (type === 'vehicle' && id) return { to: `/vehicles/${id}`, label: 'ملف المركبة' }
+  if (type === 'vehicle' && id) return { to: `/vehicles/${id}`, label: 'ملف العربية' }
   if (type === 'customer') return { to: '/customers', label: 'العملاء' }
   if (type === 'owner') return { to: '/owners', label: 'الملاك' }
   if (type === 'payroll') return { to: '/hr', label: 'الموارد البشرية' }

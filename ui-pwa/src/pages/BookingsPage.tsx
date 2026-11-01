@@ -110,7 +110,7 @@ export function BookingsPage() {
     },
     {
       id: 'vehicle',
-      header: 'المركبة',
+      header: 'العربية',
       cell: (b) =>
         b.vehicle ? (
           <>
@@ -166,10 +166,10 @@ export function BookingsPage() {
       <PageHeader
         title="العقود والحجوزات"
         subtitle="تمديد = عقد جديد · تبديل عطل = عقد جديد · بلا رصيد دائن"
-        action={<Button onClick={() => openNewContract()}>إضافة حجز</Button>}
+        action={<Button onClick={() => openNewContract()}>عقد جديد</Button>}
         mobileFab
       />
-      <Fab label="إضافة حجز" onClick={() => openNewContract()} />
+      <Fab label="عقد جديد" onClick={() => openNewContract()} />
 
       <MetricCardGrid
         label="ملخص العقود"

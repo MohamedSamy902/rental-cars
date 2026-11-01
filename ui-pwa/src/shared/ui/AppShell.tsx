@@ -30,7 +30,7 @@ type NavItem = {
 
 const railNav: NavItem[] = [
   { to: '/', label: 'لوحة اليوم', icon: <IconHome />, end: true },
-  { to: '/vehicles', label: 'المركبات', icon: <IconCar />, permission: 'vehicles.view' },
+  { to: '/vehicles', label: 'العربيات', icon: <IconCar />, permission: 'vehicles.view' },
   { to: '/bookings', label: 'العقود', icon: <IconClipboard />, permission: 'contracts.view' },
   { to: '/calendar', label: 'التقويم', icon: <IconCalendar />, permission: 'contracts.view' },
   { to: '/waitlist', label: 'الانتظار', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },

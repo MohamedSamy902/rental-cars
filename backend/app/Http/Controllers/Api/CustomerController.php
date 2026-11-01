@@ -65,8 +65,35 @@ class CustomerController extends Controller
         $this->authorize('view', $customer);
         $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
+        $customer->load([
+            'contracts' => fn ($q) => $q->with('vehicle:id,brand,model,plate,code')->latest('id')->limit(50),
+        ]);
+
+        $violations = \App\Models\Violation::query()
+            ->with(['vehicle:id,brand,model,plate', 'contract:id,code'])
+            ->where('customer_id', $customer->id)
+            ->latest('id')
+            ->limit(50)
+            ->get();
+
+        $payload = $this->presentCustomer($customer, $canViewNid);
+        $payload['contracts'] = $customer->contracts->map(function ($c) {
+            return [
+                'id' => $c->id,
+                'code' => $c->code,
+                'status' => $c->status,
+                'starts_at' => optional($c->starts_at)?->toDateString(),
+                'planned_ends_at' => optional($c->planned_ends_at)?->toDateString(),
+                'actual_ends_at' => optional($c->actual_ends_at)?->toDateString(),
+                'daily_rate' => $c->daily_rate,
+                'deposit' => $c->deposit,
+                'vehicle' => $c->vehicle,
+            ];
+        })->values();
+        $payload['violations'] = $violations;
+
         return response()->json([
-            'data' => $this->presentCustomer($customer, $canViewNid),
+            'data' => $payload,
             'credit_ledger' => $this->credits->ledger($customer),
         ]);
     }
@@ -158,6 +185,7 @@ class CustomerController extends Controller
     private function presentCustomer(Customer $customer, bool $canViewNationalId): array
     {
         $data = $customer->toArray();
+        unset($data['contracts']);
         $nid = $data['national_id'] ?? null;
 
         if ($nid !== null && $nid !== '' && ! $canViewNationalId) {
@@ -165,6 +193,14 @@ class CustomerController extends Controller
             $len = mb_strlen($nid);
             $visible = min(4, $len);
             $data['national_id'] = str_repeat('*', max(0, $len - $visible)).mb_substr($nid, -$visible);
+        }
+
+        foreach (['birth_date', 'license_expires_on', 'national_id_expires_on', 'passport_expires_on'] as $dateKey) {
+            if (! empty($data[$dateKey]) && is_string($data[$dateKey])) {
+                $data[$dateKey] = substr($data[$dateKey], 0, 10);
+            } elseif (! empty($data[$dateKey])) {
+                $data[$dateKey] = optional($customer->{$dateKey})?->toDateString();
+            }
         }
 
         return $data;

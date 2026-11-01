@@ -115,7 +115,7 @@ class VehicleController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم إضافة السيارة.'], 201);
+        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم إضافة العربية.'], 201);
     }
 
     public function show(Vehicle $vehicle): JsonResponse
@@ -125,7 +125,7 @@ class VehicleController extends Controller
         return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents', 'owner']))]);
     }
 
-    /** ملف المركبة الكامل: حجوزات · صيانة · مصروفات · مرفقات · مالك · QR */
+    /** ملف العربية الكامل: حجوزات · صيانة · مصروفات · مرفقات · مالك · QR */
     public function dossier(Vehicle $vehicle): JsonResponse
     {
         $vehicle->load(['accessories', 'documents', 'owner']);
@@ -340,7 +340,7 @@ class VehicleController extends Controller
             ->whereIn('status', ['pending', 'approved', 'active'])
             ->exists();
         if ($hasActive) {
-            return response()->json(['message' => 'لا يمكن أرشفة السيارة لوجود عقود نشطة.'], 422);
+            return response()->json(['message' => 'لا يمكن أرشفة العربية لوجود عقود نشطة.'], 422);
         }
 
         // تحرير code/plate من الفهرس الفريد الكامل حتى يمكن إعادة استخدامهما بعد الأرشفة (توافق MySQL).
@@ -352,7 +352,7 @@ class VehicleController extends Controller
         ])->save();
         $vehicle->delete();
 
-        return response()->json(['message' => 'تم أرشفة السيارة.']);
+        return response()->json(['message' => 'تم أرشفة العربية.']);
     }
 
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): JsonResponse
@@ -363,7 +363,7 @@ class VehicleController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم تحديث السيارة.']);
+        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم تحديث العربية.']);
     }
 
     /**

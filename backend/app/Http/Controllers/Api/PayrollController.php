@@ -41,7 +41,7 @@ class PayrollController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $run, 'message' => 'تم تجهيز مسودة المسير.'], 201);
+        return response()->json(['data' => $run, 'message' => 'تم إعداد كشف رواتب الشهر.'], 201);
     }
 
     public function approve(Request $request, PayrollRun $payrollRun): JsonResponse
@@ -52,7 +52,7 @@ class PayrollController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $run, 'message' => 'تم اعتماد مسير الرواتب.']);
+        return response()->json(['data' => $run, 'message' => 'تم اعتماد كشف الرواتب.']);
     }
 
     public function payout(Request $request, PayrollLine $payrollLine): JsonResponse
@@ -70,7 +70,7 @@ class PayrollController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        $message = $line->carried_over > 0 ? 'تم الصرف الجزئي وترحيل المتبقي للمسير التالي.' : 'تم صرف الراتب بالكامل.';
+        $message = $line->carried_over > 0 ? 'تم الصرف الجزئي وترحيل المتبقي لكشف الرواتب التالي.' : 'تم صرف الراتب بالكامل.';
 
         return response()->json(['data' => $line, 'message' => $message]);
     }

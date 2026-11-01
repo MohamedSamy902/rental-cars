@@ -170,14 +170,14 @@ export function WaitlistPage() {
     },
     {
       id: 'category',
-      header: 'الفئة / المركبة',
+      header: 'الفئة / العربية',
       cell: (r) => (
         <>
           <span className="rpm-table__primary">{r.category}</span>
           <span className="rpm-table__sub">
             {r.preferred_vehicle
               ? `${r.preferred_vehicle.brand} ${r.preferred_vehicle.model} · ${r.preferred_vehicle.plate}`
-              : 'أي مركبة من الفئة'}
+              : 'أي عربية من الفئة'}
           </span>
         </>
       ),
@@ -281,11 +281,11 @@ export function WaitlistPage() {
             ]}
           />
           <SelectField
-            label="مركبة مفضّلة (اختياري)"
+            label="عربية مفضّلة (اختياري)"
             value={form.preferred_vehicle_id}
             onChange={(e) => setForm({ ...form, preferred_vehicle_id: e.target.value })}
             options={[
-              { value: '', label: '— أي مركبة من الفئة —' },
+              { value: '', label: '— أي عربية من الفئة —' },
               ...vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` })),
             ]}
           />

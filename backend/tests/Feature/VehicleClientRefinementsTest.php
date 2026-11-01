@@ -165,7 +165,7 @@ class VehicleClientRefinementsTest extends TestCase
     public function test_maintenance_expense_requires_vehicle(): void
     {
         $this->postJson('/api/expenses', [
-            'title' => 'صيانة بلا مركبة',
+            'title' => 'صيانة بلا عربية',
             'category' => 'صيانة',
             'amount' => 100,
             'spent_on' => now()->toDateString(),

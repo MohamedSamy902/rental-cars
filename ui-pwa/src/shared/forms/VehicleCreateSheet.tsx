@@ -26,7 +26,6 @@ const emptyForm = {
   odometer: '',
   daily_rate: '',
   default_deposit: '',
-  rental_priority: '50',
   chassis_number: '',
   engine_number: '',
   engine_capacity: '',
@@ -100,7 +99,6 @@ export function VehicleCreateSheet({ open, onClose, onSaved }: Props) {
         odometer: Number(form.odometer),
         daily_rate: Number(form.daily_rate),
         default_deposit: Number(form.default_deposit),
-        rental_priority: Number(form.rental_priority || 50),
         chassis_number: form.chassis_number || null,
         engine_number: form.engine_number || null,
         engine_capacity: form.engine_capacity || null,
@@ -128,7 +126,7 @@ export function VehicleCreateSheet({ open, onClose, onSaved }: Props) {
       }
 
       const res = await api<{ data: { id: number } }>('/vehicles', { method: 'POST', json: payload })
-      toast.success('تم إضافة المركبة.')
+      toast.success('تم إضافة العربية.')
       onClose()
       onSaved(res.data?.id)
     } catch (e) {
@@ -145,11 +143,11 @@ export function VehicleCreateSheet({ open, onClose, onSaved }: Props) {
   return (
     <Sheet
       open={open}
-      title="إضافة مركبة جديدة"
+      title="إضافة عربية جديدة"
       onClose={onClose}
       footer={
         <>
-          <Button loading={saving} onClick={() => void save()}>حفظ المركبة</Button>
+          <Button loading={saving} onClick={() => void save()}>حفظ العربية</Button>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
         </>
       }
@@ -184,7 +182,6 @@ export function VehicleCreateSheet({ open, onClose, onSaved }: Props) {
         <NumberField label="العداد الفعلي" required value={form.odometer} error={errors.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
         <MoneyField label="الإيجار اليومي الافتراضي" required value={form.daily_rate} error={errors.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
         <MoneyField label="التأمين النقدي الافتراضي" required value={form.default_deposit} error={errors.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
-        <NumberField label="درجة أولوية التأجير" value={form.rental_priority} onChange={(e) => setForm({ ...form, rental_priority: e.target.value })} hint="من ٠ إلى ١٠٠" />
 
         <SelectField
           label="المالك"
@@ -226,7 +223,7 @@ export function VehicleCreateSheet({ open, onClose, onSaved }: Props) {
 
         <div className="rpm-field" style={{ gridColumn: '1 / -1' }}>
           <span className="rpm-field__label">بيانات الإضافة</span>
-          <span className="rpm-field__hint">اختر المستلزمات من القائمة الرئيسية لإضافتها مع المركبة</span>
+          <span className="rpm-field__hint">اختر المستلزمات من القائمة الرئيسية لإضافتها مع العربية</span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBlockStart: '0.5rem' }}>
             {addons.map((a) => {
               const on = selectedAddons.includes(a.id)

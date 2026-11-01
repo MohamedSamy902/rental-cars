@@ -70,7 +70,7 @@ class WorkOrderController extends Controller
             'lines.*.inventory_item_id.min' => 'اختر صنف المخزون.',
             'lines.*.inventory_item_id.integer' => 'اختر صنف المخزون.',
         ], [
-            'vehicle_id' => 'السيارة',
+            'vehicle_id' => 'العربية',
             'odometer' => 'العداد',
             'opened_at' => 'تاريخ ووقت الصيانة',
             'next_service_on' => 'موعد الصيانة التالية',

@@ -100,6 +100,6 @@ class VehicleAssetController extends Controller
         $template = ConsumablePartTemplate::query()->findOrFail($data['template_id']);
         $row = $this->assets->setVehicleConsumable($vehicle, $template, $data);
 
-        return response()->json(['data' => $row->load('template'), 'message' => 'تم تحديث حالة القطعة على المركبة.']);
+        return response()->json(['data' => $row->load('template'), 'message' => 'تم تحديث حالة القطعة على العربية.']);
     }
 }

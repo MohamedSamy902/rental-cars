@@ -458,7 +458,7 @@ export function DashboardPage() {
           <p className="db-hero__sub">
             لديك <strong className="tabular-nums">{formatNumber(openTasks)}</strong> مهام تحتاج متابعة
             و <strong className="tabular-nums">{formatNumber(data.kpis.returning_today || 0)}</strong>{' '}
-            مركبة ترجع اليوم.
+            عربية ترجع اليوم.
           </p>
         </div>
       </motion.header>
@@ -711,7 +711,7 @@ export function DashboardPage() {
           <Card>
             <CardHeader
               title="حالة الأسطول"
-              description="توزيع المركبات"
+              description="توزيع العربيات"
               action={<CardMenu label="خيارات الأسطول" items={menus.fleet} />}
             />
             <CardContent>
@@ -737,7 +737,7 @@ export function DashboardPage() {
                   </ResponsiveContainer>
                   <div className="db-fleet__center">
                     <strong className="tabular-nums">{formatNumber(data.fleet_total)}</strong>
-                    <span>مركبة</span>
+                    <span>عربية</span>
                   </div>
                 </div>
                 <ul className="db-fleet__legend">
@@ -776,7 +776,7 @@ export function DashboardPage() {
                 <table className="db-table">
                   <thead>
                     <tr>
-                      <th>المركبة</th>
+                      <th>العربية</th>
                       <th>العقد / العميل</th>
                       <th>الحالة</th>
                       <th>الموعد</th>

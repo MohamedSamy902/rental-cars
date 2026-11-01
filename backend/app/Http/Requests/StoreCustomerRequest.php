@@ -53,7 +53,9 @@ class StoreCustomerRequest extends FormRequest
             'license_number' => ['required', 'string', 'max:50'],
             'license_expires_on' => ['required', 'date'],
             'national_id_image_path' => ['nullable', 'string', 'max:500', new MediaReference],
+            'national_id_back_path' => ['nullable', 'string', 'max:500', new MediaReference],
             'license_image_path' => ['nullable', 'string', 'max:500', new MediaReference],
+            'license_back_path' => ['nullable', 'string', 'max:500', new MediaReference],
             'national_id_media_id' => ['nullable', 'integer', 'exists:media_files,id'],
             'license_media_id' => ['nullable', 'integer', 'exists:media_files,id'],
             'notes' => ['nullable', 'string'],
@@ -78,8 +80,10 @@ class StoreCustomerRequest extends FormRequest
             'address' => 'العنوان',
             'license_number' => 'رقم الرخصة',
             'license_expires_on' => 'انتهاء الرخصة',
-            'national_id_image_path' => 'صورة الرقم القومي',
-            'license_image_path' => 'صورة الرخصة',
+            'national_id_image_path' => 'صورة البطاقة — وش',
+            'national_id_back_path' => 'صورة البطاقة — ضهر',
+            'license_image_path' => 'صورة الرخصة — وش',
+            'license_back_path' => 'صورة الرخصة — ضهر',
             'notes' => 'الملاحظات',
         ];
     }

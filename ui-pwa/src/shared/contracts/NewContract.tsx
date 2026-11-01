@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, useToast,
+  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, MediaUpload, useToast,
 } from '@/shared/ui'
+import { toApiDateTime } from '@/shared/lib/format'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
@@ -17,12 +18,20 @@ const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
   daily_rate: '', deposit: '', notes: '',
 }
-const emptyCustomer = { full_name: '', phone: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01' }
 
-function toQueryIso(local: string): string {
-  if (!local) return ''
-  // datetime from DateTimeField is YYYY-MM-DDTHH:mm — append seconds for API
-  return local.length === 16 ? `${local}:00` : local
+const emptyCustomer = {
+  full_name: '',
+  phone: '',
+  phone_alt: '',
+  national_id: '',
+  birth_date: '1990-01-01',
+  license_number: '',
+  license_expires_on: '2030-01-01',
+  notes: '',
+  national_id_image_path: '',
+  national_id_back_path: '',
+  license_image_path: '',
+  license_back_path: '',
 }
 
 export function NewContractProvider({ children }: { children: ReactNode }) {
@@ -41,8 +50,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
 
   const loadVehicles = useCallback(async (starts?: string, ends?: string, preferredId?: number) => {
     const params = new URLSearchParams()
-    if (starts) params.set('from', toQueryIso(starts))
-    if (ends) params.set('to', toQueryIso(ends))
+    if (starts) params.set('from', toApiDateTime(starts))
+    if (ends) params.set('to', toApiDateTime(ends))
     const qs = params.toString()
     const path = qs ? `/vehicles/recommend?${qs}` : '/vehicles/recommend'
     try {
@@ -50,7 +59,6 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       setVehicles(v.data)
       setWeights(v.weights ?? null)
       if (preferredId && !v.data.some((x) => x.id === preferredId)) {
-        // Locked vehicle from dossier may be busy in the chosen window — keep it listed for clarity.
         const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=100').catch(() => ({ data: [] as Vehicle[] }))
         const found = fallback.data.find((x) => x.id === preferredId)
         if (found) setVehicles((prev) => [{ ...found }, ...prev.filter((p) => p.id !== found.id)])
@@ -68,6 +76,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     setOpen(true)
     setInlineCustomer(false)
     setErrors({})
+    setNewCustomer(emptyCustomer)
     setLockedVehicleId(opts?.vehicleId)
     setForm({
       ...emptyForm,
@@ -94,7 +103,6 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       .catch((e) => toast.error((e as ApiError).message))
   }, [loadVehicles, toast])
 
-  // Re-filter available fleet when the booking window changes.
   useEffect(() => {
     if (!open) return
     if (!form.starts_at || !form.planned_ends_at) return
@@ -102,7 +110,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       void loadVehicles(form.starts_at, form.planned_ends_at, lockedVehicleId).then((list) => {
         if (form.vehicle_id && !list.some((v) => String(v.id) === form.vehicle_id) && Number(form.vehicle_id) !== lockedVehicleId) {
           setForm((f) => ({ ...f, vehicle_id: '', daily_rate: '', deposit: '' }))
-          toast.info('المركبة المختارة غير متاحة في هذه الفترة — اختر مركبة أخرى.')
+          toast.info('العربية المختارة غير متاحة في هذه الفترة — اختر عربية أخرى.')
         }
       })
     }, 350)
@@ -117,13 +125,26 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api<{ data: Customer; message: string }>('/customers', {
         method: 'POST',
-        json: newCustomer,
+        json: {
+          full_name: newCustomer.full_name,
+          phone: newCustomer.phone,
+          phone_alt: newCustomer.phone_alt || null,
+          national_id: newCustomer.national_id || null,
+          birth_date: newCustomer.birth_date,
+          license_number: newCustomer.license_number,
+          license_expires_on: newCustomer.license_expires_on,
+          notes: newCustomer.notes || null,
+          national_id_image_path: newCustomer.national_id_image_path || null,
+          national_id_back_path: newCustomer.national_id_back_path || null,
+          license_image_path: newCustomer.license_image_path || null,
+          license_back_path: newCustomer.license_back_path || null,
+        },
       })
       setCustomers((prev) => [res.data, ...prev])
       setForm((f) => ({ ...f, customer_id: String(res.data.id) }))
       setInlineCustomer(false)
       setNewCustomer(emptyCustomer)
-      toast.success('تم تسجيل العميل وربطه بالحجز.')
+      toast.success('تم تسجيل العميل وربطه بالعقد.')
     } catch (e) {
       toast.error((e as ApiError).message)
     }
@@ -138,8 +159,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
         json: {
           customer_id: Number(form.customer_id),
           vehicle_id: Number(form.vehicle_id),
-          starts_at: toQueryIso(form.starts_at),
-          planned_ends_at: toQueryIso(form.planned_ends_at),
+          starts_at: toApiDateTime(form.starts_at),
+          planned_ends_at: toApiDateTime(form.planned_ends_at),
           daily_rate: form.daily_rate ? Number(form.daily_rate) : undefined,
           deposit: form.deposit ? Number(form.deposit) : undefined,
           notes: form.notes || undefined,
@@ -168,7 +189,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       {children}
       <Sheet
         open={open}
-        title="إضافة حجز / عقد"
+        title="عقد جديد"
         onClose={close}
         footer={
           <>
@@ -188,16 +209,53 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
             />
             <Button type="button" variant="secondary" size="sm" onClick={() => setInlineCustomer((v) => !v)}>
-              + إضافة من هنا
+              + تسجيل عميل جديد
             </Button>
           </div>
 
           {inlineCustomer ? (
             <div className="rpm-inline-box">
-              <p className="rpm-inline-box__title">تسجيل عميل سريع</p>
+              <p className="rpm-inline-box__title">تسجيل عميل كامل</p>
               <TextField label="الاسم الكامل" required value={newCustomer.full_name} onChange={(e) => setNewCustomer({ ...newCustomer, full_name: e.target.value })} />
               <TextField label="الهاتف" required value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
+              <TextField label="هاتف بديل" value={newCustomer.phone_alt} onChange={(e) => setNewCustomer({ ...newCustomer, phone_alt: e.target.value })} />
+              <TextField label="الرقم القومي" value={newCustomer.national_id} onChange={(e) => setNewCustomer({ ...newCustomer, national_id: e.target.value })} />
+              <TextField label="تاريخ الميلاد" required type="date" value={newCustomer.birth_date} onChange={(e) => setNewCustomer({ ...newCustomer, birth_date: e.target.value })} />
               <TextField label="رقم الرخصة" required value={newCustomer.license_number} onChange={(e) => setNewCustomer({ ...newCustomer, license_number: e.target.value })} />
+              <TextField label="انتهاء الرخصة" required type="date" value={newCustomer.license_expires_on} onChange={(e) => setNewCustomer({ ...newCustomer, license_expires_on: e.target.value })} />
+              <TextAreaField label="ملاحظات" value={newCustomer.notes} onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })} />
+              <MediaUpload
+                label="صورة البطاقة — وش"
+                value={newCustomer.national_id_image_path || null}
+                collection="customers_id"
+                purpose="national_id"
+                accept="image"
+                onChange={(path) => setNewCustomer({ ...newCustomer, national_id_image_path: path || '' })}
+              />
+              <MediaUpload
+                label="صورة البطاقة — ضهر"
+                value={newCustomer.national_id_back_path || null}
+                collection="customers_id"
+                purpose="national_id_back"
+                accept="image"
+                onChange={(path) => setNewCustomer({ ...newCustomer, national_id_back_path: path || '' })}
+              />
+              <MediaUpload
+                label="صورة الرخصة — وش"
+                value={newCustomer.license_image_path || null}
+                collection="customers_id"
+                purpose="license"
+                accept="image"
+                onChange={(path) => setNewCustomer({ ...newCustomer, license_image_path: path || '' })}
+              />
+              <MediaUpload
+                label="صورة الرخصة — ضهر"
+                value={newCustomer.license_back_path || null}
+                collection="customers_id"
+                purpose="license_back"
+                accept="image"
+                onChange={(path) => setNewCustomer({ ...newCustomer, license_back_path: path || '' })}
+              />
               <Button type="button" size="sm" onClick={() => void addInlineCustomer()}>حفظ واختيار</Button>
             </div>
           ) : null}
@@ -218,11 +276,11 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           />
 
           <SelectField
-            label="السيارة المتاحة في الفترة"
+            label="العربية المتاحة في الفترة"
             required
-            hint={form.starts_at && form.planned_ends_at ? 'تُستبعد المركبات المحجوزة أو المؤجرة في نفس الفترة' : 'حدد فترة الحجز أولاً لتصفية المتاح'}
+            hint={form.starts_at && form.planned_ends_at ? 'تُستبعد العربيات المحجوزة أو المؤجرة في نفس الفترة' : 'حدد فترة الحجز أولاً لتصفية المتاح'}
             options={[
-              { value: '', label: vehicles.length ? 'اختر مركبة…' : 'لا مركبات متاحة في هذه الفترة' },
+              { value: '', label: vehicles.length ? 'اختر عربية…' : 'لا عربيات متاحة في هذه الفترة' },
               ...vehicles.map((v) => ({
                 value: String(v.id),
                 label: v.scores
