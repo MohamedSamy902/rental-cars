@@ -94,7 +94,7 @@ class VehicleOwnerService
 
         $amount = (int) ($vehicle->owner_monthly_amount ?? 0);
         if ($amount < 1) {
-            throw new DomainException('لا يوجد مبلغ شهري لهذه السيارة.');
+            throw new DomainException('لا يوجد مبلغ شهري لهذه العربية.');
         }
 
         [$year, $month] = array_map('intval', explode('-', $yearMonth));
@@ -180,7 +180,7 @@ class VehicleOwnerService
         if ($vehicleId) {
             $belongs = Vehicle::query()->where('id', $vehicleId)->where('owner_id', $owner->id)->exists();
             if (! $belongs) {
-                throw new DomainException('السيارة غير مربوطة بهذا المالك.');
+                throw new DomainException('العربية غير مربوطة بهذا المالك.');
             }
         }
 

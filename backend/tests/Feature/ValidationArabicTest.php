@@ -162,6 +162,6 @@ class ValidationArabicTest extends TestCase
         $messages = $response->json('errors.vehicle_id');
         $this->assertIsArray($messages);
         $this->assertNotEmpty($messages);
-        $this->assertStringContainsString('السيارة', $messages[0]);
+        $this->assertStringContainsString('العربية', $messages[0]);
     }
 }

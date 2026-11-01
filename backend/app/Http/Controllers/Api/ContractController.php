@@ -236,9 +236,9 @@ class ContractController extends Controller
             'accessories' => ['nullable', 'array'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ], [], [
-            'replacement_vehicle_id' => 'السيارة البديلة',
-            'odometer_in' => 'عداد السيارة القديمة',
-            'odometer_out' => 'عداد السيارة البديلة',
+            'replacement_vehicle_id' => 'العربية البديلة',
+            'odometer_in' => 'عداد العربية القديمة',
+            'odometer_out' => 'عداد العربية البديلة',
             'signature_data' => 'توقيع العميل',
             'fuel_level' => 'مستوى البنزين',
             'damages' => 'الأضرار',
@@ -252,7 +252,7 @@ class ContractController extends Controller
 
         return response()->json([
             'data' => $result,
-            'message' => 'تم التبديل بسبب عطل على نفس العقد مع فتح أمر صيانة للسيارة السابقة.',
+            'message' => 'تم التبديل بسبب عطل على نفس العقد مع فتح أمر صيانة للعربية السابقة.',
         ]);
     }
 

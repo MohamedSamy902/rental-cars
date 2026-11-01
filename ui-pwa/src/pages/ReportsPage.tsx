@@ -413,7 +413,7 @@ function ProfitPanel({ data }: { data: ProfitCompare }) {
         ]}
       />
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>حسب السيارة</h3></div>
+        <div className="rpm-panel__head"><h3>حسب العربية</h3></div>
         <div className="rpm-card-list">
           {data.vehicles.slice(0, 24).map((v) => (
             <article key={v.vehicle_id} className="rpm-card">

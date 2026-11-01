@@ -101,7 +101,7 @@ export const depositLabel: Record<string, { label: string; tone: 'success' | 'wa
 }
 
 export const actionTitle: Record<Exclude<ActionKind, null>, string> = {
-  handover: 'تسليم السيارة',
+  handover: 'تسليم العربية',
   return: 'استلام وإقفال',
   cancel: 'إلغاء العقد',
   extend: 'تمديد (عقد جديد)',

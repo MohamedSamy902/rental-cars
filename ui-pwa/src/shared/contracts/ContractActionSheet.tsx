@@ -51,7 +51,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
       <div className="rpm-form-grid">
         {action === 'handover' || action === 'swap' ? (
           <NumberField
-            label={action === 'swap' ? 'عداد السيارة البديلة (خروج)' : 'عداد الخروج'}
+            label={action === 'swap' ? 'عداد العربية البديلة (خروج)' : 'عداد الخروج'}
             required
             value={form.odometer_out}
             onChange={(e) => patch({ odometer_out: e.target.value })}
@@ -59,7 +59,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
         ) : null}
         {action === 'return' || action === 'swap' ? (
           <NumberField
-            label={action === 'swap' ? 'عداد السيارة القديمة (عودة)' : 'عداد العودة'}
+            label={action === 'swap' ? 'عداد العربية القديمة (عودة)' : 'عداد العودة'}
             required
             value={form.odometer_in}
             onChange={(e) => patch({ odometer_in: e.target.value })}

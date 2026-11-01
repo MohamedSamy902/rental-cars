@@ -15,18 +15,31 @@ type Violation = {
   location?: string
   vehicle?: { brand: string; model: string; plate: string }
   customer?: { full_name: string }
-  contract?: { id: number; code: string } | null
+  contract?: { id: number; code?: string; number?: string } | null
 }
 
 type Vehicle = { id: number; brand: string; model: string; plate: string }
 type ContractOption = {
   id: number
-  code: string
+  number?: string
+  code?: string
   status: string
   starts_at: string
   planned_ends_at: string
   customer?: { id: number; full_name: string }
   vehicle?: { id: number; brand: string; model: string; plate: string }
+  vehicle_id?: number
+}
+
+function contractLabel(c: ContractOption): string {
+  const raw = (c.number || c.code || '').trim()
+  const no = raw || `CNT-${String(c.id).padStart(5, '0')}`
+  const customer = c.customer?.full_name || 'عميل'
+  const day = (c.starts_at || '').slice(0, 10) || '—'
+  const car = c.vehicle
+    ? `${c.vehicle.brand} ${c.vehicle.model}`.trim()
+    : ''
+  return car ? `${no} · ${customer} · ${day} (${car})` : `${no} · ${customer} · ${day}`
 }
 
 const statusLabel: Record<string, string> = {
@@ -102,10 +115,10 @@ export function ViolationsPage() {
     {
       id: 'contract',
       header: 'العقد',
-      cell: (r) => r.contract?.code || '—',
-      sortValue: (r) => r.contract?.code,
+      cell: (r) => r.contract?.number || r.contract?.code || '—',
+      sortValue: (r) => r.contract?.number || r.contract?.code,
     },
-    { id: 'customer', header: 'العميل', cell: (r) => r.customer?.full_name || 'بلا إسناد بعد', sortValue: (r) => r.customer?.full_name, mobile: 'subtitle' },
+    { id: 'customer', header: 'العميل', cell: (r) => r.customer?.full_name || 'بلا ربط بعد', sortValue: (r) => r.customer?.full_name, mobile: 'subtitle' },
     { id: 'date', header: 'تاريخ المخالفة', cell: (r) => formatDate(r.occurred_at), sortValue: (r) => r.occurred_at },
     { id: 'location', header: 'المكان', cell: (r) => r.location || '—', sortValue: (r) => r.location },
     { id: 'amount', header: 'المبلغ', cell: (r) => formatMoney(r.amount), sortValue: (r) => Number(r.amount) },
@@ -139,12 +152,7 @@ export function ViolationsPage() {
       api<{ data: ContractOption[] }>('/contracts?per_page=100').catch(() => api<{ data: ContractOption[] }>('/bookings?per_page=100')),
     ])
     setVehicles(v.data)
-    setContracts(c.data.map((row) => ({
-      ...row,
-      vehicle: row.vehicle || (row as { vehicle_id?: number }).vehicle_id
-        ? row.vehicle
-        : row.vehicle,
-    })))
+    setContracts(c.data)
   }
 
   async function onSave() {
@@ -242,14 +250,14 @@ export function ViolationsPage() {
             onChange={(e) => setForm({ ...form, occurred_at: e.target.value })}
           />
           <SelectField
-            label="العقد / الحجز المرتبط"
+            label="العقد المرتبط"
             error={fieldErrors.contract_id}
             hint={form.vehicle_id && form.occurred_at ? 'تُعرض العقود التي تغطي تاريخ المخالفة لهذه العربية' : 'اختر العربية والتاريخ لتصفية العقود'}
             options={[
               { value: '', label: matchingContracts.length ? '— اختيار يدوي / تلقائي —' : 'لا عقود مطابقة — سيُحاول الربط تلقائياً' },
               ...matchingContracts.map((c) => ({
                 value: String(c.id),
-                label: `${c.code} · ${c.customer?.full_name || 'عميل'} · ${(c.starts_at || '').slice(0, 10)}`,
+                label: contractLabel(c),
               })),
             ]}
             value={form.contract_id}

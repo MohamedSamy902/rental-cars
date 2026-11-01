@@ -86,7 +86,7 @@ class StoreContractRequest extends FormRequest
     {
         return [
             'customer_id' => 'العميل',
-            'vehicle_id' => 'السيارة',
+            'vehicle_id' => 'العربية',
             'guarantor_customer_id' => 'الضامن',
             'starts_at' => 'وقت البداية',
             'planned_ends_at' => 'وقت النهاية المخطط',
@@ -113,8 +113,8 @@ class StoreContractRequest extends FormRequest
         return [
             'customer_id.required' => 'العميل مطلوب.',
             'customer_id.exists' => 'العميل المحدّد غير صالح.',
-            'vehicle_id.required' => 'السيارة مطلوبة.',
-            'vehicle_id.exists' => 'السيارة المحدّدة غير صالحة.',
+            'vehicle_id.required' => 'العربية مطلوبة.',
+            'vehicle_id.exists' => 'العربية المحدّدة غير صالحة.',
             'guarantor_customer_id.exists' => 'الضامن المحدّد غير صالح.',
             'starts_at.required' => 'وقت البداية مطلوب.',
             'starts_at.date' => 'وقت البداية غير صالح.',

@@ -139,7 +139,7 @@ export function HrPage() {
   async function draftPayroll() {
     try {
       await api('/payroll/draft', { method: 'POST', json: { year: now.getFullYear(), month: now.getMonth() + 1 } })
-      toast.success('تم تجهيز مسودة المسير.')
+      toast.success('تم إعداد كشف رواتب الشهر.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -149,7 +149,7 @@ export function HrPage() {
   async function approve(id: number) {
     try {
       await api(`/payroll/${id}/approve`, { method: 'POST' })
-      toast.success('تم اعتماد المسير.')
+      toast.success('تم اعتماد كشف الرواتب.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -223,7 +223,7 @@ export function HrPage() {
           notes: assignForm.notes || undefined,
         },
       })
-      toast.success('تم الإسناد — بانتظار تأكيد استلام الأدمن.')
+      toast.success('تم تسليم العهدة/الأصل — بانتظار تأكيد استلام الأدمن.')
       setAssignOpen(false)
       setAssignForm({ employee_id: '', title: '', assignable_type: 'manual', notes: '' })
       await load()
@@ -522,7 +522,7 @@ export function HrPage() {
           <div className="rpm-form-grid">
             <p className="muted">
               الصافي {formatMoney(payoutLine.net_amount)} · مصروف {formatMoney(payoutLine.paid_amount)} · متبقي {formatMoney(Math.max(0, payoutLine.net_amount - payoutLine.paid_amount))}.
-              أي مبلغ أقل من المتبقي يُرحَّل تلقائياً للمسير التالي.
+              أي مبلغ أقل من المتبقي يُرحَّل تلقائياً لكشف الرواتب التالي.
             </p>
             <MoneyField label="المبلغ المصروف" required value={payoutForm.amount} onChange={(e) => setPayoutForm({ ...payoutForm, amount: e.target.value })} />
             <TextField label="تاريخ الصرف" type="date" required value={payoutForm.paid_on} onChange={(e) => setPayoutForm({ ...payoutForm, paid_on: e.target.value })} />
