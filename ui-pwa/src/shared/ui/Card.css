@@ -118,3 +118,46 @@
     padding: 0;
   }
 }
+
+/* Narrow phones: title block first, actions wrap below — no collision */
+@media (max-width: 640px) {
+  .rpm-surface__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.7rem;
+    padding-block: 1rem;
+  }
+
+  .rpm-surface__header-main {
+    gap: 0.25rem;
+    width: 100%;
+  }
+
+  .rpm-surface__title {
+    font-size: 0.9375rem;
+    line-height: 1.4;
+  }
+
+  .rpm-surface__description {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .rpm-surface__action {
+    margin-inline-start: 0;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 0.4rem;
+  }
+
+  .rpm-surface__action a,
+  .rpm-surface__action .rpm-surface__action-link {
+    min-height: 2rem;
+    padding-inline: 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--accent-ink);
+    font-size: 0.75rem;
+  }
+}

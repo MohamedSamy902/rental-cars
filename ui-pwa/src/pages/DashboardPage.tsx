@@ -231,7 +231,7 @@ export function DashboardPage() {
         setMom(r.data)
         setMomOpen(true)
       })
-      .catch((e) => toast.error(e.message || 'تعذّر تحميل مقارنة الربحية'))
+      .catch((e) => toast.error(e.message || 'تعذّر تحميل مقارنة الأرباح'))
   }, [data?.profitability_compare, toast])
 
   useEffect(() => {
@@ -435,7 +435,7 @@ export function DashboardPage() {
       label: 'إيراد متوقع',
       value: data.kpis.expected_revenue || 0,
       kind: 'money' as const,
-      badge: 'أفق التشغيل',
+      badge: 'من العقود الحالية',
       badgeTone: 'brand' as BadgeTone,
       icon: <IconTrend size={16} />,
       tone: 'brand',
@@ -453,12 +453,12 @@ export function DashboardPage() {
         transition={{ duration: 0.35 }}
       >
         <div className="db-hero__copy">
-          <p className="db-hero__eyebrow">لوحة التشغيل · RPM</p>
+          <p className="db-hero__eyebrow">لوحة اليوم · RPM</p>
           <h1>مرحباً، {displayName}</h1>
           <p className="db-hero__sub">
-            لديك <strong className="tabular-nums">{formatNumber(openTasks)}</strong> مهام تحتاج متابعة
+            لديك <strong className="tabular-nums">{formatNumber(openTasks)}</strong> مهام للمتابعة
             و <strong className="tabular-nums">{formatNumber(data.kpis.returning_today || 0)}</strong>{' '}
-            مركبة ترجع اليوم.
+            عربيات راجعة النهاردة.
           </p>
         </div>
       </motion.header>
@@ -502,14 +502,15 @@ export function DashboardPage() {
         >
           <Card>
             <CardHeader
-              title="صحة الإشغال"
-              description="قراءة لحظية للأسطول النشط"
+              className="db-card-head"
+              title="نسبة الإشغال"
+              description="حالة الأسطول الآن"
               action={
-                <>
-                  <button type="button" className="db-text-action" onClick={openMom}>مقارنة ربحية شهر بشهر</button>
+                <div className="db-card-head__actions">
+                  <button type="button" className="db-text-action" onClick={openMom}>مقارنة أرباح الشهر</button>
                   <Link to="/vehicles">الأسطول</Link>
                   <CardMenu label="خيارات الإشغال" items={menus.occupancy} />
-                </>
+                </div>
               }
             />
             <CardContent>
@@ -568,17 +569,18 @@ export function DashboardPage() {
         >
           <Card>
             <CardHeader
-              title="عمليات قادمة"
-              description="ما يحتاج قراراً أولاً"
+              className="db-card-head"
+              title="مهام اليوم"
+              description="يحتاج متابعتك"
               action={
-                <>
+                <div className="db-card-head__actions">
                   <Link to="/bookings">العقود</Link>
                   <CardMenu label="خيارات العمليات" items={menus.operations} />
-                </>
+                </div>
               }
             />
             <CardContent flush>
-              <div className="db-table-wrap">
+              <div className="db-table-wrap db-tasks">
                 <table className="db-table">
                   <thead>
                     <tr>
@@ -609,13 +611,16 @@ export function DashboardPage() {
                                 <span className="db-table__ico" aria-hidden>
                                   <IconClipboard size={14} />
                                 </span>
-                                <strong>{task.title}</strong>
+                                <div className="db-table__copy">
+                                  <strong>{task.title}</strong>
+                                  <span className="db-table__muted db-table__muted--inline">{task.subtitle}</span>
+                                </div>
                               </div>
                             </td>
-                            <td>
+                            <td className="db-table__details">
                               <span className="db-table__muted">{task.subtitle}</span>
                             </td>
-                            <td>
+                            <td className="db-table__status">
                               <Badge tone={pill.tone}>{pill.label}</Badge>
                             </td>
                           </motion.tr>
@@ -866,7 +871,7 @@ export function DashboardPage() {
                   <span className="db-quick__ico">
                     <IconTrend size={18} />
                   </span>
-                  <span className="db-quick__label">ربحية شهر بشهر</span>
+                  <span className="db-quick__label">أرباح الشهر</span>
                   <b className="tabular-nums">
                     {data.profitability_compare
                       ? `${data.profitability_compare.fleet.delta_pct >= 0 ? '+' : ''}${formatNumber(data.profitability_compare.fleet.delta_pct)}%`
@@ -879,13 +884,13 @@ export function DashboardPage() {
         </motion.div>
       </section>
 
-      <Sheet open={momOpen} title="مقارنة ربحية شهر بشهر" onClose={() => setMomOpen(false)}>
+      <Sheet open={momOpen} title="مقارنة أرباح الشهر" onClose={() => setMomOpen(false)}>
         {mom ? (
           <div className="rpm-stack">
             <p className="muted">{mom.current_month} مقابل {mom.previous_month}</p>
             <div className="db-mom-grid">
               <div>
-                <span>ربح التشغيل الحالي</span>
+                <span>صافي الشهر الحالي</span>
                 <strong className="tabular-nums">{formatMoney(mom.fleet.current.operating_profit)}</strong>
               </div>
               <div>

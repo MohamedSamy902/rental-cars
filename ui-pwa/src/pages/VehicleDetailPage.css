@@ -205,8 +205,9 @@
 }
 
 .vd-qr-panel {
-  justify-self: start;
-  width: min(15rem, 100%);
+  width: 100%;
+  max-width: 22rem;
+  justify-self: stretch;
 }
 
 .vd-rate {
@@ -415,18 +416,18 @@
 
 .vd-owner {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1rem;
-  align-items: center;
+  gap: 0.85rem;
   padding: 1rem;
   border-radius: 16px;
   background: var(--bg);
   border: 1px solid var(--border);
+  min-width: 0;
 }
 
 .vd-owner__avatar {
   width: 48px;
   height: 48px;
+  flex-shrink: 0;
   border-radius: 14px;
   display: grid;
   place-items: center;
@@ -445,6 +446,7 @@
 
 .vd-owner__meta strong {
   font-size: 1.05rem;
+  overflow-wrap: anywhere;
 }
 
 .vd-owner__meta span {
@@ -456,6 +458,27 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
+}
+
+.vd-owner__facts {
+  margin: 0;
+}
+
+.vd-owner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.vd-owner__actions .rpm-link-btn {
+  width: 100%;
+  justify-content: center;
+  min-height: 2.5rem;
+}
+
+.vd-qr-head {
+  margin-block-start: 0.5rem;
 }
 
 .vd-split {
@@ -732,23 +755,57 @@
     grid-template-columns: 1fr;
   }
 
-  /* Compact QR row: code on one side, caption + actions on the other */
-  .vd-qr.rpm-qr {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: 1fr auto;
-    justify-items: stretch;
-    align-items: center;
-    column-gap: 0.875rem;
+  /* Stacked QR: code → caption → full-width actions (no side squeeze) */
+  .vd-qr.rpm-qr,
+  .vd-qr-panel.rpm-qr {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    width: 100%;
+    max-width: none;
   }
-  .vd-qr .rpm-qr__plate {
-    grid-row: 1 / -1;
+
+  .vd-qr .rpm-qr__plate,
+  .vd-qr-panel .rpm-qr__plate {
+    grid-row: auto;
   }
-  .vd-qr .rpm-qr__label {
-    text-align: start;
-    align-self: end;
+
+  .vd-qr .rpm-qr__label,
+  .vd-qr-panel .rpm-qr__label {
+    text-align: center;
+    font-size: 0.8125rem;
   }
-  .vd-qr .rpm-qr__actions {
-    align-self: start;
+
+  .vd-qr .rpm-qr__actions,
+  .vd-qr-panel .rpm-qr__actions {
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .vd-qr .rpm-qr__btn,
+  .vd-qr-panel .rpm-qr__btn {
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+  }
+
+  .vd-hero__actions {
+    width: 100%;
+  }
+
+  .vd-hero__actions .rpm-btn {
+    flex: 1 1 calc(50% - 0.35rem);
+    min-width: 0;
+  }
+
+  .vd-tabs {
+    gap: 0.3rem;
+    padding: 0.3rem;
+  }
+
+  .vd-tab {
+    padding-inline: 0.7rem;
+    font-size: 0.8rem;
   }
 
   .vd-fact {
@@ -757,9 +814,17 @@
     border-radius: 0.75rem;
   }
 
+  .vd-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .vd-plate__num {
     white-space: normal;
     font-size: 1.45rem;
+  }
+
+  .vd-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

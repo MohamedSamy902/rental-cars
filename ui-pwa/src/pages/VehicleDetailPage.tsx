@@ -20,7 +20,17 @@ import './VehicleDetailPage.css'
 import './pages.css'
 import '@/shared/ui/AttentionDot.css'
 
-type OwnerOption = { id: number; full_name: string; phone?: string | null }
+type OwnerOption = {
+  id: number
+  full_name: string
+  phone?: string | null
+  phone_alt?: string | null
+  national_id?: string | null
+  notes?: string | null
+  is_active?: boolean
+  id_front_path?: string | null
+  id_back_path?: string | null
+}
 type Accessory = {
   id: number
   name: string
@@ -1178,20 +1188,57 @@ export function VehicleDetailPage() {
             <div className="vd-owner__avatar" aria-hidden>{ownerInitial}</div>
             <div className="vd-owner__meta">
               <strong>{v.owner.full_name}</strong>
-              <span>{v.owner.phone || 'بدون هاتف'} · شهري {formatMoney(v.owner_monthly_amount || 0)}</span>
-              <span>ربط منذ {v.owner_since || '—'}</span>
+              <span>{v.owner.is_active === false ? 'موقوف' : 'نشط'}</span>
             </div>
           </div>
-          <Link className="vd-no-print rpm-link-btn" to="/owners">صفحة الملاك</Link>
+          <dl className="vd-facts vd-owner__facts">
+            <div className="vd-fact">
+              <dt>الهاتف</dt>
+              <dd dir="ltr">{v.owner.phone || '—'}</dd>
+            </div>
+            <div className="vd-fact">
+              <dt>هاتف بديل</dt>
+              <dd dir="ltr">{v.owner.phone_alt || '—'}</dd>
+            </div>
+            <div className="vd-fact">
+              <dt>الرقم القومي</dt>
+              <dd dir="ltr">{v.owner.national_id || '—'}</dd>
+            </div>
+            <div className="vd-fact">
+              <dt>المبلغ الشهري لهذه المركبة</dt>
+              <dd>{formatMoney(v.owner_monthly_amount || 0)}</dd>
+            </div>
+            <div className="vd-fact">
+              <dt>تاريخ الربط</dt>
+              <dd>{v.owner_since || '—'}</dd>
+            </div>
+            <div className="vd-fact">
+              <dt>بطاقة الرقم القومي</dt>
+              <dd>
+                {v.owner.id_front_path || v.owner.id_back_path
+                  ? `${v.owner.id_front_path ? 'وجه' : ''}${v.owner.id_front_path && v.owner.id_back_path ? ' · ' : ''}${v.owner.id_back_path ? 'ضهر' : ''}`
+                  : 'غير مرفوعة'}
+              </dd>
+            </div>
+            {v.owner.notes ? (
+              <div className="vd-fact vd-fact--wide">
+                <dt>ملاحظات</dt>
+                <dd>{v.owner.notes}</dd>
+              </div>
+            ) : null}
+          </dl>
+          <div className="vd-owner__actions vd-no-print">
+            <Link className="rpm-link-btn" to="/owners">كشف حساب المالك</Link>
+          </div>
         </div>
       ) : (
         <Empty>هذه المركبة ملك المركز — لا يوجد مالك خارجي مرتبط.</Empty>
       )}
-      {(dossier.owner_dues.length > 0 || dossier.owner_payouts.length > 0) ? (
+      {v.owner ? (
         <div className="vd-split">
           <div>
             <h3>المستحقات الشهرية</h3>
-            {dossier.owner_dues.length === 0 ? <Empty>لا مستحقات</Empty> : (
+            {dossier.owner_dues.length === 0 ? <Empty>لا مستحقات مسجّلة بعد</Empty> : (
               <div className="rpm-table-wrap">
                 <table className="rpm-table rpm-table--compact rpm-table--stack">
                   <thead><tr><th>الشهر</th><th>المبلغ</th></tr></thead>
@@ -1205,8 +1252,8 @@ export function VehicleDetailPage() {
             )}
           </div>
           <div>
-            <h3>المدفوعات</h3>
-            {dossier.owner_payouts.length === 0 ? <Empty>لا مدفوعات</Empty> : (
+            <h3>مدفوعات للمالك</h3>
+            {dossier.owner_payouts.length === 0 ? <Empty>لا مدفوعات مسجّلة بعد</Empty> : (
               <div className="rpm-table-wrap">
                 <table className="rpm-table rpm-table--compact rpm-table--stack">
                   <thead><tr><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th></tr></thead>
@@ -1225,8 +1272,9 @@ export function VehicleDetailPage() {
           </div>
         </div>
       ) : null}
-      <div className="vd-panel__head" style={{ marginTop: '0.35rem' }}>
+      <div className="vd-panel__head vd-qr-head">
         <h2>رمز QR</h2>
+        <p>للوصول السريع لملف المركبة</p>
       </div>
       <QrCode
         className="vd-qr-panel"
@@ -1372,9 +1420,9 @@ export function VehicleDetailPage() {
             <QrCode
               className="vd-qr"
               value={dossier.qr.payload}
-              label="امسح للوصول السريع"
+              label="امسح لفتح ملف المركبة"
               fileName={`rpm-${v.code}-qr`}
-              size={124}
+              size={140}
             />
           </aside>
         </div>
