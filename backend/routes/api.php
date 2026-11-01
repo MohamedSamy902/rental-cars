@@ -168,6 +168,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware(['feature:petty_cash', 'permission:petty_cash.view,hr.custody'])->group(function () {
         Route::get('/petty-cash', [OperationsController::class, 'pettyCashIndex']);
+        Route::get('/petty-cash/{account}', [OperationsController::class, 'pettyCashShow']);
     });
     Route::middleware(['feature:petty_cash', 'permission:petty_cash.manage,hr.custody'])->group(function () {
         Route::post('/petty-cash', [OperationsController::class, 'pettyCashStore']);

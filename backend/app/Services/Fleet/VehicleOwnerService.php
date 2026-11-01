@@ -30,6 +30,10 @@ class VehicleOwnerService
             'phone' => $data['phone'] ?? null,
             'phone_alt' => $data['phone_alt'] ?? null,
             'national_id' => $data['national_id'] ?? null,
+            'id_front_path' => $data['id_front_path'] ?? null,
+            'id_back_path' => $data['id_back_path'] ?? null,
+            'license_front_path' => $data['license_front_path'] ?? null,
+            'license_back_path' => $data['license_back_path'] ?? null,
             'notes' => $data['notes'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ]);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
@@ -19,19 +20,22 @@ type Customer = {
   birth_date?: string
   national_id?: string | null
   national_id_image_path?: string | null
+  national_id_back_path?: string | null
   license_image_path?: string | null
+  license_back_path?: string | null
   status: string
   notes?: string | null
   blacklist_reason?: string | null
 }
 
 const emptyForm = {
-  full_name: '', phone: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01', national_id: '', notes: '',
-  national_id_image_path: '', license_image_path: '',
+  full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01', national_id: '', notes: '',
+  national_id_image_path: '', national_id_back_path: '', license_image_path: '', license_back_path: '',
 }
 
 export function CustomersPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [rows, setRows] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
   const [chip, setChip] = useState('all')
@@ -39,7 +43,7 @@ export function CustomersPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<Customer | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -80,29 +84,7 @@ export function CustomersPage() {
   }, [search, chip])
 
   async function openDetail(id: number) {
-    setDetailLoading(true)
-    setEditing(false)
-    setBlacklistReason('')
-    try {
-      const res = await api<{ data: Customer }>(`/customers/${id}`)
-      setDetail(res.data)
-      setForm({
-        full_name: res.data.full_name,
-        phone: res.data.phone,
-        birth_date: res.data.birth_date || '1990-01-01',
-        license_number: res.data.license_number,
-        license_expires_on: res.data.license_expires_on,
-        national_id: res.data.national_id || '',
-        notes: res.data.notes || '',
-        national_id_image_path: res.data.national_id_image_path || '',
-        license_image_path: res.data.license_image_path || '',
-      })
-      setBlacklistReason(res.data.blacklist_reason || '')
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setDetailLoading(false)
-    }
+    navigate(`/customers/${id}`)
   }
 
   function mapApiErrors(e: unknown) {
@@ -173,8 +155,7 @@ export function CustomersPage() {
   }
 
   async function openEdit(id: number) {
-    await openDetail(id)
-    setEditing(true)
+    navigate(`/customers/${id}`)
   }
 
   const statusPill = (c: Customer) => (
@@ -195,7 +176,7 @@ export function CustomersPage() {
     },
     { id: 'phone', header: 'الهاتف', cell: (c) => <span dir="ltr">{c.phone}</span>, sortValue: (c) => c.phone, mobile: 'subtitle' },
     { id: 'license', header: 'رقم الرخصة', cell: (c) => c.license_number, sortValue: (c) => c.license_number },
-    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => c.license_expires_on, sortValue: (c) => c.license_expires_on },
+    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => (c.license_expires_on || '').slice(0, 10), sortValue: (c) => c.license_expires_on },
     { id: 'status', header: 'الحالة', cell: statusPill, sortValue: (c) => c.status, mobile: 'badge' },
   ]
 
@@ -226,27 +207,42 @@ export function CustomersPage() {
       <TextField label="رقم الرخصة" required error={fieldErrors.license_number} value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
       <TextField label="انتهاء الرخصة" required error={fieldErrors.license_expires_on} type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
       <MediaUpload
-        label="صورة البطاقة"
+        label="صورة البطاقة — وش"
         value={form.national_id_image_path || null}
         collection="customers_id"
         purpose="national_id"
         accept="image"
         error={fieldErrors.national_id_image_path}
-        attachableType={editing && detail ? 'customer' : undefined}
-        attachableId={editing && detail ? detail.id : undefined}
         onChange={(path) => setForm({ ...form, national_id_image_path: path || '' })}
       />
       <MediaUpload
-        label="صورة الرخصة"
+        label="صورة البطاقة — ضهر"
+        value={form.national_id_back_path || null}
+        collection="customers_id"
+        purpose="national_id_back"
+        accept="image"
+        error={fieldErrors.national_id_back_path}
+        onChange={(path) => setForm({ ...form, national_id_back_path: path || '' })}
+      />
+      <MediaUpload
+        label="صورة الرخصة — وش"
         value={form.license_image_path || null}
         collection="customers_id"
         purpose="license"
         accept="image"
         error={fieldErrors.license_image_path}
-        attachableType={editing && detail ? 'customer' : undefined}
-        attachableId={editing && detail ? detail.id : undefined}
         onChange={(path) => setForm({ ...form, license_image_path: path || '' })}
+      />
+      <MediaUpload
+        label="صورة الرخصة — ضهر"
+        value={form.license_back_path || null}
+        collection="customers_id"
+        purpose="license_back"
+        accept="image"
+        error={fieldErrors.license_back_path}
+        onChange={(path) => setForm({ ...form, license_back_path: path || '' })}
       />
     </div>
   )
@@ -285,7 +281,7 @@ export function CustomersPage() {
       </Sheet>
 
       <Sheet
-        open={!!detail || detailLoading}
+        open={false}
         title={detail?.full_name || 'تفاصيل العميل'}
         onClose={() => setDetail(null)}
         closeLabel="إغلاق"

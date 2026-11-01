@@ -12,8 +12,8 @@ class Customer extends Model
 
     protected $fillable = [
         'full_name', 'phone', 'phone_alt', 'email', 'national_id', 'national_id_expires_on',
-        'national_id_image_path', 'passport_number', 'passport_expires_on', 'birth_date', 'address',
-        'license_number', 'license_expires_on', 'license_image_path',
+        'national_id_image_path', 'national_id_back_path', 'passport_number', 'passport_expires_on', 'birth_date', 'address',
+        'license_number', 'license_expires_on', 'license_image_path', 'license_back_path',
         'status', 'blacklist_reason', 'blacklisted_by', 'blacklisted_at', 'notes', 'credit_balance',
     ];
 
