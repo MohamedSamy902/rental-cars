@@ -502,14 +502,15 @@ export function DashboardPage() {
         >
           <Card>
             <CardHeader
+              className="db-card-head"
               title="نسبة الإشغال"
               description="حالة الأسطول الآن"
               action={
-                <>
+                <div className="db-card-head__actions">
                   <button type="button" className="db-text-action" onClick={openMom}>مقارنة أرباح الشهر</button>
                   <Link to="/vehicles">الأسطول</Link>
                   <CardMenu label="خيارات الإشغال" items={menus.occupancy} />
-                </>
+                </div>
               }
             />
             <CardContent>
@@ -568,17 +569,18 @@ export function DashboardPage() {
         >
           <Card>
             <CardHeader
+              className="db-card-head"
               title="مهام اليوم"
               description="يحتاج متابعتك"
               action={
-                <>
+                <div className="db-card-head__actions">
                   <Link to="/bookings">العقود</Link>
                   <CardMenu label="خيارات العمليات" items={menus.operations} />
-                </>
+                </div>
               }
             />
             <CardContent flush>
-              <div className="db-table-wrap">
+              <div className="db-table-wrap db-tasks">
                 <table className="db-table">
                   <thead>
                     <tr>
@@ -609,13 +611,16 @@ export function DashboardPage() {
                                 <span className="db-table__ico" aria-hidden>
                                   <IconClipboard size={14} />
                                 </span>
-                                <strong>{task.title}</strong>
+                                <div className="db-table__copy">
+                                  <strong>{task.title}</strong>
+                                  <span className="db-table__muted db-table__muted--inline">{task.subtitle}</span>
+                                </div>
                               </div>
                             </td>
-                            <td>
+                            <td className="db-table__details">
                               <span className="db-table__muted">{task.subtitle}</span>
                             </td>
-                            <td>
+                            <td className="db-table__status">
                               <Badge tone={pill.tone}>{pill.label}</Badge>
                             </td>
                           </motion.tr>
