@@ -84,11 +84,11 @@ class VehicleController extends Controller
             }
         }
 
-        $q->with('owner:id,full_name,phone');
+        $q->with('owner:id,full_name,phone,phone_alt,national_id,notes,is_active');
         $rows = $q->paginate((int) $request->integer('per_page', 50));
 
-        $data = collect($rows->items())->map(function (Vehicle $v) {
-            return $this->present($v);
+        $data = collect($rows->items())->map(function (Vehicle $v) use ($request) {
+            return $this->present($v, $request);
         });
 
         return response()->json([
@@ -115,18 +115,18 @@ class VehicleController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم إضافة السيارة.'], 201);
+        return response()->json(['data' => $this->present($vehicle, $request), 'message' => 'تم إضافة السيارة.'], 201);
     }
 
-    public function show(Vehicle $vehicle): JsonResponse
+    public function show(Request $request, Vehicle $vehicle): JsonResponse
     {
         $this->authorize('view', $vehicle);
 
-        return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents', 'owner']))]);
+        return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents', 'owner']), $request)]);
     }
 
     /** ملف المركبة الكامل: حجوزات · صيانة · مصروفات · مرفقات · مالك · QR */
-    public function dossier(Vehicle $vehicle): JsonResponse
+    public function dossier(Request $request, Vehicle $vehicle): JsonResponse
     {
         $vehicle->load(['accessories', 'documents', 'owner']);
 
@@ -292,7 +292,7 @@ class VehicleController extends Controller
 
         return response()->json([
             'data' => [
-                'vehicle' => $this->present($vehicle),
+                'vehicle' => $this->present($vehicle, $request),
                 'contracts' => $contracts->values(),
                 'work_orders' => $workOrders->values(),
                 'expenses' => $expenses->values(),
@@ -363,13 +363,13 @@ class VehicleController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم تحديث السيارة.']);
+        return response()->json(['data' => $this->present($vehicle, $request), 'message' => 'تم تحديث السيارة.']);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function present(Vehicle $v): array
+    private function present(Vehicle $v, ?Request $request = null): array
     {
         $status = $this->availability->statusOnDate([
             'manual_status' => $v->manual_status,
@@ -386,6 +386,29 @@ class VehicleController extends Controller
                     ->whereIn('status', ['open', 'in_progress'])
                     ->exists(),
         ]);
+
+        $canViewNid = (bool) $request?->user()?->hasPermission('sensitive.view_national_id');
+        $ownerPayload = null;
+        if ($v->relationLoaded('owner') && $v->owner) {
+            $nid = $v->owner->national_id;
+            if ($nid !== null && $nid !== '' && ! $canViewNid) {
+                $nid = (string) $nid;
+                $len = mb_strlen($nid);
+                $visible = min(4, $len);
+                $nid = str_repeat('*', max(0, $len - $visible)).mb_substr($nid, -$visible);
+            }
+            $ownerPayload = [
+                'id' => $v->owner->id,
+                'full_name' => $v->owner->full_name,
+                'phone' => $v->owner->phone,
+                'phone_alt' => $v->owner->phone_alt,
+                'national_id' => $nid,
+                'notes' => $v->owner->notes,
+                'is_active' => (bool) $v->owner->is_active,
+                'id_front_path' => $v->owner->id_front_path,
+                'id_back_path' => $v->owner->id_back_path,
+            ];
+        }
 
         return [
             'id' => $v->id,
@@ -417,11 +440,7 @@ class VehicleController extends Controller
             'owner_id' => $v->owner_id !== null ? (int) $v->owner_id : null,
             'owner_monthly_amount' => $v->owner_monthly_amount !== null ? (int) $v->owner_monthly_amount : null,
             'owner_since' => $v->owner_since?->toDateString(),
-            'owner' => $v->relationLoaded('owner') && $v->owner ? [
-                'id' => $v->owner->id,
-                'full_name' => $v->owner->full_name,
-                'phone' => $v->owner->phone,
-            ] : null,
+            'owner' => $ownerPayload,
             'accessories' => $v->relationLoaded('accessories') ? $v->accessories : null,
             'documents' => $v->relationLoaded('documents') ? $v->documents : null,
             'notes' => $v->notes,

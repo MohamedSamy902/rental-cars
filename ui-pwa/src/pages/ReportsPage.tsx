@@ -173,8 +173,8 @@ export function ReportsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="التقارير"
-        subtitle="إشغال أيامي · ميزان مراجعة · قائمة دخل · ربحية تشغيل"
-        action={<Button onClick={() => void openMom()}>مقارنة ربحية شهر بشهر</Button>}
+        subtitle="الإشغال · ميزان المراجعة · قائمة الدخل · أرباح التشغيل"
+        action={<Button onClick={() => void openMom()}>مقارنة أرباح الشهر</Button>}
       />
 
       <FilterBar
@@ -393,7 +393,7 @@ export function ReportsPage() {
 
       {tab === 'profit' && profit ? <ProfitPanel data={profit} /> : null}
 
-      <Sheet open={profitOpen} title="مقارنة ربحية شهر بشهر" onClose={() => setProfitOpen(false)}>
+      <Sheet open={profitOpen} title="مقارنة أرباح الشهر" onClose={() => setProfitOpen(false)}>
         {profit ? <ProfitPanel data={profit} /> : <SkeletonBlock rows={3} />}
       </Sheet>
     </div>
@@ -406,7 +406,7 @@ function ProfitPanel({ data }: { data: ProfitCompare }) {
       <MetricCardGrid
         label={`${data.current_month} مقابل ${data.previous_month}`}
         items={[
-          { id: 'cur', label: 'ربح التشغيل الحالي', value: data.fleet.current.operating_profit, format: 'money', tone: 'success' },
+          { id: 'cur', label: 'صافي الشهر الحالي', value: data.fleet.current.operating_profit, format: 'money', tone: 'success' },
           { id: 'prev', label: 'الشهر السابق', value: data.fleet.previous.operating_profit, format: 'money' },
           { id: 'delta', label: 'الفرق', value: data.fleet.delta, format: 'money', tone: data.fleet.delta >= 0 ? 'info' : 'warning' },
           { id: 'pct', label: 'نسبة التغيّر %', value: data.fleet.delta_pct, tone: data.fleet.delta_pct >= 0 ? 'success' : 'danger' },
