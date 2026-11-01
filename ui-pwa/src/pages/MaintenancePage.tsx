@@ -24,7 +24,7 @@ const statusLabel: Record<string, string> = {
 const columns: DataColumn<WorkOrder>[] = [
   {
     id: 'vehicle',
-    header: 'المركبة',
+    header: 'العربية',
     cell: (r) => (
       <>
         <strong className="rpm-table__primary">{r.vehicle?.brand} {r.vehicle?.model}</strong>
@@ -125,7 +125,7 @@ export function MaintenancePage() {
         chips={chips}
         activeChip={chip}
         onChipChange={setChip}
-        placeholder="بحث بالمركبة أو الورشة…"
+        placeholder="بحث بالعربية أو الورشة…"
       />
       <DataTable
         label="أوامر الشغل"

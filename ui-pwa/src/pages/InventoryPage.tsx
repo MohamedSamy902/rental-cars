@@ -159,7 +159,7 @@ export function InventoryPage() {
 
       <Sheet open={openItem} title="صنف مخزون" onClose={() => setOpenItem(false)} footer={<><Button onClick={saveItem}>حفظ</Button><Button variant="secondary" onClick={() => setOpenItem(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
-          <TextField label="الكود" required value={itemForm.code} onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })} />
+          <TextField label="الكود" value={itemForm.code} hint="اختياري — يُولَّد تلقائياً إن تُرك فارغاً" onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })} />
           <TextField label="الاسم" required value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} />
           <TextField label="التصنيف" required value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} />
           <TextField label="وحدة القياس" required value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })} />

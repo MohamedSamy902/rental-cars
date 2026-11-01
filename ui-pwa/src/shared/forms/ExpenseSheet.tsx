@@ -121,12 +121,12 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle }: Props) {
         <DateField label="التاريخ" required value={form.spent_on} error={errors.spent_on} onChange={(e) => setForm({ ...form, spent_on: e.target.value })} />
         {!vehicle ? (
           <SelectField
-            label="المركبة"
+            label="العربية"
             required={form.category === 'صيانة'}
             value={form.vehicle_id}
             error={errors.vehicle_id}
             options={[
-              { value: '', label: form.category === 'صيانة' ? 'اختر مركبة…' : '— بدون مركبة —' },
+              { value: '', label: form.category === 'صيانة' ? 'اختر عربية…' : '— بدون عربية —' },
               ...vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` })),
             ]}
             onChange={(e) => setForm({ ...form, vehicle_id: e.target.value, work_order_id: '' })}
@@ -137,7 +137,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle }: Props) {
             label="أمر الشغل المرتبط"
             value={form.work_order_id}
             error={errors.work_order_id}
-            hint="يربط المصروف بسجل صيانة المركبة محاسبياً"
+            hint="يربط المصروف بسجل صيانة العربية محاسبياً"
             options={[
               { value: '', label: '— بدون أمر شغل —' },
               ...workOrders.map((w) => ({

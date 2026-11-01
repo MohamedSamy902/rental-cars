@@ -23,7 +23,7 @@ type Item = {
 
 const ITEMS: Item[] = [
   { to: '/', label: 'لوحة اليوم', group: 'التشغيل', icon: <IconHome /> },
-  { to: '/vehicles', label: 'المركبات', group: 'التشغيل', icon: <IconCar />, permission: 'vehicles.view' },
+  { to: '/vehicles', label: 'العربيات', group: 'التشغيل', icon: <IconCar />, permission: 'vehicles.view' },
   { to: '/bookings', label: 'العقود والحجوزات', group: 'التشغيل', icon: <IconClipboard />, permission: 'contracts.view' },
   { to: '/calendar', label: 'التقويم', group: 'التشغيل', icon: <IconCalendar />, permission: 'contracts.view' },
   { to: '/waitlist', label: 'قائمة الانتظار', group: 'التشغيل', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },

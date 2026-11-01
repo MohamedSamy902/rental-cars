@@ -125,7 +125,7 @@ class VehicleController extends Controller
         return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents', 'owner']))]);
     }
 
-    /** ملف المركبة الكامل: حجوزات · صيانة · مصروفات · مرفقات · مالك · QR */
+    /** ملف العربية الكامل: حجوزات · صيانة · مصروفات · مرفقات · مالك · QR */
     public function dossier(Vehicle $vehicle): JsonResponse
     {
         $vehicle->load(['accessories', 'documents', 'owner']);

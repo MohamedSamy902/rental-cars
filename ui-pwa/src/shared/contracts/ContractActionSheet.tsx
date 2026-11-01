@@ -102,33 +102,20 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
           <TextAreaField label="سبب الإلغاء" required value={form.reason} onChange={(e) => patch({ reason: e.target.value })} />
         ) : null}
         {action === 'extend' ? (
-          <>
-            <TextField
-              label="تاريخ نهاية التمديد"
-              required
-              type="date"
-              value={form.planned_ends_at.slice(0, 10)}
-              onChange={(e) => {
-                const date = e.target.value
-                const time = form.planned_ends_at.includes('T') ? form.planned_ends_at.slice(11, 16) : '12:00'
-                patch({ planned_ends_at: date ? `${date}T${time}` : '' })
-              }}
-            />
-            <TextField
-              label="وقت النهاية"
-              required
-              type="time"
-              value={form.planned_ends_at.includes('T') ? form.planned_ends_at.slice(11, 16) : '12:00'}
-              onChange={(e) => {
-                const date = form.planned_ends_at.slice(0, 10) || new Date().toISOString().slice(0, 10)
-                patch({ planned_ends_at: `${date}T${e.target.value}` })
-              }}
-            />
-          </>
+          <TextField
+            label="تاريخ نهاية التمديد"
+            required
+            type="date"
+            value={form.planned_ends_at.slice(0, 10)}
+            onChange={(e) => {
+              const date = e.target.value
+              patch({ planned_ends_at: date ? `${date}T00:00` : '' })
+            }}
+          />
         ) : null}
         {action === 'swap' ? (
           <SelectField
-            label="السيارة البديلة"
+            label="العربية البديلة"
             required
             options={vehicles
               .filter((v) => v.id !== selected?.vehicle_id)
