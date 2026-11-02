@@ -8,6 +8,7 @@ import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
   SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconWallet, IconCash, IconTrend, IconKey,
+  PhoneActions,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -189,8 +190,8 @@ export function OwnerDetailPage() {
 
       <DetailList
         rows={[
-          { label: 'الهاتف', value: owner.phone ? <span dir="ltr">{owner.phone}</span> : '—' },
-          { label: 'هاتف بديل', value: owner.phone_alt || '—' },
+          { label: 'الهاتف', value: owner.phone ? <PhoneActions phone={owner.phone} name={owner.full_name} /> : '—' },
+          { label: 'هاتف بديل', value: owner.phone_alt ? <PhoneActions phone={owner.phone_alt} name={owner.full_name} /> : '—' },
           { label: 'الرقم القومي', value: owner.national_id || '—' },
           { label: 'الحالة', value: <StatusPill status={owner.is_active ? 'active' : 'cancelled'} label={owner.is_active ? 'نشط' : 'موقوف'} /> },
           { label: 'ملاحظات', value: owner.notes || '—', wide: true },

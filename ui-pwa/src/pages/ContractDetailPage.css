@@ -68,6 +68,17 @@
   color: var(--text-muted);
 }
 
+.cd-identity__phone {
+  margin-block-start: 0.15rem;
+}
+
+.rpm-inline-stack {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+}
+
 .cd-code {
   font-variant-numeric: tabular-nums;
   font-size: 0.78rem;

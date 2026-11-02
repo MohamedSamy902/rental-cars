@@ -4,9 +4,10 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
+import { useAuth } from '@/shared/auth/AuthContext'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
-  useToast, ErrorState, IconClipboard, IconAlert, IconCheck, IconKey,
+  useToast, ErrorState, IconClipboard, IconAlert, IconCheck, IconKey, PhoneActions,
   type DataColumn,
 } from '@/shared/ui'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -15,7 +16,7 @@ import {
 } from '@/shared/contracts/contractModel'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
-import { printContract } from '@/shared/contracts/printContract'
+import { printContractDocument } from '@/shared/contracts/printContract'
 import './pages.css'
 
 const BookingsPageTabs = ['all', 'pending', 'approved', 'active', 'completed'] as const
@@ -23,6 +24,7 @@ const BookingsPageTabs = ['all', 'pending', 'approved', 'active', 'completed'] a
 export function BookingsPage() {
   const toast = useToast()
   const navigate = useNavigate()
+  const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Contract[]>([])
   const [summary, setSummary] = useState({ total: 0, pending: 0, approved: 0, active: 0, completed: 0 })
@@ -107,7 +109,16 @@ export function BookingsPage() {
     {
       id: 'customer',
       header: 'العميل',
-      cell: (b) => <strong className="rpm-table__primary">{b.customer?.full_name || '—'}</strong>,
+      cell: (b) => (
+        <div>
+          <strong className="rpm-table__primary">{b.customer?.full_name || '—'}</strong>
+          {b.customer?.phone ? (
+            <div className="rpm-table__sub">
+              <PhoneActions phone={b.customer.phone} name={b.customer.full_name} compact />
+            </div>
+          ) : null}
+        </div>
+      ),
       sortValue: (b) => b.customer?.full_name,
       mobile: 'subtitle',
     },
@@ -202,7 +213,8 @@ export function BookingsPage() {
               view: () => navigate(`/contracts/${b.id}`),
               approve: () => void life.approve(b.id),
               openAction: (kind) => void life.openAction(kind, b),
-              print: () => void printContract(b.id, toast.error),
+              print: (kind = 'contract') => void printContractDocument(b.id, kind, toast.error),
+              can,
             })
           }
           emptyTitle="لا توجد عقود مطابقة"

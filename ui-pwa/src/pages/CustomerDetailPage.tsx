@@ -5,7 +5,7 @@ import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
-  useToast, SkeletonBlock, ErrorState, StatusPill,
+  useToast, SkeletonBlock, ErrorState, StatusPill, PhoneActions,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -183,8 +183,8 @@ export function CustomerDetailPage() {
       <DetailList
         rows={[
           { label: 'الحالة', value: statusPill },
-          { label: 'الهاتف', value: <span dir="ltr">{customer.phone}</span> },
-          { label: 'هاتف بديل', value: customer.phone_alt || '—' },
+          { label: 'الهاتف', value: <PhoneActions phone={customer.phone} name={customer.full_name} /> },
+          { label: 'هاتف بديل', value: customer.phone_alt ? <PhoneActions phone={customer.phone_alt} name={customer.full_name} /> : '—' },
           { label: 'البريد', value: customer.email || '—' },
           { label: 'الرقم القومي', value: customer.national_id || '—' },
           { label: 'تاريخ الميلاد', value: formatDate(customer.birth_date) },

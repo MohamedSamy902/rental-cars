@@ -7,6 +7,7 @@ import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, DetailList, DataTable, TextField, MoneyField,
   SelectField, TextAreaField, SwitchField, StatusPill, useToast, SkeletonBlock, IconEye, MediaUpload,
+  PhoneActions,
   type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -258,7 +259,13 @@ export function OwnersPage() {
       sortValue: (o) => o.full_name,
       mobile: 'title',
     },
-    { id: 'phone', header: 'الهاتف', cell: (o) => <span dir="ltr">{o.phone || '—'}</span>, sortValue: (o) => o.phone, mobile: 'subtitle' },
+    {
+      id: 'phone',
+      header: 'الهاتف',
+      cell: (o) => <PhoneActions phone={o.phone} name={o.full_name} compact />,
+      sortValue: (o) => o.phone,
+      mobile: 'subtitle',
+    },
     { id: 'vehicles', header: 'العربيات', cell: (o) => o.vehicles_count ?? 0, sortValue: (o) => o.vehicles_count ?? 0 },
     {
       id: 'monthly',
@@ -336,7 +343,7 @@ export function OwnersPage() {
           <>
             <DetailList
               rows={[
-                { label: 'الهاتف', value: detail.phone || '—' },
+                { label: 'الهاتف', value: detail.phone ? <PhoneActions phone={detail.phone} name={detail.full_name} /> : '—' },
                 { label: 'الرقم القومي', value: detail.national_id || '—' },
                 { label: 'المبلغ الشهري (كل العربيات)', value: formatMoney(bal?.vehicles_monthly_total || 0) },
                 { label: 'مستحق إجمالي', value: formatMoney(bal?.accrued_total || 0) },

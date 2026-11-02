@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
+import { useAuth } from '@/shared/auth/AuthContext'
 import {
   Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
-  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey,
+  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, PhoneActions,
 } from '@/shared/ui'
 import {
   DepositBadge, inspectionTypeLabel, statusLabel, timelineLabel, type Contract,
@@ -12,7 +13,7 @@ import {
 import { ContractActionsBar } from '@/shared/contracts/ContractActionsBar'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
-import { printContract } from '@/shared/contracts/printContract'
+import { printContractDocument } from '@/shared/contracts/printContract'
 import './pages.css'
 import './ContractDetailPage.css'
 
@@ -26,6 +27,7 @@ const relationLabel: Record<string, string> = {
 export function ContractDetailPage() {
   const { id } = useParams()
   const toast = useToast()
+  const { can } = useAuth()
   const contractId = Number(id)
   const [row, setRow] = useState<Contract | null>(null)
   const [loading, setLoading] = useState(true)
@@ -85,7 +87,13 @@ export function ContractDetailPage() {
         <div className="cd-hero__top">
           <BackNavButton to="/bookings" label="رجوع للعقود" />
           <div className="cd-hero__actions">
-            <Button size="sm" variant="secondary" onClick={() => void printContract(row.id, toast.error)}>طباعة</Button>
+            {can('contracts.print') ? (
+              <>
+                <Button size="sm" variant="secondary" onClick={() => void printContractDocument(row.id, 'contract', toast.error)}>طباعة العقد</Button>
+                <Button size="sm" variant="secondary" onClick={() => void printContractDocument(row.id, 'invoice', toast.error)}>الفاتورة</Button>
+                <Button size="sm" variant="secondary" onClick={() => void printContractDocument(row.id, 'receipt', toast.error)}>سند القبض</Button>
+              </>
+            ) : null}
           </div>
         </div>
         <div className="cd-identity">
@@ -96,13 +104,18 @@ export function ContractDetailPage() {
           </div>
           <h1>{row.customer?.full_name || 'عقد'}</h1>
           <p>{vehicleLabel}</p>
+          {row.customer?.phone ? (
+            <div className="cd-identity__phone">
+              <PhoneActions phone={row.customer.phone} name={row.customer.full_name} />
+            </div>
+          ) : null}
           <RentalProgressBar progress={row.progress} />
         </div>
         <ContractActionsBar
           contract={row}
           onApprove={() => void life.approve(row.id)}
           onAction={(kind) => void life.openAction(kind, row)}
-          onPrint={() => void printContract(row.id, toast.error)}
+          onPrint={(kind = 'contract') => void printContractDocument(row.id, kind, toast.error)}
         />
       </header>
 
@@ -129,7 +142,16 @@ export function ContractDetailPage() {
         <div className="rpm-panel__head"><h3>بيانات العقد</h3></div>
         <DetailList
           rows={[
-            { label: 'العميل', value: row.customer?.full_name || '—', wide: true },
+            {
+              label: 'العميل',
+              value: (
+                <span className="rpm-inline-stack">
+                  {row.customer?.full_name || '—'}
+                  {row.customer?.phone ? <PhoneActions phone={row.customer.phone} name={row.customer.full_name} /> : null}
+                </span>
+              ),
+              wide: true,
+            },
             { label: 'العربية', value: vehicleLabel, wide: true },
             { label: 'البداية', value: formatDate(row.starts_at) },
             { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },

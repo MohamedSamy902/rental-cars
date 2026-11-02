@@ -11,14 +11,14 @@ import {
   Button, BackNavButton, StatusPill, Sheet, AttentionDot,
   TextField, NumberField, SelectField, TextAreaField, SwitchField, MediaUpload,
   DateField,
-  useToast, SkeletonBlock, ErrorState, QrCode,
+  useToast, SkeletonBlock, ErrorState, QrCode, PhoneActions,
   type AttentionTone,
 } from '@/shared/ui'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { ContractActionsBar } from '@/shared/contracts/ContractActionsBar'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
-import { printContract } from '@/shared/contracts/printContract'
+import { printContractDocument } from '@/shared/contracts/printContract'
 import type { Contract } from '@/shared/contracts/contractModel'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
@@ -855,6 +855,11 @@ export function VehicleDetailPage() {
                   <div>
                     <Link className="rpm-table__code" to={`/contracts/${c.id}`}>{c.number}</Link>
                     <p className="muted">{c.customer?.full_name || '—'} · {shortDate(c.starts_at)} → {shortDate(c.actual_ends_at || c.planned_ends_at)}</p>
+                    {c.customer?.phone ? (
+                      <div style={{ marginBlockStart: '0.35rem' }}>
+                        <PhoneActions phone={c.customer.phone} name={c.customer.full_name} compact />
+                      </div>
+                    ) : null}
                   </div>
                   <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
                 </div>
@@ -864,7 +869,7 @@ export function VehicleDetailPage() {
                     contract={contract}
                     onApprove={() => void life.approve(c.id)}
                     onAction={(kind) => void life.openAction(kind, contract)}
-                    onPrint={() => void printContract(c.id, toast.error)}
+                    onPrint={(kind = 'contract') => void printContractDocument(c.id, kind, toast.error)}
                   />
                 </div>
               </article>
@@ -1112,8 +1117,12 @@ export function VehicleDetailPage() {
             <div className="vd-owner__avatar" aria-hidden>{ownerInitial}</div>
             <div className="vd-owner__meta">
               <strong>{v.owner.full_name}</strong>
-              <span>{v.owner.phone || 'بدون هاتف'} · شهري {formatMoney(v.owner_monthly_amount || 0)}</span>
-              <span>ربط منذ {v.owner_since || '—'}</span>
+              {v.owner.phone ? (
+                <PhoneActions phone={v.owner.phone} name={v.owner.full_name} />
+              ) : (
+                <span>بدون هاتف</span>
+              )}
+              <span>شهري {formatMoney(v.owner_monthly_amount || 0)} · ربط منذ {v.owner_since || '—'}</span>
             </div>
           </div>
           <Link className="vd-no-print rpm-link-btn" to={v.owner ? `/owners/${v.owner.id}` : '/owners'}>{v.owner ? 'ملف المالك' : 'صفحة الملاك'}</Link>

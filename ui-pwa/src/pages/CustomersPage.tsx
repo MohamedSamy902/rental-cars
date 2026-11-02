@@ -5,7 +5,7 @@ import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
-  MediaUpload, useToast, SkeletonBlock, IconEye, IconEdit, IconClipboard,
+  MediaUpload, useToast, SkeletonBlock, IconEye, IconEdit, IconClipboard, PhoneActions,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
@@ -177,7 +177,13 @@ export function CustomersPage() {
       sortValue: (c) => c.full_name,
       mobile: 'title',
     },
-    { id: 'phone', header: 'الهاتف', cell: (c) => <span dir="ltr">{c.phone}</span>, sortValue: (c) => c.phone, mobile: 'subtitle' },
+    {
+      id: 'phone',
+      header: 'الهاتف',
+      cell: (c) => <PhoneActions phone={c.phone} name={c.full_name} compact />,
+      sortValue: (c) => c.phone,
+      mobile: 'subtitle',
+    },
     { id: 'license', header: 'رقم الرخصة', cell: (c) => c.license_number, sortValue: (c) => c.license_number },
     { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => (c.license_expires_on || '').slice(0, 10), sortValue: (c) => c.license_expires_on },
     { id: 'status', header: 'الحالة', cell: statusPill, sortValue: (c) => c.status, mobile: 'badge' },
@@ -312,8 +318,8 @@ export function CustomersPage() {
             <DetailList
               rows={[
                 { label: 'الحالة', value: statusPill(detail) },
-                { label: 'الهاتف', value: <span dir="ltr">{detail.phone}</span> },
-                { label: 'هاتف بديل', value: detail.phone_alt || '—' },
+                { label: 'الهاتف', value: <PhoneActions phone={detail.phone} name={detail.full_name} /> },
+                { label: 'هاتف بديل', value: detail.phone_alt ? <PhoneActions phone={detail.phone_alt} name={detail.full_name} /> : '—' },
                 { label: 'البريد', value: detail.email || '—' },
                 { label: 'الرقم القومي', value: detail.national_id || '—' },
                 { label: 'تاريخ الميلاد', value: detail.birth_date || '—' },
