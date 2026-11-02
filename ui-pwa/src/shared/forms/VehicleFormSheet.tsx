@@ -29,7 +29,6 @@ export type VehicleFormValues = {
   daily_rate: string
   default_deposit: string
   target_monthly_income: string
-  purchase_value_estimate: string
   tracker_device_number: string
   tracker_sim_number: string
   notes: string
@@ -62,7 +61,6 @@ const emptyForm = (): VehicleFormValues => ({
   daily_rate: '',
   default_deposit: '',
   target_monthly_income: '',
-  purchase_value_estimate: '',
   tracker_device_number: '',
   tracker_sim_number: '',
   notes: '',
@@ -97,7 +95,6 @@ export type VehicleFormInitial = {
   daily_rate?: number | string | null
   default_deposit?: number | string | null
   target_monthly_income?: number | string | null
-  purchase_value_estimate?: number | string | null
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
   notes?: string | null
@@ -154,8 +151,6 @@ function toForm(initial?: VehicleFormInitial | null): VehicleFormValues {
     default_deposit: initial.default_deposit != null && initial.default_deposit !== '' ? String(initial.default_deposit) : '',
     target_monthly_income: initial.target_monthly_income != null && initial.target_monthly_income !== ''
       ? String(initial.target_monthly_income) : '',
-    purchase_value_estimate: initial.purchase_value_estimate != null && initial.purchase_value_estimate !== ''
-      ? String(initial.purchase_value_estimate) : '',
     tracker_device_number: initial.tracker_device_number != null ? String(initial.tracker_device_number) : '',
     tracker_sim_number: initial.tracker_sim_number != null ? String(initial.tracker_sim_number) : '',
     notes: initial.notes != null ? String(initial.notes) : '',
@@ -185,7 +180,6 @@ function buildPayload(form: VehicleFormValues, mode: 'create' | 'edit', selected
     default_deposit: Number(form.default_deposit),
     seats: form.seats ? Number(form.seats) : null,
     target_monthly_income: form.target_monthly_income !== '' ? Number(form.target_monthly_income) : null,
-    purchase_value_estimate: form.purchase_value_estimate !== '' ? Number(form.purchase_value_estimate) : null,
     color: form.color || null,
     transmission: form.transmission || null,
     chassis_number: form.chassis_number || null,
@@ -376,7 +370,6 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         <MoneyField label="الإيجار اليومي" required value={form.daily_rate} error={errors.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
         <MoneyField label="التأمين النقدي" required value={form.default_deposit} error={errors.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
         <MoneyField label="المستهدف الشهري" value={form.target_monthly_income} onChange={(e) => setForm({ ...form, target_monthly_income: e.target.value })} />
-        <MoneyField label="تقدير قيمة الشراء" value={form.purchase_value_estimate} onChange={(e) => setForm({ ...form, purchase_value_estimate: e.target.value })} />
         <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
         <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
 

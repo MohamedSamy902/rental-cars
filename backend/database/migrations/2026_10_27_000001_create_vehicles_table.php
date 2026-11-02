@@ -28,7 +28,6 @@ return new class extends Migration
             $table->unsignedInteger('daily_rate');
             $table->unsignedInteger('default_deposit');
             $table->unsignedInteger('target_monthly_income')->nullable();
-            $table->unsignedInteger('purchase_value_estimate')->nullable();
             $table->string('tracker_device_number')->nullable();
             $table->string('tracker_sim_number')->nullable();
             $table->unsignedTinyInteger('rental_priority')->default(50);

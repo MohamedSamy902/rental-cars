@@ -429,7 +429,6 @@ class VehicleController extends Controller
             'daily_rate' => $v->daily_rate,
             'default_deposit' => $v->default_deposit,
             'target_monthly_income' => $v->target_monthly_income,
-            'purchase_value_estimate' => $v->purchase_value_estimate,
             'rental_priority' => $v->rental_priority,
             'tracker_device_number' => $v->tracker_device_number,
             'tracker_sim_number' => $v->tracker_sim_number,
