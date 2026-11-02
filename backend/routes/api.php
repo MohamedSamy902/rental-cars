@@ -103,6 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
     Route::get('/vehicles/catalogs', [VehicleController::class, 'catalogs'])->middleware('permission:vehicles.view,vehicles.create,vehicles.update');
+    Route::post('/vehicles/brands', [VehicleController::class, 'storeBrand'])->middleware('permission:vehicles.create,vehicles.update');
     Route::get('/vehicles/recommend', [VehicleController::class, 'recommend'])->middleware('permission:vehicles.view,contracts.create');
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
     Route::get('/vehicles/{vehicle}/dossier', [VehicleController::class, 'dossier'])->middleware('permission:vehicles.view');
@@ -180,9 +181,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/inventory/items', [InventoryController::class, 'storeItem']);
         Route::post('/inventory/batches', [InventoryController::class, 'receiveBatch']);
     });
+    Route::middleware(['feature:inventory', 'permission:inventory.update'])->put('/inventory/items/{item}', [InventoryController::class, 'updateItem']);
 
     Route::middleware('permission:expenses.view,hr.expenses')->get('/expenses', [ExpenseController::class, 'index']);
     Route::middleware('permission:expenses.create,hr.expenses')->post('/expenses', [ExpenseController::class, 'store']);
+    Route::middleware('permission:expenses.update,hr.expenses')->put('/expenses/{expense}', [ExpenseController::class, 'update']);
 
     Route::middleware('permission:owners.view')->group(function () {
         Route::get('/owners', [VehicleOwnerController::class, 'index']);
@@ -218,6 +221,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/violations', [ViolationController::class, 'index'])->middleware('permission:violations.view');
     Route::post('/violations', [ViolationController::class, 'store'])->middleware('permission:violations.create');
+    Route::put('/violations/{violation}', [ViolationController::class, 'update'])->middleware('permission:violations.update');
     Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment'])->middleware('permission:violations.update');
 
     Route::middleware(['feature:waitlist', 'permission:waitlist.view'])->get('/waitlist', function (WaitlistService $service) {

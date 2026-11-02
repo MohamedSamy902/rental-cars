@@ -263,6 +263,40 @@ class VehicleService
     }
 
     /**
+     * Add a brand to the master list from the vehicle create/edit flow (RSD 6.1.1 · UX 3.21).
+     */
+    public function createBrand(string $name): VehicleBrand
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw new DomainException('اسم الماركة مطلوب.');
+        }
+        if (mb_strlen($name) > 100) {
+            throw new DomainException('اسم الماركة طويل جداً.');
+        }
+
+        $existing = VehicleBrand::query()
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->first();
+
+        if ($existing) {
+            if (! $existing->is_active) {
+                $existing->update(['is_active' => true]);
+            }
+
+            return $existing->fresh() ?? $existing;
+        }
+
+        $maxSort = (int) VehicleBrand::query()->max('sort_order');
+
+        return VehicleBrand::query()->create([
+            'name' => $name,
+            'sort_order' => $maxSort + 1,
+            'is_active' => true,
+        ]);
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function addonCatalog(): array

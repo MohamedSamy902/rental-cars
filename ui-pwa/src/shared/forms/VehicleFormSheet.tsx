@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { BrandSelectField } from '@/shared/forms/BrandSelectField'
 import {
   Button, Sheet, TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
   PlateField, splitPlate, useToast,
@@ -305,16 +306,13 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
           onLettersChange={(plate_letters) => setForm({ ...form, plate_letters })}
           onNumbersChange={(plate_numbers) => setForm({ ...form, plate_numbers })}
         />
-        <SelectField
-          label="الماركة"
-          required
+        <BrandSelectField
+          brands={brands}
           value={form.brand}
+          required
           error={errors.brand}
-          options={(brands.length ? brands.map((b) => b.name) : [form.brand].filter(Boolean)).map((name) => ({
-            value: name,
-            label: name,
-          }))}
-          onChange={(e) => setForm({ ...form, brand: e.target.value })}
+          onChange={(brand) => setForm({ ...form, brand })}
+          onBrandsChange={setBrands}
         />
         <TextField label="الموديل" required value={form.model} error={errors.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
         <NumberField label="سنة الصنع" required value={form.year} error={errors.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
