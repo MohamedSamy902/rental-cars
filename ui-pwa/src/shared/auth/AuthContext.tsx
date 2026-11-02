@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, setToken } from '@/shared/api/client'
+import { normalizePermissions, type PermissionRef } from './routeAccess'
 
 export type AuthUser = {
   id: number
@@ -15,9 +16,10 @@ export type AuthUser = {
 type AuthApi = {
   user: AuthUser | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<AuthUser>
   logout: () => Promise<void>
-  can: (permission: string) => boolean
+  /** True if the user has any of the listed permissions (integrator bypasses). */
+  can: (permission: PermissionRef) => boolean
   featureEnabled: (flag: string) => boolean
   isIntegrator: boolean
   featureFlags: Record<string, boolean>
@@ -50,10 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       isIntegrator,
       featureFlags,
-      can(permission: string) {
+      can(permission: PermissionRef) {
         if (!user) return false
         if (isIntegrator) return true
-        return perms.includes(permission)
+        return normalizePermissions(permission).some((key) => perms.includes(key))
       },
       featureEnabled(flag: string) {
         if (!(flag in featureFlags)) return true
@@ -66,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         setToken(res.token)
         setUser(res.user)
+        return res.user
       },
       async logout() {
         try {

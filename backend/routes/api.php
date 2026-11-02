@@ -35,14 +35,14 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
-    Route::get('/dashboard', DashboardController::class)->middleware('permission:reports.view|contracts.view|vehicles.view');
+    Route::get('/dashboard', DashboardController::class)->middleware('permission:reports.view,contracts.view,vehicles.view');
     Route::get('/attention', AttentionController::class);
 
-    Route::get('/media/limits', [MediaController::class, 'limits'])->middleware('permission:media.view|media.upload|customers.view|vehicles.view|contracts.view');
-    Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload|customers.create|customers.update|vehicles.update|contracts.update|violations.create|maintenance.create');
-    Route::get('/media/{medium}', [MediaController::class, 'show'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
-    Route::get('/media/{medium}/file', [MediaController::class, 'file'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
-    Route::delete('/media/{medium}', [MediaController::class, 'destroy'])->middleware('permission:media.delete|customers.update|vehicles.update|settings.update');
+    Route::get('/media/limits', [MediaController::class, 'limits'])->middleware('permission:media.view,media.upload,customers.view,vehicles.view,contracts.view');
+    Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload,customers.create,customers.update,vehicles.update,contracts.update,violations.create,maintenance.create');
+    Route::get('/media/{medium}', [MediaController::class, 'show'])->middleware('permission:media.view,customers.view,vehicles.view,contracts.view');
+    Route::get('/media/{medium}/file', [MediaController::class, 'file'])->middleware('permission:media.view,customers.view,vehicles.view,contracts.view');
+    Route::delete('/media/{medium}', [MediaController::class, 'destroy'])->middleware('permission:media.delete,customers.update,vehicles.update,settings.update');
 
     Route::get('/settings/tenant', function () {
         return response()->json(['data' => TenantSetting::query()->first()]);
