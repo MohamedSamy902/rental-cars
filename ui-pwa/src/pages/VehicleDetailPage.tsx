@@ -252,7 +252,8 @@ export function VehicleDetailPage() {
   const [tab, setTab] = useState<TabId>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
+  const [docForm, setDocForm] = useState({ type: 'تأمين', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
+  const [licenseForm, setLicenseForm] = useState({ issued_on: '', expires_on: '', notes: '', file_path: '', file_path_back: '' })
   const [docEdit, setDocEdit] = useState<Document | null>(null)
   const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
   const [accOpen, setAccOpen] = useState(false)
@@ -343,6 +344,21 @@ export function VehicleDetailPage() {
     [dossier],
   )
 
+  function isLicenseType(type?: string | null) {
+    return /رخص|license/i.test(String(type || ''))
+  }
+
+  function syncLicenseForm(docs?: Document[] | null) {
+    const lic = (docs || []).find((d) => isLicenseType(d.type)) || null
+    setLicenseForm({
+      issued_on: lic?.issued_on || '',
+      expires_on: lic?.expires_on || '',
+      notes: lic?.notes || '',
+      file_path: lic?.file_path || '',
+      file_path_back: lic?.file_path_back || '',
+    })
+  }
+
   async function load() {
     if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
       setError('معرّف العربية غير صالح.')
@@ -354,6 +370,7 @@ export function VehicleDetailPage() {
     try {
       const res = await api<{ data: Dossier }>(`/vehicles/${vehicleId}/dossier`)
       setDossier(res.data)
+      syncLicenseForm(res.data.vehicle.documents)
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -435,23 +452,74 @@ export function VehicleDetailPage() {
     }
   }
 
+  async function saveLicense() {
+    if (!dossier) return
+    if (!licenseForm.file_path) {
+      toast.error('صورة الرخصة — وش مطلوبة.')
+      return
+    }
+    if (!licenseForm.expires_on) {
+      toast.error('تاريخ انتهاء رخصة التسيير مطلوب.')
+      return
+    }
+    setSaving(true)
+    try {
+      const existing = (dossier.vehicle.documents || []).find((d) => isLicenseType(d.type)) || null
+      const body = {
+        type: 'رخصة تسيير',
+        file_path: licenseForm.file_path,
+        file_path_back: licenseForm.file_path_back || undefined,
+        expires_on: licenseForm.expires_on,
+        issued_on: licenseForm.issued_on || undefined,
+        notes: licenseForm.notes || undefined,
+      }
+      if (existing) {
+        const res = await api<{ message?: string }>(`/vehicles/${dossier.vehicle.id}/documents/${existing.id}`, {
+          method: 'PUT',
+          json: { ...body, archive_previous: true },
+        })
+        toast.success(res.message || 'تم تحديث رخصة التسيير مع حفظ السجل السابق.')
+      } else {
+        await api(`/vehicles/${dossier.vehicle.id}/documents`, { method: 'POST', json: body })
+        toast.success('تم حفظ رخصة التسيير على العربية.')
+      }
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function addDocument() {
     if (!dossier) return
+    if (isLicenseType(docForm.type)) {
+      toast.error('رخصة التسيير تُدار من قسم «رخصة التسيير» أعلاه.')
+      return
+    }
+    if (!docForm.file_path) {
+      toast.error('صورة وجه المستند (وش) مطلوبة.')
+      return
+    }
+    if (!docForm.expires_on) {
+      toast.error('تاريخ انتهاء المستند مطلوب.')
+      return
+    }
     setSaving(true)
     try {
       await api(`/vehicles/${dossier.vehicle.id}/documents`, {
         method: 'POST',
         json: {
           type: docForm.type,
-          file_path: docForm.file_path || undefined,
+          file_path: docForm.file_path,
           file_path_back: docForm.file_path_back || undefined,
-          expires_on: docForm.expires_on || undefined,
+          expires_on: docForm.expires_on,
           issued_on: docForm.issued_on || undefined,
           notes: docForm.notes || undefined,
         },
       })
       toast.success('تم تسجيل المستند.')
-      setDocForm({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
+      setDocForm({ type: 'تأمين', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -604,6 +672,18 @@ export function VehicleDetailPage() {
         <Fact label="الحالة التشغيلية" value={statusLabel[v.status] || v.status} />
         <Fact label="حالة يدوية" value={v.manual_status || '—'} />
         <Fact label="نشطة" value={v.is_active === false ? 'لا' : 'نعم'} />
+        <Fact
+          label="رخصة التسيير"
+          value={(() => {
+            const lic = (v.documents || []).find((d) => isLicenseType(d.type))
+            if (!lic) return 'غير مسجّلة'
+            const exp = lic.expires_on || '—'
+            const expired = lic.expires_on
+              ? new Date(`${lic.expires_on}T23:59:59`).getTime() < Date.now()
+              : false
+            return expired ? `منتهية · ${exp}` : `سارية حتى ${exp}`
+          })()}
+        />
         <Fact label="جهاز التتبع" value={v.tracker_device_number || '—'} />
         <Fact label="شريحة التتبع" value={v.tracker_sim_number || '—'} />
         <Fact label="أُنشئت" value={shortDate(v.created_at)} />
@@ -884,29 +964,101 @@ export function VehicleDetailPage() {
     </section>
   )
 
+  const licenseDoc = (v.documents || []).find((d) => isLicenseType(d.type)) || null
+  const otherDocs = (v.documents || []).filter((d) => !isLicenseType(d.type))
+  const licenseExpired = licenseDoc?.expires_on
+    ? new Date(`${licenseDoc.expires_on}T23:59:59`).getTime() < Date.now()
+    : false
+
   const docsPanel = (
     <section className="vd-panel" key="docs">
       <div className="vd-panel__head">
-        <h2>المستندات الرسمية</h2>
-        <p>{(v.documents || []).length} مستند</p>
+        <h2>رخصة التسيير</h2>
+        <p>
+          مربوطة بهذه العربية
+          {licenseDoc?.expires_on ? ` · تنتهي ${licenseDoc.expires_on}` : ''}
+          {licenseExpired ? ' · منتهية' : licenseDoc ? ' · سارية' : ' · غير مسجّلة'}
+        </p>
       </div>
-      {(v.documents || []).length === 0 ? <Empty>لا مستندات بعد</Empty> : (
+      <div className="vd-form-block vd-no-print" style={{ borderBlockStart: 'none', paddingBlockStart: 0 }}>
+        <div className="rpm-form-grid">
+          <DateField
+            label="تاريخ الإصدار"
+            value={licenseForm.issued_on}
+            onChange={(e) => setLicenseForm({ ...licenseForm, issued_on: e.target.value })}
+          />
+          <DateField
+            label="تاريخ الانتهاء"
+            required
+            value={licenseForm.expires_on}
+            onChange={(e) => setLicenseForm({ ...licenseForm, expires_on: e.target.value })}
+            hint="إلزامي — أساس تنبيهات انتهاء رخصة العربية"
+          />
+          <MediaUpload
+            label="رخصة تسيير — وش"
+            required
+            value={licenseForm.file_path || null}
+            collection="vehicle_docs"
+            purpose="license_front"
+            accept="image"
+            attachableType="vehicle"
+            attachableId={v.id}
+            onChange={(path) => setLicenseForm({ ...licenseForm, file_path: path || '' })}
+          />
+          <MediaUpload
+            label="رخصة تسيير — ضهر"
+            value={licenseForm.file_path_back || null}
+            collection="vehicle_docs"
+            purpose="license_back"
+            accept="image"
+            attachableType="vehicle"
+            attachableId={v.id}
+            onChange={(path) => setLicenseForm({ ...licenseForm, file_path_back: path || '' })}
+          />
+          <TextAreaField
+            label="ملاحظات الرخصة"
+            value={licenseForm.notes}
+            onChange={(e) => setLicenseForm({ ...licenseForm, notes: e.target.value })}
+          />
+          <div className="rpm-card__actions" style={{ gridColumn: '1 / -1' }}>
+            <Button loading={saving} onClick={() => void saveLicense()}>
+              {licenseDoc ? 'تحديث رخصة التسيير' : 'حفظ رخصة التسيير'}
+            </Button>
+            {licenseDoc ? (
+              <Button size="sm" variant="danger" loading={saving} onClick={() => void deleteDocument(licenseDoc)}>
+                حذف الرخصة
+              </Button>
+            ) : null}
+          </div>
+          {licenseDoc ? (
+            <p className="vd-note" style={{ gridColumn: '1 / -1' }}>
+              أي تحديث للرخصة يؤرشف النسخة السابقة تلقائياً في السجل أدناه.
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="vd-panel__head" style={{ marginTop: '0.85rem' }}>
+        <h2>مستندات أخرى</h2>
+        <p>{otherDocs.length} مستند · تأمين · فحص …</p>
+      </div>
+      {otherDocs.length === 0 ? <Empty>لا مستندات أخرى بعد</Empty> : (
         <div className="vd-docs">
-          {(v.documents || []).map((d) => (
+          {otherDocs.map((d) => (
             <div key={d.id} className="vd-doc">
               <div>
                 <strong>{d.type}</strong>
                 <div>
                   <span>
                     صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}
-                    {d.file_path ? ' · وجه' : ''}
-                    {d.file_path_back ? ' · ظهر' : ''}
+                    {d.file_path ? ' · وش' : ''}
+                    {d.file_path_back ? ' · ضهر' : ''}
                   </span>
                 </div>
               </div>
               <div className="rpm-actions-row vd-no-print">
                 <Button size="sm" variant="ghost" onClick={() => setDocEdit({ ...d })}>تعديل</Button>
-                <Button size="sm" variant="danger" loading={saving} onClick={() => deleteDocument(d)}>حذف</Button>
+                <Button size="sm" variant="danger" loading={saving} onClick={() => void deleteDocument(d)}>حذف</Button>
               </div>
             </div>
           ))}
@@ -919,35 +1071,36 @@ export function VehicleDetailPage() {
             value={docForm.type}
             onChange={(e) => setDocForm({ ...docForm, type: e.target.value })}
             options={[
-              { value: 'رخصة تسيير', label: 'رخصة تسيير' },
               { value: 'تأمين', label: 'تأمين' },
               { value: 'فحص فني', label: 'فحص فني' },
               { value: 'أخرى', label: 'أخرى' },
             ]}
           />
           <DateField label="تاريخ الإصدار" value={docForm.issued_on} onChange={(e) => setDocForm({ ...docForm, issued_on: e.target.value })} />
-          <DateField label="تاريخ الانتهاء" value={docForm.expires_on} onChange={(e) => setDocForm({ ...docForm, expires_on: e.target.value })} />
+          <DateField label="تاريخ الانتهاء" required value={docForm.expires_on} onChange={(e) => setDocForm({ ...docForm, expires_on: e.target.value })} />
           <MediaUpload
-            label="وجه المستند (وش)"
+            label={`${docForm.type || 'المستند'} — وش`}
+            required
             value={docForm.file_path || null}
             collection="vehicle_docs"
-            purpose="document"
-            accept="both"
+            purpose="document_front"
+            accept="image"
             attachableType="vehicle"
             attachableId={v.id}
             onChange={(path) => setDocForm({ ...docForm, file_path: path || '' })}
           />
           <MediaUpload
-            label="ظهر المستند (ضهر)"
+            label={`${docForm.type || 'المستند'} — ضهر`}
             value={docForm.file_path_back || null}
             collection="vehicle_docs"
-            purpose="document"
-            accept="both"
+            purpose="document_back"
+            accept="image"
             attachableType="vehicle"
             attachableId={v.id}
             onChange={(path) => setDocForm({ ...docForm, file_path_back: path || '' })}
           />
-          <Button size="sm" loading={saving} onClick={() => addDocument()}>إضافة مستند</Button>
+          <TextAreaField label="ملاحظات" value={docForm.notes} onChange={(e) => setDocForm({ ...docForm, notes: e.target.value })} />
+          <Button size="sm" loading={saving} onClick={() => void addDocument()}>إضافة مستند</Button>
         </div>
       </div>
 
@@ -990,10 +1143,10 @@ export function VehicleDetailPage() {
       )}
       <div className="vd-form-block vd-no-print">
         <MediaUpload
-          label="رفع مرفق للعربية"
+          label="رفع مرفق إضافي للعربية"
           value={null}
           collection="vehicle_docs"
-          purpose="document"
+          purpose="attachment"
           accept="both"
           attachableType="vehicle"
           attachableId={v.id}
@@ -1368,30 +1521,30 @@ export function VehicleDetailPage() {
               value={docEdit.type}
               onChange={(e) => setDocEdit({ ...docEdit, type: e.target.value })}
               options={[
-                { value: 'رخصة تسيير', label: 'رخصة تسيير' },
                 { value: 'تأمين', label: 'تأمين' },
                 { value: 'فحص فني', label: 'فحص فني' },
                 { value: 'أخرى', label: 'أخرى' },
               ]}
             />
             <DateField label="تاريخ الإصدار" value={docEdit.issued_on || ''} onChange={(e) => setDocEdit({ ...docEdit, issued_on: e.target.value })} />
-            <DateField label="تاريخ الانتهاء" value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />
+            <DateField label="تاريخ الانتهاء" required value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />
             <MediaUpload
-              label="وجه المستند (وش)"
+              label={`${docEdit.type || 'المستند'} — وش`}
+              required
               value={docEdit.file_path || null}
               collection="vehicle_docs"
-              purpose="document"
-              accept="both"
+              purpose="document_front"
+              accept="image"
               attachableType="vehicle"
               attachableId={v.id}
               onChange={(path) => setDocEdit({ ...docEdit, file_path: path || '' })}
             />
             <MediaUpload
-              label="ظهر المستند (ضهر)"
+              label={`${docEdit.type || 'المستند'} — ضهر`}
               value={docEdit.file_path_back || null}
               collection="vehicle_docs"
-              purpose="document"
-              accept="both"
+              purpose="document_back"
+              accept="image"
               attachableType="vehicle"
               attachableId={v.id}
               onChange={(path) => setDocEdit({ ...docEdit, file_path_back: path || '' })}

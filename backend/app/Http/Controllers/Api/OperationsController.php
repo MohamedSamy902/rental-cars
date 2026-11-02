@@ -319,19 +319,28 @@ class OperationsController extends Controller
     {
         $data = $request->validate([
             'type' => ['required', 'string', 'max:100'],
-            'file_path' => ['nullable', 'string', 'max:500'],
+            'file_path' => ['required', 'string', 'max:500'],
             'file_path_back' => ['nullable', 'string', 'max:500'],
             'issued_on' => ['nullable', 'date'],
-            'expires_on' => ['nullable', 'date'],
+            'expires_on' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
-        ], [], ['type' => 'نوع المستند', 'file_path' => 'وجه المستند', 'file_path_back' => 'ظهر المستند']);
+        ], [
+            'file_path.required' => 'صورة وجه المستند (وش) مطلوبة.',
+            'expires_on.required' => 'تاريخ انتهاء المستند مطلوب.',
+        ], [
+            'type' => 'نوع المستند',
+            'file_path' => 'وجه المستند',
+            'file_path_back' => 'ظهر المستند',
+            'expires_on' => 'تاريخ الانتهاء',
+            'issued_on' => 'تاريخ الإصدار',
+        ]);
 
         $doc = $vehicle->documents()->create([
             'type' => $data['type'],
-            'file_path' => $data['file_path'] ?? 'manual/'.$data['type'],
+            'file_path' => $data['file_path'],
             'file_path_back' => $data['file_path_back'] ?? null,
             'issued_on' => $data['issued_on'] ?? null,
-            'expires_on' => $data['expires_on'] ?? null,
+            'expires_on' => $data['expires_on'],
             'notes' => $data['notes'] ?? null,
         ]);
 
@@ -391,13 +400,22 @@ class OperationsController extends Controller
         $row = $vehicle->documents()->whereKey($document)->firstOrFail();
         $data = $request->validate([
             'type' => ['sometimes', 'string', 'max:100'],
-            'file_path' => ['nullable', 'string', 'max:500'],
+            'file_path' => ['sometimes', 'required', 'string', 'max:500'],
             'file_path_back' => ['nullable', 'string', 'max:500'],
             'issued_on' => ['nullable', 'date'],
-            'expires_on' => ['nullable', 'date'],
+            'expires_on' => ['sometimes', 'required', 'date'],
             'notes' => ['nullable', 'string'],
             'archive_previous' => ['nullable', 'boolean'],
-        ], [], ['type' => 'نوع المستند', 'file_path' => 'وجه المستند', 'file_path_back' => 'ظهر المستند']);
+        ], [
+            'file_path.required' => 'صورة وجه المستند (وش) مطلوبة.',
+            'expires_on.required' => 'تاريخ انتهاء المستند مطلوب.',
+        ], [
+            'type' => 'نوع المستند',
+            'file_path' => 'وجه المستند',
+            'file_path_back' => 'ظهر المستند',
+            'expires_on' => 'تاريخ الانتهاء',
+            'issued_on' => 'تاريخ الإصدار',
+        ]);
 
         $type = strtolower((string) ($data['type'] ?? $row->type));
         $isLicense = str_contains($type, 'license') || str_contains($type, 'رخص');
