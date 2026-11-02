@@ -134,12 +134,12 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle }: Props) {
         ) : null}
         {form.category === 'صيانة' ? (
           <SelectField
-            label="أمر الشغل المرتبط"
+            label="أمر الصيانة المرتبط"
             value={form.work_order_id}
             error={errors.work_order_id}
             hint="يربط المصروف بسجل صيانة العربية محاسبياً"
             options={[
-              { value: '', label: '— بدون أمر شغل —' },
+              { value: '', label: '— بدون أمر صيانة —' },
               ...workOrders.map((w) => ({
                 value: String(w.id),
                 label: `#${w.id} · ${w.status}${w.opened_on ? ` · ${w.opened_on}` : ''}${w.workshop ? ` · ${w.workshop}` : ''}`,

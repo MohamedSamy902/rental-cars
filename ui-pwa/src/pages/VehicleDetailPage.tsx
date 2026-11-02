@@ -715,7 +715,7 @@ export function VehicleDetailPage() {
       attention: openMaintenance > 0 || (dossier.totals.lost_revenue || 0) > 0
         ? (v.manual_status === 'maintenance' ? 'critical' : 'warning')
         : null,
-      attentionLabel: openMaintenance > 0 ? 'أوامر شغل مفتوحة' : 'دخل ضائع من التوقف',
+      attentionLabel: openMaintenance > 0 ? 'أوامر صيانة مفتوحة' : 'دخل ضائع من التوقف',
     },
     { id: 'expenses', label: 'المصروفات', count: dossier.expenses.length },
     { id: 'docs', label: 'المستندات', count: (v.documents?.length || 0) + dossier.totals.media },
@@ -1304,8 +1304,8 @@ export function VehicleDetailPage() {
 
   const overviewCombined = (
     <>
-      {overviewPanel}
       {chartsPanel}
+      {overviewPanel}
     </>
   )
 
@@ -1338,7 +1338,7 @@ export function VehicleDetailPage() {
           <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>رجوع للأسطول</button>
           <div className="vd-hero__actions vd-no-print">
             <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد جديد</Button>
-            <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>إضافة صيانة</Button>
+            <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>أمر صيانة</Button>
             <Button size="sm" variant="secondary" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
             <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
@@ -1409,7 +1409,7 @@ export function VehicleDetailPage() {
 
       <div className="vd-no-print">{panelByTab[tab]}</div>
       <div className="vd-print-all">
-        {overviewPanel}{chartsPanel}{accessoriesPanel}{assetsPanel}{bookingsPanel}{maintenancePanel}{expensesPanel}{docsPanel}{ownerPanel}
+        {chartsPanel}{overviewPanel}{accessoriesPanel}{assetsPanel}{bookingsPanel}{maintenancePanel}{expensesPanel}{docsPanel}{ownerPanel}
       </div>
 
       <Sheet

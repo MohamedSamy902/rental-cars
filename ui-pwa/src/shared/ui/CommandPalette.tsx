@@ -29,7 +29,7 @@ const ITEMS: Item[] = [
   { to: '/waitlist', label: 'قائمة الانتظار', group: 'التشغيل', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
   { to: '/showroom', label: 'وضع عرض المعرض', group: 'التشغيل', icon: <IconStore />, feature: 'showroom', permission: 'showroom.run' },
   { to: '/department-notice', label: 'إخطار القسم', group: 'التشغيل', icon: <IconFileText />, feature: 'department_notice', permission: 'department_notice.print' },
-  { to: '/maintenance', label: 'أوامر الشغل', group: 'الأسطول', icon: <IconWrench />, permission: 'maintenance.view' },
+  { to: '/maintenance', label: 'أوامر الصيانة', group: 'الأسطول', icon: <IconWrench />, permission: 'maintenance.view' },
   { to: '/inventory', label: 'المخزون', group: 'الأسطول', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
   { to: '/petty-cash', label: 'العهدة النقدية', group: 'الأسطول', icon: <IconWallet />, feature: 'petty_cash', permission: 'petty_cash.view' },
   { to: '/violations', label: 'المخالفات', group: 'الأسطول', icon: <IconAlert />, permission: 'violations.view' },

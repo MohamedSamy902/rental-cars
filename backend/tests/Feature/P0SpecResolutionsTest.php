@@ -207,6 +207,7 @@ class P0SpecResolutionsTest extends TestCase
             'odometer' => 10000,
             'puts_in_maintenance' => false,
             'labor_cost' => 0,
+            'next_service_on' => now()->addMonths(3)->toDateString(),
             'lines' => [[
                 'description' => 'تغيير زيت',
                 'part_source' => 'stock',
@@ -221,6 +222,29 @@ class P0SpecResolutionsTest extends TestCase
         $inventory = Account::query()->where('code', '1400')->firstOrFail();
         $this->assertTrue(JournalLine::query()->where('journal_entry_id', $entry->id)->where('account_id', $expense->id)->where('debit', 200)->exists());
         $this->assertTrue(JournalLine::query()->where('journal_entry_id', $entry->id)->where('account_id', $inventory->id)->where('credit', 200)->exists());
+    }
+
+    public function test_work_order_requires_next_service_date_or_odometer(): void
+    {
+        $res = $this->postJson('/api/work-orders', [
+            'vehicle_id' => $this->vehicle->id,
+            'odometer' => 10000,
+            'puts_in_maintenance' => false,
+            'labor_cost' => 0,
+        ]);
+        $res->assertStatus(422);
+        $res->assertJsonValidationErrors(['next_service_on', 'next_service_odometer']);
+
+        $ok = $this->postJson('/api/work-orders', [
+            'vehicle_id' => $this->vehicle->id,
+            'odometer' => 10000,
+            'puts_in_maintenance' => false,
+            'labor_cost' => 0,
+            'next_service_odometer' => 15000,
+        ]);
+        $ok->assertCreated();
+        $this->assertSame(15000, (int) $ok->json('data.next_service_odometer'));
+        $this->assertStringContainsString('صيانة', (string) $ok->json('message'));
     }
 
     public function test_expense_from_custody_credits_custody_account_not_cash(): void

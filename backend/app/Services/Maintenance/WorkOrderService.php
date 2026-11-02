@@ -146,7 +146,7 @@ class WorkOrderService
                 $this->accounting->postInventoryUsage(
                     $total,
                     (int) $order->vehicle_id,
-                    'صرف مخزون لأمر شغل #'.$order->id,
+                    'صرف مخزون لأمر صيانة #'.$order->id,
                     $userId,
                     $order->opened_on?->toDateString() ?? now()->toDateString(),
                     'wol:'.$created->id,
@@ -157,7 +157,7 @@ class WorkOrderService
                 $pettyEmployeeId,
                 (int) $created->petty_cash_amount,
                 (int) $order->vehicle_id,
-                'شراء قطعة لأمر شغل #'.$order->id,
+                'شراء قطعة لأمر صيانة #'.$order->id,
                 $userId,
                 $order->opened_on?->toDateString() ?? now()->toDateString(),
                 $order->id,

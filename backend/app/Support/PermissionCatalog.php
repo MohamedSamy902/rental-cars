@@ -21,7 +21,7 @@ class PermissionCatalog
             'waitlist' => ['قائمة الانتظار', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل']],
             'customers' => ['العملاء', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'export' => 'تصدير']],
             'blacklist' => ['القائمة السوداء', ['manage' => 'إدارة']],
-            'maintenance' => ['الصيانة', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'close' => 'إقفال أمر شغل']],
+            'maintenance' => ['الصيانة', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'close' => 'إقفال أمر صيانة']],
             'inventory' => ['المخزون', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'adjust' => 'تسوية كمية']],
             'violations' => ['المخالفات', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل']],
             'media' => ['الملفات والمرفقات', ['view' => 'عرض', 'upload' => 'رفع', 'delete' => 'حذف']],

@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { useNewContract } from '@/shared/contracts/newContractContext'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { VehicleCreateSheet } from '@/shared/forms/VehicleCreateSheet'
+import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
+import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable,
   useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench,
-  type DataColumn, type MenuItem,
+  IconCash, IconFileText, type DataColumn, type MenuItem,
 } from '@/shared/ui'
-import { VehicleCreateSheet } from '@/shared/forms/VehicleCreateSheet'
 import './pages.css'
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
@@ -47,6 +50,7 @@ const statusLabel: Record<string, string> = {
 export function VehiclesPage() {
   const toast = useToast()
   const navigate = useNavigate()
+  const { openNewContract } = useNewContract()
   const [rows, setRows] = useState<Vehicle[]>([])
   const [summary, setSummary] = useState({ total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0 })
   const [search, setSearch] = useState('')
@@ -54,6 +58,8 @@ export function VehiclesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
+  const [woVehicle, setWoVehicle] = useState<{ id: number; label: string; odometer?: number } | null>(null)
+  const [expVehicle, setExpVehicle] = useState<{ id: number; label: string } | null>(null)
   const chips = useMemo(
     () => [
       { id: 'all', label: 'الكل' },
@@ -165,8 +171,30 @@ export function VehiclesPage() {
     },
   ]
 
+  function vehicleLabel(v: Vehicle) {
+    return `${v.brand} ${v.model} · ${v.plate}`
+  }
+
   function vehicleMenu(v: Vehicle): MenuItem[] {
     return [
+      {
+        id: 'contract',
+        label: 'عقد جديد',
+        icon: <IconFileText size={16} />,
+        onSelect: () => openNewContract({ vehicleId: v.id }),
+      },
+      {
+        id: 'wo',
+        label: 'أمر صيانة',
+        icon: <IconWrench size={16} />,
+        onSelect: () => setWoVehicle({ id: v.id, label: vehicleLabel(v), odometer: v.odometer }),
+      },
+      {
+        id: 'expense',
+        label: 'تسجيل مصروف',
+        icon: <IconCash size={16} />,
+        onSelect: () => setExpVehicle({ id: v.id, label: vehicleLabel(v) }),
+      },
       { id: 'open', label: 'فتح الملف الكامل', icon: <IconEye size={16} />, onSelect: () => navigate(`/vehicles/${v.id}`) },
       { id: 'calendar', label: 'تقويم الأسطول', icon: <IconCalendar size={16} />, onSelect: () => navigate('/calendar') },
       {
@@ -187,7 +215,7 @@ export function VehiclesPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العربيات"
-        subtitle="أسطول التشغيل — اضغط عرض لفتح الملف الكامل"
+        subtitle="أسطول التشغيل — إجراءات سريعة من القائمة دون مغادرة الشاشة"
         action={<Button onClick={() => setOpen(true)}>إضافة عربية</Button>}
         mobileFab
       />
@@ -227,7 +255,7 @@ export function VehiclesPage() {
           rows={rows}
           columns={columns}
           rowKey={(v) => v.id}
-          rowLabel={(v) => `${v.brand} ${v.model} · ${v.plate}`}
+          rowLabel={(v) => vehicleLabel(v)}
           loading={loading}
           onRowClick={(v) => navigate(`/vehicles/${v.id}`)}
           rowActions={vehicleMenu}
@@ -243,6 +271,18 @@ export function VehiclesPage() {
           void load()
           if (id) navigate(`/vehicles/${id}`)
         }}
+      />
+      <WorkOrderSheet
+        open={!!woVehicle}
+        vehicle={woVehicle || undefined}
+        onClose={() => setWoVehicle(null)}
+        onSaved={() => void load()}
+      />
+      <ExpenseSheet
+        open={!!expVehicle}
+        vehicle={expVehicle || undefined}
+        onClose={() => setExpVehicle(null)}
+        onSaved={() => void load()}
       />
     </div>
   )

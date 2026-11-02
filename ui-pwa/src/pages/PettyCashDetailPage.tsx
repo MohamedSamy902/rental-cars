@@ -169,7 +169,7 @@ export function PettyCashDetailPage() {
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>صيانة صُرفت من العهدة</h3></div>
-        {workOrders.length === 0 ? <p className="muted">لا أوامر شغل مرتبطة.</p> : (
+        {workOrders.length === 0 ? <p className="muted">لا أوامر صيانة مرتبطة.</p> : (
           <div className="rpm-card-list">
             {workOrders.map((w) => (
               <article key={w.id} className="rpm-card">

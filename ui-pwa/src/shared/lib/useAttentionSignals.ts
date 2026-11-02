@@ -93,7 +93,7 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
     '/maintenance': {
       critical: c.open_work_orders,
       warning: 0,
-      label: c.open_work_orders ? `${c.open_work_orders} أمر شغل مفتوح` : 'أوامر شغل مفتوحة',
+      label: c.open_work_orders ? `${c.open_work_orders} أمر صيانة مفتوح` : 'أوامر صيانة مفتوحة',
       ping: true,
     },
     '/inventory': {

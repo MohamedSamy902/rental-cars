@@ -47,8 +47,8 @@ class WorkOrderController extends Controller
             'force_after_resolution' => ['nullable', 'boolean'],
             'labor_cost' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
-            'next_service_on' => ['nullable', 'date'],
-            'next_service_odometer' => ['nullable', 'integer', 'min:0'],
+            'next_service_on' => ['nullable', 'date', 'required_without:next_service_odometer'],
+            'next_service_odometer' => ['nullable', 'integer', 'min:0', 'required_without:next_service_on'],
             'lines' => ['nullable', 'array'],
             'lines.*.description' => ['required_with:lines', 'string'],
             'lines.*.part_source' => ['required_with:lines', 'in:stock,purchase'],
@@ -69,6 +69,8 @@ class WorkOrderController extends Controller
             'lines.*.inventory_item_id.exists' => 'صنف المخزون المحدد غير موجود.',
             'lines.*.inventory_item_id.min' => 'اختر صنف المخزون.',
             'lines.*.inventory_item_id.integer' => 'اختر صنف المخزون.',
+            'next_service_on.required_without' => 'أدخل موعد الصيانة التالية أو عداد الكيلومترات للإشعارات.',
+            'next_service_odometer.required_without' => 'أدخل موعد الصيانة التالية أو عداد الكيلومترات للإشعارات.',
         ], [
             'vehicle_id' => 'العربية',
             'odometer' => 'العداد',
@@ -87,13 +89,13 @@ class WorkOrderController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $order, 'message' => 'تم فتح أمر الشغل.'], 201);
+        return response()->json(['data' => $order, 'message' => 'تم فتح أمر الصيانة.'], 201);
     }
 
     public function close(WorkOrder $workOrder): JsonResponse
     {
         $order = $this->service->close($workOrder->load('lines'));
 
-        return response()->json(['data' => $order, 'message' => 'تم إغلاق أمر الشغل.']);
+        return response()->json(['data' => $order, 'message' => 'تم إغلاق أمر الصيانة.']);
     }
 }

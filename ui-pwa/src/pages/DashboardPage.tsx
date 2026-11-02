@@ -266,7 +266,7 @@ export function DashboardPage() {
     return {
       occupancy: [
         go('fleet', 'عرض الأسطول', '/vehicles', <IconCar size={16} />),
-        go('maintenance', 'الصيانة وأوامر الشغل', '/maintenance', <IconWrench size={16} />),
+        go('maintenance', 'أوامر الصيانة', '/maintenance', <IconWrench size={16} />),
         ...tail,
       ],
       operations: [
@@ -551,7 +551,7 @@ export function DashboardPage() {
                     <b className="tabular-nums">{formatNumber(data.fleet_status.maintenance || 0)}</b>
                   </li>
                   <li>
-                    <span>أوامر شغل</span>
+                    <span>أوامر صيانة</span>
                     <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
                   </li>
                 </ul>

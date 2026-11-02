@@ -467,12 +467,14 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ## ١٢) الصيانة والمخزون
 
-### أوامر الشغل
+### أوامر الصيانة
 | Method | Path |
 |--------|------|
 | GET | `/work-orders?status=` |
 | POST | `/work-orders` | فتح |
 | POST | `/work-orders/{id}/close` | إغلاق + FIFO |
+
+يلزم أحد حقول التذكير على الأقل: `next_service_on` **أو** `next_service_odometer` (أساس الإشعارات).
 
 **POST work-order**
 ```json
@@ -598,7 +600,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | `overdue_returns` | عقود نشطة تجاوزت `planned_ends_at` | العقود · حرج |
 | `pending_approvals` | عقود `pending` | العقود · حرج |
 | `returning_today` / `pickups_today` | راجعة اليوم / تسليم اليوم | تبويب العقود |
-| `open_work_orders` | أوامر شغل `open` أو `in_progress` | الصيانة · حرج |
+| `open_work_orders` | أوامر صيانة `open` أو `in_progress` | الصيانة · حرج |
 | `blocking_work_orders` | أوامر توقف السيارة | ضمن الصيانة |
 | `low_stock` | أصناف رصيدها ≤ حد إعادة الطلب | المخزون · تحذير |
 | `open_violations` | مخالفات ليست `paid` ولا `confirmed` | المخالفات · تحذير |

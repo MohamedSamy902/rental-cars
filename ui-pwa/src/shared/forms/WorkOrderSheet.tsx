@@ -96,6 +96,10 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
       if (!form.unit_price || Number(form.unit_price) < 0) next.unit_price = 'أدخل سعر الشراء.'
     }
     if (!form.quantity || Number(form.quantity) < 1) next.quantity = 'الكمية يجب أن تكون ١ فأكثر.'
+    if (!form.next_service_on && form.next_service_odometer === '') {
+      next.next_service_on = 'أدخل موعد الصيانة التالية أو عداد الكيلومترات.'
+      next.next_service_odometer = 'أدخل موعد الصيانة التالية أو عداد الكيلومترات.'
+    }
     setFieldErrors(next)
     return Object.keys(next).length === 0
   }
@@ -140,7 +144,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
           ],
         },
       })
-      toast.success('تم فتح أمر الشغل.')
+      toast.success('تم فتح أمر الصيانة.')
       onClose()
       onSaved?.()
     } catch (e) {
@@ -148,6 +152,15 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
       const invErr = err.errors?.['lines.0.inventory_item_id']?.[0]
       if (invErr) {
         setFieldErrors((prev) => ({ ...prev, inventory_item_id: invErr.replace(/^lines\.0\.inventory_item_id\s*/, '') || invErr }))
+      }
+      const nextOnErr = err.errors?.next_service_on?.[0]
+      const nextOdoErr = err.errors?.next_service_odometer?.[0]
+      if (nextOnErr || nextOdoErr) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          next_service_on: nextOnErr || prev.next_service_on || '',
+          next_service_odometer: nextOdoErr || prev.next_service_odometer || '',
+        }))
       }
       toast.error(err.message.replace(/^lines\.0\.inventory_item_id\s*/, 'صنف المخزون: ') || err.message)
     } finally {
@@ -158,11 +171,11 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
   return (
     <Sheet
       open={open}
-      title={vehicle ? `صيانة · ${vehicle.label}` : 'أمر شغل'}
+      title={vehicle ? `صيانة · ${vehicle.label}` : 'أمر صيانة'}
       onClose={onClose}
       footer={
         <>
-          <Button loading={saving} onClick={() => void save()}>فتح أمر الشغل</Button>
+          <Button loading={saving} onClick={() => void save()}>فتح أمر الصيانة</Button>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
         </>
       }
@@ -283,15 +296,25 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
         />
         <DateField
           label="موعد الصيانة التالية"
+          required={!form.next_service_odometer}
+          error={fieldErrors.next_service_on}
           value={form.next_service_on}
-          onChange={(e) => setForm({ ...form, next_service_on: e.target.value })}
-          hint="تذكير زمني اختياري"
+          onChange={(e) => {
+            setForm({ ...form, next_service_on: e.target.value })
+            setFieldErrors((prev) => ({ ...prev, next_service_on: '', next_service_odometer: '' }))
+          }}
+          hint="إلزامي للإشعارات إن لم يُدخل عداد الصيانة التالية"
         />
         <NumberField
-          label="عداد الصيانة التالية"
+          label="عداد الصيانة التالية (كم)"
+          required={!form.next_service_on}
+          error={fieldErrors.next_service_odometer}
           value={form.next_service_odometer}
-          onChange={(e) => setForm({ ...form, next_service_odometer: e.target.value })}
-          hint="تذكير بالكيلومترات اختياري"
+          onChange={(e) => {
+            setForm({ ...form, next_service_odometer: e.target.value })
+            setFieldErrors((prev) => ({ ...prev, next_service_on: '', next_service_odometer: '' }))
+          }}
+          hint="إلزامي للإشعارات إن لم يُدخل الموعد الزمني — يكفي أحدهما أو كلاهما"
         />
       </div>
     </Sheet>

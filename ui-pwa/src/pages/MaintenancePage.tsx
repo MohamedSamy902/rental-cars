@@ -74,7 +74,7 @@ export function MaintenancePage() {
         id: 'open',
         label: 'مفتوح',
         attention: summary.open > 0 ? ('critical' as const) : null,
-        attentionLabel: `${summary.open} أمر شغل مفتوح`,
+        attentionLabel: `${summary.open} أمر صيانة مفتوح`,
       },
       { id: 'closed', label: 'مغلق' },
       { id: 'all', label: 'الكل' },
@@ -96,7 +96,7 @@ export function MaintenancePage() {
   async function closeOrder(id: number) {
     try {
       await api(`/work-orders/${id}/close`, { method: 'POST' })
-      toast.success('تم إغلاق أمر الشغل.')
+      toast.success('تم إغلاق أمر الصيانة.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -105,10 +105,10 @@ export function MaintenancePage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="أوامر الشغل" subtitle="صرف FIFO أو شراء · تعارض الصيانة مع الحجوزات" action={<Button onClick={() => setOpen(true)}>أمر شغل</Button>} mobileFab />
-      <Fab label="أمر شغل" onClick={() => setOpen(true)} />
+      <PageHeader title="أوامر الصيانة" subtitle="صرف FIFO أو شراء · تعارض الصيانة مع الحجوزات" action={<Button onClick={() => setOpen(true)}>أمر صيانة</Button>} mobileFab />
+      <Fab label="أمر صيانة" onClick={() => setOpen(true)} />
       <MetricCardGrid
-        label="ملخص أوامر الشغل"
+        label="ملخص أوامر الصيانة"
         mobile="wrap"
         items={[
           { id: 'open', label: 'أوامر مفتوحة', value: summary.open, tone: 'warning', icon: <IconWrench size={16} /> },
@@ -128,19 +128,19 @@ export function MaintenancePage() {
         placeholder="بحث بالعربية أو الورشة…"
       />
       <DataTable
-        label="أوامر الشغل"
+        label="أوامر الصيانة"
         rows={filtered}
         columns={columns}
         rowKey={(r) => r.id}
-        rowLabel={(r) => `أمر شغل · ${r.vehicle?.plate ?? ''}`}
+        rowLabel={(r) => `أمر صيانة · ${r.vehicle?.plate ?? ''}`}
         loading={loading}
         rowActions={(r) =>
           r.status !== 'closed'
-            ? [{ id: 'close', label: 'إغلاق أمر الشغل', icon: <IconCheck size={16} />, onSelect: () => void closeOrder(r.id) }]
+            ? [{ id: 'close', label: 'إغلاق أمر الصيانة', icon: <IconCheck size={16} />, onSelect: () => void closeOrder(r.id) }]
             : []
         }
-        emptyTitle="لا توجد أوامر شغل"
-        emptyDescription="افتح أمر شغل لصرف قطع من المخزون أو تسجيل شراء."
+        emptyTitle="لا توجد أوامر صيانة"
+        emptyDescription="افتح أمر صيانة لصرف قطع من المخزون أو تسجيل شراء."
       />
 
       <WorkOrderSheet open={open} onClose={() => setOpen(false)} onSaved={() => void load()} />
