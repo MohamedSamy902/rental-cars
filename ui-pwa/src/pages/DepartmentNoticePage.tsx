@@ -5,6 +5,7 @@ import {
 } from '@/shared/ui'
 import { escapeHtml } from '@/shared/lib/escapeHtml'
 import { formatDateTime } from '@/shared/lib/format'
+import { printHtmlDocument } from '@/utils/printHtml'
 import './pages.css'
 
 type CustomerRow = {
@@ -61,11 +62,6 @@ export function DepartmentNoticePage() {
   }
 
   function printNotice() {
-    const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700')
-    if (!w) {
-      toast.error('اسمح بالنوافذ المنبثقة للطباعة.')
-      return
-    }
     const body = rows.map((c) => `
       <section style="break-inside:avoid;margin:0 0 18px;padding:14px;border:1px solid #cbd5e1;border-radius:12px">
         <h2 style="margin:0 0 8px;font-size:18px">${escapeHtml(c.full_name)}</h2>
@@ -76,15 +72,17 @@ export function DepartmentNoticePage() {
       </section>
     `).join('')
     const meta = `${escapeHtml(center || '')} · ${escapeHtml(generatedAt ? formatDateTime(generatedAt) : '')}`
-    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>إخطار القسم</title>
+    try {
+      printHtmlDocument(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>إخطار القسم</title>
       <style>body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a} h1{margin:0 0 4px} .muted{color:#64748b}</style>
       </head><body>
       <h1>إخطار القسم</h1>
       <p class="muted">${meta}</p>
       ${body || '<p>لا توجد بيانات</p>'}
-      <script>window.onload=()=>window.print()<\/script>
       </body></html>`)
-    w.document.close()
+    } catch (e) {
+      toast.error((e as Error).message || 'تعذّر طباعة إخطار القسم.')
+    }
   }
 
   return (

@@ -20,6 +20,7 @@ import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { printContractDocument } from '@/shared/contracts/printContract'
 import type { Contract } from '@/shared/contracts/contractModel'
+import { printDomSubtree } from '@/utils/printHtml'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
@@ -1313,7 +1314,17 @@ export function VehicleDetailPage() {
             <Button size="sm" variant="secondary" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
             <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)}>تعديل</Button>
-            <Button size="sm" variant="primary" onClick={() => window.print()}>طباعة</Button>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => {
+                const root = document.querySelector('.vd')
+                if (root) printDomSubtree(root, `ملف عربية · ${v.code}`)
+                else toast.error('تعذّر تجهيز ملف العربية للطباعة.')
+              }}
+            >
+              طباعة
+            </Button>
           </div>
         </div>
         <div className="vd-hero__body">

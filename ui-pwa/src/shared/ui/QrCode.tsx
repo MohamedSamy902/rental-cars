@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import qrcode from 'qrcode-generator'
+import { printHtmlDocument } from '@/utils/printHtml'
 import { IconDownload, IconPrinter } from './Icons'
 import './QrCode.css'
 
@@ -82,33 +83,12 @@ export function QrCode({ value, label, fileName = 'rpm-qr', size = 148, actions 
   }
 
   function print() {
-    const frame = document.createElement('iframe')
-    frame.setAttribute('aria-hidden', 'true')
-    frame.style.position = 'fixed'
-    frame.style.inlineSize = '0'
-    frame.style.blockSize = '0'
-    frame.style.border = '0'
-    document.body.appendChild(frame)
-    const doc = frame.contentDocument
-    if (!doc) {
-      frame.remove()
-      return
-    }
     const title = label ? label.replace(/[<>&]/g, '') : ''
-    doc.open()
-    doc.write(
+    printHtmlDocument(
       `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${title}</title>` +
         '<style>@page{margin:16mm}body{margin:0;display:grid;place-items:center;gap:12px;font-family:system-ui,sans-serif;text-align:center}p{margin:0;font-size:14px}</style>' +
         `</head><body>${svgMarkup(dim, path, 320)}${title ? `<p>${title}</p>` : ''}</body></html>`,
     )
-    doc.close()
-    const run = () => {
-      frame.contentWindow?.focus()
-      frame.contentWindow?.print()
-      window.setTimeout(() => frame.remove(), 1500)
-    }
-    if (doc.readyState === 'complete') window.setTimeout(run, 50)
-    else frame.onload = run
   }
 
   return (

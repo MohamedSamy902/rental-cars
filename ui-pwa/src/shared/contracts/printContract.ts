@@ -1,5 +1,6 @@
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
+import { printHtmlDocument } from '@/utils/printHtml'
 import { statusLabel } from './contractModel'
 
 export type PrintDocKind = 'contract' | 'invoice' | 'receipt'
@@ -77,7 +78,7 @@ function shell(title: string, body: string) {
       .actions{margin-top:16px}
       .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;color:#0f766e;font-size:12px}
     </style>
-  </head><body>${body}<script>window.onload=()=>window.print()</script></body></html>`
+  </head><body>${body}</body></html>`
 }
 
 function contractBody(tenant: PrintPayload['tenant'], c: PrintContract) {
@@ -203,13 +204,7 @@ export async function printContractDocument(
       },
     }).catch(() => undefined)
 
-    const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700')
-    if (!w) {
-      onError('اسمح بالنوافذ المنبثقة للطباعة.')
-      return
-    }
-    w.document.write(renderDoc(kind, payload))
-    w.document.close()
+    printHtmlDocument(renderDoc(kind, payload))
   } catch (e) {
     onError((e as ApiError).message || `تعذّر طباعة ${titles[kind]}.`)
   }
