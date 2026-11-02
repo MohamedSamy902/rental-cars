@@ -28,7 +28,6 @@ const emptyForm = {
   vehicle_id: '',
   odometer: '',
   workshop: '',
-  labor_cost: '0',
   description: 'صيانة',
   inventory_item_id: '',
   quantity: '1',
@@ -115,7 +114,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
           vehicle_id: Number(form.vehicle_id),
           odometer: Number(form.odometer),
           workshop: form.workshop || undefined,
-          labor_cost: Number(form.labor_cost || 0),
+          labor_cost: 0,
           puts_in_maintenance: putsInMaintenance,
           force_after_resolution: true,
           opened_at: form.opened_at || undefined,
@@ -280,12 +279,6 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
             setForm({ ...form, quantity: e.target.value })
             setFieldErrors((prev) => ({ ...prev, quantity: '' }))
           }}
-        />
-        <MoneyField
-          label="تكلفة العمالة"
-          value={form.labor_cost}
-          onChange={(e) => setForm({ ...form, labor_cost: e.target.value })}
-          hint="اختياري — يُحفظ صفراً إن تُرك فارغاً"
         />
         <DateField
           label="موعد الصيانة التالية"
