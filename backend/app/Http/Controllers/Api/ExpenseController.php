@@ -15,7 +15,7 @@ class ExpenseController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = Expense::query()->with(['vehicle', 'employee'])->latest('id');
+        $q = Expense::query()->with(['vehicle', 'employee', 'workOrder'])->latest('id');
         if ($vehicleId = $request->integer('vehicle_id')) {
             $q->where('vehicle_id', $vehicleId);
         }
@@ -27,7 +27,36 @@ class ExpenseController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $data = $this->validated($request);
+
+        try {
+            $row = $this->service->create($data, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $row, 'message' => 'تم تسجيل المصروف.'], 201);
+    }
+
+    public function update(Request $request, Expense $expense): JsonResponse
+    {
+        $data = $this->validated($request);
+
+        try {
+            $row = $this->service->update($expense, $data, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $row, 'message' => 'تم تحديث المصروف.']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validated(Request $request): array
+    {
+        return $request->validate([
             'title' => ['required', 'string', 'max:200'],
             'category' => ['nullable', 'string', 'max:100'],
             'amount' => ['required', 'integer', 'min:1'],
@@ -46,13 +75,5 @@ class ExpenseController extends Controller
             'work_order_id' => 'أمر الشغل',
             'employee_id' => 'موظف العهدة',
         ]);
-
-        try {
-            $row = $this->service->create($data, $request->user()?->id);
-        } catch (DomainException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        return response()->json(['data' => $row, 'message' => 'تم تسجيل المصروف.'], 201);
     }
 }

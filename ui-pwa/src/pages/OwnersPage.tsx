@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, DetailList, DataTable, TextField, MoneyField,
-  SelectField, TextAreaField, StatusPill, useToast, SkeletonBlock, IconEye, MediaUpload,
+  SelectField, TextAreaField, SwitchField, StatusPill, useToast, SkeletonBlock, IconEye, MediaUpload,
   type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -66,6 +67,8 @@ const emptyForm = {
   license_front_path: '', license_back_path: '', notes: '', is_active: true,
 }
 
+const OwnersPageTabs = ['all', 'due'] as const
+
 export function OwnersPage() {
   const toast = useToast()
   const navigate = useNavigate()
@@ -83,7 +86,7 @@ export function OwnersPage() {
   const [payoutForm, setPayoutForm] = useState({
     amount: '', paid_on: new Date().toISOString().slice(0, 10), payment_method: 'cash', vehicle_id: '', notes: '',
   })
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: OwnersPageTabs, defaultValue: 'all' })
   const { counts: attention } = useAttentionSignals(true)
 
   const chips = useMemo(
@@ -204,6 +207,7 @@ export function OwnersPage() {
     <div className="rpm-form-grid">
       <TextField label="اسم المالك" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
       <TextField label="الهاتف" error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
       <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
       <MediaUpload
         label="بطاقة الرقم القومي — الوجه (وش)"
@@ -242,6 +246,7 @@ export function OwnersPage() {
         onChange={(path) => setForm({ ...form, license_back_path: path || '' })}
       />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      <SwitchField label="نشط" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
     </div>
   )
 

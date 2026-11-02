@@ -6,16 +6,23 @@ import {
 } from 'recharts'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  Button, StatusPill, Sheet, AttentionDot,
-  TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField, MediaUpload,
-  PlateField, splitPlate, DateField,
+  Button, BackNavButton, StatusPill, Sheet, AttentionDot,
+  TextField, NumberField, SelectField, TextAreaField, SwitchField, MediaUpload,
+  DateField,
   useToast, SkeletonBlock, ErrorState, QrCode,
   type AttentionTone,
 } from '@/shared/ui'
 import { useNewContract } from '@/shared/contracts/newContractContext'
+import { ContractActionsBar } from '@/shared/contracts/ContractActionsBar'
+import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
+import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
+import { printContract } from '@/shared/contracts/printContract'
+import type { Contract } from '@/shared/contracts/contractModel'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
+import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './VehicleDetailPage.css'
 import './pages.css'
 import '@/shared/ui/AttentionDot.css'
@@ -193,6 +200,8 @@ type Dossier = {
 
 type TabId = 'overview' | 'accessories' | 'bookings' | 'maintenance' | 'expenses' | 'docs' | 'owner'
 
+const VEHICLE_DETAIL_TABS = ['overview', 'accessories', 'bookings', 'maintenance', 'expenses', 'docs', 'owner'] as const satisfies readonly TabId[]
+
 const tirePosLabel: Record<string, string> = {
   front_right: 'أمامي يمين',
   front_left: 'أمامي يسار',
@@ -209,15 +218,6 @@ const statusLabel: Record<string, string> = {
 }
 
 const chartColors = ['#dc2626', '#64748b', '#f59e0b', '#059669', '#a1a1aa', '#b91c1c', '#475569']
-
-const emptyForm = {
-  code: '', plate_letters: '', plate_numbers: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
-  color: '', transmission: 'أوتوماتيك', chassis_number: '', engine_number: '', engine_capacity: '',
-  seats: '5', odometer: '', daily_rate: '', default_deposit: '',
-  target_monthly_income: '', purchase_value_estimate: '',
-  tracker_device_number: '', tracker_sim_number: '', notes: '', is_active: true,
-  owner_id: '', owner_monthly_amount: '',
-}
 
 const emptyAcc = {
   name: '', default_qty: '1', required_each_rental: true, is_active: true, notes: '',
@@ -258,13 +258,9 @@ export function VehicleDetailPage() {
   const [dossier, setDossier] = useState<Dossier | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState<TabId>('overview')
-  const [editing, setEditing] = useState(false)
+  const [tab, setTab] = useQueryTab<TabId>({ allowed: VEHICLE_DETAIL_TABS, defaultValue: 'overview' })
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [owners, setOwners] = useState<OwnerOption[]>([])
-  const [brands, setBrands] = useState<Array<{ id: number; name: string }>>([])
   const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
   const [docEdit, setDocEdit] = useState<Document | null>(null)
   const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
@@ -356,36 +352,6 @@ export function VehicleDetailPage() {
     [dossier],
   )
 
-  function fillForm(v: Vehicle) {
-    const plateParts = splitPlate(v.plate)
-    setForm({
-      code: v.code,
-      plate_letters: plateParts.letters,
-      plate_numbers: plateParts.numbers,
-      brand: v.brand,
-      model: v.model,
-      year: String(v.year),
-      category: v.category,
-      fuel_type: v.fuel_type,
-      color: v.color || '',
-      transmission: v.transmission || 'أوتوماتيك',
-      chassis_number: v.chassis_number || '',
-      engine_number: v.engine_number || '',
-      engine_capacity: v.engine_capacity || '',
-      seats: v.seats != null ? String(v.seats) : '5',
-      odometer: String(v.odometer),
-      daily_rate: String(v.daily_rate),
-      default_deposit: String(v.default_deposit),
-      target_monthly_income: v.target_monthly_income != null ? String(v.target_monthly_income) : '',
-      purchase_value_estimate: v.purchase_value_estimate != null ? String(v.purchase_value_estimate) : '',
-      tracker_device_number: v.tracker_device_number || '',
-      tracker_sim_number: v.tracker_sim_number || '',
-      notes: v.notes || '',
-      is_active: v.is_active !== false,
-      owner_id: v.owner_id ? String(v.owner_id) : '',
-      owner_monthly_amount: v.owner_monthly_amount != null ? String(v.owner_monthly_amount) : '',
-    })
-  }
 
   async function load() {
     if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
@@ -398,7 +364,6 @@ export function VehicleDetailPage() {
     try {
       const res = await api<{ data: Dossier }>(`/vehicles/${vehicleId}/dossier`)
       setDossier(res.data)
-      fillForm(res.data.vehicle)
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -407,15 +372,53 @@ export function VehicleDetailPage() {
   }
 
   useEffect(() => { void load() }, [vehicleId])
-  useEffect(() => {
-    void api<{ data: OwnerOption[] }>('/owners?active_only=1&per_page=100')
-      .then((res) => setOwners(res.data))
-      .catch(() => setOwners([]))
-    void api<{ data: { brands: Array<{ id: number; name: string }> } }>('/vehicles/catalogs')
-      .then((res) => setBrands(res.data.brands || []))
-      .catch(() => setBrands([]))
-  }, [])
+  const life = useContractLifecycle(() => { void load() })
 
+  async function closeWorkOrder(id: number) {
+    try {
+      await api(`/work-orders/${id}/close`, { method: 'POST' })
+      toast.success('تم إغلاق أمر الشغل.')
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    }
+  }
+
+  async function confirmViolation(id: number) {
+    try {
+      await api(`/violations/${id}/confirm`, { method: 'POST' })
+      toast.success('تم تأكيد سداد المخالفة.')
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    }
+  }
+
+  function toContract(c: Dossier['contracts'][number]): Contract {
+    return {
+      id: c.id,
+      number: c.number,
+      status: c.status,
+      starts_at: c.starts_at || '',
+      planned_ends_at: c.planned_ends_at || '',
+      actual_ends_at: c.actual_ends_at,
+      frozen_daily_rate: dossier?.vehicle.daily_rate || 0,
+      final_total: c.final_total ?? undefined,
+      period_rent: c.period_rent ?? undefined,
+      customer: c.customer
+        ? { id: c.customer.id, full_name: c.customer.full_name, phone: c.customer.phone || undefined }
+        : undefined,
+      vehicle: dossier
+        ? {
+            id: dossier.vehicle.id,
+            brand: dossier.vehicle.brand,
+            model: dossier.vehicle.model,
+            plate: dossier.vehicle.plate,
+            odometer: dossier.vehicle.odometer,
+          }
+        : undefined,
+    }
+  }
   useEffect(() => {
     if (!Number.isFinite(vehicleId) || vehicleId <= 0) return
     void api<{ data: typeof docHistory }>(`/vehicles/${vehicleId}/document-history`)
@@ -423,52 +426,6 @@ export function VehicleDetailPage() {
       .catch(() => setDocHistory([]))
   }, [vehicleId, dossier?.vehicle.documents?.length])
 
-  function vehiclePayload() {
-    return {
-      plate_letters: form.plate_letters,
-      plate_numbers: form.plate_numbers,
-      brand: form.brand,
-      model: form.model,
-      year: Number(form.year),
-      category: form.category,
-      fuel_type: form.fuel_type,
-      odometer: Number(form.odometer),
-      daily_rate: Number(form.daily_rate),
-      default_deposit: Number(form.default_deposit),
-      seats: form.seats ? Number(form.seats) : null,
-      target_monthly_income: form.target_monthly_income !== '' ? Number(form.target_monthly_income) : null,
-      purchase_value_estimate: form.purchase_value_estimate !== '' ? Number(form.purchase_value_estimate) : null,
-      color: form.color || null,
-      transmission: form.transmission || null,
-      chassis_number: form.chassis_number || null,
-      engine_number: form.engine_number || null,
-      engine_capacity: form.engine_capacity || null,
-      tracker_device_number: form.tracker_device_number || null,
-      tracker_sim_number: form.tracker_sim_number || null,
-      notes: form.notes || null,
-      is_active: form.is_active,
-      owner_id: form.owner_id ? Number(form.owner_id) : null,
-      owner_monthly_amount: form.owner_id && form.owner_monthly_amount !== ''
-        ? Number(form.owner_monthly_amount)
-        : null,
-    }
-  }
-
-  async function onUpdate() {
-    if (!dossier) return
-    setSaving(true)
-    try {
-      await api(`/vehicles/${dossier.vehicle.id}`, { method: 'PUT', json: vehiclePayload() })
-      toast.success('تم تحديث العربية.')
-      setEditOpen(false)
-      setEditing(false)
-      await load()
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   function openAccCreate() {
     setAccEdit(null)
@@ -616,57 +573,6 @@ export function VehicleDetailPage() {
     }
   }
 
-  const formFields = (
-    <div className="rpm-form-grid">
-      <TextField label="الكود الداخلي" value={form.code} disabled hint="يُدار تلقائياً ولا يُعدَّل يدوياً" />
-      <PlateField
-        required
-        letters={form.plate_letters}
-        numbers={form.plate_numbers}
-        onLettersChange={(plate_letters) => setForm({ ...form, plate_letters })}
-        onNumbersChange={(plate_numbers) => setForm({ ...form, plate_numbers })}
-      />
-      <SelectField
-        label="الماركة"
-        required
-        value={form.brand}
-        options={(brands.length ? brands.map((b) => b.name) : [form.brand].filter(Boolean)).map((name) => ({ value: name, label: name }))}
-        onChange={(e) => setForm({ ...form, brand: e.target.value })}
-      />
-      <TextField label="الموديل" required value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-      <NumberField label="سنة الصنع" required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
-      <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'دفع رباعي', label: 'دفع رباعي' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-      <SelectField label="نوع الوقود" required options={[{ value: 'بنزين', label: 'بنزين' }, { value: 'ديزل', label: 'ديزل' }, { value: 'هجين', label: 'هجين' }]} value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} />
-      <TextField label="اللون" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
-      <SelectField label="ناقل الحركة" options={[{ value: 'أوتوماتيك', label: 'أوتوماتيك' }, { value: 'مانيوال', label: 'مانيوال' }]} value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} />
-      <NumberField label="عدد المقاعد" value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
-      <TextField label="رقم الشاسيه" value={form.chassis_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} />
-      <TextField label="رقم المحرك" value={form.engine_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, engine_number: e.target.value })} />
-      <TextField label="سعة المحرك" value={form.engine_capacity} onChange={(e) => setForm({ ...form, engine_capacity: e.target.value })} />
-      <NumberField label="العداد الفعلي" required value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
-      <MoneyField label="الإيجار اليومي" required value={form.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
-      <MoneyField label="التأمين النقدي" required value={form.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
-      <MoneyField label="المستهدف الشهري" value={form.target_monthly_income} onChange={(e) => setForm({ ...form, target_monthly_income: e.target.value })} />
-      <MoneyField label="تقدير قيمة الشراء" value={form.purchase_value_estimate} onChange={(e) => setForm({ ...form, purchase_value_estimate: e.target.value })} />
-      <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
-      <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
-      <SelectField
-        label="المالك"
-        value={form.owner_id}
-        onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
-        options={[
-          { value: '', label: '— ملك المركز —' },
-          ...owners.map((o) => ({ value: String(o.id), label: o.full_name + (o.phone ? ` · ${o.phone}` : '') })),
-        ]}
-      />
-      {form.owner_id ? (
-        <MoneyField label="المبلغ الشهري للمالك" required value={form.owner_monthly_amount} onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })} />
-      ) : null}
-      <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-      <SwitchField label="نشطة" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
-    </div>
-  )
-
   if (loading) {
     return <div className="vd"><SkeletonBlock rows={10} /></div>
   }
@@ -679,7 +585,7 @@ export function VehicleDetailPage() {
           description={error || 'لا توجد بيانات'}
           action={
             <div className="rpm-actions-row">
-              <Button variant="secondary" onClick={() => navigate('/vehicles')}>رجوع</Button>
+              <BackNavButton to="/vehicles" label="رجوع للعربيات" />
               <Button onClick={() => load()}>إعادة المحاولة</Button>
             </div>
           }
@@ -926,28 +832,44 @@ export function VehicleDetailPage() {
   const bookingsPanel = (
     <section className="vd-panel" key="bookings">
       <div className="vd-panel__head">
-        <h2>سجل الحجز والعقود</h2>
-        <p>{dossier.totals.contracts} عقد</p>
+        <div>
+          <h2>سجل الحجز والعقود</h2>
+          <p>{dossier.totals.contracts} عقد</p>
+        </div>
+        <Button size="sm" className="vd-no-print" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد جديد</Button>
       </div>
-      {dossier.contracts.length === 0 ? <Empty>لا حجوزات لهذه العربية بعد</Empty> : (
-        <div className="rpm-table-wrap">
-          <table className="rpm-table rpm-table--stack">
-            <thead>
-              <tr><th>العقد</th><th>العميل</th><th>الحالة</th><th>من</th><th>إلى</th><th>الإجمالي</th></tr>
-            </thead>
-            <tbody>
-              {dossier.contracts.map((c) => (
-                <tr key={c.id}>
-                  <td data-label="العقد"><span className="rpm-table__code">{c.number}</span></td>
-                  <td data-label="العميل">{c.customer?.full_name || '—'}</td>
-                  <td data-label="الحالة"><StatusPill status={c.status} label={statusLabel[c.status] || c.status} /></td>
-                  <td data-label="من">{shortDate(c.starts_at)}</td>
-                  <td data-label="إلى">{shortDate(c.actual_ends_at || c.planned_ends_at)}</td>
-                  <td data-label="الإجمالي">{c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : '—')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {dossier.contracts.length === 0 ? (
+        <Empty>
+          لا حجوزات لهذه العربية بعد
+          <div className="vd-no-print" style={{ marginBlockStart: '0.75rem' }}>
+            <Button size="sm" onClick={() => openNewContract({ vehicleId: v.id })}>إنشاء أول عقد</Button>
+          </div>
+        </Empty>
+      ) : (
+        <div className="rpm-card-list">
+          {dossier.contracts.map((c) => {
+            const contract = toContract(c)
+            return (
+              <article key={c.id} className="rpm-card">
+                <div className="rpm-card__row">
+                  <div>
+                    <Link className="rpm-table__code" to={`/contracts/${c.id}`}>{c.number}</Link>
+                    <p className="muted">{c.customer?.full_name || '—'} · {shortDate(c.starts_at)} → {shortDate(c.actual_ends_at || c.planned_ends_at)}</p>
+                  </div>
+                  <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
+                </div>
+                <p className="tabular-nums">{c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : '—')}</p>
+                <div className="vd-no-print">
+                  <ContractActionsBar
+                    contract={contract}
+                    onApprove={() => void life.approve(c.id)}
+                    onAction={(kind) => void life.openAction(kind, contract)}
+                    onPrint={() => void printContract(c.id, toast.error)}
+                  />
+                </div>
+              </article>
+            )
+          })}
         </div>
       )}
     </section>
@@ -956,54 +878,67 @@ export function VehicleDetailPage() {
   const maintenancePanel = (
     <section className="vd-panel" key="maintenance">
       <div className="vd-panel__head">
-        <h2>الصيانات</h2>
-        <p>{dossier.totals.work_orders} أمر · تكلفة {formatMoney(dossier.totals.maintenance_cost || 0)}</p>
+        <div>
+          <h2>الصيانات</h2>
+          <p>{dossier.totals.work_orders} أمر · تكلفة {formatMoney(dossier.totals.maintenance_cost || 0)}</p>
+        </div>
+        <Button size="sm" className="vd-no-print" onClick={() => setWoOpen(true)}>أمر صيانة</Button>
       </div>
-      {dossier.work_orders.length === 0 ? <Empty>لا صيانات مسجّلة</Empty> : (
-        <div className="rpm-table-wrap">
-          <table className="rpm-table rpm-table--stack">
-            <thead>
-              <tr><th>#</th><th>الحالة</th><th>الورشة</th><th>الفتح</th><th>الإغلاق</th><th>العداد</th><th>قطع / عمالة</th></tr>
-            </thead>
-            <tbody>
-              {dossier.work_orders.map((w) => (
-                <tr key={w.id}>
-                  <td data-label="#">{w.id}</td>
-                  <td data-label="الحالة"><StatusPill status={w.status} label={statusLabel[w.status] || w.status} /></td>
-                  <td data-label="الورشة">{w.workshop || '—'}</td>
-                  <td data-label="الفتح">{w.opened_on || '—'}</td>
-                  <td data-label="الإغلاق">{w.closed_on || '—'}</td>
-                  <td data-label="العداد">{w.odometer != null ? formatNumber(w.odometer) : '—'}</td>
-                  <td data-label="قطع / عمالة">
-                    {formatMoney(w.parts_cost || 0)} / {formatMoney(w.labor_cost || 0)}
-                    {w.lines.length > 0 ? <p className="muted">{w.lines.map((l) => l.description).join(' · ')}</p> : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {dossier.work_orders.length === 0 ? (
+        <Empty>
+          لا صيانات مسجّلة
+          <div className="vd-no-print" style={{ marginBlockStart: '0.75rem' }}>
+            <Button size="sm" onClick={() => setWoOpen(true)}>فتح أول أمر صيانة</Button>
+          </div>
+        </Empty>
+      ) : (
+        <div className="rpm-card-list">
+          {dossier.work_orders.map((w) => (
+            <article key={w.id} className="rpm-card">
+              <div className="rpm-card__row">
+                <div>
+                  <strong>أمر #{w.id}</strong>
+                  <p className="muted">{w.workshop || '—'} · فتح {w.opened_on || '—'} · عداد {w.odometer != null ? formatNumber(w.odometer) : '—'}</p>
+                </div>
+                <StatusPill status={w.status} label={statusLabel[w.status] || w.status} />
+              </div>
+              <p className="tabular-nums">{formatMoney(w.parts_cost || 0)} قطع · {formatMoney(w.labor_cost || 0)} عمالة</p>
+              {w.lines.length > 0 ? <p className="muted">{w.lines.map((l) => l.description).join(' · ')}</p> : null}
+              {['open', 'in_progress'].includes(String(w.status)) ? (
+                <div className="rpm-card__actions vd-no-print">
+                  <Button size="sm" onClick={() => void closeWorkOrder(w.id)}>إغلاق أمر الشغل</Button>
+                </div>
+              ) : null}
+            </article>
+          ))}
         </div>
       )}
-      <div className="vd-panel__head" style={{ marginTop: '0.5rem' }}>
-        <h2>المخالفات</h2>
-        <p>{dossier.totals.violations}</p>
+      <div className="vd-panel__head">
+        <div>
+          <h2>المخالفات</h2>
+          <p>{dossier.totals.violations}</p>
+        </div>
+        <Button size="sm" className="vd-no-print" variant="secondary" onClick={() => navigate('/violations')}>تسجيل مخالفة</Button>
       </div>
       {dossier.violations.length === 0 ? <Empty>لا مخالفات</Empty> : (
-        <div className="rpm-table-wrap">
-          <table className="rpm-table rpm-table--compact rpm-table--stack">
-            <thead><tr><th>التاريخ</th><th>الموقع</th><th>المبلغ</th><th>العميل</th><th>الحالة</th></tr></thead>
-            <tbody>
-              {dossier.violations.map((x) => (
-                <tr key={x.id}>
-                  <td data-label="التاريخ">{shortDate(x.occurred_at)}</td>
-                  <td data-label="الموقع">{x.location || '—'}</td>
-                  <td data-label="المبلغ">{x.amount != null ? formatMoney(x.amount) : '—'}</td>
-                  <td data-label="العميل">{x.customer?.full_name || '—'}</td>
-                  <td data-label="الحالة">{x.status || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="rpm-card-list">
+          {dossier.violations.map((x) => (
+            <article key={x.id} className="rpm-card">
+              <div className="rpm-card__row">
+                <div>
+                  <strong>{x.location || 'مخالفة'}</strong>
+                  <p className="muted">{shortDate(x.occurred_at)} · {x.customer?.full_name || '—'}</p>
+                </div>
+                <strong className="tabular-nums">{x.amount != null ? formatMoney(x.amount) : '—'}</strong>
+              </div>
+              <div className="rpm-card__actions">
+                <StatusPill status={x.status || 'open'} label={x.status || '—'} />
+                {x.status && !['paid', 'confirmed'].includes(x.status) ? (
+                  <Button size="sm" className="vd-no-print" onClick={() => void confirmViolation(x.id)}>تأكيد السداد</Button>
+                ) : null}
+              </div>
+            </article>
+          ))}
         </div>
       )}
     </section>
@@ -1012,10 +947,20 @@ export function VehicleDetailPage() {
   const expensesPanel = (
     <section className="vd-panel" key="expenses">
       <div className="vd-panel__head">
-        <h2>المصروفات</h2>
-        <p>الإجمالي {formatMoney(dossier.totals.expenses_amount)}</p>
+        <div>
+          <h2>المصروفات</h2>
+          <p>الإجمالي {formatMoney(dossier.totals.expenses_amount)}</p>
+        </div>
+        <Button size="sm" className="vd-no-print" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
       </div>
-      {dossier.expenses.length === 0 ? <Empty>لا مصروفات مرتبطة</Empty> : (
+      {dossier.expenses.length === 0 ? (
+        <Empty>
+          لا مصروفات مرتبطة
+          <div className="vd-no-print" style={{ marginBlockStart: '0.75rem' }}>
+            <Button size="sm" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
+          </div>
+        </Empty>
+      ) : (
         <div className="rpm-table-wrap">
           <table className="rpm-table rpm-table--stack">
             <thead><tr><th>العنوان</th><th>التصنيف</th><th>التاريخ</th><th>المبلغ</th><th>الطريقة</th></tr></thead>
@@ -1171,7 +1116,7 @@ export function VehicleDetailPage() {
               <span>ربط منذ {v.owner_since || '—'}</span>
             </div>
           </div>
-          <Link className="vd-no-print rpm-link-btn" to="/owners">صفحة الملاك</Link>
+          <Link className="vd-no-print rpm-link-btn" to={v.owner ? `/owners/${v.owner.id}` : '/owners'}>{v.owner ? 'ملف المالك' : 'صفحة الملاك'}</Link>
         </div>
       ) : (
         <Empty>هذه العربية ملك المركز — لا يوجد مالك خارجي مرتبط.</Empty>
@@ -1228,76 +1173,93 @@ export function VehicleDetailPage() {
   )
 
   const assetsPanel = (
-    <section className="vd-panel" key="assets">
+    <section className="vd-panel vd-panel--spaced" key="assets">
       <div className="vd-panel__head">
-        <h2>الإطارات · البطارية · التوقف · القطع</h2>
-        <p>دخل ضائع تقديري {formatMoney(dossier.totals.lost_revenue || 0)}</p>
+        <div>
+          <h2>الإطارات · البطارية · التوقف · القطع</h2>
+          <p>دخل ضائع تقديري {formatMoney(dossier.totals.lost_revenue || 0)}</p>
+        </div>
       </div>
 
-      <div className="vd-panel__head"><h3>الإطارات</h3></div>
-      {(dossier.tires || []).length === 0 ? <Empty>لا إطارات مسجّلة</Empty> : (
-        <div className="rpm-card-list">
-          {(dossier.tires || []).map((t) => (
-            <article key={t.id} className="rpm-card">
-              <div className="rpm-card__row">
-                <strong>{tirePosLabel[t.position] || t.position}</strong>
-                <span className="tabular-nums">{formatNumber(t.expected_life_km)} كم عمر</span>
-              </div>
-              <p className="muted">{t.brand || '—'} · تركيب {shortDate(t.installed_on)} · عداد {formatNumber(t.odometer_at_install)}</p>
-            </article>
-          ))}
-        </div>
-      )}
+      <div className="vd-assets-grid">
+        <article className="vd-asset-card">
+          <div className="vd-asset-card__head">
+            <h3>الإطارات</h3>
+            <Button size="sm" variant="secondary" className="vd-no-print" onClick={() => setAssetSheet('tire')}>+ تسجيل إطار</Button>
+          </div>
+          {(dossier.tires || []).length === 0 ? <Empty>لا إطارات مسجّلة</Empty> : (
+            <div className="rpm-card-list">
+              {(dossier.tires || []).map((t) => (
+                <article key={t.id} className="rpm-card">
+                  <div className="rpm-card__row">
+                    <strong>{tirePosLabel[t.position] || t.position}</strong>
+                    <span className="tabular-nums">{formatNumber(t.expected_life_km)} كم عمر</span>
+                  </div>
+                  <p className="muted">{t.brand || '—'} · تركيب {shortDate(t.installed_on)} · عداد {formatNumber(t.odometer_at_install)}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </article>
 
-      <div className="vd-panel__head" style={{ marginBlockStart: '1rem' }}><h3>البطارية</h3></div>
-      {(dossier.batteries || []).length === 0 ? <Empty>لا بطارية مسجّلة</Empty> : (
-        <div className="rpm-card-list">
-          {(dossier.batteries || []).map((b) => (
-            <article key={b.id} className="rpm-card">
-              <div className="rpm-card__row">
-                <strong>{b.brand || 'بطارية'}</strong>
-                <span className="tabular-nums">{formatNumber(b.expected_life_km)} كم</span>
-              </div>
-              <p className="muted">تركيب {shortDate(b.installed_on)} · عداد {formatNumber(b.odometer_at_install)}</p>
-            </article>
-          ))}
-        </div>
-      )}
+        <article className="vd-asset-card">
+          <div className="vd-asset-card__head">
+            <h3>البطارية</h3>
+            <Button size="sm" variant="secondary" className="vd-no-print" onClick={() => setAssetSheet('battery')}>+ تسجيل بطارية</Button>
+          </div>
+          {(dossier.batteries || []).length === 0 ? <Empty>لا بطارية مسجّلة</Empty> : (
+            <div className="rpm-card-list">
+              {(dossier.batteries || []).map((b) => (
+                <article key={b.id} className="rpm-card">
+                  <div className="rpm-card__row">
+                    <strong>{b.brand || 'بطارية'}</strong>
+                    <span className="tabular-nums">{formatNumber(b.expected_life_km)} كم</span>
+                  </div>
+                  <p className="muted">تركيب {shortDate(b.installed_on)} · عداد {formatNumber(b.odometer_at_install)}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </article>
 
-      <div className="vd-panel__head" style={{ marginBlockStart: '1rem' }}><h3>أيام التوقف</h3></div>
-      {(dossier.downtime || []).length === 0 ? <Empty>لا توقف مسجّل</Empty> : (
-        <div className="rpm-card-list">
-          {(dossier.downtime || []).map((d) => (
-            <article key={d.id} className="rpm-card">
-              <div className="rpm-card__row">
-                <strong>{d.reason === 'maintenance' ? 'صيانة' : d.reason === 'out_of_service' ? 'خارج الخدمة' : 'أخرى'}</strong>
-                <strong className="tabular-nums">{formatMoney(d.lost_revenue_estimate || 0)}</strong>
-              </div>
-              <p className="muted">{shortDate(d.starts_at)} → {shortDate(d.ends_at)} · {formatNumber(d.days_count || 0)} يوم</p>
-            </article>
-          ))}
-        </div>
-      )}
+        <article className="vd-asset-card">
+          <div className="vd-asset-card__head">
+            <h3>أيام التوقف</h3>
+            <Button size="sm" variant="secondary" className="vd-no-print" onClick={() => setAssetSheet('downtime')}>+ تسجيل توقف</Button>
+          </div>
+          {(dossier.downtime || []).length === 0 ? <Empty>لا توقف مسجّل</Empty> : (
+            <div className="rpm-card-list">
+              {(dossier.downtime || []).map((d) => (
+                <article key={d.id} className="rpm-card">
+                  <div className="rpm-card__row">
+                    <strong>{d.reason === 'maintenance' ? 'صيانة' : d.reason === 'out_of_service' ? 'خارج الخدمة' : 'أخرى'}</strong>
+                    <strong className="tabular-nums">{formatMoney(d.lost_revenue_estimate || 0)}</strong>
+                  </div>
+                  <p className="muted">{shortDate(d.starts_at)} → {shortDate(d.ends_at)} · {formatNumber(d.days_count || 0)} يوم</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </article>
 
-      <div className="vd-panel__head" style={{ marginBlockStart: '1rem' }}><h3>قطع استهلاكية</h3></div>
-      {(dossier.consumables || []).length === 0 ? <Empty>لا قوالب مربوطة بهذه العربية</Empty> : (
-        <div className="rpm-card-list">
-          {(dossier.consumables || []).map((c) => (
-            <article key={c.id} className="rpm-card">
-              <div className="rpm-card__row">
-                <strong>{c.template?.name || 'قطعة'}</strong>
-                <span>{c.status}</span>
-              </div>
-              <p className="muted">استحقاق {shortDate(c.due_on)}{c.due_odometer != null ? ` · عداد ${formatNumber(c.due_odometer)}` : ''}</p>
-            </article>
-          ))}
-        </div>
-      )}
-
-      <div className="rpm-card__actions" style={{ marginBlockStart: '1rem' }}>
-        <Button size="sm" variant="secondary" onClick={() => setAssetSheet('tire')}>تسجيل إطار</Button>
-        <Button size="sm" variant="secondary" onClick={() => setAssetSheet('battery')}>تسجيل بطارية</Button>
-        <Button size="sm" variant="secondary" onClick={() => setAssetSheet('downtime')}>تسجيل توقف</Button>
+        <article className="vd-asset-card">
+          <div className="vd-asset-card__head">
+            <h3>قطع استهلاكية</h3>
+          </div>
+          {(dossier.consumables || []).length === 0 ? <Empty>لا قوالب مربوطة بهذه العربية</Empty> : (
+            <div className="rpm-card-list">
+              {(dossier.consumables || []).map((c) => (
+                <article key={c.id} className="rpm-card">
+                  <div className="rpm-card__row">
+                    <strong>{c.template?.name || 'قطعة'}</strong>
+                    <span>{c.status}</span>
+                  </div>
+                  <p className="muted">استحقاق {shortDate(c.due_on)}{c.due_odometer != null ? ` · عداد ${formatNumber(c.due_odometer)}` : ''}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </article>
       </div>
     </section>
   )
@@ -1335,13 +1297,13 @@ export function VehicleDetailPage() {
 
       <header className="vd-hero">
         <div className="vd-hero__top">
-          <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>رجوع للأسطول</button>
+          <BackNavButton className="vd-no-print" to="/vehicles" label="رجوع للعربيات" />
           <div className="vd-hero__actions vd-no-print">
             <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد جديد</Button>
             <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>إضافة صيانة</Button>
             <Button size="sm" variant="secondary" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
-            <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
+            <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)}>تعديل</Button>
             <Button size="sm" variant="primary" onClick={() => window.print()}>طباعة</Button>
           </div>
         </div>
@@ -1458,19 +1420,17 @@ export function VehicleDetailPage() {
         ) : null}
       </Sheet>
 
-      <Sheet
+      <VehicleFormSheet
         open={editOpen}
-        title="تعديل العربية"
-        onClose={() => { setEditOpen(false); setEditing(false) }}
-        footer={
-          <>
-            <Button loading={saving} onClick={() => onUpdate()}>حفظ التعديل</Button>
-            <Button variant="secondary" onClick={() => { setEditOpen(false); setEditing(false) }}>إلغاء</Button>
-          </>
-        }
-      >
-        {editing ? formFields : null}
-      </Sheet>
+        mode="edit"
+        vehicleId={v.id}
+        initial={v}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => {
+          setEditOpen(false)
+          void load()
+        }}
+      />
 
       <Sheet
         open={accOpen}
@@ -1503,6 +1463,16 @@ export function VehicleDetailPage() {
         onClose={() => setExpOpen(false)}
         onSaved={() => void load()}
         vehicle={{ id: v.id, label: `${v.brand} ${v.model} · ${v.plate}` }}
+      />
+      <ContractActionSheet
+        action={life.action}
+        selected={life.selected}
+        vehicles={life.vehicles}
+        saving={life.saving}
+        form={life.actionForm}
+        onChange={life.setActionForm}
+        onConfirm={() => void life.runAction()}
+        onClose={life.closeAction}
       />
       <Sheet
         open={!!docEdit}

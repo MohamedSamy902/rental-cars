@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatDate } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  PageHeader, Button, Sheet, TextAreaField, SelectField, MoneyField,
-  useToast, SkeletonBlock, ErrorState, StatusPill, DetailList,
+  PageHeader, Button, BackNavButton, Sheet, TextAreaField, MoneyField,
+  useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, FilterBar, DataTable,
+  IconWallet, IconCash, IconTrend, IconReceipt, IconWrench, IconRefresh,
+  type DataColumn,
 } from '@/shared/ui'
+import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
+import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import './pages.css'
+import './PettyCashDetailPage.css'
 
 type Account = {
   id: number
@@ -14,44 +20,83 @@ type Account = {
   limit_amount: number
   balance: number
   is_active: boolean
-  employee?: { id: number; name: string; job_title?: string }
+  employee?: { id: number; name: string; job_title?: string | null }
 }
 
-type Movement = {
-  id: number
-  type: string
+type Summary = {
+  employee_name?: string | null
+  employee_role?: string | null
+  limit_amount: number
+  total_topup: number
+  total_spent: number
+  total_returned: number
+  balance: number
+  is_active: boolean
+  ledger_count: number
+}
+
+type LedgerRow = {
+  id: string
+  movement_id?: number | null
+  occurred_on: string
+  category: 'topup' | 'expense' | 'maintenance' | 'settlement' | string
+  direction: 'in' | 'out'
+  label: string
   amount: number
-  moved_on: string
+  signed_amount: number
+  running_balance: number
   notes?: string | null
+  expense?: {
+    id: number
+    title: string
+    category?: string | null
+    amount: number
+    spent_on?: string | null
+    vehicle_id?: number | null
+    work_order_id?: number | null
+  } | null
+  work_order?: {
+    id: number
+    workshop?: string | null
+    status?: string | null
+    opened_on?: string | null
+    vehicle_id?: number | null
+  } | null
+  vehicle?: {
+    id: number
+    brand?: string
+    model?: string
+    plate?: string
+    label?: string
+  } | null
+  parts?: Array<{ id: number; description?: string | null; quantity?: number; amount?: number }>
 }
 
-type ExpenseRow = { id: number; title: string; amount: number; spent_on: string; category?: string }
-type WoLine = {
-  id: number
-  description?: string
-  petty_cash_amount?: number
-  work_order?: { id: number; workshop?: string; opened_on?: string; status?: string }
-}
+const LedgerTabs = ['all', 'topup', 'expense', 'maintenance', 'settlement'] as const
 
-const typeLabel: Record<string, string> = {
-  topup: 'تسليم / تعزيز',
-  spend: 'استخدام',
-  adjust: 'تسوية رصيد',
+const categoryLabel: Record<string, string> = {
+  topup: 'تغذية',
+  expense: 'مصروف',
+  maintenance: 'صيانة',
+  settlement: 'تسوية',
 }
 
 export function PettyCashDetailPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const toast = useToast()
   const [account, setAccount] = useState<Account | null>(null)
-  const [movements, setMovements] = useState<Movement[]>([])
-  const [expenses, setExpenses] = useState<ExpenseRow[]>([])
-  const [workOrders, setWorkOrders] = useState<WoLine[]>([])
+  const [summary, setSummary] = useState<Summary | null>(null)
+  const [ledger, setLedger] = useState<LedgerRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useQueryTab({ allowed: LedgerTabs, defaultValue: 'all' })
   const [moveOpen, setMoveOpen] = useState(false)
+  const [moveMode, setMoveMode] = useState<'topup' | 'return'>('topup')
   const [saving, setSaving] = useState(false)
-  const [move, setMove] = useState({ type: 'topup', amount: '', notes: '' })
+  const [move, setMove] = useState({ amount: '', notes: '' })
+  const [expenseOpen, setExpenseOpen] = useState(false)
+  const [woOpen, setWoOpen] = useState(false)
 
   async function load() {
     if (!id) return
@@ -61,15 +106,13 @@ export function PettyCashDetailPage() {
       const res = await api<{
         data: {
           account: Account
-          movements: Movement[]
-          linked_expenses: ExpenseRow[]
-          linked_work_orders: WoLine[]
+          summary: Summary
+          ledger: LedgerRow[]
         }
       }>(`/petty-cash/${id}`)
       setAccount(res.data.account)
-      setMovements(res.data.movements || [])
-      setExpenses(res.data.linked_expenses || [])
-      setWorkOrders(res.data.linked_work_orders || [])
+      setSummary(res.data.summary)
+      setLedger(res.data.ledger || [])
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -79,17 +122,130 @@ export function PettyCashDetailPage() {
 
   useEffect(() => { void load() }, [id])
 
+  const chips = useMemo(() => {
+    const counts = {
+      all: ledger.length,
+      topup: ledger.filter((r) => r.category === 'topup').length,
+      expense: ledger.filter((r) => r.category === 'expense').length,
+      maintenance: ledger.filter((r) => r.category === 'maintenance').length,
+      settlement: ledger.filter((r) => r.category === 'settlement').length,
+    }
+    return [
+      { id: 'all', label: `الكل (${counts.all})` },
+      { id: 'topup', label: `تغذية (${counts.topup})` },
+      { id: 'expense', label: `مصروفات (${counts.expense})` },
+      { id: 'maintenance', label: `صيانة (${counts.maintenance})` },
+      { id: 'settlement', label: `تسويات (${counts.settlement})` },
+    ]
+  }, [ledger])
+
+  const filtered = useMemo(() => {
+    const q = search.trim()
+    return ledger.filter((r) => {
+      if (chip !== 'all' && r.category !== chip) return false
+      if (!q) return true
+      const hay = `${r.label} ${r.notes || ''} ${r.vehicle?.label || ''} ${r.vehicle?.plate || ''} ${r.expense?.title || ''} ${r.work_order?.workshop || ''}`
+      return hay.includes(q)
+    })
+  }, [ledger, chip, search])
+
+  const columns: DataColumn<LedgerRow>[] = [
+    {
+      id: 'date',
+      header: 'التاريخ',
+      cell: (r) => formatDate(r.occurred_on),
+      sortValue: (r) => r.occurred_on,
+      mobile: 'subtitle',
+    },
+    {
+      id: 'kind',
+      header: 'النوع',
+      cell: (r) => (
+        <span className={`pcd-badge pcd-badge--${r.category}`}>
+          {categoryLabel[r.category] || r.category}
+        </span>
+      ),
+      sortValue: (r) => r.category,
+      mobile: 'badge',
+    },
+    {
+      id: 'label',
+      header: 'البيان',
+      cell: (r) => (
+        <div className="pcd-ledger-main">
+          <strong className="rpm-table__primary">{r.label}</strong>
+          {r.expense?.category ? <span className="rpm-table__sub">تصنيف: {r.expense.category}</span> : null}
+          {r.parts && r.parts.length > 0 ? (
+            <span className="rpm-table__sub">
+              قطع: {r.parts.map((p) => p.description || `بند #${p.id}`).join(' · ')}
+            </span>
+          ) : null}
+          {r.notes ? <span className="rpm-table__sub">{r.notes}</span> : null}
+        </div>
+      ),
+      sortValue: (r) => r.label,
+      mobile: 'title',
+    },
+    {
+      id: 'vehicle',
+      header: 'العربية',
+      cell: (r) => (
+        r.vehicle ? (
+          <Link className="pcd-link" to={`/vehicles/${r.vehicle.id}`}>
+            {r.vehicle.label || `${r.vehicle.brand} ${r.vehicle.model} · ${r.vehicle.plate}`}
+          </Link>
+        ) : '—'
+      ),
+      sortValue: (r) => r.vehicle?.plate,
+    },
+    {
+      id: 'amount',
+      header: 'المبلغ',
+      cell: (r) => (
+        <strong className={r.direction === 'in' ? 'pcd-amt pcd-amt--in' : 'pcd-amt pcd-amt--out'}>
+          {r.direction === 'in' ? '+' : '−'}{formatMoney(r.amount)}
+        </strong>
+      ),
+      sortValue: (r) => Number(r.signed_amount),
+    },
+    {
+      id: 'balance',
+      header: 'الرصيد بعد الحركة',
+      cell: (r) => <span className="tabular-nums">{formatMoney(r.running_balance)}</span>,
+      sortValue: (r) => Number(r.running_balance),
+    },
+    {
+      id: 'links',
+      header: 'الربط',
+      cell: (r) => (
+        <div className="pcd-links">
+          {r.expense ? <Link className="pcd-link" to="/expenses">مصروف #{r.expense.id}</Link> : null}
+          {r.work_order ? (
+            <Link className="pcd-link" to={r.work_order.vehicle_id ? `/vehicles/${r.work_order.vehicle_id}?tab=maintenance` : '/maintenance'}>
+              أمر شغل #{r.work_order.id}
+            </Link>
+          ) : null}
+          {!r.expense && !r.work_order ? '—' : null}
+        </div>
+      ),
+    },
+  ]
+
   async function saveMove() {
     if (!account) return
     setSaving(true)
     try {
       await api(`/petty-cash/${account.id}/move`, {
         method: 'POST',
-        json: { type: move.type, amount: Number(move.amount), notes: move.notes || undefined },
+        json: {
+          type: moveMode,
+          amount: Number(move.amount),
+          notes: move.notes || (moveMode === 'topup' ? 'تغذية عهدة' : 'رد / تسوية عهدة'),
+        },
       })
-      toast.success('تم تسجيل حركة العهدة.')
+      toast.success(moveMode === 'topup' ? 'تم تغذية العهدة.' : 'تم تسجيل التسوية.')
       setMoveOpen(false)
-      setMove({ type: 'topup', amount: '', notes: '' })
+      setMove({ amount: '', notes: '' })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -99,117 +255,130 @@ export function PettyCashDetailPage() {
   }
 
   if (loading) return <div className="rpm-stack"><SkeletonBlock rows={8} /></div>
-  if (error || !account) {
+  if (error || !account || !summary) {
     return (
       <div className="rpm-stack">
-        <ErrorState title="تعذّر تحميل العهدة" description={error || 'غير موجودة'} action={<Button onClick={() => navigate('/petty-cash')}>رجوع</Button>} />
+        <ErrorState
+          title="تعذّر تحميل العهدة"
+          description={error || 'غير موجودة'}
+          action={<BackNavButton to="/petty-cash" label="رجوع للعهدة" />}
+        />
       </div>
     )
   }
 
+  const employeeName = summary.employee_name || account.employee?.name || `موظف #${account.employee_id}`
+  const employeeRole = summary.employee_role || account.employee?.job_title || '—'
+
   return (
-    <div className="rpm-stack">
+    <div className="rpm-stack pcd">
       <PageHeader
-        title={`عهدة · ${account.employee?.name || `#${account.employee_id}`}`}
-        subtitle={account.employee?.job_title || 'تفاصيل العهدة النقدية وسجل الحركات'}
+        title={`عهدة · ${employeeName}`}
+        subtitle={`${employeeRole} · سجل كامل لحركات الدخول والخروج`}
         action={
           <>
-            <Button variant="secondary" onClick={() => navigate('/petty-cash')}>رجوع للقائمة</Button>
-            <Button onClick={() => { setMove({ type: 'topup', amount: '', notes: '' }); setMoveOpen(true) }}>تعزيز / تسوية</Button>
+            <BackNavButton to="/petty-cash" label="رجوع للعهدة" />
+            <Button
+              variant="secondary"
+              iconStart={<IconRefresh size={16} />}
+              onClick={() => { setMoveMode('topup'); setMove({ amount: '', notes: '' }); setMoveOpen(true) }}
+            >
+              تغذية العهدة
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => { setMoveMode('return'); setMove({ amount: '', notes: '' }); setMoveOpen(true) }}
+            >
+              تسوية / رد مبلغ
+            </Button>
+            <Button variant="accent" onClick={() => setExpenseOpen(true)}>مصروف من العهدة</Button>
+            <Button onClick={() => setWoOpen(true)}>صيانة من العهدة</Button>
           </>
         }
       />
 
-      <DetailList
-        rows={[
-          { label: 'الموظف', value: account.employee?.name || `موظف #${account.employee_id}` },
-          { label: 'الوظيفة', value: account.employee?.job_title || '—' },
-          { label: 'الرصيد الحالي', value: <strong>{formatMoney(account.balance)}</strong> },
-          { label: 'حد العهدة', value: formatMoney(account.limit_amount) },
-          { label: 'الحالة', value: <StatusPill status={account.is_active ? 'active' : 'cancelled'} label={account.is_active ? 'نشطة' : 'موقوفة'} /> },
+      <div className="pcd-identity">
+        <div>
+          <p className="pcd-identity__role">{employeeRole}</p>
+          <h2>{employeeName}</h2>
+        </div>
+        <StatusPill
+          status={account.is_active ? 'active' : 'cancelled'}
+          label={account.is_active ? 'عهدة نشطة' : 'موقوفة'}
+        />
+      </div>
+
+      <MetricCardGrid
+        label="ملخص العهدة"
+        items={[
+          { id: 'limit', label: 'حد العهدة', value: summary.limit_amount, format: 'money', icon: <IconWallet size={16} /> },
+          { id: 'topup', label: 'إجمالي المستلم / التغذية', value: summary.total_topup, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
+          { id: 'spent', label: 'إجمالي المنصرف', value: summary.total_spent, format: 'money', tone: 'warning', icon: <IconReceipt size={16} /> },
+          { id: 'returned', label: 'إجمالي المرتجع / التسويات', value: summary.total_returned, format: 'money', tone: 'info', icon: <IconTrend size={16} /> },
+          { id: 'balance', label: 'الرصيد المتبقي الحالي', value: summary.balance, format: 'money', tone: summary.balance > 0 ? 'success' : 'warning', icon: <IconWrench size={16} /> },
         ]}
       />
 
-      <section className="rpm-panel">
+      <section className="rpm-panel pcd-ledger">
         <div className="rpm-panel__head">
-          <h3>سجل الحركات</h3>
-          <Button size="sm" variant="secondary" onClick={() => { setMove({ type: 'spend', amount: '', notes: '' }); setMoveOpen(true) }}>تسجيل استخدام</Button>
+          <h3>سجل حركات العهدة الكامل</h3>
+          <span className="muted">{summary.ledger_count} حركة</span>
         </div>
-        {movements.length === 0 ? <p className="muted">لا حركات بعد.</p> : (
-          <div className="rpm-card-list">
-            {movements.map((m) => (
-              <article key={m.id} className="rpm-card">
-                <div className="rpm-card__row">
-                  <strong>{typeLabel[m.type] || m.type}</strong>
-                  <strong className="tabular-nums">{formatMoney(m.amount)}</strong>
-                </div>
-                <p className="muted">{formatDate(m.moved_on)}{m.notes ? ` · ${m.notes}` : ''}</p>
-              </article>
-            ))}
-          </div>
-        )}
+        <FilterBar
+          search={search}
+          onSearchChange={setSearch}
+          chips={chips}
+          activeChip={chip}
+          onChipChange={setChip}
+          placeholder="بحث بالبيان أو اللوحة أو الورشة…"
+        />
+        <DataTable
+          label="حركات العهدة"
+          rows={filtered}
+          columns={columns}
+          rowKey={(r) => r.id}
+          rowLabel={(r) => r.label}
+          defaultSort={{ id: 'date', dir: 'desc' }}
+          emptyTitle="لا حركات في هذا الفلتر"
+          emptyDescription="سجّل تغذية أو مصروفًا أو أمر شغل من العهدة ليظهر هنا."
+        />
       </section>
-
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>مصروفات مرتبطة بالعهدة</h3></div>
-        {expenses.length === 0 ? <p className="muted">لا مصروفات مرتبطة.</p> : (
-          <div className="rpm-card-list">
-            {expenses.map((e) => (
-              <article key={e.id} className="rpm-card">
-                <div className="rpm-card__row">
-                  <strong>{e.title}</strong>
-                  <strong className="tabular-nums">{formatMoney(e.amount)}</strong>
-                </div>
-                <p className="muted">{formatDate(e.spent_on)} · {e.category || '—'}</p>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>صيانة صُرفت من العهدة</h3></div>
-        {workOrders.length === 0 ? <p className="muted">لا أوامر شغل مرتبطة.</p> : (
-          <div className="rpm-card-list">
-            {workOrders.map((w) => (
-              <article key={w.id} className="rpm-card">
-                <div className="rpm-card__row">
-                  <strong>{w.description || `بند #${w.id}`}</strong>
-                  <strong className="tabular-nums">{formatMoney(w.petty_cash_amount || 0)}</strong>
-                </div>
-                <p className="muted">
-                  أمر #{w.work_order?.id || '—'} · {w.work_order?.workshop || '—'} · {formatDate(w.work_order?.opened_on)}
-                </p>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <p className="muted"><Link to="/petty-cash">← العودة لقائمة العهد</Link></p>
 
       <Sheet
         open={moveOpen}
-        title="حركة عهدة"
+        title={moveMode === 'topup' ? 'تغذية العهدة' : 'تسوية / رد مبلغ'}
         onClose={() => setMoveOpen(false)}
-        footer={<><Button loading={saving} onClick={() => void saveMove()}>تأكيد</Button><Button variant="secondary" onClick={() => setMoveOpen(false)}>إلغاء</Button></>}
+        footer={
+          <>
+            <Button loading={saving} onClick={() => void saveMove()}>تأكيد</Button>
+            <Button variant="secondary" onClick={() => setMoveOpen(false)}>إلغاء</Button>
+          </>
+        }
       >
         <div className="rpm-form-grid">
-          <SelectField
-            label="نوع الحركة"
+          <MoneyField
+            label="المبلغ"
             required
-            value={move.type}
-            onChange={(e) => setMove({ ...move, type: e.target.value })}
-            options={[
-              { value: 'topup', label: 'تسليم / تعزيز' },
-              { value: 'spend', label: 'استخدام' },
-              { value: 'adjust', label: 'تسوية رصيد' },
-            ]}
+            value={move.amount}
+            onChange={(e) => setMove({ ...move, amount: e.target.value })}
+            hint={moveMode === 'return' ? 'يُخصم من الرصيد الحالي كمرتجع/تسوية' : 'يُضاف إلى رصيد العهدة'}
           />
-          <MoneyField label="المبلغ" required value={move.amount} onChange={(e) => setMove({ ...move, amount: e.target.value })} />
           <TextAreaField label="ملاحظات" value={move.notes} onChange={(e) => setMove({ ...move, notes: e.target.value })} />
         </div>
       </Sheet>
+
+      <ExpenseSheet
+        open={expenseOpen}
+        custodyEmployee={{ id: account.employee_id, name: employeeName }}
+        onClose={() => setExpenseOpen(false)}
+        onSaved={() => void load()}
+      />
+      <WorkOrderSheet
+        open={woOpen}
+        custodyEmployee={{ id: account.employee_id, name: employeeName }}
+        onClose={() => setWoOpen(false)}
+        onSaved={() => void load()}
+      />
     </div>
   )
 }

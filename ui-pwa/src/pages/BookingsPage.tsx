@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
@@ -17,6 +18,8 @@ import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { printContract } from '@/shared/contracts/printContract'
 import './pages.css'
 
+const BookingsPageTabs = ['all', 'pending', 'approved', 'active', 'completed'] as const
+
 export function BookingsPage() {
   const toast = useToast()
   const navigate = useNavigate()
@@ -24,7 +27,7 @@ export function BookingsPage() {
   const [rows, setRows] = useState<Contract[]>([])
   const [summary, setSummary] = useState({ total: 0, pending: 0, approved: 0, active: 0, completed: 0 })
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: BookingsPageTabs, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { openNewContract, createdVersion } = useNewContract()

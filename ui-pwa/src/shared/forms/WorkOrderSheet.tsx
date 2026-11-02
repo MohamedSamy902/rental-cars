@@ -12,6 +12,8 @@ type Props = {
   onSaved?: () => void
   /** Locks the work order to one vehicle (vehicle page quick action) */
   vehicle?: { id: number; label: string; odometer?: number }
+  /** Prefill funding from a custody employee (petty-cash detail quick action) */
+  custodyEmployee?: { id: number; name?: string }
 }
 
 type VehicleOption = { id: number; brand: string; model: string; plate: string; odometer?: number }
@@ -28,7 +30,6 @@ const emptyForm = {
   vehicle_id: '',
   odometer: '',
   workshop: '',
-  labor_cost: '0',
   description: 'صيانة',
   inventory_item_id: '',
   quantity: '1',
@@ -40,7 +41,7 @@ const emptyForm = {
   next_service_odometer: '',
 }
 
-export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
+export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmployee }: Props) {
   const toast = useToast()
   const [vehicles, setVehicles] = useState<VehicleOption[]>([])
   const [items, setItems] = useState<Item[]>([])
@@ -52,6 +53,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
 
   const lockedId = vehicle?.id
   const lockedOdometer = vehicle?.odometer
+  const lockCustody = Boolean(custodyEmployee?.id)
 
   const stockItems = useMemo(
     () => items.filter((i) => (i.remaining ?? 0) > 0),
@@ -70,6 +72,8 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
       opened_at: nowLocal(),
       vehicle_id: lockedId ? String(lockedId) : '',
       odometer: lockedOdometer != null ? String(lockedOdometer) : '',
+      funding: lockCustody ? 'custody' : 'stock',
+      employee_id: lockCustody && custodyEmployee?.id ? String(custodyEmployee.id) : '',
     })
     setFieldErrors({})
     setPutsInMaintenance(true)
@@ -81,7 +85,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
       requests.push(api<{ data: VehicleOption[] }>('/vehicles?per_page=100').then((r) => setVehicles(r.data)))
     }
     Promise.all(requests).catch((e) => toast.error((e as ApiError).message))
-  }, [open, lockedId, lockedOdometer, toast])
+  }, [open, lockedId, lockedOdometer, lockCustody, custodyEmployee?.id, toast])
 
   function validate(): boolean {
     const next: Record<string, string> = {}
@@ -115,7 +119,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
           vehicle_id: Number(form.vehicle_id),
           odometer: Number(form.odometer),
           workshop: form.workshop || undefined,
-          labor_cost: Number(form.labor_cost || 0),
+          labor_cost: 0,
           puts_in_maintenance: putsInMaintenance,
           force_after_resolution: true,
           opened_at: form.opened_at || undefined,

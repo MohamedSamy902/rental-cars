@@ -81,6 +81,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     setForm({
       ...emptyForm,
       vehicle_id: opts?.vehicleId ? String(opts.vehicleId) : '',
+      customer_id: opts?.customerId ? String(opts.customerId) : '',
     })
     void Promise.all([
       api<{ data: Customer[] }>('/customers?per_page=100'),
@@ -88,17 +89,22 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     ])
       .then(([c, v]) => {
         setCustomers(c.data)
-        if (opts?.vehicleId) {
-          const picked = v.find((x) => x.id === opts.vehicleId)
-          if (picked) {
-            setForm((f) => ({
-              ...f,
-              vehicle_id: String(picked.id),
-              daily_rate: String(picked.daily_rate),
-              deposit: String(picked.default_deposit),
-            }))
-          }
-        }
+        setForm((f) => ({
+          ...f,
+          customer_id: opts?.customerId ? String(opts.customerId) : f.customer_id,
+          ...(opts?.vehicleId
+            ? (() => {
+                const picked = v.find((x) => x.id === opts.vehicleId)
+                return picked
+                  ? {
+                      vehicle_id: String(picked.id),
+                      daily_rate: String(picked.daily_rate),
+                      deposit: String(picked.default_deposit),
+                    }
+                  : {}
+              })()
+            : {}),
+        }))
       })
       .catch((e) => toast.error((e as ApiError).message))
   }, [loadVehicles, toast])

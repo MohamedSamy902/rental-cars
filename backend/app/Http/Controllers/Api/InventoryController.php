@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\InventoryItem;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
 {
@@ -41,6 +43,29 @@ class InventoryController extends Controller
         $item = $this->inventory->storeItem($data);
 
         return response()->json(['data' => $item, 'message' => 'تم إضافة الصنف.'], 201);
+    }
+
+    public function updateItem(Request $request, InventoryItem $item): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => ['nullable', 'string', 'max:50', Rule::unique('inventory_items', 'code')->ignore($item->id)],
+            'name' => ['required', 'string'],
+            'category' => ['required', 'string'],
+            'unit' => ['required', 'string'],
+            'reorder_level' => ['required', 'integer', 'min:0'],
+            'location' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+        ], [], [
+            'code' => 'الكود',
+            'name' => 'الاسم',
+            'category' => 'التصنيف',
+            'unit' => 'وحدة القياس',
+            'reorder_level' => 'حد التنبيه',
+        ]);
+
+        $item = $this->inventory->updateItem($item, $data);
+
+        return response()->json(['data' => $item, 'message' => 'تم تحديث الصنف.']);
     }
 
     public function receiveBatch(Request $request): JsonResponse

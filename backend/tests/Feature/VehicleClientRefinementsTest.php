@@ -58,6 +58,24 @@ class VehicleClientRefinementsTest extends TestCase
         $this->assertSame('VEH-0002', $catalog->json('data.next_code'));
     }
 
+    public function test_can_add_brand_from_vehicle_form_flow(): void
+    {
+        $created = $this->postJson('/api/vehicles/brands', [
+            'name' => 'لاند روفر',
+        ])->assertCreated();
+
+        $created->assertJsonPath('data.name', 'لاند روفر');
+        $this->assertDatabaseHas('vehicle_brands', ['name' => 'لاند روفر', 'is_active' => 1]);
+
+        $again = $this->postJson('/api/vehicles/brands', [
+            'name' => 'لاند روفر',
+        ])->assertCreated();
+        $this->assertSame((int) $created->json('data.id'), (int) $again->json('data.id'));
+
+        $names = collect($this->getJson('/api/vehicles/catalogs')->json('data.brands'))->pluck('name');
+        $this->assertTrue($names->contains('لاند روفر'));
+    }
+
     public function test_license_update_archives_previous(): void
     {
         $vehicle = Vehicle::query()->create([

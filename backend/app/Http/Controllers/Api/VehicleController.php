@@ -41,6 +41,28 @@ class VehicleController extends Controller
         ]);
     }
 
+    public function storeBrand(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+        ], [
+            'name.required' => 'اسم الماركة مطلوب.',
+        ], [
+            'name' => 'اسم الماركة',
+        ]);
+
+        try {
+            $brand = $this->vehicles->createBrand((string) $data['name']);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => ['id' => $brand->id, 'name' => $brand->name],
+            'message' => 'تم إضافة الماركة للقائمة.',
+        ], 201);
+    }
+
     public function recommend(Request $request): JsonResponse
     {
         $category = $request->string('category')->toString() ?: null;

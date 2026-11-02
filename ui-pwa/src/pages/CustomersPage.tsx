@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
@@ -33,12 +34,14 @@ const emptyForm = {
   national_id_image_path: '', national_id_back_path: '', license_image_path: '', license_back_path: '',
 }
 
+const CustomersPageTabs = ['all', 'active', 'blacklist'] as const
+
 export function CustomersPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: CustomersPageTabs, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)

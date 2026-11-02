@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { PageHeader, FilterBar, SkeletonBlock, EmptyState, Button, useToast } from '@/shared/ui'
 import { disableWebPush, enableWebPush, pushSupported, sendTestPush } from '@/shared/push/webPush'
 import './pages.css'
@@ -37,6 +38,8 @@ function relativeDay(iso: string) {
   return formatDateTime(iso).split('،')[0] || formatDateTime(iso)
 }
 
+const NotificationsPageTabs = ['unread', 'all'] as const
+
 export function NotificationsPage() {
   const toast = useToast()
   const navigate = useNavigate()
@@ -46,7 +49,7 @@ export function NotificationsPage() {
   const [devices, setDevices] = useState(0)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [chip, setChip] = useState('unread')
+  const [chip, setChip] = useQueryTab({ allowed: NotificationsPageTabs, defaultValue: 'unread' })
 
   const chips = useMemo(
     () => [

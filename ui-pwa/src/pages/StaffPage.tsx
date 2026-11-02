@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   Button, Sheet, Fab, TextField, SelectField, NumberField, MoneyField, SwitchField,
   useToast, EmptyState, ErrorState, SkeletonBlock, StatusPill, AttentionDot,
@@ -82,9 +83,11 @@ const emptyEmployeeForm = {
   status: 'active',
 }
 
+const StaffPageTabs = ['users', 'permissions', 'hr'] as const satisfies readonly TabId[]
+
 export function StaffPage() {
   const toast = useToast()
-  const [tab, setTab] = useState<TabId>('users')
+  const [tab, setTab] = useQueryTab<TabId>({ allowed: StaffPageTabs, defaultValue: 'users' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')

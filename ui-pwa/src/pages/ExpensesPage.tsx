@@ -3,20 +3,15 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatDateTime } from '@/shared/lib/format'
 import {
   PageHeader, Button, Fab, MetricCardGrid, useToast, DataTable, Badge,
-  IconReceipt, IconCalendar, IconWallet, IconChart, type DataColumn,
+  IconReceipt, IconCalendar, IconWallet, IconChart, IconEdit, type DataColumn,
 } from '@/shared/ui'
-import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
+import { ExpenseSheet, type ExpenseEditInitial } from '@/shared/forms/ExpenseSheet'
 import './pages.css'
 
-type Expense = {
-  id: number
-  title: string
+type Expense = ExpenseEditInitial & {
   category: string
-  amount: number
-  spent_on: string
   payment_method: string
   from_petty_cash: boolean
-  notes?: string | null
 }
 
 const methodLabel: Record<string, string> = { cash: 'نقدي', transfer: 'تحويل', card: 'بطاقة' }
@@ -50,6 +45,7 @@ export function ExpensesPage() {
   const [rows, setRows] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<ExpenseEditInitial | null>(null)
 
   async function load() {
     setLoading(true)
@@ -80,10 +76,20 @@ export function ExpensesPage() {
     }
   }, [rows])
 
+  function openCreate() {
+    setEditing(null)
+    setOpen(true)
+  }
+
+  function openEdit(row: Expense) {
+    setEditing(row)
+    setOpen(true)
+  }
+
   return (
     <div className="rpm-stack">
-      <PageHeader title="المصروفات" subtitle="تشغيل · صيانة · أخرى مع ترحيل محاسبي" action={<Button onClick={() => setOpen(true)}>مصروف جديد</Button>} mobileFab />
-      <Fab label="مصروف جديد" onClick={() => setOpen(true)} />
+      <PageHeader title="المصروفات" subtitle="تشغيل · صيانة · أخرى مع ترحيل محاسبي" action={<Button onClick={openCreate}>مصروف جديد</Button>} mobileFab />
+      <Fab label="مصروف جديد" onClick={openCreate} />
 
       <MetricCardGrid
         label="ملخص المصروفات"
@@ -105,10 +111,18 @@ export function ExpensesPage() {
         rowKey={(r) => r.id}
         loading={loading}
         defaultSort={{ id: 'date', dir: 'desc' }}
+        rowActions={(r) => [
+          { id: 'edit', label: 'تعديل', icon: <IconEdit size={16} />, onSelect: () => openEdit(r) },
+        ]}
         emptyTitle="لا مصروفات بعد"
         emptyDescription="سجّل أول مصروف ليظهر هنا مع ترحيله المحاسبي."
       />
-      <ExpenseSheet open={open} onClose={() => setOpen(false)} onSaved={() => void load()} />
+      <ExpenseSheet
+        open={open}
+        initial={editing}
+        onClose={() => { setOpen(false); setEditing(null) }}
+        onSaved={() => void load()}
+      />
     </div>
   )
 }

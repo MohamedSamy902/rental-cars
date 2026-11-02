@@ -4,12 +4,31 @@ import {
   Button, Sheet, TextField, MoneyField, SelectField, TextAreaField, DateField, SwitchField, useToast,
 } from '@/shared/ui'
 
+export type ExpenseEditInitial = {
+  id: number
+  title: string
+  category?: string | null
+  amount: number
+  spent_on: string
+  payment_method?: string | null
+  notes?: string | null
+  vehicle_id?: number | null
+  work_order_id?: number | null
+  employee_id?: number | null
+  from_petty_cash?: boolean
+  vehicle?: { id: number; brand?: string; model?: string; plate?: string } | null
+}
+
 type Props = {
   open: boolean
   onClose: () => void
   onSaved?: () => void
   /** Pre-links the expense to a vehicle (vehicle page quick action) */
   vehicle?: { id: number; label: string }
+  /** Lock create flow to a custody employee (petty-cash detail quick action) */
+  custodyEmployee?: { id: number; name?: string }
+  /** When set, sheet works in edit mode */
+  initial?: ExpenseEditInitial | null
 }
 
 type VehicleOption = { id: number; brand: string; model: string; plate: string }
@@ -30,8 +49,14 @@ const emptyForm = () => ({
   from_petty_cash: false,
 })
 
-export function ExpenseSheet({ open, onClose, onSaved, vehicle }: Props) {
+function spentOnValue(raw: string | undefined): string {
+  if (!raw) return today()
+  return raw.slice(0, 10)
+}
+
+export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee, initial }: Props) {
   const toast = useToast()
+  const editing = Boolean(initial?.id)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -41,10 +66,27 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle }: Props) {
 
   useEffect(() => {
     if (!open) return
-    setForm({
-      ...emptyForm(),
-      vehicle_id: vehicle?.id ? String(vehicle.id) : '',
-    })
+    if (initial) {
+      setForm({
+        title: initial.title || '',
+        category: initial.category || 'تشغيل',
+        amount: String(initial.amount ?? ''),
+        spent_on: spentOnValue(initial.spent_on),
+        payment_method: initial.from_petty_cash ? 'cash' : (initial.payment_method || 'cash'),
+        notes: initial.notes || '',
+        vehicle_id: initial.vehicle_id ? String(initial.vehicle_id) : (vehicle?.id ? String(vehicle.id) : ''),
+        work_order_id: initial.work_order_id ? String(initial.work_order_id) : '',
+        employee_id: initial.employee_id ? String(initial.employee_id) : '',
+        from_petty_cash: Boolean(initial.from_petty_cash),
+      })
+    } else {
+      setForm({
+        ...emptyForm(),
+        vehicle_id: vehicle?.id ? String(vehicle.id) : '',
+        from_petty_cash: Boolean(custodyEmployee?.id),
+        employee_id: custodyEmployee?.id ? String(custodyEmployee.id) : '',
+      })
+    }
     setErrors({})
     void api<{ data: VehicleOption[] }>('/vehicles?per_page=100')
       .then((r) => setVehicles(r.data))
@@ -52,7 +94,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle }: Props) {
     void api<{ data: EmployeeOption[] }>('/employees/lookup')
       .then((r) => setEmployees(r.data || []))
       .catch(() => setEmployees([]))
-  }, [open, vehicle?.id])
+  }, [open, vehicle?.id, custodyEmployee?.id, initial])
 
   useEffect(() => {
     if (!open || form.category !== 'صيانة' || !form.vehicle_id) {
@@ -68,22 +110,25 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle }: Props) {
     setSaving(true)
     setErrors({})
     try {
-      await api('/expenses', {
-        method: 'POST',
-        json: {
-          title: form.title,
-          category: form.category,
-          amount: Number(form.amount),
-          spent_on: form.spent_on,
-          payment_method: form.from_petty_cash ? 'petty_cash' : form.payment_method,
-          notes: form.notes || undefined,
-          vehicle_id: form.vehicle_id ? Number(form.vehicle_id) : vehicle?.id,
-          work_order_id: form.category === 'صيانة' && form.work_order_id ? Number(form.work_order_id) : undefined,
-          from_petty_cash: form.from_petty_cash,
-          employee_id: form.from_petty_cash && form.employee_id ? Number(form.employee_id) : undefined,
-        },
-      })
-      toast.success('تم تسجيل المصروف.')
+      const payload = {
+        title: form.title,
+        category: form.category,
+        amount: Number(form.amount),
+        spent_on: form.spent_on,
+        payment_method: form.from_petty_cash ? 'petty_cash' : form.payment_method,
+        notes: form.notes || undefined,
+        vehicle_id: form.vehicle_id ? Number(form.vehicle_id) : vehicle?.id,
+        work_order_id: form.category === 'صيانة' && form.work_order_id ? Number(form.work_order_id) : undefined,
+        from_petty_cash: form.from_petty_cash,
+        employee_id: form.from_petty_cash && form.employee_id ? Number(form.employee_id) : undefined,
+      }
+      if (editing && initial) {
+        await api(`/expenses/${initial.id}`, { method: 'PUT', json: payload })
+        toast.success('تم تحديث المصروف.')
+      } else {
+        await api('/expenses', { method: 'POST', json: payload })
+        toast.success('تم تسجيل المصروف.')
+      }
       onClose()
       onSaved?.()
     } catch (e) {
@@ -97,14 +142,22 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle }: Props) {
     }
   }
 
+  const title = editing
+    ? 'تعديل المصروف'
+    : vehicle
+      ? `مصروف · ${vehicle.label}`
+      : 'تسجيل مصروف'
+
   return (
     <Sheet
       open={open}
-      title={vehicle ? `مصروف · ${vehicle.label}` : 'تسجيل مصروف'}
+      title={title}
       onClose={onClose}
       footer={
         <>
-          <Button loading={saving} onClick={() => void save()}>حفظ المصروف</Button>
+          <Button loading={saving} onClick={() => void save()}>
+            {editing ? 'حفظ التعديلات' : 'حفظ المصروف'}
+          </Button>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
         </>
       }

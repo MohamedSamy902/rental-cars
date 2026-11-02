@@ -16,13 +16,17 @@ use App\Models\VehicleDocumentHistory;
 use App\Models\WorkOrder;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Fleet\VehicleService;
+use App\Services\Operations\PettyCashLedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class OperationsController extends Controller
 {
-    public function __construct(private readonly VehicleAvailabilityService $availability) {}
+    public function __construct(
+        private readonly VehicleAvailabilityService $availability,
+        private readonly PettyCashLedgerService $pettyCashLedger,
+    ) {}
 
     public function showroom(): JsonResponse
     {
@@ -225,36 +229,8 @@ class OperationsController extends Controller
 
     public function pettyCashShow(PettyCashAccount $account): JsonResponse
     {
-        $account->load('employee');
-        $movements = PettyCashMovement::query()
-            ->where('petty_cash_account_id', $account->id)
-            ->orderByDesc('moved_on')
-            ->orderByDesc('id')
-            ->limit(200)
-            ->get();
-
-        $linkedExpenses = \App\Models\Expense::query()
-            ->where('from_petty_cash', true)
-            ->where('employee_id', $account->employee_id)
-            ->latest('id')
-            ->limit(50)
-            ->get(['id', 'title', 'amount', 'spent_on', 'category', 'notes']);
-
-        $linkedWorkOrders = \App\Models\WorkOrderLine::query()
-            ->with(['workOrder:id,vehicle_id,workshop,opened_on,status'])
-            ->where('from_petty_cash', true)
-            ->where('petty_cash_employee_id', $account->employee_id)
-            ->latest('id')
-            ->limit(50)
-            ->get();
-
         return response()->json([
-            'data' => [
-                'account' => $account,
-                'movements' => $movements,
-                'linked_expenses' => $linkedExpenses,
-                'linked_work_orders' => $linkedWorkOrders,
-            ],
+            'data' => $this->pettyCashLedger->dossier($account),
         ]);
     }
 
@@ -281,7 +257,7 @@ class OperationsController extends Controller
     public function pettyCashMove(Request $request, PettyCashAccount $account): JsonResponse
     {
         $data = $request->validate([
-            'type' => ['required', 'in:topup,spend,adjust'],
+            'type' => ['required', 'in:topup,spend,adjust,return'],
             'amount' => ['required', 'integer', 'min:1'],
             'notes' => ['nullable', 'string'],
         ], [], ['type' => 'نوع الحركة', 'amount' => 'المبلغ']);
@@ -291,7 +267,7 @@ class OperationsController extends Controller
             $balance = (int) $account->balance;
             if ($data['type'] === 'topup') {
                 $balance += $amount;
-            } elseif ($data['type'] === 'spend') {
+            } elseif ($data['type'] === 'spend' || $data['type'] === 'return') {
                 if ($amount > $balance) {
                     abort(422, 'رصيد العهدة غير كافٍ.');
                 }

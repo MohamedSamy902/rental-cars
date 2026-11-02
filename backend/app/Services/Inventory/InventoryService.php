@@ -19,6 +19,20 @@ class InventoryService
         return InventoryItem::query()->create($data);
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function updateItem(InventoryItem $item, array $data): InventoryItem
+    {
+        if (array_key_exists('code', $data) && ($data['code'] === null || $data['code'] === '')) {
+            unset($data['code']);
+        }
+
+        $item->update($data);
+
+        return $item->fresh() ?? $item;
+    }
+
     public function nextCode(): string
     {
         $max = InventoryItem::query()

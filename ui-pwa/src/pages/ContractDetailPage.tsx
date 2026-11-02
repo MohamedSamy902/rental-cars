@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  Button, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
+  Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
   RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey,
 } from '@/shared/ui'
 import {
@@ -25,7 +25,6 @@ const relationLabel: Record<string, string> = {
 
 export function ContractDetailPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const toast = useToast()
   const contractId = Number(id)
   const [row, setRow] = useState<Contract | null>(null)
@@ -63,7 +62,7 @@ export function ContractDetailPage() {
           description={error || 'لا توجد بيانات'}
           action={
             <div className="rpm-actions-row">
-              <Button variant="secondary" onClick={() => navigate('/bookings')}>رجوع للعقود</Button>
+              <BackNavButton to="/bookings" label="رجوع للعقود" />
               <Button onClick={() => void load()}>إعادة المحاولة</Button>
             </div>
           }
@@ -84,7 +83,7 @@ export function ContractDetailPage() {
     <div className="cd">
       <header className="cd-hero">
         <div className="cd-hero__top">
-          <button type="button" className="cd-back" onClick={() => navigate('/bookings')}>رجوع للعقود</button>
+          <BackNavButton to="/bookings" label="رجوع للعقود" />
           <div className="cd-hero__actions">
             <Button size="sm" variant="secondary" onClick={() => void printContract(row.id, toast.error)}>طباعة</Button>
           </div>

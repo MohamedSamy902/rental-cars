@@ -175,3 +175,7 @@ export const IconZap = (p: Props) => (
 export const IconPhone = (p: Props) => (
   <Svg {...p}><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" /></Svg>
 )
+/** Points to the inline-end visually in LTR; in RTL back-nav place it before the label so it faces the right edge (→ رجوع). */
+export const IconArrowRight = (p: Props) => (
+  <Svg {...p}><path d="M5 12h14" /><path d="m13 5 7 7-7 7" /></Svg>
+)

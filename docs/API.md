@@ -195,6 +195,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 |--------|------|-----|
 | GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&per_page=` |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
+| POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية من نموذج العربية |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
 | PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) |
@@ -416,10 +417,11 @@ Query: `filter=all|one|today|week|range`
 | Method | Path |
 |--------|------|
 | GET | `/petty-cash` |
+| GET | `/petty-cash/{account}` | ملف عهدة: `account` + `summary` (حد · تغذية · منصرف · مرتجع · رصيد) + `ledger[]` موحّد زمنياً (تغذية/مصروف/صيانة/تسوية) مع عربية وروابط وأرصدة بعد الحركة |
 | POST | `/petty-cash` | `{ employee_id, limit_amount, balance? }` |
-| POST | `/petty-cash/{account}/move` | `{ type: topup\|spend\|adjust, amount, notes? }` |
+| POST | `/petty-cash/{account}/move` | `{ type: topup\|spend\|adjust\|return, amount, notes? }` |
 
-`spend` يرفض إن المبلغ > الرصيد (`422`).
+`spend` و`return` يرفضان إن المبلغ > الرصيد (`422`). `return` = رد/تسوية نقدية تخصم من الرصيد.
 
 ---
 
@@ -486,7 +488,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
   "next_service_on": "2027-04-30",
   "next_service_odometer": 95000,
   "force_after_resolution": false,
-  "labor_cost": 300,
+  "labor_cost": 0,
   "notes": null,
   "lines": [
     {
@@ -515,6 +517,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 |--------|------|
 | GET | `/inventory` | أصناف + `remaining` + `is_low` |
 | POST | `/inventory/items` | صنف |
+| PUT | `/inventory/items/{id}` | تعديل صنف (اسم · كود اختياري · تصنيف · وحدة · حد تنبيه) |
 | POST | `/inventory/batches` | دفعة استلام |
 
 **Batch:** `inventory_item_id`, `received_on`, `quantity`, `unit_cost`, اختياري `supplier`, `payment_method`, `from_petty_cash`, `reference`, `notes`
@@ -527,6 +530,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 |--------|------|
 | GET | `/violations` |
 | POST | `/violations` | تسجيل مع إسناد حيازة تلقائي إن أمكن |
+| PUT | `/violations/{id}` | تعديل (تاريخ · عقد · مبلغ · مكان · حالة · مرفق) |
 | POST | `/violations/{id}/confirm` | تأكيد سداد دون قيد |
 
 ```json
@@ -726,7 +730,7 @@ password: password
 |--------|------|------------------|
 | PUT | `/settings/operational` | `settings.update` — تشغيل يومي فقط |
 | PUT | `/integrator/tenant` | دور `super_admin` فقط |
-| GET/POST | `/expenses` | `expenses.view` / `expenses.create` — صيانة ↔ `work_order_id` · عهدة `from_petty_cash`+`employee_id` |
+| GET/POST/PUT | `/expenses` · `/expenses/{id}` | `expenses.view` / `create` / `update` — صيانة ↔ `work_order_id` · عهدة `from_petty_cash`+`employee_id` |
 | GET/POST | `/payroll` · `/payroll/draft` · `/payroll/{id}/approve` | `hr.salaries` / `hr.payroll_approve` |
 | GET/POST/DELETE | `/salary-advances` · `/salary-advances/{id}` | `hr.advances` — سلف الشهر تُخصم من المسودة |
 | POST | `/payroll/lines/{id}/payout` | صرف جزئي أو كامل بعد الاعتماد؛ المتبقي يُرحَّل |
