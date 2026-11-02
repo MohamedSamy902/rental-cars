@@ -52,6 +52,15 @@ class OperationsController extends Controller
                             ->exists(),
                 ]);
 
+                $returning = null;
+                if ($status !== 'available') {
+                    $returning = Contract::query()
+                        ->where('vehicle_id', $v->id)
+                        ->whereIn('status', ['active', 'approved'])
+                        ->orderBy('planned_ends_at')
+                        ->value('planned_ends_at');
+                }
+
                 return [
                     'id' => $v->id,
                     'brand' => $v->brand,
@@ -59,11 +68,19 @@ class OperationsController extends Controller
                     'year' => $v->year,
                     'category' => $v->category,
                     'fuel_type' => $v->fuel_type,
+                    'transmission' => $v->transmission,
+                    'color' => $v->color,
+                    'seats' => $v->seats,
+                    'plate' => $v->plate,
+                    'daily_rate' => (int) $v->daily_rate,
+                    'weekly_rate' => (int) round(((int) $v->daily_rate) * 7 * 0.9),
+                    'monthly_rate' => (int) round(((int) $v->daily_rate) * 30 * 0.75),
+                    'default_deposit' => (int) $v->default_deposit,
                     'status' => $status,
                     'available' => $status === 'available',
+                    'returning_on' => $returning?->toDateString(),
                 ];
             })
-            ->filter(fn ($row) => $row['available'])
             ->values();
 
         return response()->json([
@@ -204,6 +221,41 @@ class OperationsController extends Controller
         $rows = PettyCashAccount::query()->with('employee')->orderByDesc('id')->get();
 
         return response()->json(['data' => $rows]);
+    }
+
+    public function pettyCashShow(PettyCashAccount $account): JsonResponse
+    {
+        $account->load('employee');
+        $movements = PettyCashMovement::query()
+            ->where('petty_cash_account_id', $account->id)
+            ->orderByDesc('moved_on')
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get();
+
+        $linkedExpenses = \App\Models\Expense::query()
+            ->where('from_petty_cash', true)
+            ->where('employee_id', $account->employee_id)
+            ->latest('id')
+            ->limit(50)
+            ->get(['id', 'title', 'amount', 'spent_on', 'category', 'notes']);
+
+        $linkedWorkOrders = \App\Models\WorkOrderLine::query()
+            ->with(['workOrder:id,vehicle_id,workshop,opened_on,status'])
+            ->where('from_petty_cash', true)
+            ->where('petty_cash_employee_id', $account->employee_id)
+            ->latest('id')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'data' => [
+                'account' => $account,
+                'movements' => $movements,
+                'linked_expenses' => $linkedExpenses,
+                'linked_work_orders' => $linkedWorkOrders,
+            ],
+        ]);
     }
 
     public function pettyCashStore(Request $request): JsonResponse

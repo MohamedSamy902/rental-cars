@@ -19,7 +19,7 @@ class InventoryController extends Controller
     public function storeItem(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'unique:inventory_items,code'],
+            'code' => ['nullable', 'string', 'max:50', 'unique:inventory_items,code'],
             'name' => ['required', 'string'],
             'category' => ['required', 'string'],
             'unit' => ['required', 'string'],
@@ -33,6 +33,10 @@ class InventoryController extends Controller
             'unit' => 'وحدة القياس',
             'reorder_level' => 'حد التنبيه',
         ]);
+
+        if (array_key_exists('code', $data) && ($data['code'] === null || $data['code'] === '')) {
+            unset($data['code']);
+        }
 
         $item = $this->inventory->storeItem($data);
 

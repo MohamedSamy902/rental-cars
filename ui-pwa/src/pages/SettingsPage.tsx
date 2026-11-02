@@ -116,7 +116,7 @@ export function SettingsPage() {
             onChange={(v) => setOps({ ...ops, block_expired_license: v })}
           />
           <SwitchField
-            label="منع اعتماد عقد بمستند سيارة منتهٍ"
+            label="منع اعتماد عقد بمستند عربية منتهٍ"
             checked={Boolean(ops.block_expired_vehicle_docs)}
             onChange={(v) => setOps({ ...ops, block_expired_vehicle_docs: v })}
           />

@@ -26,7 +26,7 @@ class PayrollService
     public function draft(int $year, int $month, ?int $userId = null, ?string $notes = null): PayrollRun
     {
         if (PayrollRun::query()->where(compact('year', 'month'))->where('status', 'approved')->exists()) {
-            throw new DomainException('مسير هذا الشهر معتمد مسبقاً.');
+            throw new DomainException('كشف رواتب هذا الشهر معتمد مسبقاً.');
         }
 
         return DB::transaction(function () use ($year, $month, $userId, $notes) {
@@ -67,10 +67,10 @@ class PayrollService
     public function approve(PayrollRun $run, ?int $userId = null): PayrollRun
     {
         if ($run->status === 'approved') {
-            throw new DomainException('المسير معتمد مسبقاً.');
+            throw new DomainException('كشف الرواتب معتمد مسبقاً.');
         }
         if ($run->lines()->count() === 0) {
-            throw new DomainException('لا بنود في المسير.');
+            throw new DomainException('لا بنود في كشف الرواتب.');
         }
 
         $run->fill([
@@ -103,7 +103,7 @@ class PayrollService
 
         $run = PayrollRun::query()->where(compact('year', 'month'))->first();
         if ($run?->status === 'approved') {
-            throw new DomainException('مسير هذا الشهر معتمد — سجّل السلفة على الشهر التالي.');
+            throw new DomainException('كشف رواتب هذا الشهر معتمد — سجّل السلفة على الشهر التالي.');
         }
 
         [$from, $to] = $this->monthBounds($year, $month);
@@ -149,7 +149,7 @@ class PayrollService
     {
         $line = $advance->line()->with('run')->first();
         if ($line?->run?->status === 'approved') {
-            throw new DomainException('السلفة مخصومة في مسير معتمد ولا يمكن حذفها.');
+            throw new DomainException('السلفة مخصومة في كشف رواتب معتمد ولا يمكن حذفها.');
         }
 
         DB::transaction(function () use ($advance, $line, $userId) {
@@ -181,7 +181,7 @@ class PayrollService
     {
         $run = $line->run;
         if ($run->status !== 'approved') {
-            throw new DomainException('اعتمد المسير قبل الصرف.');
+            throw new DomainException('اعتمد كشف الرواتب قبل الصرف.');
         }
 
         $amount = (int) $data['amount'];
@@ -190,7 +190,7 @@ class PayrollService
         }
 
         if ($this->laterRuns($run)->where('status', 'approved')->exists()) {
-            throw new DomainException('تم ترحيل المتبقي إلى مسير لاحق معتمد — اصرفه من هناك.');
+            throw new DomainException('تم ترحيل المتبقي إلى كشف رواتب لاحق معتمد — اصرفه من هناك.');
         }
 
         $paidOn = CarbonImmutable::parse($data['paid_on'] ?? now()->toDateString());

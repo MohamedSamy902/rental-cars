@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, Button, Sheet, Fab, NumberField, MoneyField, SelectField, TextAreaField,
-  useToast, DataTable, IconWallet, type DataColumn,
+  PageHeader, Button, Sheet, Fab, MoneyField, SelectField, TextAreaField,
+  useToast, DataTable, IconWallet, IconEye, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -33,6 +34,7 @@ const columns: DataColumn<Account>[] = [
 
 export function PettyCashPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [rows, setRows] = useState<Account[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,8 +129,9 @@ export function PettyCashPage() {
         rowKey={(a) => a.id}
         rowLabel={(a) => `عهدة ${a.employee?.name ?? ''}`}
         loading={loading}
-        onRowClick={(a) => setMoveOpen(a)}
+        onRowClick={(a) => navigate(`/petty-cash/${a.id}`)}
         rowActions={(a) => [
+          { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: () => navigate(`/petty-cash/${a.id}`) },
           { id: 'move', label: 'تسجيل حركة', icon: <IconWallet size={16} />, onSelect: () => setMoveOpen(a) },
         ]}
         emptyTitle="لا توجد عهد مسجّلة"
@@ -172,7 +175,7 @@ export function PettyCashPage() {
               { value: 'adjust', label: 'تسوية رصيد' },
             ]}
           />
-          <NumberField label="المبلغ" required value={move.amount} onChange={(e) => setMove({ ...move, amount: e.target.value })} />
+          <MoneyField label="المبلغ" required value={move.amount} onChange={(e) => setMove({ ...move, amount: e.target.value })} />
           <TextAreaField label="ملاحظات" value={move.notes} onChange={(e) => setMove({ ...move, notes: e.target.value })} />
         </div>
       </Sheet>

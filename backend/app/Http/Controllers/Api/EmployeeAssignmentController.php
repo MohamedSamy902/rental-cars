@@ -36,14 +36,14 @@ class EmployeeAssignmentController extends Controller
             'notes' => ['nullable', 'string'],
         ], [], [
             'employee_id' => 'الموظف',
-            'title' => 'عنوان الإسناد',
+            'title' => 'عنوان التسليم',
         ]);
 
         $row = $this->service->assign($data, $request->user()?->id);
 
         return response()->json([
             'data' => $row->load(['employee:id,name', 'assignedBy:id,name']),
-            'message' => 'تم إسناد الأصل/البيانات للموظف — بانتظار تأكيد استلام الأدمن.',
+            'message' => 'تم تسليم العهدة/الأصل للموظف — بانتظار تأكيد استلام الأدمن.',
         ], 201);
     }
 
@@ -57,7 +57,7 @@ class EmployeeAssignmentController extends Controller
 
         return response()->json([
             'data' => $row,
-            'message' => 'تم تأكيد استلام الأدمن للإسناد.',
+            'message' => 'تم تأكيد استلام الأدمن لتسليم العهدة/الأصل.',
         ]);
     }
 }

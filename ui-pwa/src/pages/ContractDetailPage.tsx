@@ -131,7 +131,7 @@ export function ContractDetailPage() {
         <DetailList
           rows={[
             { label: 'العميل', value: row.customer?.full_name || '—', wide: true },
-            { label: 'المركبة', value: vehicleLabel, wide: true },
+            { label: 'العربية', value: vehicleLabel, wide: true },
             { label: 'البداية', value: formatDate(row.starts_at) },
             { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },
             { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },

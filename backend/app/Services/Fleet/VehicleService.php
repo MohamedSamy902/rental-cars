@@ -183,7 +183,7 @@ class VehicleService
                 ->where($key, $value)
                 ->exists();
             if ($dup) {
-                throw new DomainException($label.' مستخدم على مركبة أخرى.');
+                throw new DomainException($label.' مستخدم على عربية أخرى.');
             }
         }
     }
@@ -197,7 +197,7 @@ class VehicleService
     {
         return DB::transaction(function () use ($vehicle, $document, $data, $userId) {
             if ($document->vehicle_id !== $vehicle->id) {
-                throw new DomainException('المستند لا يخص هذه المركبة.');
+                throw new DomainException('المستند لا يخص هذه العربية.');
             }
 
             VehicleDocumentHistory::query()->create([

@@ -12,7 +12,28 @@ class InventoryService
      */
     public function storeItem(array $data): InventoryItem
     {
+        if (empty($data['code'])) {
+            $data['code'] = $this->nextCode();
+        }
+
         return InventoryItem::query()->create($data);
+    }
+
+    public function nextCode(): string
+    {
+        $max = InventoryItem::query()
+            ->where('code', 'like', 'INV-%')
+            ->pluck('code')
+            ->map(function (string $code) {
+                if (preg_match('/^INV-(\d+)$/', $code, $m)) {
+                    return (int) $m[1];
+                }
+
+                return 0;
+            })
+            ->max() ?? 0;
+
+        return 'INV-'.str_pad((string) ($max + 1), 4, '0', STR_PAD_LEFT);
     }
 
     /**

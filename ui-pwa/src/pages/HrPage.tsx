@@ -139,7 +139,7 @@ export function HrPage() {
   async function draftPayroll() {
     try {
       await api('/payroll/draft', { method: 'POST', json: { year: now.getFullYear(), month: now.getMonth() + 1 } })
-      toast.success('تم تجهيز مسودة المسير.')
+      toast.success('تم إعداد كشف رواتب الشهر.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -149,7 +149,7 @@ export function HrPage() {
   async function approve(id: number) {
     try {
       await api(`/payroll/${id}/approve`, { method: 'POST' })
-      toast.success('تم اعتماد المسير.')
+      toast.success('تم اعتماد كشف الرواتب.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -223,7 +223,7 @@ export function HrPage() {
           notes: assignForm.notes || undefined,
         },
       })
-      toast.success('تم الإسناد — بانتظار تأكيد استلام الأدمن.')
+      toast.success('تم تسليم العهدة/الأصل — بانتظار تأكيد استلام الأدمن.')
       setAssignOpen(false)
       setAssignForm({ employee_id: '', title: '', assignable_type: 'manual', notes: '' })
       await load()
@@ -304,13 +304,13 @@ export function HrPage() {
       }] : []),
       ...(canSalaries ? [{
         id: 'payroll',
-        label: 'المسير',
+        label: 'كشف الرواتب',
         attention: stats.draftCount > 0 ? ('warning' as const) : stats.remaining > 0 ? ('critical' as const) : null,
-        attentionLabel: stats.draftCount > 0 ? 'مسيرات بانتظار الاعتماد' : 'متبقي للصرف',
+        attentionLabel: stats.draftCount > 0 ? 'كشوف رواتب بانتظار الاعتماد' : 'متبقي للصرف',
       }] : []),
       ...(canCustody ? [{
         id: 'custody',
-        label: 'إسناد عهدة',
+        label: 'تسليم عهدة',
         attention: pendingAck > 0 ? ('critical' as const) : null,
         attentionLabel: 'بانتظار تأكيد استلام الأدمن',
       }] : []),
@@ -323,22 +323,22 @@ export function HrPage() {
     <div className="rpm-stack hr-page">
       <PageHeader
         title="الموارد البشرية"
-        subtitle="صلاحيات دقيقة · سلف · مسير · إسناد عهدة بتأكيد أدمن"
+        subtitle="سلف · كشف الرواتب · تسليم العهد والأصول · التقييمات"
         action={
           <>
             {canAdvances ? <Button variant="secondary" onClick={() => setAdvanceOpen(true)}>سلفة</Button> : null}
-            {canCustody ? <Button variant="secondary" onClick={() => setAssignOpen(true)}>إسناد</Button> : null}
+            {canCustody ? <Button variant="secondary" onClick={() => setAssignOpen(true)}>تسليم عهدة</Button> : null}
             <Button variant="secondary" onClick={() => setEvalOpen(true)}>تقييم</Button>
-            {canSalaries ? <Button onClick={() => void draftPayroll()}>مسودة مسير</Button> : null}
+            {canSalaries ? <Button onClick={() => void draftPayroll()}>إعداد رواتب الشهر</Button> : null}
           </>
         }
       />
 
       <MetricCardGrid
-        label="ملخص المسير الحالي"
+        label="ملخص رواتب الشهر الحالي"
         items={[
           { id: 'adv', label: 'سلف هذا الشهر', value: stats.advances, format: 'money', tone: 'warning', icon: <IconWallet size={16} /> },
-          { id: 'net', label: 'صافي المسير', value: stats.net, format: 'money', icon: <IconBriefcase size={16} /> },
+          { id: 'net', label: 'إجمالي صافي الرواتب', value: stats.net, format: 'money', icon: <IconBriefcase size={16} /> },
           { id: 'paid', label: 'مصروف', value: stats.paid, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
           { id: 'left', label: 'متبقي للترحيل', value: stats.remaining, format: 'money', tone: 'info', icon: <IconTrend size={16} /> },
         ]}
@@ -361,7 +361,7 @@ export function HrPage() {
           <h3>سلف {periodLabel(now.getFullYear(), now.getMonth() + 1)}</h3>
           {canAdvances ? <Button size="sm" variant="secondary" onClick={() => setAdvanceOpen(true)}>تسجيل سلفة</Button> : null}
         </div>
-        {!loading && advances.length === 0 ? <EmptyState title="لا سلف هذا الشهر" description="سجّل السلفة أثناء الشهر لتُخصم تلقائياً من المسير." /> : null}
+        {!loading && advances.length === 0 ? <EmptyState title="لا سلف هذا الشهر" description="سجّل سلفة الموظف هنا لتُخصم تلقائياً من كشف رواتب الشهر." /> : null}
         <div className="rpm-card-list">
           {advances.map((a) => (
             <article key={a.id} className="rpm-card hr-card">
@@ -384,10 +384,10 @@ export function HrPage() {
       {canCustody && (chip === 'all' || chip === 'custody') ? (
       <section className="rpm-panel">
         <div className="rpm-panel__head">
-          <h3>إسناد بيانات / أصول للموظفين</h3>
-          <Button size="sm" variant="secondary" onClick={() => setAssignOpen(true)}>إسناد جديد</Button>
+          <h3>تسليم العهد والأصول للموظفين</h3>
+          <Button size="sm" variant="secondary" onClick={() => setAssignOpen(true)}>تسليم جديد</Button>
         </div>
-        {!loading && assignments.length === 0 ? <EmptyState title="لا إسنادات بعد" description="أسند عُهدة أو سجلاً تشغيلياً ثم أكّد استلام الأدمن." /> : null}
+        {!loading && assignments.length === 0 ? <EmptyState title="لا تسليمات بعد" description="سلّم معدة أو هاتف أو سيارة خدمة أو مستنداً للموظف، ثم أكّد استلام الأدمن." /> : null}
         <div className="rpm-card-list">
           {assignments.map((a) => (
             <article key={a.id} className="rpm-card hr-card">
@@ -409,16 +409,16 @@ export function HrPage() {
 
       {canSalaries && (chip === 'all' || chip === 'payroll') ? (
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>مسير الرواتب</h3></div>
-        {!loading && payrolls.length === 0 ? <EmptyState title="لا مسيرات بعد" /> : null}
+        <div className="rpm-panel__head"><h3>كشف الرواتب الشهري</h3></div>
+        {!loading && payrolls.length === 0 ? <EmptyState title="لا كشوف رواتب بعد" description="ابدأ بإعداد رواتب الشهر الحالي من الزر أعلاه." /> : null}
         <div className="rpm-card-list">
           {payrolls.map((p) => (
             <article key={p.id} className="rpm-card hr-card">
               <div className="rpm-card__row">
                 <strong>{periodLabel(p.year, p.month)}</strong>
-                <StatusPill status={p.status === 'approved' ? 'completed' : 'pending'} label={p.status === 'approved' ? 'معتمد' : 'مسودة'} />
+                <StatusPill status={p.status === 'approved' ? 'completed' : 'pending'} label={p.status === 'approved' ? 'معتمد' : 'قيد الإعداد'} />
               </div>
-              <p>صافي المسير: {formatMoney(p.total_amount)} · {p.lines?.length || 0} موظف</p>
+              <p>إجمالي صافي الرواتب: {formatMoney(p.total_amount)} · {p.lines?.length || 0} موظف</p>
               <ul className="hr-lines">
                 {(p.lines ?? []).map((l) => {
                   const remaining = Math.max(0, l.net_amount - l.paid_amount)
@@ -446,7 +446,7 @@ export function HrPage() {
               </ul>
               {p.status !== 'approved' ? (
                 <div className="rpm-card__actions">
-                  <Button size="sm" onClick={() => void approve(p.id)}>اعتماد المسير</Button>
+                  <Button size="sm" onClick={() => void approve(p.id)}>اعتماد كشف الرواتب</Button>
                 </div>
               ) : null}
             </article>
@@ -492,23 +492,23 @@ export function HrPage() {
         </div>
       </Sheet>
 
-      <Sheet open={assignOpen} title="إسناد عهدة / بيانات" onClose={() => setAssignOpen(false)} footer={<><Button loading={saving} onClick={() => void saveAssignment()}>حفظ الإسناد</Button><Button variant="secondary" onClick={() => setAssignOpen(false)}>إلغاء</Button></>}>
+      <Sheet open={assignOpen} title="تسليم عهدة / أصل للموظف" onClose={() => setAssignOpen(false)} footer={<><Button loading={saving} onClick={() => void saveAssignment()}>حفظ التسليم</Button><Button variant="secondary" onClick={() => setAssignOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
           <SelectField label="الموظف" required value={assignForm.employee_id} onChange={(e) => setAssignForm({ ...assignForm, employee_id: e.target.value })} options={employees.map((e) => ({ value: String(e.id), label: e.name }))} />
-          <TextField label="عنوان الإسناد" required value={assignForm.title} onChange={(e) => setAssignForm({ ...assignForm, title: e.target.value })} />
+          <TextField label="ما الذي يُسلَّم؟" required value={assignForm.title} hint="مثال: هاتف عمل · لابتوب · سيارة خدمة · ملف مستندات" onChange={(e) => setAssignForm({ ...assignForm, title: e.target.value })} />
           <SelectField
-            label="نوع الإسناد"
+            label="نوع التسليم"
             value={assignForm.assignable_type}
             onChange={(e) => setAssignForm({ ...assignForm, assignable_type: e.target.value })}
             options={[
-              { value: 'manual', label: 'يدوي / عام' },
+              { value: 'manual', label: 'عام / مستند' },
               { value: 'petty_cash', label: 'عهدة نقدية' },
-              { value: 'asset', label: 'أصل تشغيلي' },
-              { value: 'customer', label: 'بيانات عميل' },
+              { value: 'asset', label: 'أصل / معدة / سيارة خدمة' },
+              { value: 'customer', label: 'مستند / بيانات عميل' },
             ]}
           />
           <TextAreaField label="ملاحظات" value={assignForm.notes} onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value })} />
-          <p className="muted">بعد الحفظ يبقى الإسناد بانتظار «تأكيد استلام الأدمن».</p>
+          <p className="muted">بعد الحفظ يبقى التسليم بانتظار «تأكيد استلام الأدمن» — إثبات أن الموظف استلم العهدة أو الأصل.</p>
         </div>
       </Sheet>
 
@@ -522,7 +522,7 @@ export function HrPage() {
           <div className="rpm-form-grid">
             <p className="muted">
               الصافي {formatMoney(payoutLine.net_amount)} · مصروف {formatMoney(payoutLine.paid_amount)} · متبقي {formatMoney(Math.max(0, payoutLine.net_amount - payoutLine.paid_amount))}.
-              أي مبلغ أقل من المتبقي يُرحَّل تلقائياً للمسير التالي.
+              أي مبلغ أقل من المتبقي يُرحَّل تلقائياً لكشف الرواتب التالي.
             </p>
             <MoneyField label="المبلغ المصروف" required value={payoutForm.amount} onChange={(e) => setPayoutForm({ ...payoutForm, amount: e.target.value })} />
             <TextField label="تاريخ الصرف" type="date" required value={payoutForm.paid_on} onChange={(e) => setPayoutForm({ ...payoutForm, paid_on: e.target.value })} />

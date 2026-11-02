@@ -115,8 +115,8 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
       critical: c.pending_hr_acks,
       warning: c.draft_payroll_runs,
       label: c.pending_hr_acks
-        ? `${c.pending_hr_acks} إسناد بانتظار تأكيد الاستلام`
-        : `${c.draft_payroll_runs} مسير بانتظار الاعتماد`,
+        ? `${c.pending_hr_acks} تسليم عهدة بانتظار تأكيد الاستلام`
+        : `${c.draft_payroll_runs} كشف رواتب بانتظار الاعتماد`,
       ping: true,
     },
     '/customers': {

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatMoney, toApiDateTime } from '@/shared/lib/format'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, SelectField, TextField, MoneyField, StatusPill, useToast, DataTable, IconCheck,
+  PageHeader, FilterBar, Button, Sheet, Fab, SelectField, TextField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck,
   MediaUpload, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -15,49 +15,47 @@ type Violation = {
   location?: string
   vehicle?: { brand: string; model: string; plate: string }
   customer?: { full_name: string }
+  contract?: { id: number; code?: string; number?: string } | null
 }
 
 type Vehicle = { id: number; brand: string; model: string; plate: string }
+type ContractOption = {
+  id: number
+  number?: string
+  code?: string
+  status: string
+  starts_at: string
+  planned_ends_at: string
+  customer?: { id: number; full_name: string }
+  vehicle?: { id: number; brand: string; model: string; plate: string }
+  vehicle_id?: number
+}
+
+function contractLabel(c: ContractOption): string {
+  const raw = (c.number || c.code || '').trim()
+  const no = raw || `CNT-${String(c.id).padStart(5, '0')}`
+  const customer = c.customer?.full_name || 'عميل'
+  const day = (c.starts_at || '').slice(0, 10) || '—'
+  const car = c.vehicle
+    ? `${c.vehicle.brand} ${c.vehicle.model}`.trim()
+    : ''
+  return car ? `${no} · ${customer} · ${day} (${car})` : `${no} · ${customer} · ${day}`
+}
 
 const statusLabel: Record<string, string> = {
   new: 'جديدة', assigned: 'مسندة', confirmed: 'مؤكّد السداد', paid: 'مدفوعة للجهة',
 }
 
-const columns: DataColumn<Violation>[] = [
-  {
-    id: 'vehicle',
-    header: 'المركبة',
-    cell: (r) => (
-      <>
-        <strong className="rpm-table__primary">{r.vehicle?.brand} {r.vehicle?.model}</strong>
-        <span className="rpm-table__sub">{r.vehicle?.plate}</span>
-      </>
-    ),
-    sortValue: (r) => `${r.vehicle?.brand ?? ''} ${r.vehicle?.model ?? ''}`,
-    mobile: 'title',
-  },
-  { id: 'customer', header: 'العميل', cell: (r) => r.customer?.full_name || 'بلا إسناد بعد', sortValue: (r) => r.customer?.full_name, mobile: 'subtitle' },
-  { id: 'date', header: 'الوقت', cell: (r) => formatDateTime(r.occurred_at), sortValue: (r) => r.occurred_at },
-  { id: 'location', header: 'المكان', cell: (r) => r.location || '—', sortValue: (r) => r.location },
-  { id: 'amount', header: 'المبلغ', cell: (r) => formatMoney(r.amount), sortValue: (r) => Number(r.amount) },
-  {
-    id: 'status',
-    header: 'الحالة',
-    cell: (r) => <StatusPill status={r.status === 'confirmed' ? 'completed' : 'pending'} label={statusLabel[r.status] || r.status} />,
-    sortValue: (r) => r.status,
-    mobile: 'badge',
-  },
-]
-
 export function ViolationsPage() {
   const toast = useToast()
   const [rows, setRows] = useState<Violation[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [contracts, setContracts] = useState<ContractOption[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [chip, setChip] = useState('open')
-  const [form, setForm] = useState({ vehicle_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
+  const [form, setForm] = useState({ vehicle_id: '', contract_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const openCount = useMemo(
@@ -83,10 +81,55 @@ export function ViolationsPage() {
       if (chip === 'open' && ['paid', 'confirmed'].includes(r.status)) return false
       if (chip === 'done' && !['paid', 'confirmed'].includes(r.status)) return false
       if (!q) return true
-      const hay = `${r.vehicle?.plate ?? ''} ${r.vehicle?.brand ?? ''} ${r.customer?.full_name ?? ''} ${r.location ?? ''}`
+      const hay = `${r.vehicle?.plate ?? ''} ${r.vehicle?.brand ?? ''} ${r.customer?.full_name ?? ''} ${r.contract?.code ?? ''} ${r.location ?? ''}`
       return hay.includes(q)
     })
   }, [rows, chip, search])
+
+  const matchingContracts = useMemo(() => {
+    const vehicleId = Number(form.vehicle_id || 0)
+    const day = form.occurred_at
+    return contracts.filter((c) => {
+      const cVehicleId = c.vehicle?.id ?? Number((c as { vehicle_id?: number }).vehicle_id || 0)
+      if (vehicleId && cVehicleId !== vehicleId) return false
+      if (!day) return true
+      const start = (c.starts_at || '').slice(0, 10)
+      const end = (c.planned_ends_at || '').slice(0, 10)
+      return start <= day && (!end || end >= day)
+    })
+  }, [contracts, form.vehicle_id, form.occurred_at])
+
+  const columns: DataColumn<Violation>[] = [
+    {
+      id: 'vehicle',
+      header: 'العربية',
+      cell: (r) => (
+        <>
+          <strong className="rpm-table__primary">{r.vehicle?.brand} {r.vehicle?.model}</strong>
+          <span className="rpm-table__sub">{r.vehicle?.plate}</span>
+        </>
+      ),
+      sortValue: (r) => `${r.vehicle?.brand ?? ''} ${r.vehicle?.model ?? ''}`,
+      mobile: 'title',
+    },
+    {
+      id: 'contract',
+      header: 'العقد',
+      cell: (r) => r.contract?.number || r.contract?.code || '—',
+      sortValue: (r) => r.contract?.number || r.contract?.code,
+    },
+    { id: 'customer', header: 'العميل', cell: (r) => r.customer?.full_name || 'بلا ربط بعد', sortValue: (r) => r.customer?.full_name, mobile: 'subtitle' },
+    { id: 'date', header: 'تاريخ المخالفة', cell: (r) => formatDate(r.occurred_at), sortValue: (r) => r.occurred_at },
+    { id: 'location', header: 'المكان', cell: (r) => r.location || '—', sortValue: (r) => r.location },
+    { id: 'amount', header: 'المبلغ', cell: (r) => formatMoney(r.amount), sortValue: (r) => Number(r.amount) },
+    {
+      id: 'status',
+      header: 'الحالة',
+      cell: (r) => <StatusPill status={r.status === 'confirmed' ? 'completed' : 'pending'} label={statusLabel[r.status] || r.status} />,
+      sortValue: (r) => r.status,
+      mobile: 'badge',
+    },
+  ]
 
   async function load() {
     setLoading(true)
@@ -98,7 +141,19 @@ export function ViolationsPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { void load() }, [])
+
+  async function openForm() {
+    setOpen(true)
+    setForm({ vehicle_id: '', contract_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
+    setFieldErrors({})
+    const [v, c] = await Promise.all([
+      api<{ data: Vehicle[] }>('/vehicles?per_page=100'),
+      api<{ data: ContractOption[] }>('/contracts?per_page=100').catch(() => api<{ data: ContractOption[] }>('/bookings?per_page=100')),
+    ])
+    setVehicles(v.data)
+    setContracts(c.data)
+  }
 
   async function onSave() {
     setFieldErrors({})
@@ -107,7 +162,8 @@ export function ViolationsPage() {
         method: 'POST',
         json: {
           vehicle_id: Number(form.vehicle_id),
-          occurred_at: form.occurred_at,
+          contract_id: form.contract_id ? Number(form.contract_id) : undefined,
+          occurred_at: toApiDateTime(form.occurred_at) || form.occurred_at,
           amount: Number(form.amount),
           location: form.location || undefined,
           photo_path: form.photo_path || undefined,
@@ -137,22 +193,25 @@ export function ViolationsPage() {
     }
   }
 
+  const selectedContract = matchingContracts.find((c) => String(c.id) === form.contract_id)
+    || contracts.find((c) => String(c.id) === form.contract_id)
+
   return (
     <div className="rpm-stack">
       <PageHeader
         title="المخالفات"
-        subtitle="متابعة تشغيلية فقط — لا تدخل الحسابات أو إجمالي العقد"
-        action={<Button onClick={async () => { setOpen(true); const v = await api<{ data: Vehicle[] }>('/vehicles'); setVehicles(v.data) }}>تسجيل مخالفة</Button>}
+        subtitle="متابعة تشغيلية مربوطة بالعقد والعميل — بلا ترحيل محاسبي"
+        action={<Button onClick={() => void openForm()}>تسجيل مخالفة</Button>}
         mobileFab
       />
-      <Fab label="تسجيل مخالفة" onClick={async () => { setOpen(true); const v = await api<{ data: Vehicle[] }>('/vehicles'); setVehicles(v.data) }} />
+      <Fab label="تسجيل مخالفة" onClick={() => void openForm()} />
       <FilterBar
         search={search}
         onSearchChange={setSearch}
         chips={chips}
         activeChip={chip}
         onChipChange={setChip}
-        placeholder="بحث باللوحة أو العميل…"
+        placeholder="بحث باللوحة أو العميل أو رقم العقد…"
       />
       <DataTable
         label="المخالفات"
@@ -170,10 +229,43 @@ export function ViolationsPage() {
         emptyTitle="لا توجد مخالفات"
         emptyDescription="المخالفات المسجّلة للمتابعة التشغيلية تظهر هنا."
       />
-      <Sheet open={open} title="مخالفة جديدة" onClose={() => setOpen(false)} footer={<><Button onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
+      <Sheet open={open} title="مخالفة جديدة" onClose={() => setOpen(false)} footer={<><Button onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
-          <SelectField label="السيارة" required error={fieldErrors.vehicle_id} options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))} value={form.vehicle_id} onChange={(e) => setForm({ ...form, vehicle_id: e.target.value })} />
-          <TextField label="وقت المخالفة" required error={fieldErrors.occurred_at} type="datetime-local" value={form.occurred_at} onChange={(e) => setForm({ ...form, occurred_at: e.target.value })} />
+          <SelectField
+            label="العربية"
+            required
+            error={fieldErrors.vehicle_id}
+            options={[
+              { value: '', label: 'اختر عربية…' },
+              ...vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` })),
+            ]}
+            value={form.vehicle_id}
+            onChange={(e) => setForm({ ...form, vehicle_id: e.target.value, contract_id: '' })}
+          />
+          <DateField
+            label="تاريخ المخالفة"
+            required
+            error={fieldErrors.occurred_at}
+            value={form.occurred_at}
+            onChange={(e) => setForm({ ...form, occurred_at: e.target.value })}
+          />
+          <SelectField
+            label="العقد المرتبط"
+            error={fieldErrors.contract_id}
+            hint={form.vehicle_id && form.occurred_at ? 'تُعرض العقود التي تغطي تاريخ المخالفة لهذه العربية' : 'اختر العربية والتاريخ لتصفية العقود'}
+            options={[
+              { value: '', label: matchingContracts.length ? '— اختيار يدوي / تلقائي —' : 'لا عقود مطابقة — سيُحاول الربط تلقائياً' },
+              ...matchingContracts.map((c) => ({
+                value: String(c.id),
+                label: contractLabel(c),
+              })),
+            ]}
+            value={form.contract_id}
+            onChange={(e) => setForm({ ...form, contract_id: e.target.value })}
+          />
+          {selectedContract?.customer ? (
+            <p className="muted" style={{ margin: 0 }}>العميل المسؤول: {selectedContract.customer.full_name}</p>
+          ) : null}
           <MoneyField label="المبلغ (للمتابعة)" required error={fieldErrors.amount} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <TextField label="المكان" error={fieldErrors.location} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           <MediaUpload

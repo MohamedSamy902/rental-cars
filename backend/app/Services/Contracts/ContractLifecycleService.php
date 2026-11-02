@@ -58,14 +58,14 @@ class ContractLifecycleService
             /** @var Vehicle $vehicle */
             $vehicle = Vehicle::query()->whereKey($data['vehicle_id'])->lockForUpdate()->firstOrFail();
             if (! $vehicle->is_active) {
-                throw new DomainException('السيارة غير نشطة.');
+                throw new DomainException('العربية غير نشطة.');
             }
             if (in_array($vehicle->manual_status, [
                 VehicleAvailabilityService::STATUS_MAINTENANCE,
                 VehicleAvailabilityService::STATUS_OUT_OF_SERVICE,
                 VehicleAvailabilityService::STATUS_SOLD,
             ], true)) {
-                throw new DomainException('السيارة غير متاحة للحجز في حالتها الحالية.');
+                throw new DomainException('العربية غير متاحة للعقد في حالتها الحالية.');
             }
 
             $customer = Customer::query()->findOrFail($data['customer_id']);
@@ -281,7 +281,7 @@ class ContractLifecycleService
                 ->lockForUpdate()
                 ->exists();
             if ($otherActive) {
-                throw new DomainException('لا يمكن التسليم: توجد حيازة نشطة أخرى على نفس السيارة.');
+                throw new DomainException('لا يمكن التسليم: توجد حيازة نشطة أخرى على نفس العربية.');
             }
 
             $this->assertNoOverlap(
@@ -292,7 +292,7 @@ class ContractLifecycleService
             );
 
             if ($odometerOut < (int) $vehicle->odometer) {
-                throw new DomainException('عداد الخروج أقل من عداد السيارة المسجّل.');
+                throw new DomainException('عداد الخروج أقل من عداد العربية المسجّل.');
             }
 
             $this->inspections->record($locked->id, [
@@ -321,7 +321,7 @@ class ContractLifecycleService
             ]);
 
             $this->notifyLifecycle(
-                'تم تسليم سيارة',
+                'تم تسليم عربية',
                 "العقد {$locked->number} أصبح نشطاً بعد التسليم.",
                 $locked,
                 $userId,
@@ -448,7 +448,7 @@ class ContractLifecycleService
             ]);
 
             $this->notifyLifecycle(
-                'تم استلام سيارة',
+                'تم استلام عربية',
                 "العقد {$locked->number} أُقفل. الإجمالي: {$locked->final_total} ج.م.",
                 $locked,
                 $userId,
@@ -565,14 +565,14 @@ class ContractLifecycleService
 
         $replacementId = (int) $data['replacement_vehicle_id'];
         if ($replacementId === (int) $source->vehicle_id) {
-            throw new DomainException('السيارة البديلة يجب أن تختلف عن السيارة الحالية.');
+            throw new DomainException('العربية البديلة يجب أن تختلف عن العربية الحالية.');
         }
 
         $odometerIn = (int) $data['odometer_in'];
         $odometerOut = (int) $data['odometer_out'];
         $segmentStart = $this->currentSegmentStartOdometer($source);
         if ($odometerIn < $segmentStart) {
-            throw new DomainException('عداد إرجاع السيارة القديمة أقل من عداد بداية الحيازة.');
+            throw new DomainException('عداد إرجاع العربية القديمة أقل من عداد بداية الحيازة.');
         }
 
         return DB::transaction(function () use ($source, $data, $userId, $replacementId, $odometerIn, $odometerOut, $segmentStart) {
@@ -587,10 +587,10 @@ class ContractLifecycleService
 
             $replacement = Vehicle::query()->findOrFail($replacementId);
             if (! $replacement->is_active) {
-                throw new DomainException('السيارة البديلة غير نشطة.');
+                throw new DomainException('العربية البديلة غير نشطة.');
             }
             if ($replacement->manual_status === VehicleAvailabilityService::STATUS_MAINTENANCE) {
-                throw new DomainException('السيارة البديلة في صيانة.');
+                throw new DomainException('العربية البديلة في صيانة.');
             }
             if ($odometerOut < (int) $replacement->odometer) {
                 throw new DomainException('عداد خروج البديلة أقل من عدادها المسجّل.');
@@ -638,7 +638,7 @@ class ContractLifecycleService
                 'swap_reason' => 'عطل',
                 // Current segment start for the replacement vehicle.
                 'odometer_out' => $odometerOut,
-                'notes' => trim(($locked->notes ? $locked->notes."\n" : '').'تم تبديل سيارة بسبب عطل'),
+                'notes' => trim(($locked->notes ? $locked->notes."\n" : '').'تم تبديل عربية بسبب عطل'),
             ])->save();
 
             Vehicle::query()->whereKey($replacementId)->update(['odometer' => $odometerOut]);
@@ -829,7 +829,7 @@ class ContractLifecycleService
 
         $conflict = $q->first(['id', 'number']);
         if ($conflict) {
-            throw new DomainException('السيارة محجوزة بعقد متعارض: '.$conflict->number);
+            throw new DomainException('العربية محجوزة بعقد متعارض: '.$conflict->number);
         }
     }
 
@@ -856,7 +856,7 @@ class ContractLifecycleService
                 ->whereDate('expires_on', '<', now()->toDateString())
                 ->first();
             if ($expired) {
-                throw new DomainException('مستند سيارة منتهٍ ('.$expired->type.') — يُمنع الاعتماد.');
+                throw new DomainException('مستند عربية منتهٍ ('.$expired->type.') — يُمنع الاعتماد.');
             }
 
             $endsBeforeContract = VehicleDocument::query()
@@ -865,7 +865,7 @@ class ContractLifecycleService
                 ->whereDate('expires_on', '<', $contract->planned_ends_at->toDateString())
                 ->first();
             if ($endsBeforeContract) {
-                throw new DomainException('مستند السيارة ('.$endsBeforeContract->type.') ينتهي قبل نهاية العقد المخططة.');
+                throw new DomainException('مستند العربية ('.$endsBeforeContract->type.') ينتهي قبل نهاية العقد المخططة.');
             }
         }
     }

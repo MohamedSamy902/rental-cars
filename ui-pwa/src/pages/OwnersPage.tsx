@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
@@ -61,11 +62,13 @@ type Due = {
 }
 
 const emptyForm = {
-  full_name: '', phone: '', national_id: '', id_front_path: '', id_back_path: '', notes: '', is_active: true,
+  full_name: '', phone: '', phone_alt: '', national_id: '', id_front_path: '', id_back_path: '',
+  license_front_path: '', license_back_path: '', notes: '', is_active: true,
 }
 
 export function OwnersPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [rows, setRows] = useState<Owner[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -74,7 +77,7 @@ export function OwnersPage() {
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [detail, setDetail] = useState<(Owner & { vehicles?: OwnerVehicle[]; dues?: Due[]; payouts?: Payout[] }) | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [payoutOpen, setPayoutOpen] = useState(false)
   const [payoutForm, setPayoutForm] = useState({
@@ -120,26 +123,7 @@ export function OwnersPage() {
   }, [search])
 
   async function openDetail(id: number) {
-    setDetailLoading(true)
-    setEditing(false)
-    setPayoutOpen(false)
-    try {
-      const res = await api<{ data: Owner & { vehicles: OwnerVehicle[]; dues: Due[]; payouts: Payout[] } }>(`/owners/${id}`)
-      setDetail(res.data)
-      setForm({
-        full_name: res.data.full_name,
-        phone: res.data.phone || '',
-        national_id: res.data.national_id || '',
-        id_front_path: res.data.id_front_path || '',
-        id_back_path: res.data.id_back_path || '',
-        notes: res.data.notes || '',
-        is_active: res.data.is_active !== false,
-      })
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setDetailLoading(false)
-    }
+    navigate(`/owners/${id}`)
   }
 
   function mapApiErrors(e: unknown) {
@@ -241,6 +225,22 @@ export function OwnersPage() {
         attachableId={detail?.id}
         onChange={(path) => setForm({ ...form, id_back_path: path || '' })}
       />
+      <MediaUpload
+        label="رخصة القيادة — الوجه"
+        accept="image"
+        collection="owner_ids"
+        purpose="license_front"
+        value={form.license_front_path || null}
+        onChange={(path) => setForm({ ...form, license_front_path: path || '' })}
+      />
+      <MediaUpload
+        label="رخصة القيادة — الظهر"
+        accept="image"
+        collection="owner_ids"
+        purpose="license_back"
+        value={form.license_back_path || null}
+        onChange={(path) => setForm({ ...form, license_back_path: path || '' })}
+      />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
     </div>
   )
@@ -295,12 +295,12 @@ export function OwnersPage() {
         rowKey={(o) => o.id}
         rowLabel={(o) => o.full_name}
         loading={loading}
-        onRowClick={(o) => void openDetail(o.id)}
+        onRowClick={(o) => navigate(`/owners/${o.id}`)}
         rowActions={(o) => [
           { id: 'view', label: 'كشف الحساب', icon: <IconEye size={16} />, onSelect: () => void openDetail(o.id) },
         ]}
         emptyTitle="لا ملاك بعد"
-        emptyDescription="أضف مالكاً ثم اربطه من شاشة المركبات مع المبلغ الشهري"
+        emptyDescription="أضف مالكاً ثم اربطه من شاشة العربيات مع المبلغ الشهري"
       />
 
       <Sheet open={open} title="إضافة مالك" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
@@ -308,7 +308,7 @@ export function OwnersPage() {
       </Sheet>
 
       <Sheet
-        open={!!detail || detailLoading}
+        open={false}
         title={detail?.full_name || 'تفاصيل المالك'}
         onClose={() => setDetail(null)}
         closeLabel="إغلاق"
@@ -345,7 +345,7 @@ export function OwnersPage() {
 
             <section className="rpm-panel" style={{ marginTop: '0.75rem' }}>
               <div className="rpm-panel__head"><h3>العربيات</h3></div>
-              {(detail.vehicles || []).length === 0 ? <p className="muted">لا عربيات مربوطة — اربط من شاشة المركبات</p> : null}
+              {(detail.vehicles || []).length === 0 ? <p className="muted">لا عربيات مربوطة — اربط من شاشة العربيات</p> : null}
               <div className="rpm-dense-list">
                 {(detail.vehicles || []).map((v) => (
                   <div key={v.id} className="rpm-dense-row">

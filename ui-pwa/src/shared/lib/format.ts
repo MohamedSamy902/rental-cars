@@ -37,14 +37,29 @@ export function formatDateTime(iso: string): string {
   }).format(d)
 }
 
-/** Date only as YYYY/MM/DD (Western digits) — contracts period display. */
-export function formatDate(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}/${m}/${day}`
+/** Normalize any ISO/datetime string to YYYY-MM-DD (Western digits). */
+export function toDateOnly(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const raw = String(iso).trim()
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10)
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return ''
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Date only as YYYY-MM-DD (Western digits) — platform display standard. */
+export function formatDate(iso: string | null | undefined): string {
+  const only = toDateOnly(iso)
+  return only || '—'
+}
+
+/** Append midnight for APIs that still expect datetime. */
+export function toApiDateTime(dateOnly: string): string {
+  const d = toDateOnly(dateOnly)
+  return d ? `${d}T00:00:00` : ''
 }
 
 export function formatTime(iso: string): string {

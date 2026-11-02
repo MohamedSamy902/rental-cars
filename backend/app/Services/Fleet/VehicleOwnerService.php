@@ -30,6 +30,10 @@ class VehicleOwnerService
             'phone' => $data['phone'] ?? null,
             'phone_alt' => $data['phone_alt'] ?? null,
             'national_id' => $data['national_id'] ?? null,
+            'id_front_path' => $data['id_front_path'] ?? null,
+            'id_back_path' => $data['id_back_path'] ?? null,
+            'license_front_path' => $data['license_front_path'] ?? null,
+            'license_back_path' => $data['license_back_path'] ?? null,
             'notes' => $data['notes'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ]);
@@ -90,7 +94,7 @@ class VehicleOwnerService
 
         $amount = (int) ($vehicle->owner_monthly_amount ?? 0);
         if ($amount < 1) {
-            throw new DomainException('لا يوجد مبلغ شهري لهذه السيارة.');
+            throw new DomainException('لا يوجد مبلغ شهري لهذه العربية.');
         }
 
         [$year, $month] = array_map('intval', explode('-', $yearMonth));
@@ -176,7 +180,7 @@ class VehicleOwnerService
         if ($vehicleId) {
             $belongs = Vehicle::query()->where('id', $vehicleId)->where('owner_id', $owner->id)->exists();
             if (! $belongs) {
-                throw new DomainException('السيارة غير مربوطة بهذا المالك.');
+                throw new DomainException('العربية غير مربوطة بهذا المالك.');
             }
         }
 

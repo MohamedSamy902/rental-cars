@@ -85,7 +85,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
 
   function validate(): boolean {
     const next: Record<string, string> = {}
-    if (!form.vehicle_id) next.vehicle_id = 'اختر السيارة.'
+    if (!form.vehicle_id) next.vehicle_id = 'اختر العربية.'
     if (!form.odometer) next.odometer = 'أدخل قراءة العداد.'
     if (!form.opened_at) next.opened_at = 'أدخل تاريخ ووقت الصيانة.'
     if (form.funding === 'stock') {
@@ -170,7 +170,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
       <div className="rpm-form-grid">
         {!vehicle ? (
           <SelectField
-            label="السيارة"
+            label="العربية"
             required
             error={fieldErrors.vehicle_id}
             options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))}
@@ -204,7 +204,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
           }}
         />
         <TextField label="وصف البند" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        <SwitchField label="يضع السيارة في صيانة" checked={putsInMaintenance} onChange={setPutsInMaintenance} />
+        <SwitchField label="يضع العربية في صيانة" checked={putsInMaintenance} onChange={setPutsInMaintenance} />
 
         <SelectField
           label="مصدر التمويل / القطع"
@@ -281,7 +281,6 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
             setFieldErrors((prev) => ({ ...prev, quantity: '' }))
           }}
         />
-        <MoneyField label="تكلفة العمالة" value={form.labor_cost} onChange={(e) => setForm({ ...form, labor_cost: e.target.value })} />
         <DateField
           label="موعد الصيانة التالية"
           value={form.next_service_on}

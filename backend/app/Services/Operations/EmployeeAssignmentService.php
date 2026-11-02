@@ -31,7 +31,7 @@ class EmployeeAssignmentService
     public function acknowledgeReceipt(EmployeeAssignment $assignment, ?int $adminId = null): EmployeeAssignment
     {
         if ($assignment->status === 'acknowledged') {
-            throw new DomainException('تم تأكيد استلام هذا الإسناد مسبقاً.');
+            throw new DomainException('تم تأكيد استلام هذا التسليم مسبقاً.');
         }
 
         return DB::transaction(function () use ($assignment, $adminId) {

@@ -53,8 +53,9 @@ export function DateField(props: TextProps) {
 }
 
 /**
- * Split date + time fields (avoids native datetime-local overflow on mobile)
- * Value format: `YYYY-MM-DDTHH:mm` (same as datetime-local).
+ * Date-only field (platform standard: YYYY-MM-DD).
+ * Kept as DateTimeField for call-site compatibility; time is always midnight.
+ * Value format accepted: `YYYY-MM-DD` or `YYYY-MM-DDTHH:mm` (time ignored).
  */
 export function DateTimeField({
   label,
@@ -70,36 +71,24 @@ export function DateTimeField({
   const fieldId = id ?? name
   const raw = typeof value === 'string' ? value : ''
   const datePart = raw.slice(0, 10)
-  const timePart = raw.length >= 16 ? raw.slice(11, 16) : raw.slice(11) || ''
 
-  function emit(nextDate: string, nextTime: string) {
+  function emit(nextDate: string) {
     if (!onChange) return
-    const combined = nextDate ? `${nextDate}T${nextTime || '00:00'}` : ''
-    onChange({ target: { value: combined, name: name || '' } } as never)
+    onChange({ target: { value: nextDate, name: name || '' } } as never)
   }
 
   return (
     <FieldShell label={label} required={required} error={error} hint={hint} htmlFor={fieldId}>
-      <div className="rpm-datetime">
-        <input
-          id={fieldId}
-          className="rpm-input rpm-input--date"
-          type="date"
-          disabled={disabled}
-          required={required}
-          value={datePart}
-          aria-label={`${label} — التاريخ`}
-          onChange={(e) => emit(e.target.value, timePart)}
-        />
-        <input
-          className="rpm-input rpm-input--time"
-          type="time"
-          disabled={disabled}
-          value={timePart}
-          aria-label={`${label} — الوقت`}
-          onChange={(e) => emit(datePart || new Date().toISOString().slice(0, 10), e.target.value)}
-        />
-      </div>
+      <input
+        id={fieldId}
+        className="rpm-input rpm-input--date"
+        type="date"
+        disabled={disabled}
+        required={required}
+        value={datePart}
+        aria-label={label}
+        onChange={(e) => emit(e.target.value)}
+      />
     </FieldShell>
   )
 }

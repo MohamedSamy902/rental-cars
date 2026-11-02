@@ -42,7 +42,7 @@ class ExpenseController extends Controller
             'title' => 'العنوان',
             'amount' => 'المبلغ',
             'spent_on' => 'تاريخ الصرف',
-            'vehicle_id' => 'المركبة',
+            'vehicle_id' => 'العربية',
             'work_order_id' => 'أمر الشغل',
             'employee_id' => 'موظف العهدة',
         ]);
