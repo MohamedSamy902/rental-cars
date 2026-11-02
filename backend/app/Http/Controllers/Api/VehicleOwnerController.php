@@ -73,7 +73,7 @@ class VehicleOwnerController extends Controller
     public function show(Request $request, VehicleOwner $owner): JsonResponse
     {
         $ym = $request->string('month')->toString() ?: now()->format('Y-m');
-        $owner->load(['vehicles' => fn ($q) => $q->orderBy('code')]);
+        $owner->load(['vehicles' => fn ($q) => $q->with('documents')->orderBy('code')]);
         $balance = $this->owners->balance($owner, $ym);
         $dues = $owner->monthDues()->with('vehicle:id,code,plate,brand,model')->orderByDesc('year_month')->limit(24)->get();
         $payouts = $owner->payouts()->with('vehicle:id,code,plate')->orderByDesc('paid_on')->orderByDesc('id')->limit(50)->get();
@@ -91,6 +91,7 @@ class VehicleOwnerController extends Controller
                     'owner_monthly_amount' => $v->owner_monthly_amount,
                     'owner_since' => $v->owner_since?->toDateString(),
                     'is_active' => $v->is_active,
+                    'license_complete' => $v->hasCompleteLicense(),
                 ]),
                 'dues' => $dues,
                 'payouts' => $payouts,

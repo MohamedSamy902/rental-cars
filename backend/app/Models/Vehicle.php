@@ -58,4 +58,52 @@ class Vehicle extends Model
     {
         return $this->hasMany(WorkOrder::class);
     }
+
+    public static function isLicenseDocumentType(?string $type): bool
+    {
+        return (bool) preg_match('/رخص|license/iu', (string) $type);
+    }
+
+    /**
+     * رخصة تسيير مكتملة للحجز: سجل رخصة + وش + تاريخ انتهاء.
+     */
+    public function hasCompleteLicense(): bool
+    {
+        if ($this->relationLoaded('documents')) {
+            return $this->documents->contains(function (VehicleDocument $d) {
+                return self::isLicenseDocumentType($d->type)
+                    && filled($d->file_path)
+                    && $d->expires_on !== null;
+            });
+        }
+
+        return $this->documents()
+            ->where(function ($q) {
+                $q->where('type', 'like', '%رخص%')
+                    ->orWhere('type', 'like', '%license%');
+            })
+            ->whereNotNull('file_path')
+            ->where('file_path', '!=', '')
+            ->whereNotNull('expires_on')
+            ->exists();
+    }
+
+    /**
+     * قيد Eloquent: عربيات برخصة تسيير مكتملة (وش + انتهاء).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<Vehicle>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<Vehicle>
+     */
+    public function scopeWhereLicenseComplete($query)
+    {
+        return $query->whereHas('documents', function ($q) {
+            $q->where(function ($qq) {
+                $qq->where('type', 'like', '%رخص%')
+                    ->orWhere('type', 'like', '%license%');
+            })
+                ->whereNotNull('file_path')
+                ->where('file_path', '!=', '')
+                ->whereNotNull('expires_on');
+        });
+    }
 }

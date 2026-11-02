@@ -61,6 +61,8 @@ class OperationsController extends Controller
                         ->value('planned_ends_at');
                 }
 
+                $licenseComplete = $v->hasCompleteLicense();
+
                 return [
                     'id' => $v->id,
                     'brand' => $v->brand,
@@ -77,7 +79,8 @@ class OperationsController extends Controller
                     'monthly_rate' => (int) round(((int) $v->daily_rate) * 30 * 0.75),
                     'default_deposit' => (int) $v->default_deposit,
                     'status' => $status,
-                    'available' => $status === 'available',
+                    'license_complete' => $licenseComplete,
+                    'available' => $status === 'available' && $licenseComplete,
                     'returning_on' => $returning?->toDateString(),
                 ];
             })

@@ -7,7 +7,15 @@ import { toApiDateTime } from '@/shared/lib/format'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
-type Vehicle = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number }
+type Vehicle = {
+  id: number
+  brand: string
+  model: string
+  plate: string
+  daily_rate: number
+  default_deposit: number
+  license_complete?: boolean
+}
 type RankedVehicle = Vehicle & {
   category?: string
   rental_priority?: number
@@ -60,7 +68,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       setWeights(v.weights ?? null)
       if (preferredId && !v.data.some((x) => x.id === preferredId)) {
         const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=100').catch(() => ({ data: [] as Vehicle[] }))
-        const found = fallback.data.find((x) => x.id === preferredId)
+        const found = fallback.data.find((x) => x.id === preferredId && x.license_complete !== false)
         if (found) setVehicles((prev) => [{ ...found }, ...prev.filter((p) => p.id !== found.id)])
       }
       return v.data
@@ -278,7 +286,11 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           <SelectField
             label="العربية المتاحة في الفترة"
             required
-            hint={form.starts_at && form.planned_ends_at ? 'تُستبعد العربيات المحجوزة أو المؤجرة في نفس الفترة' : 'حدد فترة الحجز أولاً لتصفية المتاح'}
+            hint={
+              form.starts_at && form.planned_ends_at
+                ? 'تُستبعد المحجوز/المؤجّر وما بلا رخصة تسيير مكتملة (وش + انتهاء)'
+                : 'حدد فترة الحجز أولاً لتصفية المتاح — العربيات بلا رخصة مكتملة لا تظهر'
+            }
             options={[
               { value: '', label: vehicles.length ? 'اختر عربية…' : 'لا عربيات متاحة في هذه الفترة' },
               ...vehicles.map((v) => ({

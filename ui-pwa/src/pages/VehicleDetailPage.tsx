@@ -74,6 +74,7 @@ type Vehicle = {
   owner?: OwnerOption | null
   accessories?: Accessory[] | null
   documents?: Document[] | null
+  license_complete?: boolean
   created_at?: string | null
   updated_at?: string | null
 }
@@ -252,9 +253,7 @@ export function VehicleDetailPage() {
   const [tab, setTab] = useState<TabId>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [docForm, setDocForm] = useState({ type: 'تأمين', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
   const [licenseForm, setLicenseForm] = useState({ issued_on: '', expires_on: '', notes: '', file_path: '', file_path_back: '' })
-  const [docEdit, setDocEdit] = useState<Document | null>(null)
   const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
   const [accOpen, setAccOpen] = useState(false)
   const [accEdit, setAccEdit] = useState<Accessory | null>(null)
@@ -346,6 +345,12 @@ export function VehicleDetailPage() {
 
   function isLicenseType(type?: string | null) {
     return /رخص|license/i.test(String(type || ''))
+  }
+
+  function licenseIsComplete(vehicle: Vehicle): boolean {
+    if (typeof vehicle.license_complete === 'boolean') return vehicle.license_complete
+    const lic = (vehicle.documents || []).find((d) => isLicenseType(d.type))
+    return Boolean(lic?.file_path && lic?.expires_on)
   }
 
   function syncLicenseForm(docs?: Document[] | null) {
@@ -491,85 +496,29 @@ export function VehicleDetailPage() {
     }
   }
 
-  async function addDocument() {
-    if (!dossier) return
-    if (isLicenseType(docForm.type)) {
-      toast.error('رخصة التسيير تُدار من قسم «رخصة التسيير» أعلاه.')
-      return
-    }
-    if (!docForm.file_path) {
-      toast.error('صورة وجه المستند (وش) مطلوبة.')
-      return
-    }
-    if (!docForm.expires_on) {
-      toast.error('تاريخ انتهاء المستند مطلوب.')
-      return
-    }
-    setSaving(true)
-    try {
-      await api(`/vehicles/${dossier.vehicle.id}/documents`, {
-        method: 'POST',
-        json: {
-          type: docForm.type,
-          file_path: docForm.file_path,
-          file_path_back: docForm.file_path_back || undefined,
-          expires_on: docForm.expires_on,
-          issued_on: docForm.issued_on || undefined,
-          notes: docForm.notes || undefined,
-        },
-      })
-      toast.success('تم تسجيل المستند.')
-      setDocForm({ type: 'تأمين', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
-      await load()
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function saveDocumentEdit() {
-    if (!dossier || !docEdit) return
-    setSaving(true)
-    try {
-      const isLicense = /رخص|license/i.test(docEdit.type)
-      const res = await api<{ message?: string }>(`/vehicles/${dossier.vehicle.id}/documents/${docEdit.id}`, {
-        method: 'PUT',
-        json: {
-          type: docEdit.type,
-          file_path: docEdit.file_path || undefined,
-          file_path_back: docEdit.file_path_back || undefined,
-          expires_on: docEdit.expires_on || undefined,
-          issued_on: docEdit.issued_on || undefined,
-          notes: docEdit.notes || undefined,
-          archive_previous: isLicense,
-        },
-      })
-      toast.success(res.message || (isLicense ? 'تم تحديث الرخصة مع حفظ السجل السابق.' : 'تم تحديث المستند.'))
-      setDocEdit(null)
-      await load()
-      const hist = await api<{ data: typeof docHistory }>(`/vehicles/${dossier.vehicle.id}/document-history`)
-      setDocHistory(hist.data || [])
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function deleteDocument(d: Document) {
     if (!dossier) return
-    if (!window.confirm(`حذف مستند «${d.type}»؟`)) return
+    if (!window.confirm(`حذف رخصة التسيير؟`)) return
     setSaving(true)
     try {
       await api(`/vehicles/${dossier.vehicle.id}/documents/${d.id}`, { method: 'DELETE' })
-      toast.success('تم حذف المستند.')
+      toast.success('تم حذف رخصة التسيير.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
     } finally {
       setSaving(false)
     }
+  }
+
+  function requestNewContract() {
+    if (!dossier) return
+    if (!licenseIsComplete(dossier.vehicle)) {
+      toast.error('رخصة التسيير ناقصة — ارفع وش الرخصة وتاريخ الانتهاء قبل الحجز.')
+      setTab('docs')
+      return
+    }
+    openNewContract({ vehicleId: dossier.vehicle.id })
   }
 
   async function loadEstimated() {
@@ -635,7 +584,13 @@ export function VehicleDetailPage() {
       attentionLabel: openMaintenance > 0 ? 'أوامر صيانة مفتوحة' : 'دخل ضائع من التوقف',
     },
     { id: 'expenses', label: 'المصروفات', count: dossier.expenses.length },
-    { id: 'docs', label: 'المستندات', count: (v.documents?.length || 0) + dossier.totals.media },
+    {
+      id: 'docs',
+      label: 'رخصة التسيير',
+      count: dossier.totals.media,
+      attention: licenseIsComplete(v) ? null : 'critical',
+      attentionLabel: 'رخصة ناقصة — يمنع الحجز',
+    },
     { id: 'owner', label: 'المالك' },
   ]
 
@@ -675,6 +630,7 @@ export function VehicleDetailPage() {
         <Fact
           label="رخصة التسيير"
           value={(() => {
+            if (!licenseIsComplete(v)) return 'ناقصة — يمنع الحجز'
             const lic = (v.documents || []).find((d) => isLicenseType(d.type))
             if (!lic) return 'غير مسجّلة'
             const exp = lic.expires_on || '—'
@@ -965,7 +921,7 @@ export function VehicleDetailPage() {
   )
 
   const licenseDoc = (v.documents || []).find((d) => isLicenseType(d.type)) || null
-  const otherDocs = (v.documents || []).filter((d) => !isLicenseType(d.type))
+  const licenseComplete = licenseIsComplete(v)
   const licenseExpired = licenseDoc?.expires_on
     ? new Date(`${licenseDoc.expires_on}T23:59:59`).getTime() < Date.now()
     : false
@@ -977,9 +933,18 @@ export function VehicleDetailPage() {
         <p>
           مربوطة بهذه العربية
           {licenseDoc?.expires_on ? ` · تنتهي ${licenseDoc.expires_on}` : ''}
-          {licenseExpired ? ' · منتهية' : licenseDoc ? ' · سارية' : ' · غير مسجّلة'}
+          {!licenseComplete
+            ? ' · ناقصة — يمنع الحجز'
+            : licenseExpired
+              ? ' · منتهية'
+              : ' · سارية'}
         </p>
       </div>
+      {!licenseComplete ? (
+        <p className="vd-note" role="status">
+          أكمل وش الرخصة وتاريخ الانتهاء حتى تُفعَّل الحجوزات على هذه العربية.
+        </p>
+      ) : null}
       <div className="vd-form-block vd-no-print" style={{ borderBlockStart: 'none', paddingBlockStart: 0 }}>
         <div className="rpm-form-grid">
           <DateField
@@ -992,7 +957,7 @@ export function VehicleDetailPage() {
             required
             value={licenseForm.expires_on}
             onChange={(e) => setLicenseForm({ ...licenseForm, expires_on: e.target.value })}
-            hint="إلزامي — أساس تنبيهات انتهاء رخصة العربية"
+            hint="إلزامي — أساس تنبيهات انتهاء رخصة العربية ومنع الحجز إن نقص"
           />
           <MediaUpload
             label="رخصة تسيير — وش"
@@ -1038,74 +1003,8 @@ export function VehicleDetailPage() {
         </div>
       </div>
 
-      <div className="vd-panel__head" style={{ marginTop: '0.85rem' }}>
-        <h2>مستندات أخرى</h2>
-        <p>{otherDocs.length} مستند · تأمين · فحص …</p>
-      </div>
-      {otherDocs.length === 0 ? <Empty>لا مستندات أخرى بعد</Empty> : (
-        <div className="vd-docs">
-          {otherDocs.map((d) => (
-            <div key={d.id} className="vd-doc">
-              <div>
-                <strong>{d.type}</strong>
-                <div>
-                  <span>
-                    صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}
-                    {d.file_path ? ' · وش' : ''}
-                    {d.file_path_back ? ' · ضهر' : ''}
-                  </span>
-                </div>
-              </div>
-              <div className="rpm-actions-row vd-no-print">
-                <Button size="sm" variant="ghost" onClick={() => setDocEdit({ ...d })}>تعديل</Button>
-                <Button size="sm" variant="danger" loading={saving} onClick={() => void deleteDocument(d)}>حذف</Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="vd-form-block vd-no-print">
-        <div className="rpm-form-grid">
-          <SelectField
-            label="نوع المستند"
-            value={docForm.type}
-            onChange={(e) => setDocForm({ ...docForm, type: e.target.value })}
-            options={[
-              { value: 'تأمين', label: 'تأمين' },
-              { value: 'فحص فني', label: 'فحص فني' },
-              { value: 'أخرى', label: 'أخرى' },
-            ]}
-          />
-          <DateField label="تاريخ الإصدار" value={docForm.issued_on} onChange={(e) => setDocForm({ ...docForm, issued_on: e.target.value })} />
-          <DateField label="تاريخ الانتهاء" required value={docForm.expires_on} onChange={(e) => setDocForm({ ...docForm, expires_on: e.target.value })} />
-          <MediaUpload
-            label={`${docForm.type || 'المستند'} — وش`}
-            required
-            value={docForm.file_path || null}
-            collection="vehicle_docs"
-            purpose="document_front"
-            accept="image"
-            attachableType="vehicle"
-            attachableId={v.id}
-            onChange={(path) => setDocForm({ ...docForm, file_path: path || '' })}
-          />
-          <MediaUpload
-            label={`${docForm.type || 'المستند'} — ضهر`}
-            value={docForm.file_path_back || null}
-            collection="vehicle_docs"
-            purpose="document_back"
-            accept="image"
-            attachableType="vehicle"
-            attachableId={v.id}
-            onChange={(path) => setDocForm({ ...docForm, file_path_back: path || '' })}
-          />
-          <TextAreaField label="ملاحظات" value={docForm.notes} onChange={(e) => setDocForm({ ...docForm, notes: e.target.value })} />
-          <Button size="sm" loading={saving} onClick={() => void addDocument()}>إضافة مستند</Button>
-        </div>
-      </div>
-
       <div className="vd-panel__head" style={{ marginTop: '0.75rem' }}>
-        <h2>سجل الرخص والمستندات السابقة</h2>
+        <h2>سجل رخص التسيير السابقة</h2>
         <p>{docHistory.length} أرشيف</p>
       </div>
       {docHistory.length === 0 ? (
@@ -1338,7 +1237,7 @@ export function VehicleDetailPage() {
         <div className="vd-hero__top">
           <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>رجوع للأسطول</button>
           <div className="vd-hero__actions vd-no-print">
-            <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد جديد</Button>
+            <Button size="sm" variant="accent" onClick={() => requestNewContract()}>عقد جديد</Button>
             <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>أمر صيانة</Button>
             <Button size="sm" variant="secondary" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
@@ -1350,6 +1249,9 @@ export function VehicleDetailPage() {
           <div className="vd-identity">
             <div className="vd-identity__status">
               <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+              {!licenseIsComplete(v) ? (
+                <StatusPill status="danger" label="رخصة ناقصة" tone="danger" />
+              ) : null}
               <span className="vd-code">{v.code}</span>
             </div>
             <div className="vd-plate" aria-label={`لوحة ${v.plate}`}>
@@ -1503,56 +1405,6 @@ export function VehicleDetailPage() {
         onSaved={() => void load()}
         vehicle={{ id: v.id, label: `${v.brand} ${v.model} · ${v.plate}` }}
       />
-      <Sheet
-        open={!!docEdit}
-        title="تعديل مستند"
-        onClose={() => setDocEdit(null)}
-        footer={
-          <>
-            <Button loading={saving} onClick={() => saveDocumentEdit()}>حفظ</Button>
-            <Button variant="secondary" onClick={() => setDocEdit(null)}>إلغاء</Button>
-          </>
-        }
-      >
-        {docEdit ? (
-          <div className="rpm-form-grid">
-            <SelectField
-              label="نوع المستند"
-              value={docEdit.type}
-              onChange={(e) => setDocEdit({ ...docEdit, type: e.target.value })}
-              options={[
-                { value: 'تأمين', label: 'تأمين' },
-                { value: 'فحص فني', label: 'فحص فني' },
-                { value: 'أخرى', label: 'أخرى' },
-              ]}
-            />
-            <DateField label="تاريخ الإصدار" value={docEdit.issued_on || ''} onChange={(e) => setDocEdit({ ...docEdit, issued_on: e.target.value })} />
-            <DateField label="تاريخ الانتهاء" required value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />
-            <MediaUpload
-              label={`${docEdit.type || 'المستند'} — وش`}
-              required
-              value={docEdit.file_path || null}
-              collection="vehicle_docs"
-              purpose="document_front"
-              accept="image"
-              attachableType="vehicle"
-              attachableId={v.id}
-              onChange={(path) => setDocEdit({ ...docEdit, file_path: path || '' })}
-            />
-            <MediaUpload
-              label={`${docEdit.type || 'المستند'} — ضهر`}
-              value={docEdit.file_path_back || null}
-              collection="vehicle_docs"
-              purpose="document_back"
-              accept="image"
-              attachableType="vehicle"
-              attachableId={v.id}
-              onChange={(path) => setDocEdit({ ...docEdit, file_path_back: path || '' })}
-            />
-            <TextAreaField label="ملاحظات" value={docEdit.notes || ''} onChange={(e) => setDocEdit({ ...docEdit, notes: e.target.value })} />
-          </div>
-        ) : null}
-      </Sheet>
     </div>
   )
 }

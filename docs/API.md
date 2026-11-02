@@ -193,7 +193,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | وصف |
 |--------|------|-----|
-| GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&per_page=` |
+| GET | `/vehicles` | قائمة + summary حالات — `?search=&status=available\|rented\|reserved\|maintenance\|license_incomplete&per_page=` · الحقل `license_complete` |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
 | POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية `{ "name": "…" }` |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
@@ -205,7 +205,9 @@ Query شائع: `?per_page=50&page=1&search=...`
 | GET | `/vehicles/{vehicle}/document-history` | سجل الرخص/المستندات المؤرشفة |
 | POST | `/vehicles/{vehicle}/accessories` | مستلزم |
 
-**حالات مشتقة `status`:** `available` | `reserved` | `rented` | `maintenance` | `out_of_service`
+**حالات مشتقة `status`:** `available` | `reserved` | `rented` | `maintenance` | `out_of_service`  
+**رخصة التسيير:** `license_complete` (boolean) — بلا وش/انتهاء = ناقصة؛ إنشاء/اعتماد العقد يُرفض؛ التوصية والمعرض يستبعدان/يعطّلان الحجز.  
+**summary** يتضمن أيضاً `license_incomplete`.
 
 **POST /vehicles — حقول أساسية**
 `plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit`  

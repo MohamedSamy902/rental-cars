@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
 use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -188,5 +189,66 @@ class VehicleClientRefinementsTest extends TestCase
             'amount' => 100,
             'spent_on' => now()->toDateString(),
         ])->assertStatus(422);
+    }
+
+    public function test_incomplete_vehicle_license_blocks_contract_and_flags_list(): void
+    {
+        $this->autoCompleteVehicleLicense = false;
+
+        $customer = Customer::query()->create([
+            'full_name' => 'عميل رخصة',
+            'phone' => '01009998877',
+            'birth_date' => '1990-01-01',
+            'license_number' => 'L-99',
+            'license_expires_on' => now()->addYear()->toDateString(),
+            'status' => 'active',
+        ]);
+
+        $vehicle = Vehicle::query()->create([
+            'code' => 'VEH-LIC1',
+            'plate' => 'ر خ 9900',
+            'brand' => 'نيسان',
+            'model' => 'صني',
+            'year' => 2021,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 9000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 700,
+            'default_deposit' => 1500,
+            'rental_priority' => 50,
+            'is_active' => true,
+        ]);
+
+        $this->assertFalse($vehicle->hasCompleteLicense());
+
+        $list = $this->getJson('/api/vehicles?status=license_incomplete')->assertOk();
+        $this->assertTrue(collect($list->json('data'))->contains(fn ($row) => (int) $row['id'] === $vehicle->id));
+        $this->assertFalse((bool) collect($list->json('data'))->firstWhere('id', $vehicle->id)['license_complete']);
+        $this->assertGreaterThanOrEqual(1, (int) $list->json('summary.license_incomplete'));
+
+        $this->postJson('/api/contracts', [
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'starts_at' => now()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(3)->toIso8601String(),
+        ])->assertStatus(422)
+            ->assertJsonFragment(['message' => 'رخصة التسيير ناقصة على العربية — ارفع صورة الوجه (وش) وتاريخ الانتهاء قبل الحجز.']);
+
+        VehicleDocument::query()->create([
+            'vehicle_id' => $vehicle->id,
+            'type' => 'رخصة تسيير',
+            'file_path' => 'manual/license-front',
+            'expires_on' => now()->addYear()->toDateString(),
+        ]);
+
+        $this->assertTrue($vehicle->fresh()->hasCompleteLicense());
+
+        $this->postJson('/api/contracts', [
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'starts_at' => now()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(3)->toIso8601String(),
+        ])->assertCreated();
     }
 }

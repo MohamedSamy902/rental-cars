@@ -37,6 +37,7 @@ type Vehicle = {
   owner_monthly_amount?: number | null
   owner_since?: string | null
   owner?: OwnerOption | null
+  license_complete?: boolean
 }
 
 const statusLabel: Record<string, string> = {
@@ -52,7 +53,9 @@ export function VehiclesPage() {
   const navigate = useNavigate()
   const { openNewContract } = useNewContract()
   const [rows, setRows] = useState<Vehicle[]>([])
-  const [summary, setSummary] = useState({ total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0 })
+  const [summary, setSummary] = useState({
+    total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0, license_incomplete: 0,
+  })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -82,8 +85,14 @@ export function VehiclesPage() {
         attention: summary.maintenance > 0 ? ('critical' as const) : null,
         attentionLabel: 'عربيات في الصيانة',
       },
+      {
+        id: 'license_incomplete',
+        label: 'رخصة ناقصة',
+        attention: summary.license_incomplete > 0 ? ('critical' as const) : null,
+        attentionLabel: `${summary.license_incomplete} عربية بلا رخصة مكتملة`,
+      },
     ],
-    [summary.rented, summary.reserved, summary.maintenance],
+    [summary.rented, summary.reserved, summary.maintenance, summary.license_incomplete],
   )
 
   async function load(nextSearch = search, nextChip = chip) {
@@ -139,8 +148,15 @@ export function VehiclesPage() {
     {
       id: 'status',
       header: 'الحالة',
-      cell: (v) => <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />,
-      sortValue: (v) => v.status,
+      cell: (v) => (
+        <span className="rpm-inline-pills">
+          <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+          {v.license_complete === false ? (
+            <StatusPill status="danger" label="رخصة ناقصة" tone="danger" />
+          ) : null}
+        </span>
+      ),
+      sortValue: (v) => (v.license_complete === false ? `0-${v.status}` : `1-${v.status}`),
       mobile: 'badge',
     },
     {
@@ -179,9 +195,16 @@ export function VehiclesPage() {
     return [
       {
         id: 'contract',
-        label: 'عقد جديد',
+        label: v.license_complete === false ? 'عقد جديد (رخصة ناقصة)' : 'عقد جديد',
         icon: <IconFileText size={16} />,
-        onSelect: () => openNewContract({ vehicleId: v.id }),
+        onSelect: () => {
+          if (v.license_complete === false) {
+            toast.error('رخصة التسيير ناقصة — أكملها من ملف العربية قبل الحجز.')
+            navigate(`/vehicles/${v.id}`)
+            return
+          }
+          openNewContract({ vehicleId: v.id })
+        },
       },
       {
         id: 'wo',

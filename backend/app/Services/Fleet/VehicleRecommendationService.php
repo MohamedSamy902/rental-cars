@@ -63,6 +63,10 @@ class VehicleRecommendationService
                 continue;
             }
 
+            if (! $v->hasCompleteLicense()) {
+                continue;
+            }
+
             $status = $this->availability->statusOnDate([
                 'manual_status' => $v->manual_status,
                 'has_active_handover' => $activeIds->has($v->id),

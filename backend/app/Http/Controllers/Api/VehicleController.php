@@ -103,10 +103,31 @@ class VehicleController extends Controller
                 $q->whereHas('contracts', fn ($c) => $c->where('status', 'active'));
             } elseif ($status === 'reserved') {
                 $q->whereHas('contracts', fn ($c) => $c->where('status', 'approved'));
+            } elseif ($status === 'license_incomplete') {
+                $q->whereDoesntHave('documents', function ($doc) {
+                    $doc->where(function ($qq) {
+                        $qq->where('type', 'like', '%رخص%')
+                            ->orWhere('type', 'like', '%license%');
+                    })
+                        ->whereNotNull('file_path')
+                        ->where('file_path', '!=', '')
+                        ->whereNotNull('expires_on');
+                });
             }
         }
 
         $q->with('owner:id,full_name,phone');
+        $q->withExists([
+            'documents as license_complete' => function ($doc) {
+                $doc->where(function ($qq) {
+                    $qq->where('type', 'like', '%رخص%')
+                        ->orWhere('type', 'like', '%license%');
+                })
+                    ->whereNotNull('file_path')
+                    ->where('file_path', '!=', '')
+                    ->whereNotNull('expires_on');
+            },
+        ]);
         $rows = $q->paginate((int) $request->integer('per_page', 50));
 
         $data = collect($rows->items())->map(function (Vehicle $v) {
@@ -435,6 +456,9 @@ class VehicleController extends Controller
             'manual_status' => $v->manual_status,
             'is_active' => $v->is_active,
             'status' => $status,
+            'license_complete' => array_key_exists('license_complete', $v->getAttributes())
+                ? (bool) $v->getAttribute('license_complete')
+                : $v->hasCompleteLicense(),
             'owner_id' => $v->owner_id !== null ? (int) $v->owner_id : null,
             'owner_monthly_amount' => $v->owner_monthly_amount !== null ? (int) $v->owner_monthly_amount : null,
             'owner_since' => $v->owner_since?->toDateString(),
@@ -457,11 +481,21 @@ class VehicleController extends Controller
     private function summary(): array
     {
         $all = Vehicle::query()->where('is_active', true)->get();
-        $counts = ['total' => $all->count(), 'available' => 0, 'rented' => 0, 'reserved' => 0, 'maintenance' => 0];
+        $counts = [
+            'total' => $all->count(),
+            'available' => 0,
+            'rented' => 0,
+            'reserved' => 0,
+            'maintenance' => 0,
+            'license_incomplete' => 0,
+        ];
         foreach ($all as $v) {
             $status = $this->present($v)['status'];
             if (isset($counts[$status])) {
                 $counts[$status]++;
+            }
+            if (! $v->hasCompleteLicense()) {
+                $counts['license_incomplete']++;
             }
         }
 

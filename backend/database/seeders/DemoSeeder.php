@@ -13,6 +13,7 @@ use App\Models\TenantSetting;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleAccessory;
+use App\Models\VehicleDocument;
 use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
 use App\Support\PermissionCatalog;
@@ -166,6 +167,19 @@ class DemoSeeder extends Seeder
                 ['vehicle_id' => $v->id, 'name' => 'طفاية حريق'],
                 ['default_qty' => 1, 'required_each_rental' => true],
             );
+            // صني في الصيانة تبقى بلا رخصة مكتملة لإظهار علامة «رخصة ناقصة» في الديمو.
+            if ($row['code'] !== 'C-088') {
+                VehicleDocument::query()->updateOrCreate(
+                    ['vehicle_id' => $v->id, 'type' => 'رخصة تسيير'],
+                    [
+                        'file_path' => 'demo/license-'.$v->code.'-front.jpg',
+                        'file_path_back' => 'demo/license-'.$v->code.'-back.jpg',
+                        'issued_on' => now()->subYear()->toDateString(),
+                        'expires_on' => now()->addYears(2)->toDateString(),
+                        'notes' => 'رخصة ديمو',
+                    ],
+                );
+            }
         }
 
         $customers = [

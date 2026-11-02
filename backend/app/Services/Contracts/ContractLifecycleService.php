@@ -68,6 +68,8 @@ class ContractLifecycleService
                 throw new DomainException('العربية غير متاحة للعقد في حالتها الحالية.');
             }
 
+            $this->assertVehicleLicenseAllowsBooking($vehicle);
+
             $customer = Customer::query()->findOrFail($data['customer_id']);
             if (in_array($customer->status, ['blacklist', 'blacklisted'], true)) {
                 throw new DomainException('العميل في القائمة السوداء.');
@@ -143,6 +145,7 @@ class ContractLifecycleService
             /** @var Vehicle $vehicle */
             $vehicle = Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
 
+            $this->assertVehicleLicenseAllowsBooking($vehicle);
             $this->assertDocumentsAllowApproval($locked);
             $this->assertNoOverlap(
                 (int) $locked->vehicle_id,
@@ -830,6 +833,15 @@ class ContractLifecycleService
         $conflict = $q->first(['id', 'number']);
         if ($conflict) {
             throw new DomainException('العربية محجوزة بعقد متعارض: '.$conflict->number);
+        }
+    }
+
+    private function assertVehicleLicenseAllowsBooking(Vehicle $vehicle): void
+    {
+        if (! $vehicle->hasCompleteLicense()) {
+            throw new DomainException(
+                'رخصة التسيير ناقصة على العربية — ارفع صورة الوجه (وش) وتاريخ الانتهاء قبل الحجز.'
+            );
         }
     }
 

@@ -256,6 +256,13 @@
   margin-block-start: 0.25rem;
 }
 
+.rpm-inline-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .rpm-inline-create {
   display: grid;
   gap: 0.55rem;

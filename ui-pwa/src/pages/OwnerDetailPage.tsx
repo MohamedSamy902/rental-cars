@@ -27,6 +27,7 @@ type OwnerVehicle = {
   owner_monthly_amount?: number | null
   owner_since?: string | null
   is_active: boolean
+  license_complete?: boolean
 }
 
 type Payout = {
@@ -219,7 +220,20 @@ export function OwnerDetailPage() {
                   </div>
                   <p className="muted">{v.code} · {v.plate} · منذ {formatDate(v.owner_since)}</p>
                   <div className="rpm-card__actions">
-                    <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد جديد</Button>
+                    <Button
+                      size="sm"
+                      variant="accent"
+                      onClick={() => {
+                        if (v.license_complete === false) {
+                          toast.error('رخصة التسيير ناقصة — أكملها من ملف العربية قبل الحجز.')
+                          navigate(`/vehicles/${v.id}`)
+                          return
+                        }
+                        openNewContract({ vehicleId: v.id })
+                      }}
+                    >
+                      {v.license_complete === false ? 'رخصة ناقصة' : 'عقد جديد'}
+                    </Button>
                     <Button size="sm" variant="secondary" onClick={() => setWoVehicle({ id: v.id, label })}>أمر صيانة</Button>
                     <Button size="sm" variant="secondary" onClick={() => setExpVehicle({ id: v.id, label })}>مصروف</Button>
                   </div>

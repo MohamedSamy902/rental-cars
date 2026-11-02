@@ -23,6 +23,7 @@ type ShowroomVehicle = {
   default_deposit: number
   status: string
   available: boolean
+  license_complete?: boolean
   returning_on?: string | null
 }
 
@@ -150,9 +151,12 @@ export function ShowroomPage() {
               <div className="rpm-showroom__actions">
                 <Button
                   disabled={!v.available}
-                  onClick={() => openNewContract({ vehicleId: v.id })}
+                  onClick={() => {
+                    if (v.license_complete === false) return
+                    openNewContract({ vehicleId: v.id })
+                  }}
                 >
-                  حجز فوري
+                  {v.license_complete === false ? 'رخصة ناقصة' : 'حجز فوري'}
                 </Button>
                 <Button variant="secondary" onClick={() => shareWhatsApp(v)}>مشاركة واتساب</Button>
               </div>
