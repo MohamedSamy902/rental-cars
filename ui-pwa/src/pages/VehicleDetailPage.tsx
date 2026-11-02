@@ -8,14 +8,15 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, StatusPill, Sheet, AttentionDot,
-  TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField, MediaUpload,
-  PlateField, splitPlate, DateField,
+  TextField, NumberField, SelectField, TextAreaField, SwitchField, MediaUpload,
+  DateField,
   useToast, SkeletonBlock, ErrorState, QrCode,
   type AttentionTone,
 } from '@/shared/ui'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
+import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './VehicleDetailPage.css'
 import './pages.css'
 import '@/shared/ui/AttentionDot.css'
@@ -210,15 +211,6 @@ const statusLabel: Record<string, string> = {
 
 const chartColors = ['#dc2626', '#64748b', '#f59e0b', '#059669', '#a1a1aa', '#b91c1c', '#475569']
 
-const emptyForm = {
-  code: '', plate_letters: '', plate_numbers: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
-  color: '', transmission: 'أوتوماتيك', chassis_number: '', engine_number: '', engine_capacity: '',
-  seats: '5', odometer: '', daily_rate: '', default_deposit: '',
-  target_monthly_income: '', purchase_value_estimate: '',
-  tracker_device_number: '', tracker_sim_number: '', notes: '', is_active: true,
-  owner_id: '', owner_monthly_amount: '',
-}
-
 const emptyAcc = {
   name: '', default_qty: '1', required_each_rental: true, is_active: true, notes: '',
 }
@@ -259,12 +251,8 @@ export function VehicleDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<TabId>('overview')
-  const [editing, setEditing] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [owners, setOwners] = useState<OwnerOption[]>([])
-  const [brands, setBrands] = useState<Array<{ id: number; name: string }>>([])
   const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
   const [docEdit, setDocEdit] = useState<Document | null>(null)
   const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
@@ -356,37 +344,6 @@ export function VehicleDetailPage() {
     [dossier],
   )
 
-  function fillForm(v: Vehicle) {
-    const plateParts = splitPlate(v.plate)
-    setForm({
-      code: v.code,
-      plate_letters: plateParts.letters,
-      plate_numbers: plateParts.numbers,
-      brand: v.brand,
-      model: v.model,
-      year: String(v.year),
-      category: v.category,
-      fuel_type: v.fuel_type,
-      color: v.color || '',
-      transmission: v.transmission || 'أوتوماتيك',
-      chassis_number: v.chassis_number || '',
-      engine_number: v.engine_number || '',
-      engine_capacity: v.engine_capacity || '',
-      seats: v.seats != null ? String(v.seats) : '5',
-      odometer: String(v.odometer),
-      daily_rate: String(v.daily_rate),
-      default_deposit: String(v.default_deposit),
-      target_monthly_income: v.target_monthly_income != null ? String(v.target_monthly_income) : '',
-      purchase_value_estimate: v.purchase_value_estimate != null ? String(v.purchase_value_estimate) : '',
-      tracker_device_number: v.tracker_device_number || '',
-      tracker_sim_number: v.tracker_sim_number || '',
-      notes: v.notes || '',
-      is_active: v.is_active !== false,
-      owner_id: v.owner_id ? String(v.owner_id) : '',
-      owner_monthly_amount: v.owner_monthly_amount != null ? String(v.owner_monthly_amount) : '',
-    })
-  }
-
   async function load() {
     if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
       setError('معرّف العربية غير صالح.')
@@ -398,7 +355,6 @@ export function VehicleDetailPage() {
     try {
       const res = await api<{ data: Dossier }>(`/vehicles/${vehicleId}/dossier`)
       setDossier(res.data)
-      fillForm(res.data.vehicle)
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -407,14 +363,6 @@ export function VehicleDetailPage() {
   }
 
   useEffect(() => { void load() }, [vehicleId])
-  useEffect(() => {
-    void api<{ data: OwnerOption[] }>('/owners?active_only=1&per_page=100')
-      .then((res) => setOwners(res.data))
-      .catch(() => setOwners([]))
-    void api<{ data: { brands: Array<{ id: number; name: string }> } }>('/vehicles/catalogs')
-      .then((res) => setBrands(res.data.brands || []))
-      .catch(() => setBrands([]))
-  }, [])
 
   useEffect(() => {
     if (!Number.isFinite(vehicleId) || vehicleId <= 0) return
@@ -422,53 +370,6 @@ export function VehicleDetailPage() {
       .then((res) => setDocHistory(res.data || []))
       .catch(() => setDocHistory([]))
   }, [vehicleId, dossier?.vehicle.documents?.length])
-
-  function vehiclePayload() {
-    return {
-      plate_letters: form.plate_letters,
-      plate_numbers: form.plate_numbers,
-      brand: form.brand,
-      model: form.model,
-      year: Number(form.year),
-      category: form.category,
-      fuel_type: form.fuel_type,
-      odometer: Number(form.odometer),
-      daily_rate: Number(form.daily_rate),
-      default_deposit: Number(form.default_deposit),
-      seats: form.seats ? Number(form.seats) : null,
-      target_monthly_income: form.target_monthly_income !== '' ? Number(form.target_monthly_income) : null,
-      purchase_value_estimate: form.purchase_value_estimate !== '' ? Number(form.purchase_value_estimate) : null,
-      color: form.color || null,
-      transmission: form.transmission || null,
-      chassis_number: form.chassis_number || null,
-      engine_number: form.engine_number || null,
-      engine_capacity: form.engine_capacity || null,
-      tracker_device_number: form.tracker_device_number || null,
-      tracker_sim_number: form.tracker_sim_number || null,
-      notes: form.notes || null,
-      is_active: form.is_active,
-      owner_id: form.owner_id ? Number(form.owner_id) : null,
-      owner_monthly_amount: form.owner_id && form.owner_monthly_amount !== ''
-        ? Number(form.owner_monthly_amount)
-        : null,
-    }
-  }
-
-  async function onUpdate() {
-    if (!dossier) return
-    setSaving(true)
-    try {
-      await api(`/vehicles/${dossier.vehicle.id}`, { method: 'PUT', json: vehiclePayload() })
-      toast.success('تم تحديث العربية.')
-      setEditOpen(false)
-      setEditing(false)
-      await load()
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   function openAccCreate() {
     setAccEdit(null)
@@ -615,57 +516,6 @@ export function VehicleDetailPage() {
       toast.error('تعذّر حساب العداد التقديري.')
     }
   }
-
-  const formFields = (
-    <div className="rpm-form-grid">
-      <TextField label="الكود الداخلي" value={form.code} disabled hint="يُدار تلقائياً ولا يُعدَّل يدوياً" />
-      <PlateField
-        required
-        letters={form.plate_letters}
-        numbers={form.plate_numbers}
-        onLettersChange={(plate_letters) => setForm({ ...form, plate_letters })}
-        onNumbersChange={(plate_numbers) => setForm({ ...form, plate_numbers })}
-      />
-      <SelectField
-        label="الماركة"
-        required
-        value={form.brand}
-        options={(brands.length ? brands.map((b) => b.name) : [form.brand].filter(Boolean)).map((name) => ({ value: name, label: name }))}
-        onChange={(e) => setForm({ ...form, brand: e.target.value })}
-      />
-      <TextField label="الموديل" required value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-      <NumberField label="سنة الصنع" required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
-      <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'دفع رباعي', label: 'دفع رباعي' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-      <SelectField label="نوع الوقود" required options={[{ value: 'بنزين', label: 'بنزين' }, { value: 'ديزل', label: 'ديزل' }, { value: 'هجين', label: 'هجين' }]} value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} />
-      <TextField label="اللون" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
-      <SelectField label="ناقل الحركة" options={[{ value: 'أوتوماتيك', label: 'أوتوماتيك' }, { value: 'مانيوال', label: 'مانيوال' }]} value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} />
-      <NumberField label="عدد المقاعد" value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
-      <TextField label="رقم الشاسيه" value={form.chassis_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} />
-      <TextField label="رقم المحرك" value={form.engine_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, engine_number: e.target.value })} />
-      <TextField label="سعة المحرك" value={form.engine_capacity} onChange={(e) => setForm({ ...form, engine_capacity: e.target.value })} />
-      <NumberField label="العداد الفعلي" required value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
-      <MoneyField label="الإيجار اليومي" required value={form.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
-      <MoneyField label="التأمين النقدي" required value={form.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
-      <MoneyField label="المستهدف الشهري" value={form.target_monthly_income} onChange={(e) => setForm({ ...form, target_monthly_income: e.target.value })} />
-      <MoneyField label="تقدير قيمة الشراء" value={form.purchase_value_estimate} onChange={(e) => setForm({ ...form, purchase_value_estimate: e.target.value })} />
-      <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
-      <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
-      <SelectField
-        label="المالك"
-        value={form.owner_id}
-        onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
-        options={[
-          { value: '', label: '— ملك المركز —' },
-          ...owners.map((o) => ({ value: String(o.id), label: o.full_name + (o.phone ? ` · ${o.phone}` : '') })),
-        ]}
-      />
-      {form.owner_id ? (
-        <MoneyField label="المبلغ الشهري للمالك" required value={form.owner_monthly_amount} onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })} />
-      ) : null}
-      <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-      <SwitchField label="نشطة" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
-    </div>
-  )
 
   if (loading) {
     return <div className="vd"><SkeletonBlock rows={10} /></div>
@@ -1341,7 +1191,7 @@ export function VehicleDetailPage() {
             <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>أمر صيانة</Button>
             <Button size="sm" variant="secondary" onClick={() => setExpOpen(true)}>تسجيل مصروف</Button>
             <Button size="sm" variant="secondary" onClick={() => loadEstimated()}>عداد تقديري</Button>
-            <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setEditOpen(true) }}>تعديل</Button>
+            <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)}>تعديل</Button>
             <Button size="sm" variant="primary" onClick={() => window.print()}>طباعة</Button>
           </div>
         </div>
@@ -1458,19 +1308,17 @@ export function VehicleDetailPage() {
         ) : null}
       </Sheet>
 
-      <Sheet
+      <VehicleFormSheet
         open={editOpen}
-        title="تعديل العربية"
-        onClose={() => { setEditOpen(false); setEditing(false) }}
-        footer={
-          <>
-            <Button loading={saving} onClick={() => onUpdate()}>حفظ التعديل</Button>
-            <Button variant="secondary" onClick={() => { setEditOpen(false); setEditing(false) }}>إلغاء</Button>
-          </>
-        }
-      >
-        {editing ? formFields : null}
-      </Sheet>
+        mode="edit"
+        vehicleId={v.id}
+        initial={v}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => {
+          setEditOpen(false)
+          void load()
+        }}
+      />
 
       <Sheet
         open={accOpen}

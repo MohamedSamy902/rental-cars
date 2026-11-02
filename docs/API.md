@@ -195,6 +195,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 |--------|------|-----|
 | GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&per_page=` |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
+| POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية `{ "name": "…" }` |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
 | PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) |

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
-import { VehicleCreateSheet } from '@/shared/forms/VehicleCreateSheet'
+import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import {
@@ -264,8 +264,9 @@ export function VehiclesPage() {
         />
       )}
 
-      <VehicleCreateSheet
+      <VehicleFormSheet
         open={open}
+        mode="create"
         onClose={() => setOpen(false)}
         onSaved={(id) => {
           void load()
