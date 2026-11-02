@@ -167,39 +167,47 @@ export function contractMenu(
     view: () => void
     approve: () => void
     openAction: (kind: Exclude<ActionKind, null>) => void
-    print: () => void
+    print: (kind?: 'contract' | 'invoice' | 'receipt') => void
+    can?: (permission: string) => boolean
   },
 ): MenuItem[] {
+  const can = handlers.can ?? (() => true)
   const items: MenuItem[] = [
     { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: handlers.view },
     { id: 'sep-1', separator: true },
   ]
-  if (b.status === 'pending') {
+  if (b.status === 'pending' && can('contracts.approve')) {
     items.push({ id: 'approve', label: 'اعتماد', icon: <IconCheck size={16} />, onSelect: handlers.approve })
   }
-  if (b.status === 'approved') {
+  if (b.status === 'approved' && can('contracts.update')) {
     items.push({ id: 'handover', label: 'تسليم', icon: <IconKey size={16} />, onSelect: () => handlers.openAction('handover') })
   }
-  if (b.status === 'active') {
+  if (b.status === 'active' && can('contracts.update')) {
     items.push({ id: 'return', label: 'استلام وإقفال', icon: <IconReturn size={16} />, onSelect: () => handlers.openAction('return') })
   }
-  if ((b.status === 'approved' || b.status === 'active') && !b.deposit) {
+  if ((b.status === 'approved' || b.status === 'active') && !b.deposit && can('deposits.collect')) {
     items.push({ id: 'deposit', label: 'قبض تأمين', icon: <IconCash size={16} />, onSelect: () => handlers.openAction('deposit') })
   }
-  if (b.status === 'approved' || b.status === 'active' || b.status === 'completed') {
+  if ((b.status === 'approved' || b.status === 'active' || b.status === 'completed') && can('contracts_extend.execute')) {
     items.push({ id: 'extend', label: 'تمديد', icon: <IconCalendar size={16} />, onSelect: () => handlers.openAction('extend') })
   }
-  if (b.status === 'active') {
+  if (b.status === 'active' && can('contracts_swap.execute')) {
     items.push({ id: 'swap', label: 'تبديل عطل', icon: <IconCar size={16} />, onSelect: () => handlers.openAction('swap') })
   }
-  if (b.deposit && b.deposit.status !== 'returned') {
+  if (b.deposit && b.deposit.status !== 'returned' && can('deposits.settle')) {
     items.push(
       { id: 'deduct', label: 'خصم تأمين', icon: <IconWallet size={16} />, onSelect: () => handlers.openAction('deduct') },
       { id: 'refund', label: 'رد تأمين', icon: <IconReturn size={16} />, onSelect: () => handlers.openAction('refund') },
     )
   }
-  items.push({ id: 'print', label: 'طباعة', icon: <IconPrinter size={16} />, onSelect: handlers.print })
-  if (b.status === 'pending' || b.status === 'approved') {
+  if (can('contracts.print')) {
+    items.push(
+      { id: 'print-contract', label: 'طباعة العقد', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('contract') },
+      { id: 'print-invoice', label: 'الفاتورة / كشف الحساب', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('invoice') },
+      { id: 'print-receipt', label: 'سند القبض / محضر التسليم', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
+    )
+  }
+  if ((b.status === 'pending' || b.status === 'approved') && can('contracts_cancel.approve')) {
     items.push(
       { id: 'sep-2', separator: true },
       { id: 'cancel', label: 'إلغاء العقد', icon: <IconBan size={16} />, tone: 'danger', onSelect: () => handlers.openAction('cancel') },

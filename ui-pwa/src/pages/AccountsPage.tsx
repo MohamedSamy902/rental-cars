@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAuth } from '@/shared/auth/AuthContext'
 import { formatMoney } from '@/shared/lib/format'
 import {
   PageHeader, MetricCardGrid, Button, StatusPill, useToast,
@@ -30,6 +31,9 @@ function monthKey(m: MonthRow) {
 export function AccountsPage() {
   const toast = useToast()
   const navigate = useNavigate()
+  const { can } = useAuth()
+  const canLock = can('accounting.lock_month')
+  const canReopen = can('accounting.reopen_month')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [months, setMonths] = useState<MonthRow[]>([])
@@ -137,11 +141,12 @@ export function AccountsPage() {
                   <Button size="sm" variant="primary" onClick={() => navigate(`/accounts/months/${monthKey(m)}`)}>
                     دفتر الشهر
                   </Button>
-                  {!m.locked ? (
+                  {!m.locked && canLock ? (
                     <Button size="sm" variant="danger" onClick={() => void lockMonth(m)}>إقفال</Button>
-                  ) : (
+                  ) : null}
+                  {m.locked && canReopen ? (
                     <Button size="sm" variant="secondary" onClick={() => setReopen(m)}>إعادة فتح</Button>
-                  )}
+                  ) : null}
                 </div>
               </article>
             ))}
