@@ -417,10 +417,11 @@ Query: `filter=all|one|today|week|range`
 | Method | Path |
 |--------|------|
 | GET | `/petty-cash` |
+| GET | `/petty-cash/{account}` | ملف عهدة: `account` + `summary` (حد · تغذية · منصرف · مرتجع · رصيد) + `ledger[]` موحّد زمنياً (تغذية/مصروف/صيانة/تسوية) مع عربية وروابط وأرصدة بعد الحركة |
 | POST | `/petty-cash` | `{ employee_id, limit_amount, balance? }` |
-| POST | `/petty-cash/{account}/move` | `{ type: topup\|spend\|adjust, amount, notes? }` |
+| POST | `/petty-cash/{account}/move` | `{ type: topup\|spend\|adjust\|return, amount, notes? }` |
 
-`spend` يرفض إن المبلغ > الرصيد (`422`).
+`spend` و`return` يرفضان إن المبلغ > الرصيد (`422`). `return` = رد/تسوية نقدية تخصم من الرصيد.
 
 ---
 

@@ -25,6 +25,8 @@ type Props = {
   onSaved?: () => void
   /** Pre-links the expense to a vehicle (vehicle page quick action) */
   vehicle?: { id: number; label: string }
+  /** Lock create flow to a custody employee (petty-cash detail quick action) */
+  custodyEmployee?: { id: number; name?: string }
   /** When set, sheet works in edit mode */
   initial?: ExpenseEditInitial | null
 }
@@ -52,7 +54,7 @@ function spentOnValue(raw: string | undefined): string {
   return raw.slice(0, 10)
 }
 
-export function ExpenseSheet({ open, onClose, onSaved, vehicle, initial }: Props) {
+export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee, initial }: Props) {
   const toast = useToast()
   const editing = Boolean(initial?.id)
   const [saving, setSaving] = useState(false)
@@ -81,6 +83,8 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, initial }: Props
       setForm({
         ...emptyForm(),
         vehicle_id: vehicle?.id ? String(vehicle.id) : '',
+        from_petty_cash: Boolean(custodyEmployee?.id),
+        employee_id: custodyEmployee?.id ? String(custodyEmployee.id) : '',
       })
     }
     setErrors({})
@@ -90,7 +94,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, initial }: Props
     void api<{ data: EmployeeOption[] }>('/employees/lookup')
       .then((r) => setEmployees(r.data || []))
       .catch(() => setEmployees([]))
-  }, [open, vehicle?.id, initial])
+  }, [open, vehicle?.id, custodyEmployee?.id, initial])
 
   useEffect(() => {
     if (!open || form.category !== 'صيانة' || !form.vehicle_id) {
