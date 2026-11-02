@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney, toApiDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, SelectField, TextField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck,
+  PageHeader, FilterBar, Button, Sheet, Fab, SelectField, TextField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck, IconEdit,
   MediaUpload, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -14,7 +14,10 @@ type Violation = {
   occurred_at: string
   status: string
   location?: string
-  vehicle?: { brand: string; model: string; plate: string }
+  photo_path?: string | null
+  vehicle_id?: number
+  contract_id?: number | null
+  vehicle?: { id?: number; brand: string; model: string; plate: string }
   customer?: { full_name: string }
   contract?: { id: number; code?: string; number?: string } | null
 }
@@ -47,7 +50,17 @@ const statusLabel: Record<string, string> = {
   new: 'جديدة', assigned: 'مسندة', confirmed: 'مؤكّد السداد', paid: 'مدفوعة للجهة',
 }
 
-const ViolationsPageTabs = ['open', 'done'] as const
+const emptyForm = () => ({
+  vehicle_id: '',
+  contract_id: '',
+  occurred_at: '',
+  amount: '',
+  location: '',
+  photo_path: '',
+  status: 'new',
+})
+
+const ViolationsPageTabs = ['open', 'done', 'all'] as const
 
 export function ViolationsPage() {
   const toast = useToast()
@@ -56,10 +69,12 @@ export function ViolationsPage() {
   const [contracts, setContracts] = useState<ContractOption[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<Violation | null>(null)
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: ViolationsPageTabs, defaultValue: 'open' })
-  const [form, setForm] = useState({ vehicle_id: '', contract_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
+  const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
 
   const openCount = useMemo(
     () => rows.filter((r) => !['paid', 'confirmed'].includes(r.status)).length,
@@ -146,10 +161,7 @@ export function ViolationsPage() {
 
   useEffect(() => { void load() }, [])
 
-  async function openForm() {
-    setOpen(true)
-    setForm({ vehicle_id: '', contract_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
-    setFieldErrors({})
+  async function ensureLookups() {
     const [v, c] = await Promise.all([
       api<{ data: Vehicle[] }>('/vehicles?per_page=100'),
       api<{ data: ContractOption[] }>('/contracts?per_page=100').catch(() => api<{ data: ContractOption[] }>('/bookings?per_page=100')),
@@ -158,22 +170,52 @@ export function ViolationsPage() {
     setContracts(c.data)
   }
 
+  async function openCreate() {
+    setEditing(null)
+    setForm(emptyForm())
+    setFieldErrors({})
+    setOpen(true)
+    await ensureLookups()
+  }
+
+  async function openEdit(row: Violation) {
+    setEditing(row)
+    setForm({
+      vehicle_id: String(row.vehicle_id || row.vehicle?.id || ''),
+      contract_id: row.contract_id || row.contract?.id ? String(row.contract_id || row.contract?.id) : '',
+      occurred_at: (row.occurred_at || '').slice(0, 10),
+      amount: String(row.amount ?? ''),
+      location: row.location || '',
+      photo_path: row.photo_path || '',
+      status: row.status || 'new',
+    })
+    setFieldErrors({})
+    setOpen(true)
+    await ensureLookups()
+  }
+
   async function onSave() {
     setFieldErrors({})
+    setSaving(true)
     try {
-      await api('/violations', {
-        method: 'POST',
-        json: {
-          vehicle_id: Number(form.vehicle_id),
-          contract_id: form.contract_id ? Number(form.contract_id) : undefined,
-          occurred_at: toApiDateTime(form.occurred_at) || form.occurred_at,
-          amount: Number(form.amount),
-          location: form.location || undefined,
-          photo_path: form.photo_path || undefined,
-        },
-      })
-      toast.success('تم التسجيل للمتابعة بلا ترحيل محاسبي.')
+      const payload = {
+        vehicle_id: Number(form.vehicle_id),
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
+        occurred_at: toApiDateTime(form.occurred_at) || form.occurred_at,
+        amount: Number(form.amount),
+        location: form.location || undefined,
+        photo_path: form.photo_path || undefined,
+        ...(editing ? { status: form.status } : {}),
+      }
+      if (editing) {
+        await api(`/violations/${editing.id}`, { method: 'PUT', json: payload })
+        toast.success('تم تحديث المخالفة.')
+      } else {
+        await api('/violations', { method: 'POST', json: payload })
+        toast.success('تم التسجيل للمتابعة بلا ترحيل محاسبي.')
+      }
       setOpen(false)
+      setEditing(null)
       await load()
     } catch (e) {
       const apiErr = e as ApiError
@@ -183,6 +225,8 @@ export function ViolationsPage() {
       }
       setFieldErrors(next)
       toast.error(apiErr.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -204,10 +248,10 @@ export function ViolationsPage() {
       <PageHeader
         title="المخالفات"
         subtitle="متابعة تشغيلية مربوطة بالعقد والعميل — بلا ترحيل محاسبي"
-        action={<Button onClick={() => void openForm()}>تسجيل مخالفة</Button>}
+        action={<Button onClick={() => void openCreate()}>تسجيل مخالفة</Button>}
         mobileFab
       />
-      <Fab label="تسجيل مخالفة" onClick={() => void openForm()} />
+      <Fab label="تسجيل مخالفة" onClick={() => void openCreate()} />
       <FilterBar
         search={search}
         onSearchChange={setSearch}
@@ -224,15 +268,26 @@ export function ViolationsPage() {
         rowLabel={(r) => `مخالفة · ${r.vehicle?.plate ?? ''}`}
         loading={loading}
         defaultSort={{ id: 'date', dir: 'desc' }}
-        rowActions={(r) =>
-          r.status !== 'confirmed'
+        rowActions={(r) => [
+          { id: 'edit', label: 'تعديل', icon: <IconEdit size={16} />, onSelect: () => void openEdit(r) },
+          ...(r.status !== 'confirmed'
             ? [{ id: 'confirm', label: 'تأكيد السداد', icon: <IconCheck size={16} />, onSelect: () => void confirm(r.id) }]
-            : []
-        }
+            : []),
+        ]}
         emptyTitle="لا توجد مخالفات"
         emptyDescription="المخالفات المسجّلة للمتابعة التشغيلية تظهر هنا."
       />
-      <Sheet open={open} title="مخالفة جديدة" onClose={() => setOpen(false)} footer={<><Button onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
+      <Sheet
+        open={open}
+        title={editing ? 'تعديل المخالفة' : 'مخالفة جديدة'}
+        onClose={() => { setOpen(false); setEditing(null) }}
+        footer={
+          <>
+            <Button loading={saving} onClick={() => void onSave()}>{editing ? 'حفظ التعديلات' : 'حفظ'}</Button>
+            <Button variant="secondary" onClick={() => { setOpen(false); setEditing(null) }}>إلغاء</Button>
+          </>
+        }
+      >
         <div className="rpm-form-grid">
           <SelectField
             label="العربية"
@@ -253,7 +308,7 @@ export function ViolationsPage() {
             onChange={(e) => setForm({ ...form, occurred_at: e.target.value })}
           />
           <SelectField
-            label="العقد المرتبط"
+            label="العقد / الحجز المرتبط"
             error={fieldErrors.contract_id}
             hint={form.vehicle_id && form.occurred_at ? 'تُعرض العقود التي تغطي تاريخ المخالفة لهذه العربية' : 'اختر العربية والتاريخ لتصفية العقود'}
             options={[
@@ -271,6 +326,20 @@ export function ViolationsPage() {
           ) : null}
           <MoneyField label="المبلغ (للمتابعة)" required error={fieldErrors.amount} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <TextField label="المكان" error={fieldErrors.location} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          {editing ? (
+            <SelectField
+              label="الحالة"
+              value={form.status}
+              error={fieldErrors.status}
+              options={[
+                { value: 'new', label: statusLabel.new },
+                { value: 'assigned', label: statusLabel.assigned },
+                { value: 'confirmed', label: statusLabel.confirmed },
+                { value: 'paid', label: statusLabel.paid },
+              ]}
+              onChange={(e) => setForm({ ...form, status: e.target.value })}
+            />
+          ) : null}
           <MediaUpload
             label="صورة المخالفة"
             accept="both"

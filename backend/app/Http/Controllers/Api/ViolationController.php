@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreViolationRequest;
+use App\Http\Requests\UpdateViolationRequest;
 use App\Models\Contract;
 use App\Models\Violation;
 use Illuminate\Http\JsonResponse;
@@ -22,26 +23,7 @@ class ViolationController extends Controller
     {
         $data = $request->validated();
 
-        $contractId = $data['contract_id'] ?? null;
-        $customerId = null;
-        if (! $contractId) {
-            $contract = Contract::query()
-                ->where('vehicle_id', $data['vehicle_id'])
-                ->whereIn('status', ['active', 'completed'])
-                ->where('starts_at', '<=', $data['occurred_at'])
-                ->where(function ($q) use ($data) {
-                    $q->whereNull('actual_ends_at')
-                        ->orWhere('actual_ends_at', '>=', $data['occurred_at']);
-                })
-                ->orderByDesc('starts_at')
-                ->first();
-            if ($contract) {
-                $contractId = $contract->id;
-                $customerId = $contract->customer_id;
-            }
-        } else {
-            $customerId = Contract::query()->find($contractId)?->customer_id;
-        }
+        [$contractId, $customerId] = $this->resolveContractLink($data);
 
         $violation = Violation::query()->create([
             ...$data,
@@ -54,6 +36,54 @@ class ViolationController extends Controller
             'data' => $violation->load(['vehicle', 'customer', 'contract']),
             'message' => 'تم تسجيل المخالفة للمتابعة (بلا ترحيل محاسبي).',
         ], 201);
+    }
+
+    public function update(UpdateViolationRequest $request, Violation $violation): JsonResponse
+    {
+        $data = $request->validated();
+
+        $vehicleId = (int) ($data['vehicle_id'] ?? $violation->vehicle_id);
+        $occurredAt = (string) ($data['occurred_at'] ?? $violation->occurred_at);
+        $linkPayload = [
+            'vehicle_id' => $vehicleId,
+            'occurred_at' => $occurredAt,
+            'contract_id' => array_key_exists('contract_id', $data) ? $data['contract_id'] : $violation->contract_id,
+        ];
+
+        [$contractId, $customerId] = $this->resolveContractLink($linkPayload);
+
+        $status = $data['status'] ?? $violation->status;
+        if (! isset($data['status'])) {
+            if ($contractId && in_array($violation->status, ['new', 'assigned'], true)) {
+                $status = 'assigned';
+            } elseif (! $contractId && $violation->status === 'assigned') {
+                $status = 'new';
+            }
+        }
+
+        $payload = [
+            ...$data,
+            'vehicle_id' => $vehicleId,
+            'contract_id' => $contractId,
+            'customer_id' => $customerId,
+            'status' => $status,
+        ];
+
+        if (($status === 'confirmed' || $status === 'paid') && ! $violation->confirmed_at) {
+            $payload['confirmed_at'] = now();
+            $payload['confirmed_by'] = $request->user()?->id;
+        }
+        if (in_array($status, ['new', 'assigned'], true)) {
+            $payload['confirmed_at'] = null;
+            $payload['confirmed_by'] = null;
+        }
+
+        $violation->update($payload);
+
+        return response()->json([
+            'data' => $violation->fresh()->load(['vehicle', 'customer', 'contract']),
+            'message' => 'تم تحديث المخالفة.',
+        ]);
     }
 
     public function confirmPayment(Request $request, Violation $violation): JsonResponse
@@ -73,5 +103,36 @@ class ViolationController extends Controller
             'data' => $violation->fresh(),
             'message' => 'تم تأكيد السداد دون قيد محاسبي.',
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{0: int|null, 1: int|null}
+     */
+    private function resolveContractLink(array $data): array
+    {
+        $contractId = isset($data['contract_id']) && $data['contract_id'] ? (int) $data['contract_id'] : null;
+        $customerId = null;
+
+        if (! $contractId) {
+            $contract = Contract::query()
+                ->where('vehicle_id', $data['vehicle_id'])
+                ->whereIn('status', ['active', 'completed'])
+                ->where('starts_at', '<=', $data['occurred_at'])
+                ->where(function ($q) use ($data) {
+                    $q->whereNull('actual_ends_at')
+                        ->orWhere('actual_ends_at', '>=', $data['occurred_at']);
+                })
+                ->orderByDesc('starts_at')
+                ->first();
+            if ($contract) {
+                $contractId = $contract->id;
+                $customerId = $contract->customer_id;
+            }
+        } else {
+            $customerId = Contract::query()->find($contractId)?->customer_id;
+        }
+
+        return [$contractId, $customerId];
     }
 }
