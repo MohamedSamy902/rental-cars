@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import {
-  PageHeader, Button, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
+  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
   useToast, SkeletonBlock, ErrorState, StatusPill,
 } from '@/shared/ui'
 import './pages.css'
@@ -59,7 +59,6 @@ const emptyForm = {
 
 export function CustomerDetailPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const toast = useToast()
   const { openNewContract } = useNewContract()
   const [customer, setCustomer] = useState<Customer | null>(null)
@@ -149,7 +148,7 @@ export function CustomerDetailPage() {
   if (error || !customer) {
     return (
       <div className="rpm-stack">
-        <ErrorState title="تعذّر تحميل العميل" description={error || 'غير موجود'} action={<Button onClick={() => navigate('/customers')}>رجوع</Button>} />
+        <ErrorState title="تعذّر تحميل العميل" description={error || 'غير موجود'} action={<BackNavButton to="/customers" label="رجوع للعملاء" />} />
       </div>
     )
   }
@@ -169,7 +168,7 @@ export function CustomerDetailPage() {
         subtitle="ملف العميل · العقود · المخالفات · المستندات"
         action={
           <>
-            <Button variant="secondary" onClick={() => navigate('/customers')}>رجوع</Button>
+            <BackNavButton to="/customers" label="رجوع للعملاء" />
             <Button variant="accent" onClick={() => openNewContract({ customerId: customer.id })}>عقد جديد</Button>
             <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
             {customer.status === 'blacklist' ? (

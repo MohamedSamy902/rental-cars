@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import {
-  PageHeader, Button, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
+  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
   SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconWallet, IconCash, IconTrend, IconKey,
 } from '@/shared/ui'
 import './pages.css'
@@ -70,7 +70,6 @@ const emptyForm = {
 
 export function OwnerDetailPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const toast = useToast()
   const { openNewContract } = useNewContract()
   const [owner, setOwner] = useState<Owner | null>(null)
@@ -157,7 +156,7 @@ export function OwnerDetailPage() {
   if (error || !owner) {
     return (
       <div className="rpm-stack">
-        <ErrorState title="تعذّر تحميل المالك" description={error || 'غير موجود'} action={<Button onClick={() => navigate('/owners')}>رجوع</Button>} />
+        <ErrorState title="تعذّر تحميل المالك" description={error || 'غير موجود'} action={<BackNavButton to="/owners" label="رجوع للملاك" />} />
       </div>
     )
   }
@@ -171,7 +170,7 @@ export function OwnerDetailPage() {
         subtitle="ملف مالك العربيات · المستحقات · الصرف · المستندات"
         action={
           <>
-            <Button variant="secondary" onClick={() => navigate('/owners')}>رجوع</Button>
+            <BackNavButton to="/owners" label="رجوع للملاك" />
             <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
             <Button onClick={() => setPayoutOpen(true)}>صرف مستحقات</Button>
           </>

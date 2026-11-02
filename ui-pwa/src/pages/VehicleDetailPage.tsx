@@ -8,7 +8,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  Button, StatusPill, Sheet, AttentionDot,
+  Button, BackNavButton, StatusPill, Sheet, AttentionDot,
   TextField, NumberField, SelectField, TextAreaField, SwitchField, MediaUpload,
   DateField,
   useToast, SkeletonBlock, ErrorState, QrCode,
@@ -585,7 +585,7 @@ export function VehicleDetailPage() {
           description={error || 'لا توجد بيانات'}
           action={
             <div className="rpm-actions-row">
-              <Button variant="secondary" onClick={() => navigate('/vehicles')}>رجوع</Button>
+              <BackNavButton to="/vehicles" label="رجوع للعربيات" />
               <Button onClick={() => load()}>إعادة المحاولة</Button>
             </div>
           }
@@ -1297,7 +1297,7 @@ export function VehicleDetailPage() {
 
       <header className="vd-hero">
         <div className="vd-hero__top">
-          <button type="button" className="vd-back vd-no-print" onClick={() => navigate('/vehicles')}>رجوع للأسطول</button>
+          <BackNavButton className="vd-no-print" to="/vehicles" label="رجوع للعربيات" />
           <div className="vd-hero__actions vd-no-print">
             <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد جديد</Button>
             <Button size="sm" variant="secondary" onClick={() => setWoOpen(true)}>إضافة صيانة</Button>
