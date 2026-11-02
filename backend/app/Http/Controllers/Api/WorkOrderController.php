@@ -72,7 +72,7 @@ class WorkOrderController extends Controller
         ], [
             'vehicle_id' => 'العربية',
             'odometer' => 'العداد',
-            'opened_at' => 'تاريخ ووقت الصيانة',
+            'opened_at' => 'تاريخ الصيانة',
             'next_service_on' => 'موعد الصيانة التالية',
             'next_service_odometer' => 'عداد الصيانة التالية',
             'lines.*.inventory_item_id' => 'صنف المخزون',

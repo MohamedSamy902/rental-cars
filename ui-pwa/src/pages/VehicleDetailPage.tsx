@@ -280,7 +280,7 @@ export function VehicleDetailPage() {
     brand: '', installed_on: new Date().toISOString().slice(0, 10), odometer_at_install: '', expected_life_km: '',
   })
   const [downtimeForm, setDowntimeForm] = useState({
-    reason: 'maintenance', starts_at: new Date().toISOString().slice(0, 16), ends_at: '',
+    reason: 'maintenance', starts_at: new Date().toISOString().slice(0, 10), ends_at: '',
   })
 
   async function saveAsset() {
@@ -1434,8 +1434,8 @@ export function VehicleDetailPage() {
                 { value: 'other', label: 'أخرى' },
               ]}
             />
-            <TextField label="بداية التوقف" type="date" value={downtimeForm.starts_at.slice(0, 10)} onChange={(e) => setDowntimeForm({ ...downtimeForm, starts_at: e.target.value })} />
-            <TextField label="نهاية التوقف" type="date" value={downtimeForm.ends_at.slice(0, 10)} onChange={(e) => setDowntimeForm({ ...downtimeForm, ends_at: e.target.value })} />
+            <TextField label="تاريخ بداية التوقف" type="date" value={downtimeForm.starts_at.slice(0, 10)} onChange={(e) => setDowntimeForm({ ...downtimeForm, starts_at: e.target.value })} />
+            <TextField label="تاريخ نهاية التوقف" type="date" value={downtimeForm.ends_at.slice(0, 10)} onChange={(e) => setDowntimeForm({ ...downtimeForm, ends_at: e.target.value })} />
           </div>
         ) : null}
       </Sheet>

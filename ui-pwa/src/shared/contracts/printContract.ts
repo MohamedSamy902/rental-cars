@@ -158,13 +158,13 @@ function receiptBody(tenant: PrintPayload['tenant'], c: PrintContract) {
     <table>
       <tr><th>عداد الخروج</th><td>${handover?.odometer ?? c.odometer_out ?? '—'}</td></tr>
       <tr><th>مستوى البنزين</th><td>${handover?.fuel_level != null ? `${handover.fuel_level}%` : '—'}</td></tr>
-      <tr><th>وقت التسليم</th><td>${handover?.inspected_at ? formatDate(handover.inspected_at) : '—'}</td></tr>
+      <tr><th>تاريخ التسليم</th><td>${handover?.inspected_at ? formatDate(handover.inspected_at) : '—'}</td></tr>
     </table>
     <h2>محضر الاستلام</h2>
     <table>
       <tr><th>عداد العودة</th><td>${ret?.odometer ?? c.odometer_in ?? '—'}</td></tr>
       <tr><th>مستوى البنزين</th><td>${ret?.fuel_level != null ? `${ret.fuel_level}%` : '—'}</td></tr>
-      <tr><th>وقت الاستلام</th><td>${ret?.inspected_at ? formatDate(ret.inspected_at) : (c.actual_ends_at ? formatDate(c.actual_ends_at) : '—')}</td></tr>
+      <tr><th>تاريخ الاستلام</th><td>${ret?.inspected_at ? formatDate(ret.inspected_at) : (c.actual_ends_at ? formatDate(c.actual_ends_at) : '—')}</td></tr>
     </table>
     <p class="foot">${esc(tenant.print_footer || '')}</p>`
 }
