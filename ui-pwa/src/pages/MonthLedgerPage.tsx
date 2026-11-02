@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  Button, MetricCardGrid, StatusPill, SkeletonBlock, ErrorState, EmptyState, Sheet, TextField, useToast,
+  Button, BackNavButton, MetricCardGrid, StatusPill, SkeletonBlock, ErrorState, EmptyState, Sheet, TextField, useToast,
   IconCash, IconReceipt, IconWallet, IconTrend, IconReturn, IconBriefcase, IconAlert, IconKey,
 } from '@/shared/ui'
 import './pages.css'
@@ -103,7 +103,6 @@ function MoneyRows({ rows, empty, render }: { rows: Row[]; empty: string; render
 
 export function MonthLedgerPage() {
   const { monthId } = useParams()
-  const navigate = useNavigate()
   const toast = useToast()
   const [data, setData] = useState<Ledger | null>(null)
   const [error, setError] = useState('')
@@ -186,7 +185,7 @@ export function MonthLedgerPage() {
     <div className="ml">
       <header className="ml-hero">
         <div className="ml-hero__top">
-          <button type="button" className="ml-back" onClick={() => navigate('/accounts')}>رجوع للحسابات</button>
+          <BackNavButton to="/accounts" label="رجوع للحسابات" />
           <div className="ml-hero__actions">
             <Button size="sm" variant="secondary" onClick={exportCsv}>تصدير CSV</Button>
             {!data.lock.locked ? (

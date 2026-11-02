@@ -69,3 +69,41 @@
   margin-block-start: 0.35rem;
   padding-block-start: 0.55rem;
 }
+
+.hr-custody-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.85rem;
+  margin: 0;
+}
+
+.hr-custody-meta > div {
+  display: grid;
+  gap: 0.15rem;
+  min-inline-size: 0;
+}
+
+.hr-custody-meta__wide {
+  grid-column: 1 / -1;
+}
+
+.hr-custody-meta dt {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
+  font-weight: 600;
+}
+
+.hr-custody-meta dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .hr-custody-meta {
+    grid-template-columns: 1fr;
+  }
+}
