@@ -281,6 +281,12 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle }: Props) {
             setFieldErrors((prev) => ({ ...prev, quantity: '' }))
           }}
         />
+        <MoneyField
+          label="تكلفة العمالة"
+          value={form.labor_cost}
+          onChange={(e) => setForm({ ...form, labor_cost: e.target.value })}
+          hint="اختياري — يُحفظ صفراً إن تُرك فارغاً"
+        />
         <DateField
           label="موعد الصيانة التالية"
           value={form.next_service_on}

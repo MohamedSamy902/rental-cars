@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
+import { useNewContract } from '@/shared/contracts/newContractContext'
 import {
   PageHeader, Button, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
   useToast, SkeletonBlock, ErrorState, StatusPill,
@@ -60,6 +61,7 @@ export function CustomerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const { openNewContract } = useNewContract()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -168,6 +170,7 @@ export function CustomerDetailPage() {
         action={
           <>
             <Button variant="secondary" onClick={() => navigate('/customers')}>رجوع</Button>
+            <Button variant="accent" onClick={() => openNewContract({ customerId: customer.id })}>عقد جديد</Button>
             <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
             {customer.status === 'blacklist' ? (
               <Button loading={saving} onClick={() => void setBlacklist(false)}>إزالة من السوداء</Button>
@@ -204,13 +207,16 @@ export function CustomerDetailPage() {
       </section>
 
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>العقود</h3></div>
+        <div className="rpm-panel__head">
+          <h3>العقود</h3>
+          <Button size="sm" onClick={() => openNewContract({ customerId: customer.id })}>عقد جديد</Button>
+        </div>
         {(customer.contracts || []).length === 0 ? <p className="muted">لا عقود بعد.</p> : (
           <div className="rpm-card-list">
             {(customer.contracts || []).map((c) => (
               <article key={c.id} className="rpm-card">
                 <div className="rpm-card__row">
-                  <strong><Link to={`/bookings/${c.id}`}>{c.code}</Link></strong>
+                  <strong><Link to={`/contracts/${c.id}`}>{c.code}</Link></strong>
                   <StatusPill status={c.status} label={c.status} />
                 </div>
                 <p className="muted">
@@ -240,6 +246,20 @@ export function CustomerDetailPage() {
                   {v.contract?.code ? ` · ${v.contract.code}` : ''}
                   {v.location ? ` · ${v.location}` : ''}
                 </p>
+                {!['paid', 'confirmed'].includes(v.status) ? (
+                  <div className="rpm-card__actions">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        void api(`/violations/${v.id}/confirm`, { method: 'POST' })
+                          .then(() => { toast.success('تم تأكيد السداد.'); return load() })
+                          .catch((e) => toast.error((e as ApiError).message))
+                      }}
+                    >
+                      تأكيد السداد
+                    </Button>
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>

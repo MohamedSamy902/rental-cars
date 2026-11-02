@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, SkeletonBlock, ErrorState, MetricCardGrid, FilterBar, Button, Sheet, SelectField,
   IconCash, IconReturn, IconTrend, IconWallet, IconClipboard, IconCheck, IconUsers, IconBan, IconAlert,
@@ -77,10 +78,12 @@ function ymLabel(ym: string) {
 
 type TabId = 'overview' | 'trial' | 'income' | 'payments' | 'customer' | 'profit'
 
+const ReportsPageTabs = ['overview', 'trial', 'income', 'payments', 'customer', 'profit'] as const satisfies readonly TabId[]
+
 export function ReportsPage() {
   const [data, setData] = useState<Report | null>(null)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState<TabId>('overview')
+  const [tab, setTab] = useQueryTab<TabId>({ allowed: ReportsPageTabs, defaultValue: 'overview' })
   const [trial, setTrial] = useState<TrialRow[] | null>(null)
   const [income, setIncome] = useState<IncomeStatement | null>(null)
   const [methods, setMethods] = useState<PayMethod[] | null>(null)

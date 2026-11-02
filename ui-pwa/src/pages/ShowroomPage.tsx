@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { formatMoney, formatDate } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { PageHeader, EmptyState, SkeletonBlock, ErrorState, StatusPill, Button } from '@/shared/ui'
 import './pages.css'
 import './ShowroomPage.css'
@@ -26,13 +27,15 @@ type ShowroomVehicle = {
   returning_on?: string | null
 }
 
+const ShowroomPageTabs = ['all', 'available', 'busy'] as const
+
 export function ShowroomPage() {
   const { openNewContract } = useNewContract()
   const [center, setCenter] = useState('')
   const [rows, setRows] = useState<ShowroomVehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [chip, setChip] = useState<'all' | 'available' | 'busy'>('all')
+  const [chip, setChip] = useQueryTab({ allowed: ShowroomPageTabs, defaultValue: 'all' })
 
   async function load() {
     setLoading(true)

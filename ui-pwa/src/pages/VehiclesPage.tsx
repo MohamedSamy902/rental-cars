@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable,
   useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
-import { VehicleCreateSheet } from '@/shared/forms/VehicleCreateSheet'
+import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './pages.css'
+
+const VEHICLE_TABS = ['all', 'available', 'rented', 'reserved', 'maintenance'] as const
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
 
@@ -50,7 +53,7 @@ export function VehiclesPage() {
   const [rows, setRows] = useState<Vehicle[]>([])
   const [summary, setSummary] = useState({ total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0 })
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: VEHICLE_TABS, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
@@ -236,8 +239,9 @@ export function VehiclesPage() {
         />
       )}
 
-      <VehicleCreateSheet
+      <VehicleFormSheet
         open={open}
+        mode="create"
         onClose={() => setOpen(false)}
         onSaved={(id) => {
           void load()

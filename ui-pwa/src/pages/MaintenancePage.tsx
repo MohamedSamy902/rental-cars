@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, Fab, DataTable, StatusPill, useToast,
   IconCheck, IconWrench, IconCash, type DataColumn,
@@ -46,6 +47,8 @@ const columns: DataColumn<WorkOrder>[] = [
   },
 ]
 
+const MaintenancePageTabs = ['open', 'closed'] as const
+
 export function MaintenancePage() {
   const toast = useToast()
   const [rows, setRows] = useState<WorkOrder[]>([])
@@ -53,7 +56,7 @@ export function MaintenancePage() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('open')
+  const [chip, setChip] = useQueryTab({ allowed: MaintenancePageTabs, defaultValue: 'open' })
 
   async function load() {
     setLoading(true)

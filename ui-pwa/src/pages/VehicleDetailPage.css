@@ -354,6 +354,61 @@
   animation: vd-panel 320ms var(--ease) both;
 }
 
+.vd-panel--spaced {
+  margin-block-start: 1.5rem;
+}
+
+.vd-panel + .vd-panel {
+  margin-block-start: 1.5rem;
+}
+
+/* Nested heads inside the same panel (e.g. violations under maintenance) */
+.vd-panel > .vd-panel__head + .vd-panel__head,
+.vd-panel > .rpm-card-list + .vd-panel__head,
+.vd-panel > .vd-empty + .vd-panel__head {
+  margin-block-start: 1.25rem;
+  padding-block-start: 1.25rem;
+  border-block-start: 1px solid var(--border);
+}
+
+.vd-assets-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 720px) {
+  .vd-assets-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vd-asset-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  min-width: 0;
+  align-content: start;
+}
+
+.vd-asset-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.vd-asset-card__head h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 800;
+  font-family: var(--font-display);
+}
+
 @keyframes vd-panel {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }

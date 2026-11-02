@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
+import { useNewContract } from '@/shared/contracts/newContractContext'
+import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
+import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import {
   PageHeader, Button, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
-  useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconWallet, IconCash, IconTrend, IconKey,
+  SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconWallet, IconCash, IconTrend, IconKey,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -69,6 +72,7 @@ export function OwnerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const { openNewContract } = useNewContract()
   const [owner, setOwner] = useState<Owner | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -79,6 +83,8 @@ export function OwnerDetailPage() {
   const [payoutForm, setPayoutForm] = useState({
     amount: '', paid_on: new Date().toISOString().slice(0, 10), payment_method: 'cash', vehicle_id: '', notes: '',
   })
+  const [woVehicle, setWoVehicle] = useState<{ id: number; label: string } | null>(null)
+  const [expVehicle, setExpVehicle] = useState<{ id: number; label: string } | null>(null)
 
   async function load() {
     if (!id) return
@@ -206,15 +212,23 @@ export function OwnerDetailPage() {
         <div className="rpm-panel__head"><h3>العربيات المربوطة</h3></div>
         {(owner.vehicles || []).length === 0 ? <p className="muted">لا عربيات مربوطة — اربط من شاشة العربيات.</p> : (
           <div className="rpm-card-list">
-            {(owner.vehicles || []).map((v) => (
+            {(owner.vehicles || []).map((v) => {
+              const label = `${v.brand} ${v.model} · ${v.plate}`
+              return (
               <article key={v.id} className="rpm-card">
                 <div className="rpm-card__row">
                   <strong><Link to={`/vehicles/${v.id}`}>{v.brand} {v.model}</Link></strong>
                   <strong className="tabular-nums">{v.owner_monthly_amount != null ? formatMoney(v.owner_monthly_amount) : '—'}</strong>
                 </div>
                 <p className="muted">{v.code} · {v.plate} · منذ {formatDate(v.owner_since)}</p>
+                <div className="rpm-card__actions">
+                  <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد جديد</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setWoVehicle({ id: v.id, label })}>أمر صيانة</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setExpVehicle({ id: v.id, label })}>مصروف</Button>
+                </div>
               </article>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
@@ -260,12 +274,26 @@ export function OwnerDetailPage() {
           <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
           <TextField label="الرقم القومي" value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <SwitchField label="نشط" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
           <MediaUpload label="بطاقة — وش" value={form.id_front_path || null} collection="owners_id" purpose="id_front" accept="image" onChange={(path) => setForm({ ...form, id_front_path: path || '' })} />
           <MediaUpload label="بطاقة — ضهر" value={form.id_back_path || null} collection="owners_id" purpose="id_back" accept="image" onChange={(path) => setForm({ ...form, id_back_path: path || '' })} />
           <MediaUpload label="رخصة — وش" value={form.license_front_path || null} collection="owners_id" purpose="license_front" accept="image" onChange={(path) => setForm({ ...form, license_front_path: path || '' })} />
           <MediaUpload label="رخصة — ضهر" value={form.license_back_path || null} collection="owners_id" purpose="license_back" accept="image" onChange={(path) => setForm({ ...form, license_back_path: path || '' })} />
         </div>
       </Sheet>
+
+      <WorkOrderSheet
+        open={!!woVehicle}
+        vehicle={woVehicle || undefined}
+        onClose={() => setWoVehicle(null)}
+        onSaved={() => void load()}
+      />
+      <ExpenseSheet
+        open={!!expVehicle}
+        vehicle={expVehicle || undefined}
+        onClose={() => setExpVehicle(null)}
+        onSaved={() => void load()}
+      />
 
       <Sheet open={payoutOpen} title="صرف مستحقات" onClose={() => setPayoutOpen(false)} footer={<><Button loading={saving} onClick={() => void onPayout()}>تأكيد الصرف</Button><Button variant="secondary" onClick={() => setPayoutOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">

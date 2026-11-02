@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, FilterBar, Button, Sheet, NumberField, TextAreaField, SelectField, MoneyField, TextField,
   useToast, EmptyState, SkeletonBlock, StatusPill, MetricCardGrid,
@@ -68,6 +69,8 @@ function periodLabel(year: number, month: number) {
   return `${monthNames[month - 1] ?? month} ${year}`
 }
 
+const HrPageTabs = ['all', 'advances', 'payroll', 'custody', 'evals'] as const
+
 export function HrPage() {
   const toast = useToast()
   const { can } = useAuth()
@@ -94,7 +97,7 @@ export function HrPage() {
     employee_id: '', title: '', assignable_type: 'manual', notes: '',
   })
   const [payoutForm, setPayoutForm] = useState({ amount: '', paid_on: now.toISOString().slice(0, 10), method: 'cash', notes: '' })
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: HrPageTabs, defaultValue: 'all' })
 
   async function load() {
     setLoading(true)

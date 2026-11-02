@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney, toApiDateTime } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, SelectField, TextField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck,
   MediaUpload, type DataColumn,
@@ -46,6 +47,8 @@ const statusLabel: Record<string, string> = {
   new: 'جديدة', assigned: 'مسندة', confirmed: 'مؤكّد السداد', paid: 'مدفوعة للجهة',
 }
 
+const ViolationsPageTabs = ['open', 'done'] as const
+
 export function ViolationsPage() {
   const toast = useToast()
   const [rows, setRows] = useState<Violation[]>([])
@@ -54,7 +57,7 @@ export function ViolationsPage() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('open')
+  const [chip, setChip] = useQueryTab({ allowed: ViolationsPageTabs, defaultValue: 'open' })
   const [form, setForm] = useState({ vehicle_id: '', contract_id: '', occurred_at: '', amount: '', location: '', photo_path: '' })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 

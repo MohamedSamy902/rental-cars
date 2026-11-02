@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, Button, FilterBar, Sheet, Fab, SelectField, TextAreaField, NumberField, DateField,
@@ -45,6 +46,8 @@ const emptyForm = {
   notes: '',
 }
 
+const WaitlistPageTabs = ['all', 'waiting'] as const
+
 export function WaitlistPage() {
   const toast = useToast()
   const [rows, setRows] = useState<Row[]>([])
@@ -54,7 +57,7 @@ export function WaitlistPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: WaitlistPageTabs, defaultValue: 'all' })
   const [form, setForm] = useState(emptyForm)
   const { counts: attention } = useAttentionSignals(true)
 

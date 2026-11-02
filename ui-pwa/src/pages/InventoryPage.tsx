@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, TextField, NumberField, MoneyField, SelectField, StatusPill, useToast, DataTable, IconBox,
   type DataColumn,
@@ -38,6 +39,8 @@ const columns: DataColumn<Item>[] = [
   },
 ]
 
+const InventoryPageTabs = ['all', 'low'] as const
+
 export function InventoryPage() {
   const toast = useToast()
   const [rows, setRows] = useState<Item[]>([])
@@ -45,7 +48,7 @@ export function InventoryPage() {
   const [openItem, setOpenItem] = useState(false)
   const [openBatch, setOpenBatch] = useState(false)
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: InventoryPageTabs, defaultValue: 'all' })
   const [itemForm, setItemForm] = useState({ code: '', name: '', category: 'زيوت', unit: 'لتر', reorder_level: '5' })
   const [batchForm, setBatchForm] = useState({ inventory_item_id: '', received_on: new Date().toISOString().slice(0, 10), quantity: '', unit_cost: '', supplier: '' })
 
