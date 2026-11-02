@@ -349,17 +349,23 @@ function SwipeCard<T>({ row, index, columns, label, onRowClick, actions = [] }: 
         <header className="rpm-dt-card__head">
           <div className="rpm-dt-card__titles">
             {title ? <strong className="rpm-dt-card__title">{title.cell(row)}</strong> : null}
+          </div>
+          <div className="rpm-dt-card__meta">
+            {badge ? <div className="rpm-dt-card__badge">{badge.cell(row)}</div> : null}
+            {canSwipe ? (
+              <DropdownMenu label={label} items={actions} open={menuOpen} onOpenChange={setMenuOpen} />
+            ) : null}
+          </div>
+        </header>
+        {subtitle.length > 0 ? (
+          <div className="rpm-dt-card__contact">
             {subtitle.map((c) => (
-              <span key={c.id} className="rpm-dt-card__sub">
+              <div key={c.id} className="rpm-dt-card__contact-item">
                 {c.cell(row)}
-              </span>
+              </div>
             ))}
           </div>
-          {badge ? <div className="rpm-dt-card__badge">{badge.cell(row)}</div> : null}
-          {canSwipe ? (
-            <DropdownMenu label={label} items={actions} open={menuOpen} onOpenChange={setMenuOpen} />
-          ) : null}
-        </header>
+        ) : null}
         {fields.length > 0 ? (
           <dl className="rpm-dt-card__grid">
             {fields.map((c) => (

@@ -8,7 +8,8 @@
     position: fixed;
     z-index: 45;
     inset-inline-end: 1rem;
-    inset-block-end: calc(var(--bottom-nav-height) + 0.875rem + var(--safe-bottom));
+    /* Sit closer to the dock so the last card header/menu clears the circle */
+    inset-block-end: calc(var(--bottom-nav-height) + 0.4rem + var(--safe-bottom));
     display: block;
     pointer-events: none;
   }
@@ -49,8 +50,22 @@
     opacity: 0.6;
   }
 
-  /* The FAB's top edge sits nav + 3.875rem up; keep the last card just clear of it */
+  /* FAB sits above bottom nav — clear last list card + contact bar from the dock */
   .shell-main:has(.rpm-fab-dock) {
-    padding-block-end: calc(var(--bottom-nav-height) + 4.75rem + var(--safe-bottom));
+    padding-block-end: calc(var(--bottom-nav-height) + 5.75rem + var(--safe-bottom));
+  }
+
+  /* Keep the last mobile card (and its PhoneActions) above the floating + */
+  .shell-main:has(.rpm-fab-dock) .rpm-dt--cards .rpm-dt__cards,
+  .shell-main:has(.rpm-fab-dock) .rpm-card-list {
+    padding-block-end: 5rem;
+  }
+
+  /*
+   * Soft end inset as a safety rail when a long number still reaches the dock.
+   * Primary clearance comes from PhoneActions hugging RTL start (not growing).
+   */
+  .shell-main:has(.rpm-fab-dock) .rpm-dt-card__contact {
+    padding-inline-end: 3.75rem;
   }
 }

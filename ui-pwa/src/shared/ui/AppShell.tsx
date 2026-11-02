@@ -55,7 +55,7 @@ const railNav: NavItem[] = [
 
 const mobileNav: NavItem[] = [
   { to: '/', label: 'اليوم', icon: <IconHome />, end: true },
-  { to: '/vehicles', label: 'أسطول', icon: <IconCar /> },
+  { to: '/vehicles', label: 'العربيات', icon: <IconCar /> },
   { to: '/bookings', label: 'عقود', icon: <IconClipboard /> },
   { to: '/calendar', label: 'تقويم', icon: <IconCalendar /> },
   { to: '/maintenance', label: 'صيانة', icon: <IconWrench /> },

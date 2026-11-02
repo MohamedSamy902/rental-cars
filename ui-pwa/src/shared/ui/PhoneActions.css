@@ -1,9 +1,12 @@
 .rpm-phone-actions {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 0.35rem 0.5rem;
+  justify-content: flex-start;
+  gap: 8px;
   max-inline-size: 100%;
+  min-inline-size: 0;
 }
 
 .rpm-phone-actions--empty {
@@ -22,16 +25,22 @@
   font-weight: 600;
   text-decoration: none;
   line-height: 1.2;
+  white-space: nowrap;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .rpm-phone-actions__call {
+  min-inline-size: 0;
+  /* Hug content — do not grow and shove WhatsApp under the FAB */
+  flex: 0 1 auto;
+  overflow: hidden;
   color: #0f766e;
   background: color-mix(in srgb, #0d9488 12%, transparent);
   border: 1px solid color-mix(in srgb, #0d9488 28%, transparent);
 }
 
 .rpm-phone-actions__wa {
+  flex: 0 0 auto;
   color: #166534;
   background: color-mix(in srgb, #22c55e 14%, transparent);
   border: 1px solid color-mix(in srgb, #16a34a 28%, transparent);
@@ -52,15 +61,36 @@
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rpm-phone-actions--compact .rpm-phone-actions__call,
 .rpm-phone-actions--compact .rpm-phone-actions__wa {
-  padding-inline: 0.4rem;
+  padding-block: 0.28rem;
+  padding-inline: 0.45rem;
+  font-size: 0.75rem;
+}
+
+.rpm-phone-actions--compact .rpm-phone-actions__wa {
+  inline-size: 2rem;
+  block-size: 2rem;
+  padding: 0;
+  justify-content: center;
+  border-radius: 999px;
 }
 
 @media (max-width: 640px) {
   .rpm-phone-actions {
-    gap: 0.4rem;
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .rpm-phone-actions__call,
+  .rpm-phone-actions__wa {
+    padding-block: 0.28rem;
+    padding-inline: 0.4rem;
+    font-size: 0.74rem;
   }
 }
