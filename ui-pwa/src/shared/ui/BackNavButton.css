@@ -1,43 +1,48 @@
+/* Minimal back control — same geometry/surface language as toolbar secondary buttons. */
+
 .rpm-back-nav {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  min-height: 42px;
-  padding-block: 0.45rem;
-  padding-inline: 0.95rem 1.1rem;
-  border-radius: 999px;
-  border: 1.5px solid color-mix(in srgb, var(--accent, #0f766e) 42%, var(--border));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface, #fff) 92%, var(--accent, #0f766e) 8%),
-      var(--surface, #fff)
-    );
-  color: var(--text);
-  font-weight: 800;
-  font-size: 0.9rem;
-  letter-spacing: 0;
+  gap: 6px;
+  min-height: 2.25rem;
+  padding-block: 0.5rem;
+  padding-inline: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted, var(--text-secondary, #a1a1aa));
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
   cursor: pointer;
-  box-shadow:
-    0 1px 0 color-mix(in srgb, var(--accent, #0f766e) 12%, transparent),
-    0 6px 16px -10px color-mix(in srgb, var(--accent, #0f766e) 35%, transparent);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  box-shadow: none;
   transition:
-    background 160ms var(--ease, ease),
-    border-color 160ms var(--ease, ease),
-    box-shadow 160ms var(--ease, ease),
-    transform 160ms var(--ease, ease);
+    background-color var(--motion-fast, 150ms) ease,
+    border-color var(--motion-fast, 150ms) ease,
+    color var(--motion-fast, 150ms) ease,
+    transform var(--motion-fast, 150ms) ease;
 }
 
 .rpm-back-nav__icon {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 1.65rem;
-  height: 1.65rem;
-  border-radius: 999px;
-  color: var(--accent, #0f766e);
-  background: color-mix(in srgb, var(--accent, #0f766e) 14%, transparent);
-  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  color: currentColor;
+  transition: transform var(--motion-fast, 150ms) ease;
+}
+
+.rpm-back-nav__icon svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
 }
 
 .rpm-back-nav__label {
@@ -45,33 +50,43 @@
 }
 
 .rpm-back-nav:hover {
-  border-color: color-mix(in srgb, var(--accent, #0f766e) 70%, var(--border));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface, #fff) 82%, var(--accent, #0f766e) 18%),
-      var(--surface, #fff)
-    );
-  box-shadow:
-    0 1px 0 color-mix(in srgb, var(--accent, #0f766e) 18%, transparent),
-    0 10px 22px -12px color-mix(in srgb, var(--accent, #0f766e) 45%, transparent);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text);
+}
+
+/* Icon nudges toward the RTL back edge (visual right). */
+.rpm-back-nav:hover .rpm-back-nav__icon {
+  transform: translateX(2px);
 }
 
 .rpm-back-nav:active {
-  transform: translateY(0);
-  box-shadow: none;
+  transform: scale(0.98);
 }
 
 .rpm-back-nav:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent, #0f766e) 55%, transparent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring-strong, var(--ring));
+}
+
+/* Light theme: soft neutral wash instead of white translucency. */
+[data-theme='light'] .rpm-back-nav {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+[data-theme='light'] .rpm-back-nav:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
 }
 
 @media (max-width: 480px) {
   .rpm-back-nav {
-    min-height: 40px;
-    padding-inline: 0.8rem 0.95rem;
-    font-size: 0.84rem;
+    min-height: 2rem;
+    padding-block: 0.375rem;
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
   }
 }

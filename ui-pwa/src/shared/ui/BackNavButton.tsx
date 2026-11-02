@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconArrowRight } from './Icons'
+import { IconChevronRight } from './Icons'
 import './BackNavButton.css'
 
 type Props = {
@@ -15,8 +15,8 @@ type Props = {
 }
 
 /**
- * Distinct RTL back control — arrow points toward the right edge (start of reading).
- * Use on every detail page as the primary return-to-list affordance.
+ * Minimal RTL back control — matches toolbar secondary geometry.
+ * Chevron points toward the right edge (start of reading in RTL).
  */
 export function BackNavButton({ to, label, className = '', onClick }: Props) {
   const navigate = useNavigate()
@@ -31,7 +31,7 @@ export function BackNavButton({ to, label, className = '', onClick }: Props) {
       }}
     >
       <span className="rpm-back-nav__icon" aria-hidden>
-        <IconArrowRight size={18} />
+        <IconChevronRight size={16} />
       </span>
       <span className="rpm-back-nav__label">{label}</span>
     </button>
