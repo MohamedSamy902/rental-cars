@@ -9,7 +9,10 @@ use App\Models\Vehicle;
 use App\Models\VehicleOwner;
 use App\Services\Accounting\AccountingService;
 use App\Support\PermissionCatalog;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -22,6 +25,10 @@ class VehicleOwnerPayoutTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Freeze calendar so owner accrual months are deterministic across CI timezones.
+        $frozen = CarbonImmutable::parse('2026-11-15 12:00:00', 'UTC');
+        Carbon::setTestNow($frozen);
+        CarbonImmutable::setTestNow($frozen);
         PermissionCatalog::ensureSeeded();
         app(AccountingService::class)->ensureChartOfAccounts();
         TenantSetting::query()->create([
@@ -30,8 +37,20 @@ class VehicleOwnerPayoutTest extends TestCase
             'operational' => [],
         ]);
         $adminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
-        $this->admin = User::factory()->create(['role_id' => $adminRole->id, 'is_active' => true]);
+        $this->admin = User::factory()->create([
+            'role_id' => $adminRole->id,
+            'is_active' => true,
+            'phone' => '01070070070',
+            'email' => 'owner-admin@rpm.local',
+            'password' => Hash::make('password'),
+        ]);
         Sanctum::actingAs($this->admin);
+    }
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+        parent::tearDown();
     }
 
     public function test_owner_with_two_vehicles_accrues_and_partial_payout(): void
@@ -41,20 +60,24 @@ class VehicleOwnerPayoutTest extends TestCase
             'phone' => '01099998888',
         ])->assertCreated()->json('data');
 
+        $since = now()->startOfMonth()->toDateString();
         $v1 = Vehicle::query()->create([
             'code' => 'O-1', 'plate' => 'OWN 1', 'brand' => 'هيونداي', 'model' => 'إلينترا',
             'year' => 2021, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين',
             'odometer' => 10000, 'daily_rate' => 900, 'default_deposit' => 2000, 'is_active' => true,
             'owner_id' => $owner['id'], 'owner_monthly_amount' => 5000,
-            'owner_since' => now()->startOfMonth()->toDateString(),
+            'owner_since' => $since,
         ]);
         $v2 = Vehicle::query()->create([
             'code' => 'O-2', 'plate' => 'OWN 2', 'brand' => 'كيا', 'model' => 'سيراتو',
             'year' => 2022, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين',
             'odometer' => 8000, 'daily_rate' => 850, 'default_deposit' => 2000, 'is_active' => true,
             'owner_id' => $owner['id'], 'owner_monthly_amount' => 4000,
-            'owner_since' => now()->startOfMonth()->toDateString(),
+            'owner_since' => $since,
         ]);
+
+        $this->assertSame(5000, (int) $v1->fresh()->owner_monthly_amount);
+        $this->assertSame(4000, (int) $v2->fresh()->owner_monthly_amount);
 
         $show = $this->getJson('/api/owners/'.$owner['id'])->assertOk()->json('data');
         $this->assertSame(2, count($show['vehicles']));
