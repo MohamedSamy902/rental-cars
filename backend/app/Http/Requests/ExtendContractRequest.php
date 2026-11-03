@@ -56,7 +56,7 @@ class ExtendContractRequest extends FormRequest
             if (strtotime((string) $ends) <= strtotime((string) $starts)) {
                 $validator->errors()->add(
                     'planned_ends_at',
-                    'يجب أن يكون وقت النهاية المخطط بعد وقت البداية.',
+                    'يجب أن يكون تاريخ النهاية المخطط بعد تاريخ البداية.',
                 );
             }
         });

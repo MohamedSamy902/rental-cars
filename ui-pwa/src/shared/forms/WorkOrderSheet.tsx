@@ -3,8 +3,9 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
   Button, Sheet, SelectField, NumberField, MoneyField, TextField, SwitchField,
-  DateField, DateTimeField, useToast,
+  DateField, useToast,
 } from '@/shared/ui'
+import { toApiDateTime, toDateOnly } from '@/shared/lib/format'
 
 type Props = {
   open: boolean
@@ -20,10 +21,9 @@ type VehicleOption = { id: number; brand: string; model: string; plate: string; 
 type Item = { id: number; name: string; code: string; remaining?: number; unit_cost?: number | null }
 type EmployeeOption = { id: number; name: string }
 
-function nowLocal(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+/** Platform standard: date-only `YYYY-MM-DD` (Western digits). */
+function todayDate(): string {
+  return toDateOnly(new Date().toISOString()) || new Date().toISOString().slice(0, 10)
 }
 
 const emptyForm = {
@@ -34,7 +34,7 @@ const emptyForm = {
   inventory_item_id: '',
   quantity: '1',
   unit_price: '0',
-  opened_at: nowLocal(),
+  opened_at: todayDate(),
   funding: 'stock' as 'stock' | 'custody',
   employee_id: '',
   next_service_on: '',
@@ -69,7 +69,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     if (!open) return
     setForm({
       ...emptyForm,
-      opened_at: nowLocal(),
+      opened_at: todayDate(),
       vehicle_id: lockedId ? String(lockedId) : '',
       odometer: lockedOdometer != null ? String(lockedOdometer) : '',
       funding: lockCustody ? 'custody' : 'stock',
@@ -91,7 +91,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     const next: Record<string, string> = {}
     if (!form.vehicle_id) next.vehicle_id = 'اختر العربية.'
     if (!form.odometer) next.odometer = 'أدخل قراءة العداد.'
-    if (!form.opened_at) next.opened_at = 'أدخل تاريخ ووقت الصيانة.'
+    if (!form.opened_at) next.opened_at = 'أدخل تاريخ الصيانة.'
     if (form.funding === 'stock') {
       if (!form.inventory_item_id) next.inventory_item_id = 'اختر صنف المخزون.'
       else if (!selectedItem) next.inventory_item_id = 'الصنف غير متاح أو نفد رصيده.'
@@ -122,8 +122,8 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           labor_cost: 0,
           puts_in_maintenance: putsInMaintenance,
           force_after_resolution: true,
-          opened_at: form.opened_at || undefined,
-          opened_on: form.opened_at ? form.opened_at.slice(0, 10) : undefined,
+          opened_at: form.opened_at ? toApiDateTime(form.opened_at) || undefined : undefined,
+          opened_on: form.opened_at ? toDateOnly(form.opened_at) || undefined : undefined,
           next_service_on: form.next_service_on || undefined,
           next_service_odometer: form.next_service_odometer !== '' ? Number(form.next_service_odometer) : undefined,
           lines: [
@@ -186,11 +186,11 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
             }}
           />
         ) : null}
-        <DateTimeField
-          label="تاريخ ووقت الصيانة"
+        <DateField
+          label="تاريخ الصيانة"
           required
           error={fieldErrors.opened_at}
-          value={form.opened_at}
+          value={toDateOnly(form.opened_at) || form.opened_at}
           onChange={(e) => {
             setForm({ ...form, opened_at: e.target.value })
             setFieldErrors((prev) => ({ ...prev, opened_at: '' }))

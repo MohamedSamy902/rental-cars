@@ -267,14 +267,14 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           ) : null}
 
           <DateTimeField
-            label="بداية الحجز"
+            label="تاريخ بداية الحجز"
             required
             value={form.starts_at}
             error={errors.starts_at}
             onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
           />
           <DateTimeField
-            label="نهاية الحجز المخططة"
+            label="تاريخ نهاية الحجز المخططة"
             required
             value={form.planned_ends_at}
             error={errors.planned_ends_at}
