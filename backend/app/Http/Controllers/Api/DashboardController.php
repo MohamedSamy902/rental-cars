@@ -13,6 +13,7 @@ use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Services\Accounting\ProfitabilityService;
 use App\Services\Contracts\RentalProgressService;
+use App\Services\Fleet\FleetDailyPrepService;
 use App\Services\Fleet\OccupancyService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ class DashboardController extends Controller
         private readonly OccupancyService $occupancy,
         private readonly ProfitabilityService $profitability,
         private readonly RentalProgressService $progress,
+        private readonly FleetDailyPrepService $dailyPrep,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -129,6 +131,7 @@ class DashboardController extends Controller
                     ->count(),
             ],
             'tasks' => $tasks,
+            'fleet_prep' => $this->dailyPrep->summarize(now(), 5),
             'recent_contracts' => Contract::query()
                 ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
                 ->latest('id')

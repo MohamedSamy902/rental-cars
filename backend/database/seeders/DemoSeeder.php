@@ -41,15 +41,16 @@ class DemoSeeder extends Seeder
         );
 
         $roleUsers = [
-            'ops_manager' => ['ops@rpm.local', 'مدير التشغيل'],
-            'sales' => ['sales@rpm.local', 'موظف مبيعات'],
-            'fleet' => ['fleet@rpm.local', 'مسؤول أسطول'],
-            'maintenance' => ['maint@rpm.local', 'مسؤول صيانة'],
-            'accounts' => ['accounts@rpm.local', 'محاسب'],
-            'hr' => ['hr@rpm.local', 'موارد بشرية'],
-            'viewer' => ['viewer@rpm.local', 'مشاهدة فقط'],
+            // [email, name, phone] — stable phones for phone-login demos
+            'ops_manager' => ['ops@rpm.local', 'مدير التشغيل', '01000000001'],
+            'sales' => ['sales@rpm.local', 'موظف مبيعات', '01000000002'],
+            'fleet' => ['fleet@rpm.local', 'مسؤول أسطول', '01000000003'],
+            'maintenance' => ['maint@rpm.local', 'مسؤول صيانة', '01000000004'],
+            'accounts' => ['accounts@rpm.local', 'محاسب', '01000000005'],
+            'hr' => ['hr@rpm.local', 'موارد بشرية', '01000000006'],
+            'viewer' => ['viewer@rpm.local', 'مشاهدة فقط', '01000000007'],
         ];
-        foreach ($roleUsers as $roleName => [$email, $name]) {
+        foreach ($roleUsers as $roleName => [$email, $name, $phone]) {
             $role = Role::query()->where('name', $roleName)->first();
             if (! $role) {
                 continue;
@@ -128,7 +129,7 @@ class DemoSeeder extends Seeder
                 [
                     'name' => $name,
                     'password' => Hash::make('password'),
-                    'phone' => '010'.str_pad((string) random_int(10000000, 99999999), 8, '0', STR_PAD_LEFT),
+                    'phone' => $phone,
                     'role_id' => $role->id,
                     'is_active' => true,
                 ],
