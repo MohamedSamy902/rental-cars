@@ -622,8 +622,10 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/notifications/unread-count` | `{ "unread": N }` |
 | POST | `/notifications/{id}/read` | تعليم مقروء (مالك الإشعار فقط — حماية IDOR) |
 
+الماسح `php artisan notifications:scan` يشتغل كل ساعة من `schedule:run` (Cron على cPanel). يرسل الإشعار الأول عند تحقق الشرط ثم تذكيراً كل ٢٤ ساعة لنفس السجل ونفس القاعدة: بداية حجز معلّق/معتمد أو نهاية عقد نشط قبلها بيومين، والمستحقات المالية (عقد، تأمين، مالك، راتب معتمد، مخالفة)، ونقص المخزون، والمستندات، والصيانة، والانتظار. Web Push يُرسل مع نفس الصف إن وُجد VAPID.
+
 ### Web Push (موبايل)
-صلاحية `notifications.view` · يحتاج VAPID في `.env` (`php artisan push:vapid --write`) وHTTPS.
+صلاحية `notifications.view` · يحتاج VAPID في `.env` (`php artisan push:vapid --write`) وHTTPS. `VAPID_SUBJECT` لازم يكون `https://` لنفس الموقع؛ عنوان `mailto` على نطاق غير عام (مثل `.local`) يرفضه آيفون بـ 403.
 
 | Method | Path | الوصف |
 |--------|------|--------|
@@ -631,7 +633,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/push/status` | `{ enabled, devices }` |
 | POST | `/push/subscribe` | تسجيل جهاز `{ endpoint, keys:{p256dh,auth} }` |
 | POST | `/push/unsubscribe` | إلغاء جهاز |
-| POST | `/push/test` | إرسال إشعار تجريبي للأجهزة المسجّلة |
+| POST | `/push/test` | إرسال إشعار تجريبي. المتصفح لازم يتفعّل من الصفحة أولاً (ترميز aes128gcm). من غير جهاز مشترك يرجع 422 برسالة تطلب التفعيل، ومن غير مفاتيح VAPID رسالة منفصلة. |
 
 ---
 

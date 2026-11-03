@@ -53,7 +53,7 @@ class PushSubscriptionController extends Controller
             [
                 'public_key' => $data['keys']['p256dh'],
                 'auth_token' => $data['keys']['auth'],
-                'content_encoding' => $data['contentEncoding'] ?? 'aesgcm',
+                'content_encoding' => $data['contentEncoding'] ?? 'aes128gcm',
                 'user_agent' => substr((string) $request->userAgent(), 0, 255),
                 'last_used_at' => now(),
             ],
@@ -91,6 +91,12 @@ class PushSubscriptionController extends Controller
 
     public function test(Request $request): JsonResponse
     {
+        if (! $this->dispatch->vapidPublicKey()) {
+            return response()->json([
+                'message' => 'مفاتيح VAPID غير مضبوطة على السيرفر.',
+            ], 422);
+        }
+
         $user = $request->user();
         $sent = $this->dispatch->pushToUser(
             $user,
@@ -100,9 +106,14 @@ class PushSubscriptionController extends Controller
         );
 
         if ($sent < 1) {
-            return response()->json([
-                'message' => 'لا يوجد جهاز مشترك أو مفاتيح VAPID غير مضبوطة. فعّل الإشعارات من الصفحة أولاً.',
-            ], 422);
+            $message = match ($this->dispatch->lastPushError) {
+                'vapid_missing' => 'مفاتيح VAPID غير مضبوطة على السيرفر.',
+                'delivery_rejected' => 'الجهاز المسجّل لم يعد صالحاً. اضغط «تفعيل على هذا الجهاز» مرة أخرى واسمح بالإشعارات.',
+                'delivery_failed' => 'تعذّر تسليم الإشعار للجهاز المسجّل. أعد التفعيل من هذه الصفحة.',
+                default => 'لا يوجد جهاز مشترك. اضغط «تفعيل على هذا الجهاز» واسمح للمتصفح بالإشعارات.',
+            };
+
+            return response()->json(['message' => $message], 422);
         }
 
         return response()->json([

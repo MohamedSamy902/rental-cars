@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\InventoryBatch;
 use App\Models\InventoryItem;
 use App\Models\Notification;
+use App\Models\Permission;
 use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
 use App\Models\Role;
@@ -18,6 +19,7 @@ use App\Models\VehicleAccessory;
 use App\Models\VehicleOwner;
 use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
+use App\Services\Notifications\NotificationDispatchService;
 use App\Support\PermissionCatalog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -58,7 +60,7 @@ class DemoSeeder extends Seeder
             // امنح أدوار التشغيل صلاحيات عملية أساسية للمعاينة
             if (in_array($roleName, ['ops_manager', 'sales', 'fleet'], true)) {
                 $role->permissions()->syncWithoutDetaching(
-                    \App\Models\Permission::query()
+                    Permission::query()
                         ->where(function ($q) {
                             $q->where('key', 'like', 'contracts.%')
                                 ->orWhere('key', 'like', 'contracts_extend.%')
@@ -71,6 +73,7 @@ class DemoSeeder extends Seeder
                                 ->orWhere('key', 'like', 'deposits.%')
                                 ->orWhere('key', 'like', 'media.%')
                                 ->orWhere('key', 'like', 'notifications.%')
+                                ->orWhere('key', 'like', 'waitlist.%')
                                 ->orWhere('key', 'like', 'reports.%')
                                 ->orWhere('key', 'like', 'chat.%');
                         })
@@ -79,7 +82,7 @@ class DemoSeeder extends Seeder
             }
             // المبيعات بلا اعتماد/إلغاء/تبديل — للتحقق من RBAC أمام الأدمن
             if ($roleName === 'sales') {
-                $deny = \App\Models\Permission::query()
+                $deny = Permission::query()
                     ->whereIn('key', [
                         'contracts.approve',
                         'contracts_cancel.approve',
@@ -94,7 +97,7 @@ class DemoSeeder extends Seeder
             }
             if ($roleName === 'maintenance') {
                 $role->permissions()->syncWithoutDetaching(
-                    \App\Models\Permission::query()
+                    Permission::query()
                         ->where(function ($q) {
                             $q->where('key', 'like', 'maintenance.%')
                                 ->orWhere('key', 'like', 'vehicles.view')
@@ -107,7 +110,7 @@ class DemoSeeder extends Seeder
             }
             if ($roleName === 'accounts') {
                 $role->permissions()->syncWithoutDetaching(
-                    \App\Models\Permission::query()
+                    Permission::query()
                         ->where(function ($q) {
                             $q->where('key', 'like', 'accounting.%')
                                 ->orWhere('key', 'like', 'payments.%')
@@ -120,7 +123,12 @@ class DemoSeeder extends Seeder
             }
             if ($roleName === 'hr') {
                 $role->permissions()->syncWithoutDetaching(
-                    \App\Models\Permission::query()->where('key', 'like', 'hr.%')->pluck('id')
+                    Permission::query()->where('key', 'like', 'hr.%')->pluck('id')
+                );
+            }
+            if (in_array($roleName, ['accounts', 'hr', 'maintenance'], true)) {
+                $role->permissions()->syncWithoutDetaching(
+                    Permission::query()->where('key', 'notifications.view')->pluck('id')
                 );
             }
 
@@ -414,7 +422,7 @@ class DemoSeeder extends Seeder
         }
 
         if (! Notification::query()->where('user_id', $user->id)->where('title', 'قرب انتهاء عقد CNT-00001')->exists()) {
-            app(\App\Services\Notifications\NotificationDispatchService::class)->notify(
+            app(NotificationDispatchService::class)->notify(
                 $user,
                 'قرب انتهاء عقد CNT-00001',
                 'عقد أحمد محمود ينتهي اليوم — جهّز الاستلام.',
