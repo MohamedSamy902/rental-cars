@@ -79,7 +79,7 @@ type PrintPayload = {
 const titles: Record<PrintDocKind, string> = {
   contract: 'عقد تأجير',
   invoice: 'فاتورة / كشف حساب',
-  receipt: 'سند قبض / محضر تسليم واستلام',
+  receipt: 'إيصال الاستلام والتأمين',
 }
 
 const snapshotType: Record<PrintDocKind, string> = {
@@ -228,27 +228,27 @@ function receiptBody(tenant: PrintTenant, c: PrintContract) {
   const deposit = c.deposit
   return `
     ${headerBlock(tenant)}
-    <h2>سند قبض التأمين ومحضر التسليم/الاستلام</h2>
+    <h2>إيصال الاستلام والتأمين</h2>
     <p class="muted">عقد ${esc(c.number)}</p>
     <h2>بيانات العميل والعربية</h2>
     <table>
       <tr><th>العميل</th><td>${esc(c.customer?.full_name || '—')}${c.customer?.phone ? ` · <span dir="ltr">${esc(c.customer.phone)}</span>` : ''}</td></tr>
       <tr><th>العربية</th><td>${c.vehicle ? esc(`${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}`) : '—'}</td></tr>
     </table>
-    <h2>سند قبض التأمين</h2>
+    <h2>بيانات التأمين</h2>
     <table>
       <tr><th>مبلغ التأمين</th><td>${formatMoney(deposit?.original_amount ?? c.frozen_agreed_deposit ?? 0)}</td></tr>
       <tr><th>حالة التأمين</th><td>${esc(deposit?.status || 'لم يُقبض بعد')}</td></tr>
       <tr><th>الخصومات</th><td>${formatMoney(deposit?.deductions_total ?? 0)}</td></tr>
       <tr><th>المتبقي</th><td>${formatMoney(deposit?.remaining ?? deposit?.original_amount ?? 0)}</td></tr>
     </table>
-    <h2>محضر التسليم</h2>
+    <h2>عند التسليم</h2>
     <table>
       <tr><th>عداد الخروج</th><td>${handover?.odometer ?? c.odometer_out ?? '—'}</td></tr>
       <tr><th>مستوى البنزين</th><td>${handover?.fuel_level != null ? `${handover.fuel_level}%` : '—'}</td></tr>
       <tr><th>وقت التسليم</th><td>${handover?.inspected_at ? formatDate(handover.inspected_at) : '—'}</td></tr>
     </table>
-    <h2>محضر الاستلام</h2>
+    <h2>عند الاستلام</h2>
     <table>
       <tr><th>عداد العودة</th><td>${ret?.odometer ?? c.odometer_in ?? '—'}</td></tr>
       <tr><th>مستوى البنزين</th><td>${ret?.fuel_level != null ? `${ret.fuel_level}%` : '—'}</td></tr>

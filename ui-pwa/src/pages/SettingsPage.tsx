@@ -123,7 +123,7 @@ export function SettingsPage() {
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>قالب وبنود العقد والطباعة</h3></div>
         <p className="muted" style={{ marginBlockEnd: '0.75rem' }}>
-          يتحكم في بيانات الترويسة والتذييل وبنود العقد المطبوعة (العقد · الفاتورة · سند القبض).
+          يتحكم في بيانات الترويسة والتذييل وبنود العقد المطبوعة (العقد · الفاتورة · إيصال الاستلام والتأمين).
         </p>
         <div className="rpm-form-grid">
           <TextField label="اسم الشركة على المطبوعات" value={centerName} onChange={(e) => setCenterName(e.target.value)} />
@@ -149,7 +149,7 @@ export function SettingsPage() {
             label="ملاحظات التذييل"
             value={printFooter}
             onChange={(e) => setPrintFooter(e.target.value)}
-            hint="سطر ختامي على العقد والفاتورة وسند القبض"
+            hint="سطر ختامي على العقد والفاتورة وإيصال الاستلام والتأمين"
           />
         </div>
       </section>

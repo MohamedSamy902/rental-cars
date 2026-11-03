@@ -88,11 +88,11 @@ export function ContractDetailPage() {
           <BackNavButton to="/bookings" label="رجوع للعقود" />
           <div className="cd-hero__actions">
             {can('contracts.print') ? (
-              <>
-                <Button size="sm" variant="secondary" onClick={() => void printContractDocument(row.id, 'contract', toast.error)}>طباعة العقد</Button>
-                <Button size="sm" variant="secondary" onClick={() => void printContractDocument(row.id, 'invoice', toast.error)}>الفاتورة</Button>
-                <Button size="sm" variant="secondary" onClick={() => void printContractDocument(row.id, 'receipt', toast.error)}>سند القبض</Button>
-              </>
+              <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'contract', toast.error)}>طباعة العقد</Button>
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'invoice', toast.error)}>الفاتورة / كشف الحساب</Button>
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'receipt', toast.error)}>إيصال الاستلام والتأمين</Button>
+              </div>
             ) : null}
           </div>
         </div>

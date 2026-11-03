@@ -41,6 +41,30 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+  min-width: 0;
+}
+
+.cd-print-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.cd-print-actions__btn,
+.cd-print-actions .rpm-btn {
+  white-space: nowrap;
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.cd-print-actions__btn .rpm-btn__label,
+.cd-print-actions .rpm-btn__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .cd-identity {
@@ -158,5 +182,13 @@
   }
   .cd-hero .rpm-card__actions .rpm-btn:last-child:nth-child(odd) {
     grid-column: 1 / -1;
+  }
+  .cd-print-actions {
+    width: 100%;
+  }
+  .cd-print-actions__btn,
+  .cd-print-actions .rpm-btn {
+    flex: 1 1 calc(50% - 0.45rem);
+    justify-content: center;
   }
 }

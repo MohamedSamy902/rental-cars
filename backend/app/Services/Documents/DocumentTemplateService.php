@@ -8,6 +8,7 @@ use App\Models\TenantSetting;
 use DomainException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use ZipArchive;
@@ -53,15 +54,28 @@ class DocumentTemplateService
         ];
     }
 
+    public function tableReady(): bool
+    {
+        try {
+            return Schema::hasTable('document_templates');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function ensureDefaults(?int $userId = null): void
     {
+        if (! $this->tableReady()) {
+            return;
+        }
+
         foreach ([
             DocumentTemplate::TYPE_CONTRACT => [
                 'title' => 'قالب العقد الأساسي',
                 'content' => $this->defaultContractHtml(),
             ],
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => [
-                'title' => 'قالب محضر الاستلام / سند القبض',
+                'title' => 'قالب إيصال الاستلام والتأمين',
                 'content' => $this->defaultHandoverHtml(),
             ],
         ] as $type => $meta) {
@@ -79,6 +93,22 @@ class DocumentTemplateService
                 'updated_by' => $userId,
             ]);
         }
+
+        // Soft rename for the stock v1 handover template if it still uses legacy wording.
+        DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
+            ->where('is_active', true)
+            ->where('version', 1)
+            ->where(function ($q) {
+                $q->where('title', 'like', '%محضر%')
+                    ->orWhere('title', 'like', '%سند%')
+                    ->orWhere('content', 'like', '%سند قبض%')
+                    ->orWhere('content', 'like', '%محضر التسليم%');
+            })
+            ->update([
+                'title' => 'قالب إيصال الاستلام والتأمين',
+                'content' => $this->defaultHandoverHtml(),
+            ]);
     }
 
     /**
@@ -86,6 +116,9 @@ class DocumentTemplateService
      */
     public function listAll(): array
     {
+        if (! $this->tableReady()) {
+            return [];
+        }
         $this->ensureDefaults();
 
         return DocumentTemplate::query()
@@ -100,6 +133,9 @@ class DocumentTemplateService
      */
     public function listActive(): array
     {
+        if (! $this->tableReady()) {
+            return [];
+        }
         $this->ensureDefaults();
 
         return DocumentTemplate::query()
@@ -112,6 +148,9 @@ class DocumentTemplateService
     public function getActive(string $type): ?DocumentTemplate
     {
         $this->assertType($type);
+        if (! $this->tableReady()) {
+            return null;
+        }
         $this->ensureDefaults();
 
         return DocumentTemplate::query()
@@ -128,6 +167,10 @@ class DocumentTemplateService
      */
     public function publish(array $data, ?UploadedFile $file = null, ?int $userId = null): DocumentTemplate
     {
+        if (! $this->tableReady()) {
+            throw new DomainException('جدول قوالب المستندات غير جاهز. نفّذ ترحيل قاعدة البيانات أولاً.');
+        }
+
         $type = $data['type'];
         $this->assertType($type);
 
@@ -396,7 +439,7 @@ class DocumentTemplateService
     {
         return match ($type) {
             DocumentTemplate::TYPE_CONTRACT => 'قالب العقد الأساسي',
-            DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب محضر الاستلام / سند القبض',
+            DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب إيصال الاستلام والتأمين',
             default => 'قالب مستند',
         };
     }
@@ -438,27 +481,27 @@ HTML;
     <p class="muted">{{company_phone}} · {{company_address}}</p>
   </div>
 </header>
-<h2>سند قبض التأمين ومحضر التسليم/الاستلام</h2>
+<h2>إيصال الاستلام والتأمين</h2>
 <p class="muted">عقد {{contract_number}} · إصدار القالب {{template_version}}</p>
 <h2>بيانات العميل والعربية</h2>
 <table>
   <tr><th>العميل</th><td>{{customer_name}} · <span dir="ltr">{{customer_phone}}</span></td></tr>
   <tr><th>العربية</th><td>{{vehicle_name}} · {{vehicle_plate}}</td></tr>
 </table>
-<h2>سند قبض التأمين</h2>
+<h2>بيانات التأمين</h2>
 <table>
   <tr><th>مبلغ التأمين</th><td>{{deposit}}</td></tr>
   <tr><th>حالة التأمين</th><td>{{deposit_status}}</td></tr>
   <tr><th>الخصومات</th><td>{{deposit_deductions}}</td></tr>
   <tr><th>المتبقي</th><td>{{deposit_remaining}}</td></tr>
 </table>
-<h2>محضر التسليم</h2>
+<h2>عند التسليم</h2>
 <table>
   <tr><th>عداد الخروج</th><td>{{odometer_out}}</td></tr>
   <tr><th>مستوى البنزين</th><td>{{fuel_out}}</td></tr>
   <tr><th>وقت التسليم</th><td>{{handover_at}}</td></tr>
 </table>
-<h2>محضر الاستلام</h2>
+<h2>عند الاستلام</h2>
 <table>
   <tr><th>عداد العودة</th><td>{{odometer_in}}</td></tr>
   <tr><th>مستوى البنزين</th><td>{{fuel_in}}</td></tr>

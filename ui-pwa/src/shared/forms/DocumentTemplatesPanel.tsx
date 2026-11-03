@@ -30,8 +30,8 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
     hint: 'يُستخدم عند طباعة عقد التأجير. يدعم HTML أو Markdown أو رفع ملف Word (.docx).',
   },
   handover_receipt: {
-    title: 'قالب محضر الاستلام / سند القبض',
-    hint: 'يُستخدم عند طباعة سند قبض التأمين ومحضر التسليم/الاستلام.',
+    title: 'قالب إيصال الاستلام والتأمين',
+    hint: 'يُستخدم عند طباعة إيصال الاستلام والتأمين.',
   },
 }
 
