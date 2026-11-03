@@ -204,7 +204,7 @@ export function contractMenu(
     items.push(
       { id: 'print-contract', label: 'طباعة العقد', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('contract') },
       { id: 'print-invoice', label: 'الفاتورة / كشف الحساب', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('invoice') },
-      { id: 'print-receipt', label: 'سند القبض / محضر التسليم', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
+      { id: 'print-receipt', label: 'إيصال الاستلام والتأمين', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
     )
   }
   if ((b.status === 'pending' || b.status === 'approved') && can('contracts_cancel.approve')) {
