@@ -93,10 +93,10 @@ class ReportQueryService
     {
         $q = Payment::query();
         if ($from) {
-            $q->whereDate('date', '>=', $from);
+            $q->whereDate('paid_at', '>=', $from);
         }
         if ($to) {
-            $q->whereDate('date', '<=', $to);
+            $q->whereDate('paid_at', '<=', $to);
         }
         $labels = [
             'cash' => 'نقدي',
@@ -127,11 +127,22 @@ class ReportQueryService
      */
     public function customerStatement(Customer $customer): array
     {
+        // AR hint from journal lines tagged to this customer (schema has customer_id on lines;
+        // entries use narration/source — never memo/source_id).
         $arDebit = (int) JournalLine::query()
+            ->where('customer_id', $customer->id)
             ->whereHas('account', fn ($q) => $q->where('code', '1200'))
-            ->whereHas('entry', fn ($q) => $q->where('memo', 'like', '%'.$customer->full_name.'%')
-                ->orWhere('source_id', $customer->id))
             ->sum('debit');
+
+        if ($arDebit === 0 && filled($customer->full_name)) {
+            $arDebit = (int) JournalLine::query()
+                ->whereHas('account', fn ($q) => $q->where('code', '1200'))
+                ->whereHas('entry', function ($q) use ($customer) {
+                    $q->where('narration', 'like', '%'.$customer->full_name.'%');
+                })
+                ->sum('debit');
+        }
+
         // Prefer contract-linked payments + period totals
         $contracts = $customer->contracts()->with('deposit')->latest('id')->limit(50)->get();
         $contractDebt = 0;

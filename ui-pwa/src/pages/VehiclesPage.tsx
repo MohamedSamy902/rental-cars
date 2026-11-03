@@ -10,6 +10,7 @@ import {
 } from '@/shared/ui'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './pages.css'
+import './VehiclesPage.css'
 
 const VEHICLE_TABS = ['all', 'available', 'rented', 'reserved', 'maintenance', 'expiring'] as const
 const EXPIRING_PRESETS = [1, 2, 3, 7] as const
@@ -272,24 +273,26 @@ export function VehiclesPage() {
       />
 
       {chip === 'expiring' ? (
-        <div className="rpm-dense-row" style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-          <span className="muted">خلال:</span>
-          {EXPIRING_PRESETS.map((d) => (
-            <Button
-              key={d}
-              type="button"
-              size="sm"
-              variant={withinDays === d ? 'accent' : 'secondary'}
-              onClick={() => { setWithinDays(d); setCustomDays('') }}
-            >
-              {d === 1 ? '1 يوم' : d === 2 ? '2 يوم' : `${d} أيام`}
-            </Button>
-          ))}
-          <label className="rpm-field" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span className="muted">مخصص</span>
+        <div className="vh-expiring-bar" role="group" aria-label="نافذة قرب انتهاء التأجير">
+          <span className="vh-expiring-bar__label">خلال:</span>
+          <div className="vh-expiring-bar__pills">
+            {EXPIRING_PRESETS.map((d) => (
+              <Button
+                key={d}
+                type="button"
+                size="sm"
+                variant={withinDays === d && customDays === '' ? 'accent' : 'secondary'}
+                onClick={() => { setWithinDays(d); setCustomDays('') }}
+              >
+                {d === 1 ? '1 يوم' : d === 2 ? '2 يوم' : `${d} أيام`}
+              </Button>
+            ))}
+          </div>
+          <span className="vh-expiring-bar__sep" aria-hidden />
+          <label className="vh-expiring-bar__custom">
+            <span className="vh-expiring-bar__custom-label">مخصص:</span>
             <input
-              className="rpm-input"
-              style={{ width: '4.5rem' }}
+              className="vh-expiring-bar__input"
               type="number"
               min={0}
               max={60}
@@ -300,6 +303,7 @@ export function VehiclesPage() {
               onKeyDown={(e) => { if (e.key === 'Enter') applyCustomDays() }}
               aria-label="عدد الأيام المخصص"
             />
+            <span className="vh-expiring-bar__unit">يوم</span>
           </label>
         </div>
       ) : null}
