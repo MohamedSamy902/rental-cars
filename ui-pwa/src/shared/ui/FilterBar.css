@@ -7,6 +7,11 @@
   min-width: 0;
 }
 
+.rpm-filters--tabs-only {
+  gap: 0;
+  margin-block-end: 20px;
+}
+
 .rpm-filters__search {
   width: 100%;
   min-height: 44px;

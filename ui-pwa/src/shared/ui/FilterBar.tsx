@@ -16,6 +16,8 @@ type Props = {
   activeChip: string
   onChipChange: (id: string) => void
   placeholder?: string
+  /** Hide the search field — useful for tab-only bars (e.g. reports). */
+  hideSearch?: boolean
 }
 
 export function FilterBar({
@@ -25,17 +27,20 @@ export function FilterBar({
   activeChip,
   onChipChange,
   placeholder = 'بحث…',
+  hideSearch = false,
 }: Props) {
   return (
-    <div className="rpm-filters">
-      <input
-        className="rpm-filters__search"
-        type="search"
-        value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
-        placeholder={placeholder}
-        aria-label="بحث"
-      />
+    <div className={`rpm-filters ${hideSearch ? 'rpm-filters--tabs-only' : ''}`.trim()}>
+      {hideSearch ? null : (
+        <input
+          className="rpm-filters__search"
+          type="search"
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={placeholder}
+          aria-label="بحث"
+        />
+      )}
       <div className="rpm-filters__chips" role="tablist" aria-label="فلاتر">
         {chips.map((chip) => (
           <button

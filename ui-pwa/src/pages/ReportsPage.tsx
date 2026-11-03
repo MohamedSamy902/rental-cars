@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
+import { printHtmlDocument } from '@/utils/printHtml'
 import {
-  PageHeader, SkeletonBlock, ErrorState, MetricCardGrid, FilterBar, Button, Sheet, SelectField,
+  PageHeader, SkeletonBlock, ErrorState, MetricCardGrid, FilterBar, Button, Sheet, SelectField, StatusPill,
   IconCash, IconReturn, IconTrend, IconWallet, IconClipboard, IconCheck, IconUsers, IconBan, IconAlert,
+  type BadgeTone,
 } from '@/shared/ui'
 import './pages.css'
 import './ReportsPage.css'
@@ -53,13 +56,27 @@ type ProfitCompare = {
   }>
 }
 type CustomerOption = { id: number; full_name: string; phone?: string }
+type StatementContract = {
+  id: number
+  number: string
+  status: string
+  starts_at?: string | null
+  planned_ends_at?: string | null
+  actual_ends_at?: string | null
+  final_total: number
+  period_rent: number
+  total?: number
+  paid?: number
+  remaining?: number
+  vehicle?: { id: number; brand?: string; model?: string; plate?: string; label?: string } | null
+}
 type CustomerStatement = {
   credit_balance: number
   contracts_total: number
   payments_in: number
   open_receivable: number
-  customer: { id: number; full_name: string; credit_balance: number }
-  contracts: Array<{ id: number; number: string; status: string; final_total: number; period_rent: number }>
+  customer: { id: number; full_name: string; phone?: string; credit_balance: number }
+  contracts: StatementContract[]
 }
 
 const fleetMeta: Record<string, { label: string; tone: string }> = {
@@ -69,11 +86,79 @@ const fleetMeta: Record<string, { label: string; tone: string }> = {
   maintenance: { label: 'في الصيانة', tone: 'danger' },
 }
 
+const accountTypeLabel: Record<string, string> = {
+  asset: 'أصل',
+  liability: 'التزام',
+  equity: 'حقوق ملكية',
+  income: 'إيراد',
+  expense: 'مصروف',
+}
+
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
 function ymLabel(ym: string) {
   const [y, m] = ym.split('-')
   return `${monthNames[Number(m) - 1] ?? m} ${y}`
+}
+
+function contractStatusMeta(status: string): { label: string; tone: BadgeTone; key: string } {
+  const key = (status || '').toLowerCase()
+  if (key === 'pending') return { label: 'معلّق', tone: 'warning', key: 'pending' }
+  if (key === 'approved' || key === 'confirmed') return { label: 'معتمد', tone: 'steel', key: 'approved' }
+  if (key === 'active' || key === 'handed_over') return { label: 'نشط / مسلّم', tone: 'success', key: 'active' }
+  if (key === 'completed' || key === 'returned' || key === 'closed') return { label: 'مكتمل', tone: 'muted', key: 'completed' }
+  if (key === 'cancelled' || key === 'canceled') return { label: 'ملغي', tone: 'danger', key: 'cancelled' }
+  return { label: status || '—', tone: 'muted', key: key || 'muted' }
+}
+
+function esc(s: string) {
+  return s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch))
+}
+
+function printCustomerStatement(statement: CustomerStatement) {
+  const rows = statement.contracts.map((c) => {
+    const total = c.total ?? c.final_total ?? c.period_rent ?? 0
+    const paid = c.paid ?? 0
+    const remaining = c.remaining ?? Math.max(0, total - paid)
+    const meta = contractStatusMeta(c.status)
+    const period = `${formatDate(c.starts_at)} ← ${formatDate(c.planned_ends_at || c.actual_ends_at)}`
+    return `<tr>
+      <td>${esc(c.number)}</td>
+      <td>${esc(c.vehicle?.label || '—')}</td>
+      <td>${esc(period)}</td>
+      <td>${esc(meta.label)}</td>
+      <td>${formatMoney(total)}</td>
+      <td>${formatMoney(paid)}</td>
+      <td>${formatMoney(remaining)}</td>
+    </tr>`
+  }).join('')
+
+  printHtmlDocument(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف عميل · ${esc(statement.customer.full_name)}</title>
+  <style>
+    body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a}
+    h1{margin:0 0 4px;font-size:22px}
+    .muted{color:#64748b}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    td,th{border:1px solid #cbd5e1;padding:8px;text-align:start}
+    th{background:#f8fafc}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+    .kpi{border:1px solid #e2e8f0;border-radius:10px;padding:10px}
+    .kpi span{display:block;color:#64748b;font-size:12px}
+    .kpi strong{font-size:16px}
+  </style></head><body>
+  <h1>كشف عميل · ${esc(statement.customer.full_name)}</h1>
+  <p class="muted">${statement.customer.phone ? `<span dir="ltr">${esc(statement.customer.phone)}</span>` : ''}</p>
+  <div class="kpis">
+    <div class="kpi"><span>إجمالي عقود</span><strong>${formatMoney(statement.contracts_total)}</strong></div>
+    <div class="kpi"><span>مدفوع</span><strong>${formatMoney(statement.payments_in)}</strong></div>
+    <div class="kpi"><span>ذمم مفتوحة</span><strong>${formatMoney(statement.open_receivable)}</strong></div>
+    <div class="kpi"><span>رصيد دائن</span><strong>${formatMoney(statement.credit_balance)}</strong></div>
+  </div>
+  <table>
+    <thead><tr><th>العقد</th><th>العربية</th><th>الفترة</th><th>الحالة</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7">لا عقود لهذا العميل.</td></tr>'}</tbody>
+  </table>
+  </body></html>`)
 }
 
 type TabId = 'overview' | 'trial' | 'income' | 'payments' | 'customer' | 'profit'
@@ -137,6 +222,7 @@ export function ReportsPage() {
       setStatement(null)
       return
     }
+    setTabError('')
     setTabLoading(true)
     api<{ data: CustomerStatement }>(`/reports/customers/${customerId}/statement`)
       .then((r) => setStatement(r.data))
@@ -186,11 +272,11 @@ export function ReportsPage() {
         chips={chips}
         activeChip={tab}
         onChipChange={(id) => setTab(id as TabId)}
-        placeholder="أقسام التقارير"
+        hideSearch
       />
 
       {tab === 'overview' ? (
-        <>
+        <div className="rp-section">
           <MetricCardGrid
             label="المؤشرات المالية"
             items={[
@@ -277,124 +363,214 @@ export function ReportsPage() {
               )}
             </section>
           </div>
-        </>
+        </div>
       ) : null}
 
       {tabLoading ? <SkeletonBlock rows={4} /> : null}
-      {tabError ? <p className="muted">{tabError}</p> : null}
+      {tabError ? <ErrorState title="تعذّر تحميل هذا القسم" description={tabError} /> : null}
 
       {tab === 'trial' && trial ? (
-        <section className="rpm-panel">
+        <section className="rpm-panel rp-section">
           <div className="rpm-panel__head"><h3>ميزان مراجعة</h3></div>
-          <div className="rpm-table-wrap">
-            <table className="rpm-table rpm-table--stack">
-              <thead>
-                <tr><th>الحساب</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr>
-              </thead>
-              <tbody>
-                {trial.map((r) => (
-                  <tr key={r.code}>
-                    <td data-label="الحساب"><strong className="rpm-table__primary">{r.code} · {r.name}</strong></td>
-                    <td data-label="مدين" className="tabular-nums">{formatMoney(r.debit)}</td>
-                    <td data-label="دائن" className="tabular-nums">{formatMoney(r.credit)}</td>
-                    <td data-label="الرصيد" className="tabular-nums">{formatMoney(r.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="rp-section__body">
+            <div className="rp-table-scroll">
+              <table className="rpm-table rpm-table--stack">
+                <thead>
+                  <tr><th>الحساب</th><th>النوع</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr>
+                </thead>
+                <tbody>
+                  {trial.map((r) => (
+                    <tr key={r.code}>
+                      <td data-label="الحساب"><strong className="rpm-table__primary">{r.code} · {r.name}</strong></td>
+                      <td data-label="النوع"><span className="rp-account-type">{accountTypeLabel[r.type] || r.type}</span></td>
+                      <td data-label="مدين" className="tabular-nums">{formatMoney(r.debit)}</td>
+                      <td data-label="دائن" className="tabular-nums">{formatMoney(r.credit)}</td>
+                      <td data-label="الرصيد" className="tabular-nums">{formatMoney(r.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       ) : null}
 
       {tab === 'income' && income ? (
-        <section className="rpm-panel">
+        <section className="rpm-panel rp-section">
           <div className="rpm-panel__head">
             <h3>قائمة دخل</h3>
             <span className="rp-chip tabular-nums">صافي {formatMoney(income.net)}</span>
           </div>
-          <MetricCardGrid
-            label="ملخص الفترة"
-            items={[
-              { id: 'inc', label: 'إيرادات', value: income.income_total, format: 'money', tone: 'success' },
-              { id: 'exp', label: 'مصروفات', value: income.expense_total, format: 'money', tone: 'warning' },
-              { id: 'net', label: 'صافي', value: income.net, format: 'money', tone: 'info' },
-            ]}
-          />
-          <div className="rpm-table-wrap">
-            <table className="rpm-table rpm-table--stack">
-              <thead><tr><th>البند</th><th>النوع</th><th>المبلغ</th></tr></thead>
-              <tbody>
-                {income.income.map((r) => (
-                  <tr key={`i-${r.code}`}><td data-label="البند">{r.code} · {r.name}</td><td data-label="النوع">إيراد</td><td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td></tr>
-                ))}
-                {income.expenses.map((r) => (
-                  <tr key={`e-${r.code}`}><td data-label="البند">{r.code} · {r.name}</td><td data-label="النوع">مصروف</td><td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td></tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="rp-section__body">
+            <MetricCardGrid
+              label="ملخص الفترة"
+              items={[
+                { id: 'inc', label: 'إيرادات', value: income.income_total, format: 'money', tone: 'success' },
+                { id: 'exp', label: 'مصروفات', value: income.expense_total, format: 'money', tone: 'warning' },
+                { id: 'net', label: 'صافي', value: income.net, format: 'money', tone: 'info' },
+              ]}
+            />
+            <div className="rp-table-scroll">
+              <table className="rpm-table rpm-table--stack">
+                <thead><tr><th>البند</th><th>النوع</th><th>المبلغ</th></tr></thead>
+                <tbody>
+                  {income.income.map((r) => (
+                    <tr key={`i-${r.code}`}>
+                      <td data-label="البند">{r.code} · {r.name}</td>
+                      <td data-label="النوع"><span className="rp-account-type">إيراد</span></td>
+                      <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
+                    </tr>
+                  ))}
+                  {income.expenses.map((r) => (
+                    <tr key={`e-${r.code}`}>
+                      <td data-label="البند">{r.code} · {r.name}</td>
+                      <td data-label="النوع"><span className="rp-account-type">مصروف</span></td>
+                      <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       ) : null}
 
       {tab === 'payments' && methods ? (
-        <section className="rpm-panel">
+        <section className="rpm-panel rp-section">
           <div className="rpm-panel__head"><h3>أرصدة طرق الدفع</h3></div>
-          <div className="rpm-card-list">
-            {methods.map((m) => (
-              <article key={m.method} className="rpm-card">
-                <div className="rpm-card__row">
-                  <strong>{m.label}</strong>
-                  <strong className="tabular-nums">{formatMoney(m.net)}</strong>
-                </div>
-                <p className="muted">داخل {formatMoney(m.in)} · خارج {formatMoney(m.out)}</p>
-              </article>
-            ))}
+          <div className="rp-section__body">
+            <div className="rp-kpi-grid">
+              {methods.map((m) => (
+                <article key={m.method} className="rp-kpi">
+                  <span>{m.label}</span>
+                  <strong>{formatMoney(m.net)}</strong>
+                  <span className="muted">داخل {formatMoney(m.in)} · خارج {formatMoney(m.out)}</span>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
       ) : null}
 
       {tab === 'customer' ? (
-        <section className="rpm-panel">
+        <section className="rpm-panel rp-section">
           <div className="rpm-panel__head"><h3>كشف عميل</h3></div>
-          <div className="rpm-form-grid">
-            <SelectField
-              label="العميل"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              options={customers.map((c) => ({ value: String(c.id), label: `${c.full_name}${c.phone ? ` · ${c.phone}` : ''}` }))}
-            />
-          </div>
-          {statement ? (
-            <>
-              <MetricCardGrid
-                label={statement.customer.full_name}
-                items={[
-                  { id: 'debt', label: 'إجمالي عقود', value: statement.contracts_total, format: 'money' },
-                  { id: 'paid', label: 'مدفوع', value: statement.payments_in, format: 'money', tone: 'success' },
-                  { id: 'open', label: 'ذمم مفتوحة', value: statement.open_receivable, format: 'money', tone: 'warning' },
-                  { id: 'credit', label: 'رصيد دائن', value: statement.credit_balance, format: 'money', tone: 'info' },
-                ]}
-              />
-              <div className="rpm-table-wrap">
-                <table className="rpm-table rpm-table--stack">
-                  <thead><tr><th>العقد</th><th>الحالة</th><th>الإجمالي</th></tr></thead>
-                  <tbody>
-                    {statement.contracts.map((c) => (
-                      <tr key={c.id}>
-                        <td data-label="العقد"><span className="rpm-table__code">{c.number}</span></td>
-                        <td data-label="الحالة">{c.status}</td>
-                        <td data-label="الإجمالي" className="tabular-nums">{formatMoney(c.final_total || c.period_rent)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="rp-section__body">
+            <div className="rp-customer-toolbar">
+              <div className="rp-customer-toolbar__select">
+                <SelectField
+                  label="العميل"
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  options={[
+                    { value: '', label: 'اختر عميلاً…' },
+                    ...customers.map((c) => ({
+                      value: String(c.id),
+                      label: `${c.full_name}${c.phone ? ` · ${c.phone}` : ''}`,
+                    })),
+                  ]}
+                />
               </div>
-            </>
-          ) : null}
+              <div className="rp-customer-toolbar__actions">
+                <Button
+                  variant="secondary"
+                  disabled={!statement}
+                  onClick={() => { if (statement) printCustomerStatement(statement) }}
+                >
+                  طباعة كشف العميل
+                </Button>
+                {customerId ? (
+                  <Link className="rpm-link-btn" to={`/customers/${customerId}`}>
+                    ملف العميل ←
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+
+            {statement ? (
+              <>
+                <div className="rp-kpi-grid" aria-label={`ملخص ${statement.customer.full_name}`}>
+                  <article className="rp-kpi">
+                    <span>إجمالي عقود</span>
+                    <strong>{formatMoney(statement.contracts_total)}</strong>
+                  </article>
+                  <article className="rp-kpi is-success">
+                    <span>مدفوع</span>
+                    <strong>{formatMoney(statement.payments_in)}</strong>
+                  </article>
+                  <article className="rp-kpi is-warning">
+                    <span>ذمم مفتوحة</span>
+                    <strong>{formatMoney(statement.open_receivable)}</strong>
+                  </article>
+                  <article className="rp-kpi is-info">
+                    <span>رصيد دائن</span>
+                    <strong>{formatMoney(statement.credit_balance)}</strong>
+                  </article>
+                </div>
+
+                {statement.contracts.length === 0 ? (
+                  <p className="rp-empty">لا عقود مسجّلة لهذا العميل بعد.</p>
+                ) : (
+                  <div className="rp-table-scroll">
+                    <table className="rpm-table rpm-table--stack">
+                      <thead>
+                        <tr>
+                          <th>العقد</th>
+                          <th>العربية</th>
+                          <th>الفترة</th>
+                          <th>الحالة</th>
+                          <th>الإجمالي</th>
+                          <th>المدفوع</th>
+                          <th>المتبقي</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {statement.contracts.map((c) => {
+                          const total = c.total ?? c.final_total ?? c.period_rent ?? 0
+                          const paid = c.paid ?? 0
+                          const remaining = c.remaining ?? Math.max(0, total - paid)
+                          const meta = contractStatusMeta(c.status)
+                          return (
+                            <tr key={c.id}>
+                              <td data-label="العقد">
+                                <Link className="rp-contract-link" to={`/bookings/${c.id}`}>
+                                  {c.number}
+                                </Link>
+                              </td>
+                              <td data-label="العربية">
+                                <strong className="rpm-table__primary">{c.vehicle?.label || '—'}</strong>
+                              </td>
+                              <td data-label="الفترة" className="tabular-nums">
+                                {formatDate(c.starts_at)} ← {formatDate(c.planned_ends_at || c.actual_ends_at)}
+                              </td>
+                              <td data-label="الحالة">
+                                <StatusPill status={meta.key} label={meta.label} tone={meta.tone} />
+                              </td>
+                              <td data-label="الإجمالي" className="tabular-nums">{formatMoney(total)}</td>
+                              <td data-label="المدفوع" className="tabular-nums">{formatMoney(paid)}</td>
+                              <td data-label="المتبقي" className="tabular-nums"><strong>{formatMoney(remaining)}</strong></td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              !tabLoading && customerId === '' ? (
+                <p className="rp-empty">اختر عميلاً لعرض كشف الحساب والعقود.</p>
+              ) : null
+            )}
+          </div>
         </section>
       ) : null}
 
-      {tab === 'profit' && profit ? <ProfitPanel data={profit} /> : null}
+      {tab === 'profit' && profit ? (
+        <div className="rp-section">
+          <ProfitPanel data={profit} />
+        </div>
+      ) : null}
 
       <Sheet open={profitOpen} title="مقارنة ربحية شهر بشهر" onClose={() => setProfitOpen(false)}>
         {profit ? <ProfitPanel data={profit} /> : <SkeletonBlock rows={3} />}
@@ -405,7 +581,7 @@ export function ReportsPage() {
 
 function ProfitPanel({ data }: { data: ProfitCompare }) {
   return (
-    <div className="rpm-stack">
+    <div className="rp-section">
       <MetricCardGrid
         label={`${data.current_month} مقابل ${data.previous_month}`}
         items={[
@@ -417,7 +593,7 @@ function ProfitPanel({ data }: { data: ProfitCompare }) {
       />
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>حسب العربية</h3></div>
-        <div className="rpm-card-list">
+        <div className="rpm-card-list" style={{ marginBlockStart: '12px' }}>
           {data.vehicles.slice(0, 24).map((v) => (
             <article key={v.vehicle_id} className="rpm-card">
               <div className="rpm-card__row">

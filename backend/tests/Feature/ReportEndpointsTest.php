@@ -106,6 +106,9 @@ class ReportEndpointsTest extends TestCase
                 ],
             ]);
 
+        // Enriched contract row shape (vehicle / period / paid / remaining) even when empty.
+        $this->assertIsArray($this->getJson("/api/reports/customers/{$this->customer->id}/statement")->json('data.contracts'));
+
         $this->getJson('/api/reports/petty-cash-balances')->assertOk()
             ->assertJsonStructure(['data']);
     }

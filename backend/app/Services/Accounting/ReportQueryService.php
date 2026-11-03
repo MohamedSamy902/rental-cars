@@ -144,17 +144,50 @@ class ReportQueryService
         }
 
         // Prefer contract-linked payments + period totals
-        $contracts = $customer->contracts()->with('deposit')->latest('id')->limit(50)->get();
+        $contracts = $customer->contracts()
+            ->with(['deposit', 'vehicle:id,brand,model,plate'])
+            ->latest('id')
+            ->limit(50)
+            ->get();
+
         $contractDebt = 0;
-        $paid = 0;
+        $paidTotal = 0;
+        $rows = [];
         foreach ($contracts as $c) {
             $total = (int) ($c->final_total ?: $c->period_rent ?: 0);
-            $contractDebt += $total;
-            $paid += (int) Payment::query()
+            $paidIn = (int) Payment::query()
                 ->where('link_type', 'contract')
                 ->where('link_id', $c->id)
                 ->where('direction', 'in')
                 ->sum('amount');
+            $paidOut = (int) Payment::query()
+                ->where('link_type', 'contract')
+                ->where('link_id', $c->id)
+                ->where('direction', 'out')
+                ->sum('amount');
+            $netPaid = max(0, $paidIn - $paidOut);
+            $contractDebt += $total;
+            $paidTotal += $netPaid;
+            $rows[] = [
+                'id' => $c->id,
+                'number' => $c->number,
+                'status' => $c->status,
+                'starts_at' => $c->starts_at?->toDateString(),
+                'planned_ends_at' => $c->planned_ends_at?->toDateString(),
+                'actual_ends_at' => $c->actual_ends_at?->toDateString(),
+                'final_total' => (int) ($c->final_total ?: 0),
+                'period_rent' => (int) ($c->period_rent ?: 0),
+                'total' => $total,
+                'paid' => $netPaid,
+                'remaining' => max(0, $total - $netPaid),
+                'vehicle' => $c->vehicle ? [
+                    'id' => $c->vehicle->id,
+                    'brand' => $c->vehicle->brand,
+                    'model' => $c->vehicle->model,
+                    'plate' => $c->vehicle->plate,
+                    'label' => trim(($c->vehicle->brand ?? '').' '.($c->vehicle->model ?? '')).' · '.($c->vehicle->plate ?? ''),
+                ] : null,
+            ];
         }
 
         return [
@@ -165,17 +198,11 @@ class ReportQueryService
                 'credit_balance' => (int) $customer->credit_balance,
             ],
             'contracts_total' => $contractDebt,
-            'payments_in' => $paid,
-            'open_receivable' => max(0, $contractDebt - $paid),
+            'payments_in' => $paidTotal,
+            'open_receivable' => max(0, $contractDebt - $paidTotal),
             'credit_balance' => (int) $customer->credit_balance,
             'credit_ledger' => $this->credit->ledger($customer),
-            'contracts' => $contracts->map(fn ($c) => [
-                'id' => $c->id,
-                'number' => $c->number,
-                'status' => $c->status,
-                'final_total' => (int) ($c->final_total ?: 0),
-                'period_rent' => (int) ($c->period_rent ?: 0),
-            ])->all(),
+            'contracts' => $rows,
             'journal_ar_hint' => $arDebit,
         ];
     }
