@@ -130,9 +130,15 @@ class NotificationDispatchService
         return match ($linkType) {
             'contract' => $linkId ? '/contracts/'.$linkId : '/bookings',
             'vehicle' => $linkId ? '/vehicles/'.$linkId : '/vehicles',
-            'customer' => '/customers',
-            'owner' => '/owners',
+            'customer' => $linkId ? '/customers/'.$linkId : '/customers',
+            'owner' => $linkId ? '/owners/'.$linkId : '/owners',
             'payroll' => '/hr',
+            'employee' => $linkId ? '/employees/'.$linkId : '/hr',
+            'violation' => '/violations',
+            'inventory' => '/inventory',
+            'waitlist' => '/waitlist',
+            'maintenance' => '/maintenance',
+            'expense' => '/expenses',
             default => '/notifications',
         };
     }

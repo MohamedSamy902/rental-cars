@@ -22,9 +22,15 @@ function shortcut(type?: string | null, id?: number | null): { to: string; label
   if (!type) return null
   if (type === 'contract' && id) return { to: `/contracts/${id}`, label: 'فتح العقد' }
   if (type === 'vehicle' && id) return { to: `/vehicles/${id}`, label: 'ملف العربية' }
-  if (type === 'customer') return { to: '/customers', label: 'العملاء' }
-  if (type === 'owner') return { to: '/owners', label: 'الملاك' }
+  if (type === 'customer') return { to: id ? `/customers/${id}` : '/customers', label: 'العميل' }
+  if (type === 'owner') return { to: id ? `/owners/${id}` : '/owners', label: 'المالك' }
   if (type === 'payroll') return { to: '/hr', label: 'الموارد البشرية' }
+  if (type === 'employee') return { to: id ? `/employees/${id}` : '/hr', label: 'الموظف' }
+  if (type === 'violation') return { to: '/violations', label: 'المخالفات' }
+  if (type === 'inventory') return { to: '/inventory', label: 'المخزون' }
+  if (type === 'waitlist') return { to: '/waitlist', label: 'قائمة الانتظار' }
+  if (type === 'maintenance') return { to: '/maintenance', label: 'الصيانة' }
+  if (type === 'expense') return { to: '/expenses', label: 'المصروفات' }
   return null
 }
 
