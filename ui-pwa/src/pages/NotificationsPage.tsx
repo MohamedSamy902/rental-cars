@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
-import { PageHeader, FilterBar, SkeletonBlock, EmptyState, Button, useToast } from '@/shared/ui'
+import { PageHeader, FilterBar, SkeletonBlock, EmptyState, Button, Badge, useToast } from '@/shared/ui'
 import { disableWebPush, enableWebPush, pushSupported, sendTestPush } from '@/shared/push/webPush'
 import './pages.css'
 import './NotificationsPage.css'
@@ -18,6 +18,8 @@ type Note = {
   link_id?: number | null
 }
 
+const PUSH_BANNER_KEY = 'rpm.nf.pushBannerOpen'
+
 function shortcut(type?: string | null, id?: number | null): { to: string; label: string } | null {
   if (!type) return null
   if (type === 'contract' && id) return { to: `/contracts/${id}`, label: 'فتح العقد' }
@@ -25,7 +27,29 @@ function shortcut(type?: string | null, id?: number | null): { to: string; label
   if (type === 'customer') return { to: '/customers', label: 'العملاء' }
   if (type === 'owner') return { to: '/owners', label: 'الملاك' }
   if (type === 'payroll') return { to: '/hr', label: 'الموارد البشرية' }
+  if (type === 'inventory') return { to: '/inventory', label: 'المخزون' }
   return null
+}
+
+function categoryMeta(type?: string | null): { label: string; tone: 'brand' | 'warning' | 'steel' | 'muted' | 'accent' | 'success' } | null {
+  switch (type) {
+    case 'contract':
+      return { label: 'عقد', tone: 'brand' }
+    case 'vehicle':
+      return { label: 'عربية', tone: 'steel' }
+    case 'customer':
+      return { label: 'عميل', tone: 'accent' }
+    case 'owner':
+      return { label: 'مالك', tone: 'muted' }
+    case 'payroll':
+      return { label: 'الموظف', tone: 'warning' }
+    case 'inventory':
+      return { label: 'المخزون', tone: 'success' }
+    case 'deposit':
+      return { label: 'تأمين', tone: 'warning' }
+    default:
+      return type ? { label: 'نظام', tone: 'muted' } : null
+  }
 }
 
 function relativeDay(iso: string) {
@@ -38,6 +62,26 @@ function relativeDay(iso: string) {
   return formatDateTime(iso).split('،')[0] || formatDateTime(iso)
 }
 
+function readBannerPref(): boolean | null {
+  try {
+    const raw = localStorage.getItem(PUSH_BANNER_KEY)
+    if (raw === '1') return true
+    if (raw === '0') return false
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function writeBannerPref(open: boolean) {
+  try {
+    localStorage.setItem(PUSH_BANNER_KEY, open ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
+
+/** الكل must stay first (RTL far-right) and remain the default active tab. */
 const NotificationsPageTabs = ['all', 'unread'] as const
 
 export function NotificationsPage() {
@@ -49,6 +93,10 @@ export function NotificationsPage() {
   const [devices, setDevices] = useState(0)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [bannerOpen, setBannerOpen] = useState(() => {
+    const pref = readBannerPref()
+    return pref === null ? true : pref
+  })
   const [chip, setChip] = useQueryTab({ allowed: NotificationsPageTabs, defaultValue: 'all' })
 
   const chips = useMemo(
@@ -80,6 +128,9 @@ export function NotificationsPage() {
       const res = await api<{ enabled: boolean; devices: number }>('/push/status')
       setPushEnabled(res.enabled)
       setDevices(res.devices)
+      if (readBannerPref() === null && res.enabled && res.devices > 0) {
+        setBannerOpen(false)
+      }
     } catch {
       setPushEnabled(false)
       setDevices(0)
@@ -90,6 +141,14 @@ export function NotificationsPage() {
     void load()
     void loadPushStatus()
   }, [])
+
+  function toggleBanner() {
+    setBannerOpen((prev) => {
+      const next = !prev
+      writeBannerPref(next)
+      return next
+    })
+  }
 
   async function markRead(id: number) {
     await api(`/notifications/${id}/read`, { method: 'POST' })
@@ -166,6 +225,15 @@ export function NotificationsPage() {
     return [...map.entries()]
   }, [visibleRows])
 
+  const supported = pushSupported()
+  const pushStatusLabel = !supported
+    ? 'غير مدعوم على هذا المتصفح'
+    : !pushEnabled
+      ? 'السيرفر غير جاهز'
+      : devices > 0
+        ? `مفعّل · ${devices} جهاز`
+        : 'جاهز — لم يُفعَّل على هذا الجهاز'
+
   return (
     <div className="rpm-stack nf">
       <PageHeader
@@ -174,30 +242,49 @@ export function NotificationsPage() {
         action={unread > 0 ? <Button variant="secondary" onClick={() => void markAll()}>تعليم الكل كمقروء</Button> : undefined}
       />
 
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>إشعارات الموبايل (Push)</h3></div>
-        <p className="muted">
-          {pushSupported()
-            ? 'فعّل الإذن ليصلك تنبيه على شاشة الموبايل حتى لو التطبيق مقفول. أندرويد: Chrome/Edge · آيفون: iOS 16.4+ بعد «إضافة إلى الشاشة الرئيسية» وعلى HTTPS.'
-            : 'هذا المتصفح لا يدعم Web Push.'}
-        </p>
-        <p className="muted">
-          حالة السيرفر: {pushEnabled ? 'مفاتيح VAPID جاهزة' : 'غير مفعّل — نفّذ php artisan push:vapid --write'}
-          {' · '}
-          أجهزة هذا الحساب: {devices}
-        </p>
-        <div className="rpm-actions-row">
-          <Button loading={busy} onClick={() => void onEnablePush()}>تفعيل على هذا الجهاز</Button>
-          {devices > 0 ? (
-            <>
-              <Button variant="secondary" loading={busy} onClick={() => void onTestPush()}>إرسال تجربة</Button>
-              <Button variant="secondary" loading={busy} onClick={() => void onDisablePush()}>إيقاف هذا الجهاز</Button>
-            </>
-          ) : null}
-        </div>
+      <section className={`nf-push ${bannerOpen ? 'is-open' : 'is-collapsed'}`.trim()} aria-label="إشعارات الموبايل">
+        <button
+          type="button"
+          className="nf-push__bar"
+          onClick={toggleBanner}
+          aria-expanded={bannerOpen}
+          aria-controls="nf-push-panel"
+        >
+          <span className="nf-push__lead">
+            <span className={`nf-push__pulse ${pushEnabled && devices > 0 ? 'is-on' : ''}`.trim()} aria-hidden />
+            <span className="nf-push__title">إشعارات الموبايل</span>
+            <span className="nf-push__status">{pushStatusLabel}</span>
+          </span>
+          <span className="nf-push__chevron" aria-hidden>{bannerOpen ? '⌃' : '⌄'}</span>
+        </button>
+
+        {bannerOpen ? (
+          <div id="nf-push-panel" className="nf-push__panel">
+            <p className="nf-push__hint">
+              {supported
+                ? 'فعّل الإذن ليصلك تنبيه على شاشة الموبايل حتى لو التطبيق مقفول. أندرويد: Chrome/Edge · آيفون: iOS 16.4+ بعد «إضافة إلى الشاشة الرئيسية» وعلى HTTPS.'
+                : 'هذا المتصفح لا يدعم Web Push.'}
+            </p>
+            <p className="nf-push__meta">
+              السيرفر: {pushEnabled ? 'مفاتيح VAPID جاهزة' : 'غير مفعّل — نفّذ php artisan push:vapid --write'}
+              {' · '}
+              أجهزة هذا الحساب: {devices}
+            </p>
+            <div className="nf-push__actions">
+              <Button size="sm" loading={busy} onClick={() => void onEnablePush()}>تفعيل على هذا الجهاز</Button>
+              {devices > 0 ? (
+                <>
+                  <Button size="sm" variant="secondary" loading={busy} onClick={() => void onTestPush()}>إرسال تجربة</Button>
+                  <Button size="sm" variant="secondary" loading={busy} onClick={() => void onDisablePush()}>إيقاف هذا الجهاز</Button>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <FilterBar
+        hideSearch
         search=""
         onSearchChange={() => undefined}
         chips={chips}
@@ -214,25 +301,46 @@ export function NotificationsPage() {
       <div className="nf-feed" role="feed" aria-label="سجل الإشعارات">
         {grouped.map(([day, items]) => (
           <section key={day} className="nf-day">
-            <h3>{day}</h3>
+            <header className="nf-day__head">
+              <h3>{day}</h3>
+              <span className="nf-day__count tabular-nums">{items.length}</span>
+            </header>
             <ol>
               {items.map((n) => {
                 const go = shortcut(n.link_type, n.link_id)
+                const cat = categoryMeta(n.link_type)
                 const unreadNote = !n.read_at
                 return (
                   <li key={n.id}>
-                    <article className={`nf-item ${unreadNote ? 'is-unread' : ''}`.trim()}>
-                      <button type="button" className="nf-item__main" onClick={() => void openNote(n)}>
-                        <span className="nf-item__dot" aria-hidden />
-                        <span className="nf-item__body">
-                          <strong>{n.title}</strong>
-                          <p>{n.body}</p>
-                          <time dateTime={n.created_at}>{formatDateTime(n.created_at)}</time>
+                    <article className={`nf-card ${unreadNote ? 'is-unread' : ''}`.trim()}>
+                      <button type="button" className="nf-card__main" onClick={() => void openNote(n)}>
+                        <span className="nf-card__dot" aria-hidden />
+                        <span className="nf-card__body">
+                          <span className="nf-card__top">
+                            <strong className="nf-card__title">{n.title}</strong>
+                            <time className="nf-card__time tabular-nums" dateTime={n.created_at}>
+                              {formatDateTime(n.created_at)}
+                            </time>
+                          </span>
+                          <p className="nf-card__text">{n.body}</p>
+                          {cat ? (
+                            <span className="nf-card__tags">
+                              <Badge tone={cat.tone} dot={false}>{cat.label}</Badge>
+                            </span>
+                          ) : null}
                         </span>
                       </button>
-                      <div className="nf-item__actions">
-                        {go ? <Button size="sm" variant="secondary" onClick={() => void openNote(n)}>{go.label}</Button> : null}
-                        {unreadNote ? <Button size="sm" variant="secondary" onClick={() => void markRead(n.id)}>مقروء</Button> : null}
+                      <div className="nf-card__actions">
+                        {go ? (
+                          <Button size="sm" variant="secondary" onClick={() => void openNote(n)}>
+                            {go.label}
+                          </Button>
+                        ) : null}
+                        {unreadNote ? (
+                          <Button size="sm" variant="ghost" onClick={() => void markRead(n.id)}>
+                            مقروء
+                          </Button>
+                        ) : null}
                       </div>
                     </article>
                   </li>
