@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, NumberField, SelectField,
+  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, NumberField, SelectField, SwitchField,
   useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid,
   IconWallet, IconCash, IconTrend, IconBadge,
 } from '@/shared/ui'
@@ -14,7 +14,7 @@ type Permission = { id: number; key: string; label: string; module: string }
 type StaffUser = {
   id: number
   name: string
-  email: string
+  email?: string | null
   phone?: string | null
   is_active: boolean
   role?: {
@@ -94,11 +94,17 @@ export function EmployeeDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editOpen, setEditOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [evalOpen, setEvalOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', job_title: '', hired_on: '', base_salary: '', status: 'active' })
+  const [accountForm, setAccountForm] = useState({ name: '', phone: '', email: '', is_active: true })
+  const [accountErrors, setAccountErrors] = useState<Record<string, string>>({})
+  const [passwordForm, setPasswordForm] = useState({ password: '', password_confirmation: '' })
+  const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
   const [advanceForm, setAdvanceForm] = useState({ amount: '', advanced_on: new Date().toISOString().slice(0, 10), method: 'cash', notes: '' })
   const [evalForm, setEvalForm] = useState({ score: '80', period: '', notes: '' })
   const [assignForm, setAssignForm] = useState({ notes: '', handed_on: new Date().toISOString().slice(0, 10) })
@@ -118,6 +124,15 @@ export function EmployeeDetailPage() {
         base_salary: String(e.base_salary ?? ''),
         status: e.status || 'active',
       })
+      const u = res.data.user
+      if (u) {
+        setAccountForm({
+          name: u.name,
+          phone: u.phone || '',
+          email: u.email || '',
+          is_active: u.is_active,
+        })
+      }
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -146,6 +161,65 @@ export function EmployeeDetailPage() {
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveAccount() {
+    if (!data?.user) return
+    setSaving(true)
+    setAccountErrors({})
+    try {
+      await api(`/staff/${data.user.id}`, {
+        method: 'PUT',
+        json: {
+          name: accountForm.name,
+          phone: accountForm.phone.trim(),
+          email: accountForm.email.trim() || null,
+          is_active: accountForm.is_active,
+        },
+      })
+      toast.success('تم تحديث حساب الدخول.')
+      setAccountOpen(false)
+      await load()
+    } catch (e) {
+      const err = e as ApiError
+      const next: Record<string, string> = {}
+      if (err.errors) for (const [k, v] of Object.entries(err.errors)) next[k] = v[0]
+      setAccountErrors(next)
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function resetPassword() {
+    if (!data?.user) return
+    setPasswordErrors({})
+    if (passwordForm.password.length < 8) {
+      setPasswordErrors({ password: 'كلمة المرور ٨ أحرف على الأقل.' })
+      return
+    }
+    if (passwordForm.password !== passwordForm.password_confirmation) {
+      setPasswordErrors({ password_confirmation: 'تأكيد كلمة المرور غير متطابق.' })
+      return
+    }
+    setSaving(true)
+    try {
+      await api(`/staff/${data.user.id}`, {
+        method: 'PUT',
+        json: { password: passwordForm.password },
+      })
+      toast.success('تم تحديث كلمة المرور.')
+      setPasswordOpen(false)
+      setPasswordForm({ password: '', password_confirmation: '' })
+    } catch (e) {
+      const err = e as ApiError
+      const next: Record<string, string> = {}
+      if (err.errors) for (const [k, v] of Object.entries(err.errors)) next[k] = v[0]
+      setPasswordErrors(next)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
@@ -296,14 +370,20 @@ export function EmployeeDetailPage() {
       <section className="rpm-panel">
         <div className="rpm-panel__head">
           <h3>حساب الدخول والدور</h3>
-          {user ? <Button size="sm" variant="secondary" onClick={() => navigate('/staff?tab=users')}>إدارة الصلاحيات</Button> : null}
+          {user ? (
+            <div className="rpm-card__actions">
+              <Button size="sm" variant="secondary" onClick={() => { setAccountErrors({}); setAccountOpen(true) }}>تعديل الحساب</Button>
+              <Button size="sm" variant="secondary" onClick={() => { setPasswordErrors({}); setPasswordForm({ password: '', password_confirmation: '' }); setPasswordOpen(true) }}>تعيين كلمة مرور</Button>
+              <Button size="sm" variant="ghost" onClick={() => navigate('/staff?tab=permissions')}>الصلاحيات</Button>
+            </div>
+          ) : null}
         </div>
         {user ? (
           <DetailList
             rows={[
               { label: 'اسم الحساب', value: user.name },
-              { label: 'البريد', value: <span dir="ltr">{user.email}</span> },
-              { label: 'الهاتف', value: user.phone || '—' },
+              { label: 'الموبايل', value: user.phone ? <span dir="ltr">{user.phone}</span> : '—' },
+              { label: 'البريد', value: user.email ? <span dir="ltr">{user.email}</span> : '—' },
               { label: 'الدور', value: user.role?.label || '—' },
               {
                 label: 'الحساب',
@@ -436,6 +516,68 @@ export function EmployeeDetailPage() {
               { value: 'active', label: 'على رأس العمل' },
               { value: 'ended', label: 'منتهٍ' },
             ]}
+          />
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={accountOpen}
+        title="تعديل حساب الدخول"
+        onClose={() => setAccountOpen(false)}
+        footer={<><Button loading={saving} onClick={() => void saveAccount()}>حفظ</Button><Button variant="secondary" onClick={() => setAccountOpen(false)}>إلغاء</Button></>}
+      >
+        <div className="rpm-form-grid">
+          <TextField label="الاسم" required value={accountForm.name} error={accountErrors.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} />
+          <TextField
+            label="رقم الموبايل"
+            required
+            type="tel"
+            inputMode="tel"
+            dir="ltr"
+            value={accountForm.phone}
+            error={accountErrors.phone}
+            onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })}
+          />
+          <TextField
+            label="البريد الإلكتروني"
+            type="email"
+            dir="ltr"
+            value={accountForm.email}
+            error={accountErrors.email}
+            hint="اختياري"
+            onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })}
+          />
+          <SwitchField
+            label="الحساب نشط"
+            checked={accountForm.is_active}
+            onChange={(next) => setAccountForm({ ...accountForm, is_active: next })}
+          />
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={passwordOpen}
+        title="تعيين كلمة مرور"
+        onClose={() => setPasswordOpen(false)}
+        footer={<><Button loading={saving} onClick={() => void resetPassword()}>حفظ</Button><Button variant="secondary" onClick={() => setPasswordOpen(false)}>إلغاء</Button></>}
+      >
+        <div className="rpm-form-grid">
+          <TextField
+            label="كلمة المرور الجديدة"
+            required
+            type="password"
+            value={passwordForm.password}
+            error={passwordErrors.password}
+            hint="٨ أحرف على الأقل"
+            onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+          />
+          <TextField
+            label="تأكيد كلمة المرور"
+            required
+            type="password"
+            value={passwordForm.password_confirmation}
+            error={passwordErrors.password_confirmation}
+            onChange={(e) => setPasswordForm({ ...passwordForm, password_confirmation: e.target.value })}
           />
         </div>
       </Sheet>

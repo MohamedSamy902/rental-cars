@@ -154,12 +154,12 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/staff` | إنشاء مستخدم |
 | PUT | `/staff/{user}` | تحديث |
 
-**POST /staff Body**
+**POST /staff Body** — `phone` إلزامي · `email` اختياري (`null` مسموح)
 ```json
 {
   "name": "أحمد",
-  "email": "a@rpm.local",
   "phone": "0100...",
+  "email": null,
   "password": "secret123",
   "role_id": 1,
   "employee_id": null,
@@ -177,6 +177,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 |--------|------|
 | GET | `/employees/lookup` | `{id,name,job_title}` نشطون فقط |
 | GET | `/employees` | قائمة مصفحة `?search=&status=` |
+| GET | `/employees/{employee}` | ملف كامل (حساب · سلف · عهدة · رواتب · تقييمات) — واجهة `/staff/:id` |
 | POST | `/employees` | إنشاء |
 | PUT | `/employees/{employee}` | تحديث |
 
@@ -666,7 +667,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | عهدة | `/petty-cash*` | `/petty-cash` |
 | حسابات | `/accounting*` | `/accounts` |
 | تقارير | `/reports/summary` | `/reports` |
-| موظفون/صلاحيات | `/staff` `/roles` `/employees` | `/staff` |
+| موظفون/صلاحيات | `/staff` `/roles` `/employees` | `/staff` · `/staff/:id` |
 | إخطار قسم | `/department-notice` | `/department-notice` |
 | إعدادات | `/settings/tenant` | `/settings` |
 | مُدمج | نفس settings + flags | `/integrator` |
