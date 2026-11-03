@@ -7,9 +7,11 @@ import './pages.css'
 type Log = {
   id: number
   action: string
+  summary?: string
   record_type?: string
   record_id?: number
   user_id?: number
+  user_name?: string | null
   created_at?: string
 }
 
@@ -35,7 +37,7 @@ export function AuditLogsPage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="سجل التعديلات" subtitle="آخر الحركات على العقود والسجلات" action={<Button variant="secondary" onClick={() => void load()}>تحديث</Button>} />
+      <PageHeader title="سجل التعديلات" subtitle="حركات واضحة بلغة عربية بسيطة" action={<Button variant="secondary" onClick={() => void load()}>تحديث</Button>} />
       {loading ? <SkeletonBlock rows={6} /> : null}
       {!loading && error ? <ErrorState title="تعذّر التحميل" description={error} /> : null}
       {!loading && !error && rows.length === 0 ? <EmptyState title="لا توجد سجلات بعد" /> : null}
@@ -43,10 +45,12 @@ export function AuditLogsPage() {
         {rows.map((r) => (
           <article key={r.id} className="rpm-card">
             <div className="rpm-card__row">
-              <strong>{r.action}</strong>
+              <strong>{r.summary || r.action}</strong>
               <span className="muted">{r.created_at ? formatDateTime(r.created_at) : ''}</span>
             </div>
-            <p className="muted">{r.record_type || '—'} #{r.record_id || '—'} · مستخدم #{r.user_id || '—'}</p>
+            <p className="muted">
+              {r.user_name || (r.user_id ? `مستخدم #${r.user_id}` : 'النظام')}
+            </p>
           </article>
         ))}
       </div>

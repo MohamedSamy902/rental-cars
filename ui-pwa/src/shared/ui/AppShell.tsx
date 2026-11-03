@@ -13,7 +13,7 @@ import { useSheetDrag } from './useSheetDrag'
 import {
   IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart,
   IconChevron, IconClipboard, IconEdit, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
-  IconLogout, IconMenu, IconMoon, IconPlus, IconQueue, IconReceipt, IconSearch, IconSettings,
+  IconLogout, IconMenu, IconMoon, IconPlus, IconReceipt, IconSearch, IconSettings,
   IconStore, IconSun, IconUserCog, IconUsers, IconWallet, IconWrench,
 } from './Icons'
 import './Button.css'
@@ -34,7 +34,6 @@ const railNav: NavItem[] = [
   { to: '/vehicles', label: 'العربيات', icon: <IconCar />, permission: 'vehicles.view' },
   { to: '/bookings', label: 'العقود', icon: <IconClipboard />, permission: 'contracts.view' },
   { to: '/calendar', label: 'التقويم', icon: <IconCalendar />, permission: 'contracts.view' },
-  { to: '/waitlist', label: 'الانتظار', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
   { to: '/showroom', label: 'المعرض', icon: <IconStore />, feature: 'showroom', permission: 'showroom.run' },
   { to: '/maintenance', label: 'الصيانة', icon: <IconWrench />, permission: 'maintenance.view' },
   { to: '/inventory', label: 'المخزون', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },

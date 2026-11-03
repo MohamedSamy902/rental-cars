@@ -290,7 +290,6 @@ class HappyPathE2ETest extends TestCase
         $this->postJson("/api/contracts/{$contractId}/handover", [
             'odometer_out' => 1000,
             'signature_data' => $signature,
-            'fuel_level' => 80,
             'accessories' => [
                 ['name' => 'مثلث تحذير', 'expected_qty' => 1, 'actual_qty' => 1, 'ok' => true],
             ],
@@ -312,7 +311,6 @@ class HappyPathE2ETest extends TestCase
             'odometer_in' => 1050,
             'odometer_out' => 2000,
             'signature_data' => $signature,
-            'fuel_level' => 70,
             'fault_description' => 'عطل مكيف أثناء الإيجار',
         ])->assertOk();
         $this->assertSame($vehicleB->id, (int) $swapped->json('data.vehicle_id'));

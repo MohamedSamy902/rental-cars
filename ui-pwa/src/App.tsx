@@ -15,7 +15,6 @@ import { MaintenancePage } from '@/pages/MaintenancePage'
 import { CustomersPage } from '@/pages/CustomersPage'
 import { InventoryPage } from '@/pages/InventoryPage'
 import { ViolationsPage } from '@/pages/ViolationsPage'
-import { WaitlistPage } from '@/pages/WaitlistPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { AccountsPage } from '@/pages/AccountsPage'
@@ -79,7 +78,6 @@ export default function App() {
                 <Route path="customers" element={<CustomersPage />} />
                 <Route path="customers/:id" element={<CustomerDetailPage />} />
                 <Route path="violations" element={<ViolationsPage />} />
-                <Route path="waitlist" element={<WaitlistPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="accounts" element={<AccountsPage />} />

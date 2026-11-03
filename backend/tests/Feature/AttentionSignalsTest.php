@@ -59,7 +59,6 @@ class AttentionSignalsTest extends TestCase
             'daily_rate' => 800,
             'default_deposit' => 2000,
             'is_active' => true,
-            'rental_priority' => 50,
         ]);
 
         Contract::query()->create([
@@ -196,7 +195,6 @@ class AttentionSignalsTest extends TestCase
             'daily_rate' => 800,
             'default_deposit' => 2000,
             'is_active' => true,
-            'rental_priority' => 50,
             'owner_id' => $ownerId,
             'owner_monthly_amount' => 2000,
         ]);

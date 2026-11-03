@@ -46,8 +46,6 @@ class DocumentTemplateService
             ['key' => 'final_total', 'aliases' => ['الإجمالي_النهائي'], 'label' => 'الإجمالي النهائي', 'sample' => '3200'],
             ['key' => 'odometer_out', 'aliases' => ['عداد_الخروج'], 'label' => 'عداد الخروج', 'sample' => '45000'],
             ['key' => 'odometer_in', 'aliases' => ['عداد_العودة'], 'label' => 'عداد العودة', 'sample' => '45210'],
-            ['key' => 'fuel_out', 'aliases' => ['بنزين_التسليم'], 'label' => 'مستوى البنزين عند التسليم', 'sample' => '80%'],
-            ['key' => 'fuel_in', 'aliases' => ['بنزين_الاستلام'], 'label' => 'مستوى البنزين عند الاستلام', 'sample' => '60%'],
             ['key' => 'handover_at', 'aliases' => ['وقت_التسليم'], 'label' => 'وقت التسليم', 'sample' => '2026-11-01 10:00'],
             ['key' => 'return_at', 'aliases' => ['وقت_الاستلام'], 'label' => 'وقت الاستلام', 'sample' => '2026-11-05 18:00'],
             ['key' => 'template_version', 'aliases' => ['إصدار_القالب'], 'label' => 'رقم إصدار القالب', 'sample' => '1'],
@@ -279,9 +277,6 @@ class DocumentTemplateService
         $customer = $contract->customer;
         $deposit = $contract->deposit;
 
-        $fuelOut = $handover?->fuel_level;
-        $fuelIn = $ret?->fuel_level;
-
         $map = [
             'company_name' => (string) ($tenant?->center_name ?: 'مركز التأجير'),
             'company_phone' => (string) ($ops['print_phone'] ?? ''),
@@ -295,6 +290,8 @@ class DocumentTemplateService
             'contract_status' => (string) $contract->status,
             'customer_name' => (string) ($customer?->full_name ?: ''),
             'customer_phone' => (string) ($customer?->phone ?: ''),
+            'national_id_front' => (string) ($customer?->national_id_image_path ?: ''),
+            'national_id_back' => (string) ($customer?->national_id_back_path ?: ''),
             'vehicle_plate' => (string) ($vehicle?->plate ?: ''),
             'vehicle_name' => trim(($vehicle?->brand ?? '').' '.($vehicle?->model ?? '')),
             'start_date' => $contract->starts_at?->format('Y-m-d H:i') ?? '',
@@ -308,8 +305,6 @@ class DocumentTemplateService
             'final_total' => $contract->final_total !== null ? (string) (int) $contract->final_total : '',
             'odometer_out' => (string) ($handover?->odometer ?? $contract->odometer_out ?? ''),
             'odometer_in' => (string) ($ret?->odometer ?? $contract->odometer_in ?? ''),
-            'fuel_out' => $fuelOut !== null ? ((string) $fuelOut).'%' : '',
-            'fuel_in' => $fuelIn !== null ? ((string) $fuelIn).'%' : '',
             'handover_at' => $handover?->inspected_at?->format('Y-m-d H:i') ?? '',
             'return_at' => $ret?->inspected_at?->format('Y-m-d H:i')
                 ?? ($contract->actual_ends_at?->format('Y-m-d H:i') ?? ''),
@@ -498,13 +493,11 @@ HTML;
 <h2>عند التسليم</h2>
 <table>
   <tr><th>عداد الخروج</th><td>{{odometer_out}}</td></tr>
-  <tr><th>مستوى البنزين</th><td>{{fuel_out}}</td></tr>
   <tr><th>وقت التسليم</th><td>{{handover_at}}</td></tr>
 </table>
 <h2>عند الاستلام</h2>
 <table>
   <tr><th>عداد العودة</th><td>{{odometer_in}}</td></tr>
-  <tr><th>مستوى البنزين</th><td>{{fuel_in}}</td></tr>
   <tr><th>وقت الاستلام</th><td>{{return_at}}</td></tr>
 </table>
 <p class="foot">{{print_footer}}</p>

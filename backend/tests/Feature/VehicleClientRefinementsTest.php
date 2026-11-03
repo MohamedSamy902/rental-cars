@@ -90,7 +90,6 @@ class VehicleClientRefinementsTest extends TestCase
             'odometer_source' => 'manual',
             'daily_rate' => 1000,
             'default_deposit' => 2000,
-            'rental_priority' => 50,
             'is_active' => true,
         ]);
 
@@ -144,7 +143,6 @@ class VehicleClientRefinementsTest extends TestCase
             'odometer_source' => 'manual',
             'daily_rate' => 700,
             'default_deposit' => 1500,
-            'rental_priority' => 50,
             'is_active' => true,
         ]);
 

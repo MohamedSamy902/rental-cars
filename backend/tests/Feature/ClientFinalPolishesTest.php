@@ -1,0 +1,176 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\AuditLog;
+use App\Models\Contract;
+use App\Models\Customer;
+use App\Models\Role;
+use App\Models\TenantSetting;
+use App\Models\User;
+use App\Models\Vehicle;
+use App\Services\Accounting\AccountingService;
+use App\Services\Operations\AuditNarrator;
+use App\Support\PermissionCatalog;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class ClientFinalPolishesTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $admin;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        PermissionCatalog::ensureSeeded();
+        app(AccountingService::class)->ensureChartOfAccounts();
+        TenantSetting::query()->create([
+            'center_name' => 'اختبار الصقل',
+            'feature_flags' => [
+                'showroom' => true, 'petty_cash' => true, 'waitlist' => true, 'inventory' => true,
+                'department_notice' => true, 'chat' => true, 'evaluations' => true, 'hr' => true,
+            ],
+            'operational' => [
+                'require_handover_signature' => false,
+                'block_expired_license' => false,
+                'block_expired_vehicle_docs' => false,
+            ],
+        ]);
+        $adminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $this->admin = User::factory()->create([
+            'name' => 'أحمد',
+            'role_id' => $adminRole->id,
+            'is_active' => true,
+        ]);
+        Sanctum::actingAs($this->admin);
+    }
+
+    public function test_audit_logs_return_arabic_summary(): void
+    {
+        AuditLog::query()->create([
+            'user_id' => $this->admin->id,
+            'action' => 'created',
+            'record_type' => Contract::class,
+            'record_id' => 1,
+            'after' => ['number' => 'C-TEST-1'],
+        ]);
+
+        $res = $this->getJson('/api/audit-logs?limit=5')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertNotEmpty($res);
+        $this->assertStringContainsString('قام', $res[0]['summary']);
+        $this->assertStringContainsString('حجز', $res[0]['summary']);
+        $this->assertSame('أحمد', $res[0]['user_name']);
+    }
+
+    public function test_audit_narrator_vehicle_example(): void
+    {
+        $narrator = app(AuditNarrator::class);
+        $log = new AuditLog([
+            'action' => 'vehicle_updated',
+            'record_type' => Vehicle::class,
+            'record_id' => 1,
+            'after' => ['plate' => 'أ ب ج 1234'],
+        ]);
+        $sentence = $narrator->summarize($log, 'سارة');
+        $this->assertStringContainsString('بتعديل بيانات السيارة', $sentence);
+        $this->assertStringContainsString('أ ب ج 1234', $sentence);
+    }
+
+    public function test_contract_create_with_odometer_and_partial_handover_payment(): void
+    {
+        $customer = Customer::query()->create([
+            'full_name' => 'عميل صقل',
+            'phone' => '01099998877',
+            'birth_date' => '1990-01-01',
+            'license_number' => 'L-POLISH',
+            'license_expires_on' => now()->addYear()->toDateString(),
+            'status' => 'active',
+        ]);
+        $vehicle = Vehicle::query()->create([
+            'code' => 'P-1',
+            'plate' => 'صقل 1',
+            'brand' => 'هيونداي',
+            'model' => 'إلنترا',
+            'year' => 2023,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 10000,
+            'daily_rate' => 900,
+            'default_deposit' => 3000,
+            'is_active' => true,
+            'manual_status' => 'available',
+        ]);
+
+        $starts = now()->addDays(3)->startOfHour();
+        $ends = $starts->copy()->addDays(2);
+
+        $created = $this->postJson('/api/contracts', [
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'starts_at' => $starts->toDateTimeString(),
+            'planned_ends_at' => $ends->toDateTimeString(),
+            'daily_rate' => 1100,
+            'deposit' => 3000,
+            'odometer' => 10050,
+        ])->assertCreated()->json('data');
+
+        $this->assertSame(10050, (int) $vehicle->fresh()->odometer);
+        $this->assertSame($this->admin->id, (int) $created['sales_user_id']);
+
+        $this->postJson("/api/contracts/{$created['id']}/approve")->assertOk();
+
+        $handover = $this->postJson("/api/contracts/{$created['id']}/handover", [
+            'odometer_out' => 10060,
+            'payment_amount' => 500,
+            'payment_method' => 'cash',
+        ])->assertOk()->json('data');
+
+        $this->assertSame('active', $handover['status']);
+        $inspection = collect($handover['inspections'] ?? [])->first();
+        if (is_array($inspection)) {
+            $this->assertArrayNotHasKey('fuel_level', $inspection);
+        }
+
+        $dossier = $this->getJson("/api/contracts/{$created['id']}")->assertOk()->json('data');
+        $this->assertSame('أحمد', $dossier['created_by']);
+        $this->assertGreaterThanOrEqual(500, (int) $dossier['ledger']['paid']);
+    }
+
+    public function test_upcoming_and_handover_today_tabs(): void
+    {
+        $this->getJson('/api/contracts?tab=upcoming')->assertOk();
+        $this->getJson('/api/contracts?tab=handover_today')->assertOk()
+            ->assertJsonStructure(['summary' => ['upcoming', 'handover_today']]);
+    }
+
+    public function test_recommend_has_no_weights_or_scores(): void
+    {
+        Vehicle::query()->create([
+            'code' => 'P-2',
+            'plate' => 'صقل 2',
+            'brand' => 'كيا',
+            'model' => 'ريو',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 5000,
+            'daily_rate' => 700,
+            'default_deposit' => 2000,
+            'is_active' => true,
+            'manual_status' => 'available',
+        ]);
+
+        $res = $this->getJson('/api/vehicles/recommend')->assertOk()->json();
+        $this->assertArrayNotHasKey('weights', $res);
+        foreach ($res['data'] as $row) {
+            $this->assertArrayNotHasKey('scores', $row);
+            $this->assertArrayNotHasKey('rental_priority', $row);
+        }
+    }
+}

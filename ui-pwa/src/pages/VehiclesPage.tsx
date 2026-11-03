@@ -30,7 +30,6 @@ type Vehicle = {
   daily_rate: number
   default_deposit: number
   status: string
-  rental_priority: number
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
   notes?: string | null

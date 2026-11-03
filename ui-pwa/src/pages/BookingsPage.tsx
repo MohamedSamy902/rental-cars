@@ -19,7 +19,7 @@ import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { printContractDocument } from '@/shared/contracts/printContract'
 import './pages.css'
 
-const BookingsPageTabs = ['all', 'pending', 'approved', 'active', 'completed'] as const
+const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed'] as const
 
 export function BookingsPage() {
   const toast = useToast()
@@ -27,7 +27,9 @@ export function BookingsPage() {
   const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Contract[]>([])
-  const [summary, setSummary] = useState({ total: 0, pending: 0, approved: 0, active: 0, completed: 0 })
+  const [summary, setSummary] = useState({
+    total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0, handover_today: 0,
+  })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: BookingsPageTabs, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
@@ -39,6 +41,18 @@ export function BookingsPage() {
   const chips = useMemo(
     () => [
       { id: 'all', label: 'الكل' },
+      {
+        id: 'handover_today',
+        label: 'تسليم العربية',
+        attention: summary.handover_today > 0 ? ('warning' as const) : null,
+        attentionLabel: 'تسليمات اليوم',
+      },
+      {
+        id: 'upcoming',
+        label: 'الحجوزات القادمة',
+        attention: summary.upcoming > 0 ? ('warning' as const) : null,
+        attentionLabel: 'حجوزات مستقبلية',
+      },
       {
         id: 'pending',
         label: 'معلّق',
@@ -64,7 +78,7 @@ export function BookingsPage() {
       },
       { id: 'completed', label: 'مكتمل' },
     ],
-    [summary.pending, attention.pickups_today, attention.overdue_returns, attention.returning_today],
+    [summary.pending, summary.upcoming, summary.handover_today, attention.pickups_today, attention.overdue_returns, attention.returning_today],
   )
 
   async function load() {
@@ -73,10 +87,22 @@ export function BookingsPage() {
     try {
       const qs = new URLSearchParams()
       if (search.trim()) qs.set('search', search.trim())
-      if (chip !== 'all') qs.set('status', chip)
+      if (chip === 'upcoming' || chip === 'handover_today') {
+        qs.set('tab', chip)
+      } else if (chip !== 'all') {
+        qs.set('status', chip)
+      }
       const res = await api<{ data: Contract[]; summary: typeof summary }>(`/contracts?${qs}`)
       setRows(res.data)
-      setSummary(res.summary)
+      setSummary({
+        total: res.summary.total ?? 0,
+        pending: res.summary.pending ?? 0,
+        approved: res.summary.approved ?? 0,
+        active: res.summary.active ?? 0,
+        completed: res.summary.completed ?? 0,
+        upcoming: res.summary.upcoming ?? 0,
+        handover_today: res.summary.handover_today ?? 0,
+      })
     } catch (e) {
       setError((e as ApiError).message)
     } finally {

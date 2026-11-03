@@ -223,7 +223,6 @@ class AuditFollowupFixesTest extends TestCase
             'daily_rate' => $daily,
             'default_deposit' => $deposit,
             'is_active' => true,
-            'rental_priority' => 50,
         ]);
 
         return [$customer, $vehicle];

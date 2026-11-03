@@ -124,11 +124,6 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
       warning: c.blacklisted_customers,
       label: `${c.blacklisted_customers} عميل في القائمة السوداء`,
     },
-    '/waitlist': {
-      critical: 0,
-      warning: c.waiting_requests,
-      label: `${c.waiting_requests} طلب انتظار قائم`,
-    },
     '/owners': {
       critical: 0,
       warning: c.owners_unpaid,
@@ -152,7 +147,6 @@ const NAV_PATHS = [
   '/notifications',
   '/hr',
   '/customers',
-  '/waitlist',
   '/owners',
 ] as const
 

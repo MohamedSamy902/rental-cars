@@ -5,6 +5,7 @@ namespace App\Services\Contracts;
 use App\Models\Inspection;
 use App\Models\InspectionDamage;
 use DomainException;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class InspectionService
@@ -13,7 +14,6 @@ class InspectionService
      * @param  array{
      *   type: string,
      *   odometer: int,
-     *   fuel_level?: int,
      *   notes?: string|null,
      *   signature_data?: string|null,
      *   accessories?: array<int, array{accessory_id?: int, name: string, expected_qty?: int, actual_qty?: int, ok?: bool}>,
@@ -26,42 +26,29 @@ class InspectionService
             throw new DomainException('نوع الفحص غير صالح.');
         }
 
-        $opsRequireSignature = true;
-        $settings = \App\Models\TenantSetting::query()->first();
-        $ops = $settings?->operational ?? [];
-        if ($payload['type'] === 'handover') {
-            $opsRequireSignature = (bool) ($ops['require_handover_signature'] ?? true);
-        } else {
-            $hasDamage = ! empty($payload['damages']);
-            $missingAccessory = collect($payload['accessories'] ?? [])->contains(fn ($a) => ($a['ok'] ?? true) === false);
-            $opsRequireSignature = (bool) ($ops['require_return_signature_always'] ?? false)
-                || $hasDamage
-                || $missingAccessory
-                || ((int) ($payload['damage_fee'] ?? 0) > 0);
-        }
-
+        // Signature canvas removed from close/handover modals — keep optional for legacy clients.
         $signatureData = $payload['signature_data'] ?? null;
-        if ($opsRequireSignature && (! is_string($signatureData) || strlen($signatureData) < 40)) {
-            throw new DomainException('توقيع العميل على الشاشة إلزامي لهذا الفحص.');
-        }
-
         $path = null;
         if (is_string($signatureData) && str_starts_with($signatureData, 'data:image')) {
             $path = $this->storeSignature($contractId, $payload['type'], $signatureData);
         }
 
-        $inspection = Inspection::query()->create([
+        $attrs = [
             'contract_id' => $contractId,
             'type' => $payload['type'],
             'inspected_at' => now(),
             'odometer' => (int) $payload['odometer'],
-            'fuel_level' => (int) ($payload['fuel_level'] ?? 50),
             'notes' => $payload['notes'] ?? null,
             'inspector_id' => $inspectorId,
             'signature_path' => $path,
             'signature_data' => $signatureData,
             'accessories_json' => $payload['accessories'] ?? [],
-        ]);
+        ];
+        if (Schema::hasColumn('inspections', 'fuel_level')) {
+            $attrs['fuel_level'] = null;
+        }
+
+        $inspection = Inspection::query()->create($attrs);
 
         foreach ($payload['damages'] ?? [] as $damage) {
             InspectionDamage::query()->create([

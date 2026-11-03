@@ -81,13 +81,13 @@ class P1SpecRequirementsTest extends TestCase
             'code' => 'P1-A', 'plate' => 'P1 100', 'brand' => 'هيونداي', 'model' => 'إلنترا',
             'year' => 2023, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين',
             'odometer' => 12000, 'daily_rate' => 1000, 'default_deposit' => 2000,
-            'is_active' => true, 'rental_priority' => 80, 'manual_status' => 'available',
+            'is_active' => true, 'manual_status' => 'available',
         ]);
         $this->vehicleB = Vehicle::query()->create([
             'code' => 'P1-B', 'plate' => 'P1 200', 'brand' => 'كيا', 'model' => 'سيراتو',
             'year' => 2024, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين',
             'odometer' => 4000, 'daily_rate' => 900, 'default_deposit' => 2000,
-            'is_active' => true, 'rental_priority' => 20, 'manual_status' => 'available',
+            'is_active' => true, 'manual_status' => 'available',
         ]);
 
         $this->employee = Employee::query()->create([
@@ -320,12 +320,12 @@ class P1SpecRequirementsTest extends TestCase
 
         $ranked = app(VehicleRecommendationService::class)->rankAvailable('اقتصادي');
         $this->assertNotEmpty($ranked);
-        $weights = $ranked[0]['weights'];
-        $this->assertSame(100, $weights['underuse'] + $weights['availability'] + $weights['manual']);
+        $this->assertArrayNotHasKey('weights', $ranked[0]);
+        $this->assertArrayNotHasKey('scores', $ranked[0]);
 
         $this->getJson('/api/vehicles/recommend?category='.urlencode('اقتصادي'))
             ->assertOk()
-            ->assertJsonStructure(['data', 'weights']);
+            ->assertJsonStructure(['data']);
 
         $this->getJson("/api/vehicles/{$this->vehicleA->id}/dossier")
             ->assertOk()

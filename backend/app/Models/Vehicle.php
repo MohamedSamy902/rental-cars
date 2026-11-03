@@ -16,7 +16,7 @@ class Vehicle extends Model
         'category', 'engine_capacity', 'transmission', 'fuel_type', 'seats', 'odometer',
         'odometer_source', 'daily_rate', 'default_deposit', 'target_monthly_income',
         'purchase_value_estimate', 'tracker_device_number', 'tracker_sim_number',
-        'rental_priority', 'notes', 'is_active', 'manual_status', 'branch_id',
+        'notes', 'is_active', 'manual_status', 'branch_id',
         'owner_id', 'owner_monthly_amount', 'owner_since',
     ];
 
@@ -28,7 +28,6 @@ class Vehicle extends Model
             'odometer' => 'integer',
             'daily_rate' => 'integer',
             'default_deposit' => 'integer',
-            'rental_priority' => 'integer',
             'owner_monthly_amount' => 'integer',
             'owner_since' => 'date',
         ];
