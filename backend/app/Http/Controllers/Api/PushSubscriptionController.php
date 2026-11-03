@@ -86,11 +86,19 @@ class PushSubscriptionController extends Controller
         return response()->json([
             'enabled' => (bool) $this->dispatch->vapidPublicKey(),
             'devices' => $count,
+            'app_env' => app()->environment(),
+            'allow_test' => ! app()->isProduction(),
         ]);
     }
 
     public function test(Request $request): JsonResponse
     {
+        if (app()->isProduction()) {
+            return response()->json([
+                'message' => 'إرسال التجربة غير متاح في بيئة الإنتاج.',
+            ], 403);
+        }
+
         if (! $this->dispatch->vapidPublicKey()) {
             return response()->json([
                 'message' => 'مفاتيح VAPID غير مضبوطة على السيرفر.',

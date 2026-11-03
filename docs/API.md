@@ -630,10 +630,10 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | Method | Path | الوصف |
 |--------|------|--------|
 | GET | `/push/vapid-public-key` | المفتاح العام للمتصفح |
-| GET | `/push/status` | `{ enabled, devices }` |
+| GET | `/push/status` | `{ enabled, devices, app_env, allow_test }` — `allow_test` يكون `false` عندما `APP_ENV=production` |
 | POST | `/push/subscribe` | تسجيل جهاز `{ endpoint, keys:{p256dh,auth} }` |
 | POST | `/push/unsubscribe` | إلغاء جهاز |
-| POST | `/push/test` | إرسال إشعار تجريبي. المتصفح لازم يتفعّل من الصفحة أولاً (ترميز aes128gcm). من غير جهاز مشترك يرجع 422 برسالة تطلب التفعيل، ومن غير مفاتيح VAPID رسالة منفصلة. |
+| POST | `/push/test` | إرسال إشعار تجريبي خارج الإنتاج فقط (`403` في `production`). المتصفح لازم يتفعّل من الصفحة أولاً (ترميز aes128gcm). من غير جهاز مشترك يرجع 422 برسالة تطلب التفعيل، ومن غير مفاتيح VAPID رسالة منفصلة. |
 
 ---
 
