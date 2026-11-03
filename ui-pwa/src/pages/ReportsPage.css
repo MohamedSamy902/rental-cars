@@ -1,3 +1,34 @@
+/* Page containment — prevent any child from blowing past the viewport */
+.rp-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+.rp-page .rpm-metrics {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rp-page .rpm-metric__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-page > *,
+.rp-page .rp-section,
+.rp-page .rp-bento,
+.rp-page .rpm-panel,
+.rp-page .rpm-page-header,
+.rp-page .rpm-filters {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .rp-bento {
   display: grid;
   gap: 20px;
@@ -80,12 +111,19 @@
 .rp-rent__meta {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 0.75rem;
   margin-block-end: 0.35rem;
   font-size: 0.875rem;
+  min-width: 0;
 }
 .rp-rent__meta span {
   color: var(--text-muted);
+  min-width: 0;
+}
+.rp-rent__meta strong {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 .rp-rent__track {
   height: 0.55rem;
@@ -141,8 +179,11 @@
 
 .rp-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rp-kpi {
@@ -228,6 +269,42 @@
 }
 
 @media (max-width: 720px) {
+  .rp-page {
+    padding-inline: 0;
+  }
+
+  .rp-section {
+    gap: 16px;
+  }
+
+  .rp-bento,
+  .rp-section__body {
+    gap: 14px;
+  }
+
+  .rp-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .rp-kpi {
+    padding: 12px;
+  }
+
+  .rp-kpi strong {
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+  }
+
+  .rp-table-scroll {
+    margin-inline: 0;
+    max-width: 100%;
+  }
+
+  .rp-table-scroll .rpm-table {
+    min-width: 640px;
+  }
+
   .rp-customer-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -240,5 +317,11 @@
   }
   .rp-customer-toolbar__actions .rpm-btn {
     flex: 1 1 auto;
+  }
+
+  .rpm-panel__head {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-width: 0;
   }
 }

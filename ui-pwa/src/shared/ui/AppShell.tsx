@@ -351,8 +351,9 @@ export function AppShell() {
               <div className="shell-drawer__grab" onPointerDown={startDrawerDrag}>
                 <div className="shell-drawer__handle" aria-hidden />
                 <div className="shell-drawer__head">
-                  <BrandLogo variant="mark" />
                   <span className="shell-drawer__title">كل الأقسام</span>
+                  <BrandLogo variant="mark" className="shell-drawer__brand" />
+                  <span className="shell-drawer__head-spacer" aria-hidden />
                 </div>
               </div>
               <div className="shell-drawer__grid">
