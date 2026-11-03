@@ -82,8 +82,9 @@
     color var(--motion-fast) ease;
 }
 .shell-rail__toggle:hover {
-  background: var(--action);
-  color: var(--on-action);
+  /* Never use --action fill as icon ink in dark mode (action ≈ surface-hover). */
+  background: var(--accent-solid);
+  color: var(--on-accent);
 }
 .shell.is-collapsed .shell-rail__toggle {
   transform: scaleX(-1);
@@ -132,9 +133,20 @@
   color: var(--nav-muted);
   font-size: 0.875rem;
 }
+.shell-rail__link .shell-rail__ico,
+.shell-rail__link .shell-rail__ico svg {
+  color: inherit;
+  stroke: currentColor;
+}
 .shell-rail__link:hover {
   background: var(--surface-hover);
   color: var(--text);
+}
+.shell-rail__link:hover .shell-rail__ico,
+.shell-rail__link:hover .shell-rail__ico svg {
+  color: var(--text);
+  stroke: currentColor;
+  opacity: 1;
 }
 .shell-rail__link:active {
   transform: scale(0.98);
@@ -210,7 +222,12 @@
 }
 .shell-rail__theme:hover {
   color: var(--text);
-  background: var(--surface-hover);
+  background: var(--surface-3);
+}
+.shell-rail__theme:hover svg {
+  color: var(--text);
+  stroke: currentColor;
+  opacity: 1;
 }
 .shell-rail__quit {
   color: var(--danger-ink);
@@ -330,9 +347,19 @@
     color var(--motion-fast) ease,
     transform var(--motion-fast) ease;
 }
+.shell-icon svg {
+  color: inherit;
+  stroke: currentColor;
+}
 .shell-icon:hover {
-  background: var(--surface-hover);
+  background: var(--surface-3);
   border-color: var(--border-strong);
+  color: var(--text);
+}
+.shell-icon:hover svg {
+  color: var(--text);
+  stroke: currentColor;
+  opacity: 1;
 }
 .shell-icon:active {
   transform: scale(0.95);
@@ -427,8 +454,14 @@
 }
 .shell-user--action:hover .shell-user__edit {
   opacity: 1;
-  color: var(--action);
-  background: color-mix(in srgb, var(--action) 12%, transparent);
+  color: var(--accent-solid);
+  background: color-mix(in srgb, var(--accent-solid) 14%, transparent);
+}
+.shell-user--action:hover .shell-user__meta strong {
+  color: var(--text);
+}
+.shell-user--action:hover .shell-user__meta em {
+  color: var(--text-muted);
 }
 
 .shell-main {
@@ -607,9 +640,24 @@
 }
 .shell-drawer__action--profile {
   grid-column: 1 / -1;
-  color: var(--action);
-  border-color: color-mix(in srgb, var(--action) 28%, var(--border));
-  background: color-mix(in srgb, var(--action) 8%, var(--surface-2));
+  /* Use brand/accent ink — --action is a fill color and vanishes on dark hover. */
+  color: var(--brand);
+  border-color: color-mix(in srgb, var(--brand) 28%, var(--border));
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface-2));
+}
+.shell-drawer__action--profile:hover,
+.shell-drawer__action--profile:active {
+  color: var(--text);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+.shell-drawer__link:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.shell-drawer__link:hover .shell-drawer__ico {
+  color: var(--text);
 }
 .shell-drawer__action--quit {
   color: var(--danger-ink);

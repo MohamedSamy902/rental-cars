@@ -10,8 +10,8 @@ type Props = {
 
 type FormState = {
   name: string
-  email: string
   phone: string
+  email: string
   current_password: string
   password: string
   password_confirmation: string
@@ -19,8 +19,8 @@ type FormState = {
 
 const emptyForm = (): FormState => ({
   name: '',
-  email: '',
   phone: '',
+  email: '',
   current_password: '',
   password: '',
   password_confirmation: '',
@@ -29,8 +29,8 @@ const emptyForm = (): FormState => ({
 function formFromUser(user: AuthUser | null): FormState {
   return {
     name: user?.name || '',
-    email: user?.email || '',
     phone: user?.phone || '',
+    email: user?.email || '',
     current_password: '',
     password: '',
     password_confirmation: '',
@@ -56,8 +56,8 @@ export function ProfileSheet({ open, onClose }: Props) {
     try {
       const payload: Record<string, string | null> = {
         name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim() || null,
+        phone: form.phone.trim(),
+        email: form.email.trim() || null,
       }
       if (form.password) {
         payload.current_password = form.current_password
@@ -117,21 +117,24 @@ export function ProfileSheet({ open, onClose }: Props) {
           onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
         <TextField
-          label="البريد الإلكتروني"
+          label="رقم الموبايل"
           required
+          type="tel"
+          autoComplete="tel"
+          inputMode="tel"
+          value={form.phone}
+          error={errors.phone}
+          hint="الهوية الأساسية لتسجيل الدخول"
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+        />
+        <TextField
+          label="البريد الإلكتروني"
           type="email"
           autoComplete="email"
           value={form.email}
           error={errors.email}
+          hint="اختياري — يمكن تركه فارغاً"
           onChange={(e) => setForm({ ...form, email: e.target.value })}
-        />
-        <TextField
-          label="رقم الهاتف / الموبايل"
-          type="tel"
-          autoComplete="tel"
-          value={form.phone}
-          error={errors.phone}
-          onChange={(e) => setForm({ ...form, phone: e.target.value })}
         />
         <TextField
           label="كلمة المرور الحالية"

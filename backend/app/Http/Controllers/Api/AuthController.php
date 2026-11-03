@@ -103,26 +103,33 @@ class AuthController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => [
+            'phone' => [
                 'required',
+                'string',
+                'max:50',
+                new \App\Rules\EgyptianPhone,
+                Rule::unique('users', 'phone')->ignore($user->id),
+            ],
+            'email' => [
+                'nullable',
                 'email',
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
             'current_password' => ['nullable', 'string'],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ], [
             'name.required' => 'الاسم مطلوب.',
-            'email.required' => 'البريد الإلكتروني مطلوب.',
+            'phone.required' => 'رقم الموبايل مطلوب.',
+            'phone.unique' => 'رقم الموبايل مستخدم مسبقاً.',
             'email.email' => 'البريد الإلكتروني غير صالح.',
             'email.unique' => 'البريد الإلكتروني مستخدم مسبقاً.',
             'password.min' => 'كلمة المرور يجب ألا تقل عن ٨ أحرف.',
             'password.confirmed' => 'تأكيد كلمة المرور غير متطابق.',
         ], [
             'name' => 'الاسم',
+            'phone' => 'رقم الموبايل',
             'email' => 'البريد الإلكتروني',
-            'phone' => 'الهاتف',
             'current_password' => 'كلمة المرور الحالية',
             'password' => 'كلمة المرور الجديدة',
         ]);
@@ -138,8 +145,9 @@ class AuthController extends Controller
         }
 
         $user->name = $data['name'];
-        $user->email = $data['email'];
-        $user->phone = $data['phone'] ?? null;
+        $user->phone = $data['phone'];
+        $email = isset($data['email']) ? trim((string) $data['email']) : '';
+        $user->email = $email !== '' ? $email : null;
         if ($changingPassword) {
             $user->password = $data['password'];
         }
