@@ -21,6 +21,18 @@ export async function registerPushWorker(): Promise<ServiceWorkerRegistration | 
   return navigator.serviceWorker.register('/sw.js', { scope: '/' })
 }
 
+/** هل هذا المتصفح مشترك فعلياً في Web Push؟ */
+export async function hasLocalPushSubscription(): Promise<boolean> {
+  if (!pushSupported()) return false
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/')
+    const sub = await reg?.pushManager.getSubscription()
+    return Boolean(sub)
+  } catch {
+    return false
+  }
+}
+
 export async function enableWebPush(): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!pushSupported()) {
     return { ok: false, message: 'المتصفح لا يدعم إشعارات الدفع. استخدم Chrome/Edge على أندرويد أو Safari 16.4+ بعد إضافة التطبيق للشاشة الرئيسية.' }

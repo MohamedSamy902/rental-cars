@@ -4,7 +4,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { PageHeader, FilterBar, SkeletonBlock, EmptyState, Button, Badge, useToast } from '@/shared/ui'
-import { disableWebPush, enableWebPush, pushSupported, sendTestPush } from '@/shared/push/webPush'
+import { disableWebPush, enableWebPush, hasLocalPushSubscription, pushSupported, sendTestPush } from '@/shared/push/webPush'
 import './pages.css'
 import './NotificationsPage.css'
 
@@ -106,6 +106,8 @@ export function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [devices, setDevices] = useState(0)
   const [pushEnabled, setPushEnabled] = useState(false)
+  const [deviceOn, setDeviceOn] = useState(false)
+  const [allowTest, setAllowTest] = useState(false)
   const [busy, setBusy] = useState(false)
   const [bannerOpen, setBannerOpen] = useState(() => {
     const pref = readBannerPref()
@@ -139,15 +141,20 @@ export function NotificationsPage() {
 
   async function loadPushStatus() {
     try {
-      const res = await api<{ enabled: boolean; devices: number }>('/push/status')
+      const res = await api<{ enabled: boolean; devices: number; allow_test?: boolean }>('/push/status')
       setPushEnabled(res.enabled)
       setDevices(res.devices)
-      if (readBannerPref() === null && res.enabled && res.devices > 0) {
+      setAllowTest(Boolean(res.allow_test))
+      const localOn = await hasLocalPushSubscription()
+      setDeviceOn(localOn)
+      if (readBannerPref() === null && res.enabled && (localOn || res.devices > 0)) {
         setBannerOpen(false)
       }
     } catch {
       setPushEnabled(false)
       setDevices(0)
+      setDeviceOn(false)
+      setAllowTest(false)
     }
   }
 
@@ -206,6 +213,7 @@ export function NotificationsPage() {
   }
 
   async function onTestPush() {
+    if (!allowTest) return
     setBusy(true)
     try {
       // Ensure this browser is subscribed before sending (iPhone / first-run).
@@ -251,9 +259,11 @@ export function NotificationsPage() {
     ? 'غير مدعوم على هذا المتصفح'
     : !pushEnabled
       ? 'السيرفر غير جاهز'
-      : devices > 0
-        ? `مفعّل · ${devices} جهاز`
-        : 'جاهز — لم يُفعَّل على هذا الجهاز'
+      : deviceOn
+        ? `مفعّل على هذا الجهاز${devices > 1 ? ` · ${devices} أجهزة للحساب` : ''}`
+        : devices > 0
+          ? `جاهز · ${devices} جهاز آخر على الحساب`
+          : 'جاهز — لم يُفعَّل على هذا الجهاز'
 
   return (
     <div className="rpm-stack nf">
@@ -272,7 +282,7 @@ export function NotificationsPage() {
           aria-controls="nf-push-panel"
         >
           <span className="nf-push__lead">
-            <span className={`nf-push__pulse ${pushEnabled && devices > 0 ? 'is-on' : ''}`.trim()} aria-hidden />
+            <span className={`nf-push__pulse ${deviceOn ? 'is-on' : ''}`.trim()} aria-hidden />
             <span className="nf-push__title">إشعارات الموبايل</span>
             <span className="nf-push__status">{pushStatusLabel}</span>
           </span>
@@ -292,10 +302,19 @@ export function NotificationsPage() {
               أجهزة هذا الحساب: {devices}
             </p>
             <div className="nf-push__actions">
-              <Button size="sm" loading={busy} onClick={() => void onEnablePush()}>تفعيل على هذا الجهاز</Button>
-              <Button size="sm" variant="secondary" loading={busy} onClick={() => void onTestPush()}>إرسال تجربة</Button>
-              {devices > 0 ? (
-                <Button size="sm" variant="secondary" loading={busy} onClick={() => void onDisablePush()}>إيقاف هذا الجهاز</Button>
+              {deviceOn ? (
+                <Button size="sm" variant="secondary" loading={busy} onClick={() => void onDisablePush()}>
+                  إيقاف على هذا الجهاز
+                </Button>
+              ) : (
+                <Button size="sm" loading={busy} onClick={() => void onEnablePush()} disabled={!pushEnabled || !supported}>
+                  تفعيل على هذا الجهاز
+                </Button>
+              )}
+              {allowTest ? (
+                <Button size="sm" variant="secondary" loading={busy} onClick={() => void onTestPush()}>
+                  إرسال تجربة
+                </Button>
               ) : null}
             </div>
           </div>
