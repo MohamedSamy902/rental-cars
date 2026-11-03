@@ -55,9 +55,25 @@ type PrintTenant = {
   logo_src?: string | null
 }
 
+type PrintTemplate = {
+  id: number
+  type: string
+  title: string
+  content: string
+  format: string
+  version: number
+  is_active: boolean
+  rendered_html?: string
+  variables?: Record<string, string>
+}
+
 type PrintPayload = {
   tenant: PrintTenant
   contract: PrintContract
+  templates?: {
+    contract?: PrintTemplate | null
+    handover_receipt?: PrintTemplate | null
+  }
 }
 
 const titles: Record<PrintDocKind, string> = {
@@ -93,7 +109,7 @@ async function resolveLogoSrc(logoPath?: string | null): Promise<string> {
           ? logoPath
           : `/api${logoPath.startsWith('/') ? logoPath : `/${logoPath}`}`
 
-    if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:')) {
+    if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:') || path.includes('/brand/')) {
       return path
     }
 
@@ -243,7 +259,7 @@ function receiptBody(tenant: PrintTenant, c: PrintContract) {
 
 async function loadPrintPayload(id: number): Promise<PrintPayload> {
   const res = await api<{ data: PrintPayload }>(`/contracts/${id}/print`)
-  const { tenant, contract } = res.data
+  const { tenant, contract, templates } = res.data
   const number = String(contract?.number || (contract as any)?.code || '').trim()
   if (!number) {
     throw Object.assign(new Error('تعذّر تحميل بيانات العقد للطباعة.'), { status: 422 })
@@ -252,13 +268,53 @@ async function loadPrintPayload(id: number): Promise<PrintPayload> {
   return {
     tenant: { ...tenant, logo_src },
     contract: { ...contract, number },
+    templates,
   }
 }
 
+/** Rewrite logo placeholders inside server-rendered HTML to the resolved blob/URL. */
+function applyRuntimeAssets(html: string, tenant: PrintTenant): string {
+  const logo = tenant.logo_src || brandFallbackSrc()
+  return html
+    .replaceAll('{{logo_src}}', esc(logo))
+    .replace(/src="([^"]*logo[^"]*)"/gi, (full, src: string) => {
+      if (src.startsWith('blob:') || src.startsWith('data:') || src.includes('/brand/')) return full
+      if (tenant.logo_path && src.includes(tenant.logo_path)) {
+        return `src="${esc(logo)}"`
+      }
+      if (src.startsWith('/api/') || src.startsWith('/media/')) {
+        return `src="${esc(logo)}"`
+      }
+      return full
+    })
+}
+
+function wrapTemplateHtml(title: string, html: string): string {
+  const trimmed = html.trim()
+  if (/^<!doctype/i.test(trimmed) || /<html[\s>]/i.test(trimmed)) {
+    return trimmed
+  }
+  return shell(title, trimmed)
+}
+
 function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
-  const { tenant, contract } = payload
+  const { tenant, contract, templates } = payload
   const title = `${titles[kind]} ${contract.number}`
-  if (kind === 'invoice') return shell(title, invoiceBody(tenant, contract))
+
+  if (kind === 'invoice') {
+    return shell(title, invoiceBody(tenant, contract))
+  }
+
+  if (kind === 'contract' && templates?.contract?.rendered_html) {
+    const body = applyRuntimeAssets(templates.contract.rendered_html, tenant)
+    return wrapTemplateHtml(title, body)
+  }
+
+  if (kind === 'receipt' && templates?.handover_receipt?.rendered_html) {
+    const body = applyRuntimeAssets(templates.handover_receipt.rendered_html, tenant)
+    return wrapTemplateHtml(title, body)
+  }
+
   if (kind === 'receipt') return shell(title, receiptBody(tenant, contract))
   return shell(title, contractBody(tenant, contract))
 }
@@ -271,13 +327,24 @@ export async function printContractDocument(
 ) {
   try {
     const payload = await loadPrintPayload(id)
+    const templateMeta =
+      kind === 'contract'
+        ? payload.templates?.contract
+        : kind === 'receipt'
+          ? payload.templates?.handover_receipt
+          : null
+
     await api('/print-snapshots', {
       method: 'POST',
       json: {
         type: snapshotType[kind],
         record_type: 'contract',
         record_id: id,
-        payload,
+        payload: {
+          ...payload,
+          template_version: templateMeta?.version ?? null,
+          template_id: templateMeta?.id ?? null,
+        },
       },
     }).catch(() => undefined)
 
