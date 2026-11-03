@@ -390,10 +390,11 @@
   align-items: center;
   gap: 0.55rem;
   padding-block: 0.25rem;
-  padding-inline: 0.25rem 0.6rem;
+  padding-inline: 0.25rem 0.55rem;
   border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--border);
+  color: var(--text);
 }
 .shell-user--action {
   cursor: pointer;
@@ -406,13 +407,14 @@
     box-shadow var(--motion-fast) ease,
     transform var(--motion-fast) ease;
 }
+/* Clean chip hover: neutral wash + border highlight — no crimson overlay. */
 .shell-user--action:hover {
-  background: var(--surface-hover, color-mix(in srgb, var(--surface) 88%, var(--action) 12%));
-  border-color: color-mix(in srgb, var(--border) 60%, var(--action) 40%);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--action) 18%, transparent);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
 }
 .shell-user--action:focus-visible {
-  outline: 2px solid var(--action);
+  outline: 2px solid var(--ring-strong);
   outline-offset: 2px;
 }
 .shell-user--action:active {
@@ -424,38 +426,59 @@
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: var(--action);
-  color: var(--on-action);
+  background: var(--brand);
+  color: var(--on-brand);
   font-weight: 700;
   font-size: 0.85rem;
+  flex-shrink: 0;
 }
 .shell-user__meta {
   display: grid;
+  min-width: 0;
 }
 .shell-user__meta strong {
   font-size: 0.8rem;
   line-height: 1.2;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .shell-user__meta em {
   font-style: normal;
   font-size: 0.68rem;
   color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .shell-user__edit {
   display: grid;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.55rem;
+  height: 1.55rem;
+  flex-shrink: 0;
   border-radius: 999px;
   color: var(--text-muted);
-  background: color-mix(in srgb, var(--surface-2, var(--bg)) 80%, transparent);
-  opacity: 0.72;
-  transition: opacity var(--motion-fast) ease, color var(--motion-fast) ease, background-color var(--motion-fast) ease;
+  background: transparent;
+  border: 1px solid transparent;
+  opacity: 0.85;
+  transition:
+    opacity var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
 }
+.shell-user__edit svg {
+  color: inherit;
+  stroke: currentColor;
+}
+/* Pencil stays crisp: translucent neutral disc, no red blob. */
 .shell-user--action:hover .shell-user__edit {
   opacity: 1;
-  color: var(--accent-solid);
-  background: color-mix(in srgb, var(--accent-solid) 14%, transparent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-color: var(--border);
 }
 .shell-user--action:hover .shell-user__meta strong {
   color: var(--text);
