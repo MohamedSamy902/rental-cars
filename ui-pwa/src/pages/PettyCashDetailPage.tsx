@@ -6,7 +6,7 @@ import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, Button, BackNavButton, Sheet, TextAreaField, MoneyField,
   useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, FilterBar, DataTable,
-  IconWallet, IconCash, IconTrend, IconReceipt, IconWrench, IconRefresh,
+  IconWallet, IconCash, IconTrend, IconReceipt, IconRefresh,
   type DataColumn,
 } from '@/shared/ui'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
@@ -240,10 +240,10 @@ export function PettyCashDetailPage() {
         json: {
           type: moveMode,
           amount: Number(move.amount),
-          notes: move.notes || (moveMode === 'topup' ? 'تغذية عهدة' : 'رد / تسوية عهدة'),
+          notes: move.notes || (moveMode === 'topup' ? 'تغذية عهدة' : 'سحب / استرداد من العهدة'),
         },
       })
-      toast.success(moveMode === 'topup' ? 'تم تغذية العهدة.' : 'تم تسجيل التسوية.')
+      toast.success(moveMode === 'topup' ? 'تم تغذية العهدة.' : 'تم سحب المبلغ من العهدة.')
       setMoveOpen(false)
       setMove({ amount: '', notes: '' })
       await load()
@@ -287,9 +287,13 @@ export function PettyCashDetailPage() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => { setMoveMode('return'); setMove({ amount: '', notes: '' }); setMoveOpen(true) }}
+              onClick={() => {
+                setMoveMode('return')
+                setMove({ amount: String(account.balance || ''), notes: 'سحب / استرداد من العهدة' })
+                setMoveOpen(true)
+              }}
             >
-              تسوية / رد مبلغ
+              سحب / استرداد من العهدة
             </Button>
             <Button variant="accent" onClick={() => setExpenseOpen(true)}>مصروف من العهدة</Button>
             <Button onClick={() => setWoOpen(true)}>صيانة من العهدة</Button>
@@ -311,11 +315,10 @@ export function PettyCashDetailPage() {
       <MetricCardGrid
         label="ملخص العهدة"
         items={[
-          { id: 'limit', label: 'حد العهدة', value: summary.limit_amount, format: 'money', icon: <IconWallet size={16} /> },
           { id: 'topup', label: 'إجمالي المستلم / التغذية', value: summary.total_topup, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
           { id: 'spent', label: 'إجمالي المنصرف', value: summary.total_spent, format: 'money', tone: 'warning', icon: <IconReceipt size={16} /> },
           { id: 'returned', label: 'إجمالي المرتجع / التسويات', value: summary.total_returned, format: 'money', tone: 'info', icon: <IconTrend size={16} /> },
-          { id: 'balance', label: 'الرصيد المتبقي الحالي', value: summary.balance, format: 'money', tone: summary.balance > 0 ? 'success' : 'warning', icon: <IconWrench size={16} /> },
+          { id: 'balance', label: 'الرصيد المتبقي الحالي', value: summary.balance, format: 'money', tone: summary.balance > 0 ? 'success' : 'warning', icon: <IconWallet size={16} /> },
         ]}
       />
 
@@ -346,7 +349,7 @@ export function PettyCashDetailPage() {
 
       <Sheet
         open={moveOpen}
-        title={moveMode === 'topup' ? 'تغذية العهدة' : 'تسوية / رد مبلغ'}
+        title={moveMode === 'topup' ? 'تغذية العهدة' : 'سحب / استرداد من العهدة'}
         onClose={() => setMoveOpen(false)}
         footer={
           <>
@@ -361,8 +364,20 @@ export function PettyCashDetailPage() {
             required
             value={move.amount}
             onChange={(e) => setMove({ ...move, amount: e.target.value })}
-            hint={moveMode === 'return' ? 'يُخصم من الرصيد الحالي كمرتجع/تسوية' : 'يُضاف إلى رصيد العهدة'}
+            hint={moveMode === 'return'
+              ? `الرصيد الحالي ${formatMoney(account.balance)} — يمكن سحب جزء أو الكل`
+              : 'يُضاف إلى رصيد العهدة (تراكمي)'}
           />
+          {moveMode === 'return' && account.balance > 0 ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setMove({ ...move, amount: String(account.balance), notes: move.notes || 'سحب الرصيد بالكامل' })}
+            >
+              سحب الرصيد بالكامل ({formatMoney(account.balance)})
+            </Button>
+          ) : null}
           <TextAreaField label="ملاحظات" value={move.notes} onChange={(e) => setMove({ ...move, notes: e.target.value })} />
         </div>
       </Sheet>

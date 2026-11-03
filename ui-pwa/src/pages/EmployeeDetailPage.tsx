@@ -1,0 +1,492 @@
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { api, type ApiError } from '@/shared/api/client'
+import { formatDate, formatMoney } from '@/shared/lib/format'
+import {
+  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, NumberField, SelectField,
+  useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid,
+  IconWallet, IconCash, IconTrend, IconBadge,
+} from '@/shared/ui'
+import './pages.css'
+
+type Permission = { id: number; key: string; label: string; module: string }
+
+type StaffUser = {
+  id: number
+  name: string
+  email: string
+  phone?: string | null
+  is_active: boolean
+  role?: {
+    id: number
+    name: string
+    label: string
+    permissions: Permission[]
+  } | null
+}
+
+type Employee = {
+  id: number
+  name: string
+  job_title?: string | null
+  hired_on?: string | null
+  base_salary: number
+  status: string
+}
+
+type Advance = {
+  id: number
+  amount: number
+  advanced_on: string
+  method?: string | null
+  notes?: string | null
+}
+
+type Assignment = {
+  id: number
+  title: string
+  status: string
+  notes?: string | null
+  assigned_at?: string | null
+  assignable_type?: string | null
+}
+
+type PettyCash = {
+  id: number
+  employee_id: number
+  balance: number
+  is_active: boolean
+} | null
+
+type Evaluation = {
+  id: number
+  score: number
+  period?: string | null
+  notes?: string | null
+}
+
+type PayrollRow = {
+  id: number
+  year?: number | null
+  month?: number | null
+  base_salary: number
+  advances: number
+  net_amount: number
+  paid_amount: number
+  run_status?: string | null
+}
+
+type Dossier = {
+  employee: Employee
+  user: StaffUser | null
+  advances: Advance[]
+  assignments: Assignment[]
+  petty_cash: PettyCash
+  evaluations: Evaluation[]
+  payroll_history: PayrollRow[]
+}
+
+export function EmployeeDetailPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const toast = useToast()
+  const [data, setData] = useState<Dossier | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+  const [advanceOpen, setAdvanceOpen] = useState(false)
+  const [evalOpen, setEvalOpen] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', job_title: '', hired_on: '', base_salary: '', status: 'active' })
+  const [advanceForm, setAdvanceForm] = useState({ amount: '', advanced_on: new Date().toISOString().slice(0, 10), method: 'cash', notes: '' })
+  const [evalForm, setEvalForm] = useState({ score: '80', period: '', notes: '' })
+  const [assignForm, setAssignForm] = useState({ notes: '', handed_on: new Date().toISOString().slice(0, 10) })
+
+  async function load() {
+    if (!id) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await api<{ data: Dossier }>(`/employees/${id}`)
+      setData(res.data)
+      const e = res.data.employee
+      setEditForm({
+        name: e.name,
+        job_title: e.job_title || '',
+        hired_on: e.hired_on ? String(e.hired_on).slice(0, 10) : '',
+        base_salary: String(e.base_salary ?? ''),
+        status: e.status || 'active',
+      })
+    } catch (e) {
+      setError((e as ApiError).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void load() }, [id])
+
+  async function saveEmployee() {
+    if (!data) return
+    setSaving(true)
+    try {
+      await api(`/employees/${data.employee.id}`, {
+        method: 'PUT',
+        json: {
+          name: editForm.name,
+          job_title: editForm.job_title || null,
+          hired_on: editForm.hired_on || null,
+          base_salary: Number(editForm.base_salary || 0),
+          status: editForm.status,
+        },
+      })
+      toast.success('تم تحديث بيانات الموظف.')
+      setEditOpen(false)
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveAdvance() {
+    if (!data) return
+    setSaving(true)
+    try {
+      await api('/salary-advances', {
+        method: 'POST',
+        json: {
+          employee_id: data.employee.id,
+          amount: Number(advanceForm.amount),
+          advanced_on: advanceForm.advanced_on,
+          method: advanceForm.method,
+          notes: advanceForm.notes || null,
+        },
+      })
+      toast.success('تم تسجيل السلفة.')
+      setAdvanceOpen(false)
+      setAdvanceForm({ amount: '', advanced_on: new Date().toISOString().slice(0, 10), method: 'cash', notes: '' })
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveEval() {
+    if (!data) return
+    setSaving(true)
+    try {
+      await api('/evaluations', {
+        method: 'POST',
+        json: {
+          employee_id: data.employee.id,
+          score: Number(evalForm.score),
+          period: evalForm.period || null,
+          notes: evalForm.notes || null,
+        },
+      })
+      toast.success('تم تسجيل التقييم.')
+      setEvalOpen(false)
+      setEvalForm({ score: '80', period: '', notes: '' })
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveAssignment() {
+    if (!data) return
+    const note = assignForm.notes.trim()
+    if (!note) {
+      toast.error('أدخل ملاحظات التسليم.')
+      return
+    }
+    setSaving(true)
+    try {
+      const day = assignForm.handed_on || new Date().toISOString().slice(0, 10)
+      await api('/employee-assignments', {
+        method: 'POST',
+        json: {
+          employee_id: data.employee.id,
+          title: note.slice(0, 200),
+          assignable_type: 'manual',
+          notes: `تاريخ التسليم: ${day}\n${note}`,
+        },
+      })
+      toast.success('تم تسجيل تسليم العهدة.')
+      setAssignOpen(false)
+      setAssignForm({ notes: '', handed_on: new Date().toISOString().slice(0, 10) })
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <div className="rpm-stack"><SkeletonBlock rows={8} /></div>
+  if (error || !data) {
+    return (
+      <div className="rpm-stack">
+        <ErrorState
+          title="تعذّر تحميل ملف الموظف"
+          description={error || 'غير موجود'}
+          action={<BackNavButton to="/staff" label="رجوع للموظفين" />}
+        />
+      </div>
+    )
+  }
+
+  const { employee: emp, user, advances, assignments, petty_cash: petty, evaluations, payroll_history: payroll } = data
+  const openAdvances = advances.reduce((s, a) => s + Number(a.amount || 0), 0)
+
+  return (
+    <div className="rpm-stack">
+      <PageHeader
+        title={emp.name}
+        subtitle={`${emp.job_title || 'بدون مسمى'} · ملف الموظف الكامل`}
+        action={
+          <>
+            <BackNavButton to="/staff" label="رجوع للموظفين" />
+            <Button variant="secondary" onClick={() => setEditOpen(true)}>تعديل الموظف</Button>
+            <Button variant="secondary" onClick={() => setAdvanceOpen(true)}>إضافة سلفة</Button>
+            <Button variant="secondary" onClick={() => setEvalOpen(true)}>تسجيل تقييم</Button>
+            <Button onClick={() => setAssignOpen(true)}>تسليم عهدة</Button>
+          </>
+        }
+      />
+
+      <MetricCardGrid
+        label="ملخص الموظف"
+        items={[
+          { id: 'salary', label: 'الراتب الأساسي', value: emp.base_salary, format: 'money', icon: <IconCash size={16} /> },
+          { id: 'advances', label: 'سلف مفتوحة', value: openAdvances, format: 'money', tone: openAdvances > 0 ? 'warning' : 'success', icon: <IconTrend size={16} /> },
+          { id: 'petty', label: 'رصيد العهدة', value: petty?.balance ?? 0, format: 'money', icon: <IconWallet size={16} /> },
+          { id: 'evals', label: 'عدد التقييمات', value: evaluations.length, icon: <IconBadge size={16} /> },
+        ]}
+      />
+
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>البيانات الأساسية</h3></div>
+        <DetailList
+          items={[
+            { label: 'الاسم', value: emp.name },
+            { label: 'المسمى الوظيفي', value: emp.job_title || '—' },
+            { label: 'تاريخ التعيين', value: emp.hired_on ? formatDate(emp.hired_on) : '—' },
+            { label: 'الراتب الأساسي', value: formatMoney(emp.base_salary) },
+            {
+              label: 'الحالة',
+              value: (
+                <StatusPill
+                  status={emp.status === 'active' ? 'active' : 'completed'}
+                  label={emp.status === 'active' ? 'على رأس العمل' : 'منتهٍ'}
+                />
+              ),
+            },
+          ]}
+        />
+      </section>
+
+      <section className="rpm-panel">
+        <div className="rpm-panel__head">
+          <h3>حساب الدخول والدور</h3>
+          {user ? <Button size="sm" variant="secondary" onClick={() => navigate('/staff?tab=users')}>إدارة الصلاحيات</Button> : null}
+        </div>
+        {user ? (
+          <DetailList
+            items={[
+              { label: 'اسم الحساب', value: user.name },
+              { label: 'البريد', value: <span dir="ltr">{user.email}</span> },
+              { label: 'الهاتف', value: user.phone || '—' },
+              { label: 'الدور', value: user.role?.label || '—' },
+              {
+                label: 'الحساب',
+                value: <StatusPill status={user.is_active ? 'active' : 'cancelled'} label={user.is_active ? 'نشط' : 'موقوف'} />,
+              },
+              {
+                label: 'الصلاحيات',
+                value: user.role?.permissions?.length
+                  ? `${user.role.permissions.length} صلاحية`
+                  : '—',
+              },
+            ]}
+          />
+        ) : (
+          <p className="muted">لا يوجد حساب دخول مربوط بهذا الموظف بعد.</p>
+        )}
+      </section>
+
+      <section className="rpm-panel">
+        <div className="rpm-panel__head">
+          <h3>العهدة النقدية</h3>
+          {petty ? (
+            <Link className="rpm-link-btn" to={`/petty-cash/${petty.id}`}>فتح سجل العهدة</Link>
+          ) : (
+            <Link className="rpm-link-btn" to="/petty-cash">فتح العهدة</Link>
+          )}
+        </div>
+        {petty ? (
+          <DetailList
+            items={[
+              { label: 'الرصيد الحالي', value: formatMoney(petty.balance) },
+              {
+                label: 'الحالة',
+                value: <StatusPill status={petty.is_active ? 'active' : 'cancelled'} label={petty.is_active ? 'نشطة' : 'موقوفة'} />,
+              },
+            ]}
+          />
+        ) : (
+          <p className="muted">لا توجد عهدة نقدية مسجّلة لهذا الموظف.</p>
+        )}
+      </section>
+
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>السلف النشطة</h3></div>
+        {advances.length === 0 ? <p className="muted">لا سلف مفتوحة.</p> : (
+          <div className="rpm-card-list">
+            {advances.map((a) => (
+              <article key={a.id} className="rpm-card">
+                <div className="rpm-card__row">
+                  <strong>{formatMoney(a.amount)}</strong>
+                  <span className="muted">{formatDate(a.advanced_on)}</span>
+                </div>
+                <p className="muted">{a.method || 'نقدي'}{a.notes ? ` · ${a.notes}` : ''}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>العهد والأصول المسلَّمة</h3></div>
+        {assignments.length === 0 ? <p className="muted">لا تسليمات مسجّلة.</p> : (
+          <div className="rpm-card-list">
+            {assignments.map((a) => (
+              <article key={a.id} className="rpm-card">
+                <div className="rpm-card__row">
+                  <strong>{a.title}</strong>
+                  <StatusPill status={a.status === 'acknowledged' ? 'completed' : 'pending'} label={a.status === 'acknowledged' ? 'مؤكَّد' : 'بانتظار'} />
+                </div>
+                <p className="muted">{a.assigned_at ? formatDate(a.assigned_at) : '—'}{a.notes ? ` · ${a.notes}` : ''}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>سجل الرواتب</h3></div>
+        {payroll.length === 0 ? <p className="muted">لا مسيرات رواتب بعد.</p> : (
+          <div className="rpm-card-list">
+            {payroll.map((p) => (
+              <article key={p.id} className="rpm-card">
+                <div className="rpm-card__row">
+                  <strong>{p.year}/{String(p.month || '').padStart(2, '0')}</strong>
+                  <span>{formatMoney(p.net_amount)}</span>
+                </div>
+                <p className="muted">
+                  أساسي {formatMoney(p.base_salary)} · سلف {formatMoney(p.advances)} · مدفوع {formatMoney(p.paid_amount)}
+                  {p.run_status ? ` · ${p.run_status}` : ''}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>التقييمات</h3></div>
+        {evaluations.length === 0 ? <p className="muted">لا تقييمات بعد.</p> : (
+          <div className="rpm-card-list">
+            {evaluations.map((ev) => (
+              <article key={ev.id} className="rpm-card">
+                <div className="rpm-card__row">
+                  <strong>درجة {ev.score}</strong>
+                  <span className="muted">{ev.period || '—'}</span>
+                </div>
+                {ev.notes ? <p className="muted">{ev.notes}</p> : null}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <Sheet
+        open={editOpen}
+        title="تعديل الموظف"
+        onClose={() => setEditOpen(false)}
+        footer={<><Button loading={saving} onClick={() => void saveEmployee()}>حفظ</Button><Button variant="secondary" onClick={() => setEditOpen(false)}>إلغاء</Button></>}
+      >
+        <div className="rpm-form-grid">
+          <TextField label="الاسم" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+          <TextField label="المسمى الوظيفي" value={editForm.job_title} onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })} />
+          <TextField label="تاريخ التعيين" type="date" value={editForm.hired_on} onChange={(e) => setEditForm({ ...editForm, hired_on: e.target.value })} />
+          <MoneyField label="الراتب الأساسي" value={editForm.base_salary} onChange={(e) => setEditForm({ ...editForm, base_salary: e.target.value })} />
+          <SelectField
+            label="الحالة"
+            value={editForm.status}
+            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+            options={[
+              { value: 'active', label: 'على رأس العمل' },
+              { value: 'ended', label: 'منتهٍ' },
+            ]}
+          />
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={advanceOpen}
+        title="إضافة سلفة"
+        onClose={() => setAdvanceOpen(false)}
+        footer={<><Button loading={saving} onClick={() => void saveAdvance()}>حفظ</Button><Button variant="secondary" onClick={() => setAdvanceOpen(false)}>إلغاء</Button></>}
+      >
+        <div className="rpm-form-grid">
+          <MoneyField label="المبلغ" required value={advanceForm.amount} onChange={(e) => setAdvanceForm({ ...advanceForm, amount: e.target.value })} />
+          <TextField label="التاريخ" type="date" value={advanceForm.advanced_on} onChange={(e) => setAdvanceForm({ ...advanceForm, advanced_on: e.target.value })} />
+          <SelectField
+            label="الطريقة"
+            value={advanceForm.method}
+            onChange={(e) => setAdvanceForm({ ...advanceForm, method: e.target.value })}
+            options={[
+              { value: 'cash', label: 'نقدي' },
+              { value: 'transfer', label: 'تحويل' },
+              { value: 'card', label: 'بطاقة' },
+            ]}
+          />
+          <TextAreaField label="ملاحظات" value={advanceForm.notes} onChange={(e) => setAdvanceForm({ ...advanceForm, notes: e.target.value })} />
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={evalOpen}
+        title="تسجيل تقييم"
+        onClose={() => setEvalOpen(false)}
+        footer={<><Button loading={saving} onClick={() => void saveEval()}>حفظ</Button><Button variant="secondary" onClick={() => setEvalOpen(false)}>إلغاء</Button></>}
+      >
+        <div className="rpm-form-grid">
+          <NumberField label="الدرجة" required value={evalForm.score} onChange={(e) => setEvalForm({ ...evalForm, score: e.target.value })} />
+          <TextField label="الفترة" value={evalForm.period} onChange={(e) => setEvalForm({ ...evalForm, period: e.target.value })} hint="مثال: Q1 2026" />
+          <TextAreaField label="ملاحظات" value={evalForm.notes} onChange={(e) => setEvalForm({ ...evalForm, notes: e.target.value })} />
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={assignOpen}
+        title="تسليم عهدة / أصل"
+        onClose={() => setAssignOpen(false)}
+        footer={<><Button loading={saving} onClick={() => void saveAssignment()}>حفظ</Button><Button variant="secondary" onClick={() => setAssignOpen(false)}>إلغاء</Button></>}
+      >
+        <div className="rpm-form-grid">
+          <TextAreaField label="ملاحظات / وصف التسليم" required value={assignForm.notes} onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value })} />
+          <TextField label="تاريخ التسليم" type="date" value={assignForm.handed_on} onChange={(e) => setAssignForm({ ...assignForm, handed_on: e.target.value })} />
+        </div>
+      </Sheet>
+    </div>
+  )
+}

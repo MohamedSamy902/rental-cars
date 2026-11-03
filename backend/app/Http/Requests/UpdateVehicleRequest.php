@@ -96,6 +96,8 @@ class UpdateVehicleRequest extends FormRequest
             'owner_id' => ['nullable', 'integer', 'exists:vehicle_owners,id'],
             'owner_monthly_amount' => ['nullable', 'integer', 'min:0'],
             'owner_since' => ['nullable', 'date'],
+            'addon_ids' => ['nullable', 'array'],
+            'addon_ids.*' => ['integer', 'exists:vehicle_addon_catalog,id'],
         ];
     }
 

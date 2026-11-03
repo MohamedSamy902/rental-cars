@@ -10,7 +10,7 @@ import { BrandLogo } from './BrandLogo'
 import { CommandPalette } from './CommandPalette'
 import { useSheetDrag } from './useSheetDrag'
 import {
-  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart, IconChat,
+  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart,
   IconChevron, IconClipboard, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
   IconLogout, IconMenu, IconMoon, IconPlus, IconQueue, IconReceipt, IconSearch, IconSettings,
   IconStore, IconSun, IconUserCog, IconUsers, IconWallet, IconWrench,
@@ -46,7 +46,7 @@ const railNav: NavItem[] = [
   { to: '/accounts', label: 'الحسابات', icon: <IconLandmark />, permission: 'accounting.view' },
   { to: '/reports', label: 'التقارير', icon: <IconChart />, permission: 'reports.view' },
   { to: '/hr', label: 'الموارد البشرية', icon: <IconBriefcase />, feature: 'hr', permission: 'hr.view' },
-  { to: '/chat', label: 'المحادثة', icon: <IconChat />, feature: 'chat' },
+  // Chat hidden from client delivery nav (route kept for integrator/feature flag).
   { to: '/staff', label: 'الموظفون', icon: <IconUserCog />, permission: 'staff.view' },
   { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconHistory />, permission: 'audit.view' },
   { to: '/notifications', label: 'الإشعارات', icon: <IconBell />, permission: 'notifications.view' },

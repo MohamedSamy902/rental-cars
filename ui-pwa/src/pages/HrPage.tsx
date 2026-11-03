@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
@@ -89,15 +89,6 @@ function assignableTypeLabel(raw?: string | null): string {
   return ASSIGNABLE_TYPE_LABELS[key] || key
 }
 
-const ASSIGNABLE_TYPE_OPTIONS = [
-  { value: 'manual', label: ASSIGNABLE_TYPE_LABELS.manual },
-  { value: 'asset', label: ASSIGNABLE_TYPE_LABELS.asset },
-  { value: 'phone', label: ASSIGNABLE_TYPE_LABELS.phone },
-  { value: 'car', label: ASSIGNABLE_TYPE_LABELS.car },
-  { value: 'petty_cash', label: ASSIGNABLE_TYPE_LABELS.petty_cash },
-  { value: 'customer', label: ASSIGNABLE_TYPE_LABELS.customer },
-]
-
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
 function periodLabel(year: number, month: number) {
@@ -108,6 +99,7 @@ const HrPageTabs = ['all', 'advances', 'payroll', 'custody', 'evals'] as const
 
 export function HrPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const { can } = useAuth()
   const canSalaries = can('hr.salaries') || can('hr.view') || can('hr.payroll_approve')
   const canAdvances = can('hr.advances') || can('hr.salaries')
@@ -130,7 +122,7 @@ export function HrPage() {
     employee_id: '', amount: '', advanced_on: now.toISOString().slice(0, 10), method: 'cash', notes: '',
   })
   const [assignForm, setAssignForm] = useState({
-    employee_id: '', title: '', assignable_type: 'manual', notes: '',
+    employee_id: '', title: 'تسليم عهدة', assignable_type: 'manual', notes: '', handed_on: new Date().toISOString().slice(0, 10),
   })
   const [payoutForm, setPayoutForm] = useState({ amount: '', paid_on: now.toISOString().slice(0, 10), method: 'cash', notes: '' })
   const [chip, setChip] = useQueryTab({ allowed: HrPageTabs, defaultValue: 'all' })
@@ -266,18 +258,24 @@ export function HrPage() {
   async function saveAssignment() {
     setSaving(true)
     try {
+      const note = (assignForm.notes || '').trim()
+      if (!note) {
+        toast.error('أدخل ملاحظات التسليم.')
+        return
+      }
+      const day = assignForm.handed_on || new Date().toISOString().slice(0, 10)
       await api('/employee-assignments', {
         method: 'POST',
         json: {
           employee_id: Number(assignForm.employee_id),
-          title: assignForm.title,
-          assignable_type: assignForm.assignable_type || 'manual',
-          notes: assignForm.notes || undefined,
+          title: note.slice(0, 200),
+          assignable_type: 'manual',
+          notes: `تاريخ التسليم: ${day}\n${note}`,
         },
       })
       toast.success('تم تسليم العهدة/الأصل — بانتظار تأكيد استلام الأدمن.')
       setAssignOpen(false)
-      setAssignForm({ employee_id: '', title: '', assignable_type: 'manual', notes: '' })
+      setAssignForm({ employee_id: '', title: 'تسليم عهدة', assignable_type: 'manual', notes: '', handed_on: new Date().toISOString().slice(0, 10) })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -422,11 +420,14 @@ export function HrPage() {
                 <strong className="tabular-nums">{formatMoney(a.amount)}</strong>
               </div>
               <p className="muted">{a.advanced_on} · {a.method === 'transfer' ? 'تحويل' : a.method === 'card' ? 'بطاقة' : 'نقدي'}{a.notes ? ` · ${a.notes}` : ''}</p>
-              {canAdvances ? (
-                <div className="rpm-card__actions">
+              <div className="rpm-card__actions">
+                {a.employee?.id ? (
+                  <Button size="sm" variant="secondary" onClick={() => navigate(`/employees/${a.employee!.id}`)}>عرض الملف الكامل</Button>
+                ) : null}
+                {canAdvances ? (
                   <Button size="sm" variant="danger" onClick={() => void deleteAdvance(a.id)}>حذف</Button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </article>
           ))}
         </div>
@@ -453,7 +454,13 @@ export function HrPage() {
                 <dl className="hr-custody-meta">
                   <div>
                     <dt>الموظف</dt>
-                    <dd>{a.employee?.name || 'موظف'}</dd>
+                    <dd>
+                      {a.employee?.id ? (
+                        <button type="button" className="rpm-link-btn" onClick={() => navigate(`/employees/${a.employee!.id}`)}>
+                          {a.employee?.name || 'موظف'}
+                        </button>
+                      ) : (a.employee?.name || 'موظف')}
+                    </dd>
                   </div>
                   <div>
                     <dt>نوع التسليم</dt>
@@ -589,15 +596,9 @@ export function HrPage() {
       <Sheet open={assignOpen} title="تسليم عهدة / أصل للموظف" onClose={() => setAssignOpen(false)} footer={<><Button loading={saving} onClick={() => void saveAssignment()}>حفظ التسليم</Button><Button variant="secondary" onClick={() => setAssignOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
           <SelectField label="الموظف" required value={assignForm.employee_id} onChange={(e) => setAssignForm({ ...assignForm, employee_id: e.target.value })} options={employees.map((e) => ({ value: String(e.id), label: e.name }))} />
-          <TextField label="ما الذي يُسلَّم؟" required value={assignForm.title} hint="مثال: هاتف عمل · لابتوب · سيارة خدمة · ملف مستندات" onChange={(e) => setAssignForm({ ...assignForm, title: e.target.value })} />
-          <SelectField
-            label="نوع التسليم"
-            value={assignForm.assignable_type}
-            onChange={(e) => setAssignForm({ ...assignForm, assignable_type: e.target.value })}
-            options={ASSIGNABLE_TYPE_OPTIONS}
-          />
-          <TextAreaField label="ملاحظات" value={assignForm.notes} onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value })} />
-          <p className="muted">بعد الحفظ يبقى التسليم بانتظار «تأكيد استلام الأدمن» — إثبات أن الموظف استلم العهدة أو الأصل.</p>
+          <TextAreaField label="ملاحظات" value={assignForm.notes} required hint="وصف مختصر لما يُسلَّم (هاتف · لابتوب · ملف…)" onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value, title: e.target.value.slice(0, 120) || 'تسليم عهدة' })} />
+          <TextField label="تاريخ التسليم" type="date" value={assignForm.handed_on || new Date().toISOString().slice(0, 10)} onChange={(e) => setAssignForm({ ...assignForm, handed_on: e.target.value })} />
+          <p className="muted">بعد الحفظ يبقى التسليم بانتظار «تأكيد استلام الأدمن».</p>
         </div>
       </Sheet>
 

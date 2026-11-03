@@ -160,8 +160,8 @@ function fromInitial(initial?: VehicleFormInitial | null): FormState {
 
 /**
  * Unified create/edit vehicle sheet — same field schema both modes.
- * Create-only: auto code preview, addon chips, inline new owner.
- * Edit: code locked read-only.
+ * Create: auto code preview, addon chips, inline new owner.
+ * Edit: code locked read-only; addons editable via the same catalog chips.
  */
 export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSaved }: Props) {
   const toast = useToast()
@@ -182,11 +182,22 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
     void api<{ data: { brands: Brand[]; addons: Addon[]; next_code: string } }>('/vehicles/catalogs')
       .then((res) => {
         const brandList = res.data.brands || []
+        const addonList = res.data.addons || []
         setBrands(brandList)
-        setAddons(res.data.addons || [])
+        setAddons(addonList)
         setNextCode(res.data.next_code || '—')
         if (mode === 'create' && brandList[0]) {
           setForm((f) => (f.brand ? f : { ...f, brand: brandList[0].name }))
+        }
+        if (mode === 'edit' && initial) {
+          const names = new Set(
+            ((initial as VehicleFormInitial & { accessories?: Array<{ name?: string | null }> }).accessories || [])
+              .map((a) => (a.name || '').trim().toLowerCase())
+              .filter(Boolean),
+          )
+          setSelectedAddons(
+            addonList.filter((a) => names.has(a.name.trim().toLowerCase())).map((a) => a.id),
+          )
         }
       })
       .catch(() => {
@@ -221,7 +232,6 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       transmission: form.transmission || null,
       seats: form.seats !== '' ? Number(form.seats) : null,
       target_monthly_income: form.target_monthly_income !== '' ? Number(form.target_monthly_income) : null,
-      purchase_value_estimate: form.purchase_value_estimate !== '' ? Number(form.purchase_value_estimate) : null,
       tracker_device_number: form.tracker_device_number || null,
       tracker_sim_number: form.tracker_sim_number || null,
       notes: form.notes || null,
@@ -235,8 +245,8 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
     try {
       const payload = corePayload()
 
+      payload.addon_ids = selectedAddons
       if (mode === 'create') {
-        payload.addon_ids = selectedAddons
         if (form.owner_mode === 'existing' && form.owner_id) {
           payload.owner_id = Number(form.owner_id)
           payload.owner_monthly_amount = form.owner_monthly_amount !== '' ? Number(form.owner_monthly_amount) : null
@@ -328,7 +338,6 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         <MoneyField label="الإيجار اليومي الافتراضي" required value={form.daily_rate} error={errors.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
         <MoneyField label="التأمين النقدي الافتراضي" required value={form.default_deposit} error={errors.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
         <MoneyField label="المستهدف الشهري" value={form.target_monthly_income} onChange={(e) => setForm({ ...form, target_monthly_income: e.target.value })} />
-        <MoneyField label="تقدير قيمة الشراء" value={form.purchase_value_estimate} onChange={(e) => setForm({ ...form, purchase_value_estimate: e.target.value })} />
         <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
         <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
 
@@ -371,21 +380,6 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
                 onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })}
               />
             ) : null}
-            <div className="rpm-field" style={{ gridColumn: '1 / -1' }}>
-              <span className="rpm-field__label">بيانات الإضافة</span>
-              <span className="rpm-field__hint">اختر المستلزمات من القائمة الرئيسية لإضافتها مع العربية</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBlockStart: '0.5rem' }}>
-                {addons.map((a) => {
-                  const on = selectedAddons.includes(a.id)
-                  return (
-                    <Button key={a.id} type="button" size="sm" variant={on ? 'accent' : 'secondary'} onClick={() => toggleAddon(a.id)}>
-                      {a.name}
-                    </Button>
-                  )
-                })}
-                {!addons.length ? <span className="muted">لا توجد بيانات إضافة بعد</span> : null}
-              </div>
-            </div>
           </>
         ) : (
           <>
@@ -403,6 +397,22 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
             ) : null}
           </>
         )}
+
+        <div className="rpm-field" style={{ gridColumn: '1 / -1' }}>
+          <span className="rpm-field__label">بيانات الإضافة / المستلزمات</span>
+          <span className="rpm-field__hint">اختر المستلزمات من القائمة الرئيسية لإضافتها أو تحديثها مع العربية</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBlockStart: '0.5rem' }}>
+            {addons.map((a) => {
+              const on = selectedAddons.includes(a.id)
+              return (
+                <Button key={a.id} type="button" size="sm" variant={on ? 'accent' : 'secondary'} onClick={() => toggleAddon(a.id)}>
+                  {a.name}
+                </Button>
+              )
+            })}
+            {!addons.length ? <span className="muted">لا توجد بيانات إضافة بعد</span> : null}
+          </div>
+        </div>
 
         <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         <SwitchField label="نشطة" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />

@@ -138,11 +138,30 @@ class OperationsController extends Controller
     {
         $data = $request->validate([
             'center_name' => ['sometimes', 'string', 'max:200'],
-            'print_footer' => ['nullable', 'string', 'max:300'],
+            'print_footer' => ['nullable', 'string', 'max:2000'],
+            'logo_path' => ['nullable', 'string', 'max:500'],
+            'print_phone' => ['nullable', 'string', 'max:50'],
+            'print_address' => ['nullable', 'string', 'max:500'],
+            'print_commercial_register' => ['nullable', 'string', 'max:120'],
+            'print_tax_info' => ['nullable', 'string', 'max:200'],
+            'contract_terms' => ['nullable', 'string', 'max:20000'],
             'operational' => ['nullable', 'array'],
         ]);
 
         $settings = TenantSetting::query()->firstOrCreate([]);
+
+        $ops = is_array($settings->operational) ? $settings->operational : [];
+        if (array_key_exists('operational', $data) && is_array($data['operational'])) {
+            $ops = array_merge($ops, $data['operational']);
+        }
+        foreach (['print_phone', 'print_address', 'print_commercial_register', 'print_tax_info', 'contract_terms'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $ops[$key] = $data[$key];
+                unset($data[$key]);
+            }
+        }
+        $data['operational'] = $ops;
+
         $settings->fill($data)->save();
 
         return response()->json(['data' => $settings->fresh(), 'message' => 'تم حفظ إعدادات التشغيل.']);
@@ -238,20 +257,74 @@ class OperationsController extends Controller
     {
         $data = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
-            'limit_amount' => ['required', 'integer', 'min:0'],
+            'limit_amount' => ['nullable', 'integer', 'min:0'],
             'balance' => ['nullable', 'integer', 'min:0'],
-        ], [], ['employee_id' => 'الموظف', 'limit_amount' => 'حد العهدة']);
+            'topup_amount' => ['nullable', 'integer', 'min:0'],
+        ], [], [
+            'employee_id' => 'الموظف',
+            'limit_amount' => 'حد العهدة',
+            'balance' => 'المبلغ',
+            'topup_amount' => 'مبلغ التغذية',
+        ]);
 
-        $row = PettyCashAccount::query()->updateOrCreate(
-            ['employee_id' => $data['employee_id']],
-            [
-                'limit_amount' => $data['limit_amount'],
-                'balance' => $data['balance'] ?? $data['limit_amount'],
+        $row = DB::transaction(function () use ($data, $request) {
+            $existing = PettyCashAccount::query()
+                ->where('employee_id', $data['employee_id'])
+                ->lockForUpdate()
+                ->first();
+
+            $topup = (int) ($data['topup_amount'] ?? $data['balance'] ?? 0);
+            if ($topup < 0) {
+                $topup = 0;
+            }
+
+            if ($existing) {
+                // Cumulative top-up — never overwrite the live balance.
+                $newBalance = (int) $existing->balance + $topup;
+                $existing->update([
+                    'limit_amount' => array_key_exists('limit_amount', $data)
+                        ? (int) ($data['limit_amount'] ?? 0)
+                        : (int) $existing->limit_amount,
+                    'balance' => $newBalance,
+                    'is_active' => true,
+                ]);
+
+                if ($topup > 0) {
+                    PettyCashMovement::query()->create([
+                        'petty_cash_account_id' => $existing->id,
+                        'type' => 'topup',
+                        'amount' => $topup,
+                        'moved_on' => now()->toDateString(),
+                        'performed_by' => $request->user()?->id,
+                        'notes' => 'تغذية عهدة',
+                    ]);
+                }
+
+                return $existing->fresh('employee');
+            }
+
+            $created = PettyCashAccount::query()->create([
+                'employee_id' => $data['employee_id'],
+                'limit_amount' => (int) ($data['limit_amount'] ?? 0),
+                'balance' => $topup,
                 'is_active' => true,
-            ],
-        );
+            ]);
 
-        return response()->json(['data' => $row->load('employee'), 'message' => 'تم حفظ العهدة.'], 201);
+            if ($topup > 0) {
+                PettyCashMovement::query()->create([
+                    'petty_cash_account_id' => $created->id,
+                    'type' => 'topup',
+                    'amount' => $topup,
+                    'moved_on' => now()->toDateString(),
+                    'performed_by' => $request->user()?->id,
+                    'notes' => 'تغذية عهدة',
+                ]);
+            }
+
+            return $created->load('employee');
+        });
+
+        return response()->json(['data' => $row, 'message' => 'تم حفظ العهدة.'], 201);
     }
 
     public function pettyCashMove(Request $request, PettyCashAccount $account): JsonResponse

@@ -1,4 +1,4 @@
-import { api, type ApiError } from '@/shared/api/client'
+import { api, getToken, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { statusLabel } from './contractModel'
@@ -43,8 +43,20 @@ type PrintContract = Record<string, unknown> & {
   }>
 }
 
+type PrintTenant = {
+  center_name?: string
+  print_footer?: string
+  logo_path?: string | null
+  print_phone?: string | null
+  print_address?: string | null
+  print_commercial_register?: string | null
+  print_tax_info?: string | null
+  contract_terms?: string | null
+  logo_src?: string | null
+}
+
 type PrintPayload = {
-  tenant: { center_name?: string; print_footer?: string }
+  tenant: PrintTenant
   contract: PrintContract
 }
 
@@ -64,6 +76,58 @@ function esc(s: string) {
   return s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch))
 }
 
+function brandFallbackSrc() {
+  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'
+  return `${base}brand/rpm-logo.webp`
+}
+
+async function resolveLogoSrc(logoPath?: string | null): Promise<string> {
+  const fallback = brandFallbackSrc()
+  if (!logoPath) return fallback
+  try {
+    const path = logoPath.startsWith('/api/')
+      ? logoPath
+      : logoPath.startsWith('/media/')
+        ? `/api${logoPath}`
+        : logoPath.startsWith('http')
+          ? logoPath
+          : `/api${logoPath.startsWith('/') ? logoPath : `/${logoPath}`}`
+
+    if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:')) {
+      return path
+    }
+
+    const headers: HeadersInit = { Accept: '*/*' }
+    const token = getToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(path, { headers })
+    if (!res.ok) return fallback
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  } catch {
+    return fallback
+  }
+}
+
+function headerBlock(tenant: PrintTenant) {
+  const logo = tenant.logo_src || brandFallbackSrc()
+  const meta = [
+    tenant.print_phone ? `هاتف: <span dir="ltr">${esc(tenant.print_phone)}</span>` : '',
+    tenant.print_address ? `العنوان: ${esc(tenant.print_address)}` : '',
+    tenant.print_commercial_register ? `س.ت: ${esc(tenant.print_commercial_register)}` : '',
+    tenant.print_tax_info ? `ضريبي: ${esc(tenant.print_tax_info)}` : '',
+  ].filter(Boolean).join(' · ')
+
+  return `
+    <header class="print-head">
+      <img class="print-logo" src="${esc(logo)}" alt="شعار الشركة" />
+      <div>
+        <h1>${esc(tenant.center_name || 'مركز التأجير')}</h1>
+        ${meta ? `<p class="muted">${meta}</p>` : ''}
+      </div>
+    </header>`
+}
+
 function shell(title: string, body: string) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title>
     <style>
@@ -75,16 +139,21 @@ function shell(title: string, body: string) {
       td,th{border:1px solid #cbd5e1;padding:8px;text-align:start}
       th{background:#f8fafc;width:32%}
       .foot{margin-top:24px;color:#64748b;font-size:12px}
-      .actions{margin-top:16px}
+      .terms{margin-top:20px;white-space:pre-wrap;font-size:13px;line-height:1.7}
       .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;color:#0f766e;font-size:12px}
+      .print-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
+      .print-logo{width:96px;height:auto;object-fit:contain}
+      @media print{.print-logo{max-width:110px}}
     </style>
   </head><body>${body}</body></html>`
 }
 
-function contractBody(tenant: PrintPayload['tenant'], c: PrintContract) {
+function contractBody(tenant: PrintTenant, c: PrintContract) {
+  const terms = (tenant.contract_terms || '').trim()
   return `
-    <h1>${esc(tenant.center_name || 'عقد تأجير')}</h1>
-    <p class="muted">عقد رقم ${esc(c.number)} · <span class="badge">${esc(statusLabel[c.status] || c.status)}</span></p>
+    ${headerBlock(tenant)}
+    <h2>عقد تأجير · رقم ${esc(c.number)}</h2>
+    <p class="muted"><span class="badge">${esc(statusLabel[c.status] || c.status)}</span></p>
     <table>
       <tr><th>العميل</th><td>${esc(c.customer?.full_name || '—')}${c.customer?.phone ? ` · <span dir="ltr">${esc(c.customer.phone)}</span>` : ''}</td></tr>
       <tr><th>العربية</th><td>${c.vehicle ? esc(`${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}`) : '—'}</td></tr>
@@ -94,10 +163,11 @@ function contractBody(tenant: PrintPayload['tenant'], c: PrintContract) {
       <tr><th>التأمين النقدي</th><td>${formatMoney(c.frozen_agreed_deposit || 0)}</td></tr>
       <tr><th>الإجمالي النهائي</th><td>${c.final_total != null ? formatMoney(c.final_total) : '—'}</td></tr>
     </table>
+    ${terms ? `<h2>بنود وشروط العقد</h2><div class="terms">${esc(terms)}</div>` : ''}
     <p class="foot">${esc(tenant.print_footer || '')}</p>`
 }
 
-function invoiceBody(tenant: PrintPayload['tenant'], c: PrintContract) {
+function invoiceBody(tenant: PrintTenant, c: PrintContract) {
   const payments = c.payments || []
   const rent = c.period_rent ?? null
   const excess = c.excess_km_amount ?? 0
@@ -116,8 +186,9 @@ function invoiceBody(tenant: PrintPayload['tenant'], c: PrintContract) {
     </tr>`).join('')
 
   return `
-    <h1>${esc(tenant.center_name || 'كشف حساب')}</h1>
-    <p class="muted">فاتورة / كشف حساب للعقد ${esc(c.number)} · ${esc(c.customer?.full_name || '—')}</p>
+    ${headerBlock(tenant)}
+    <h2>فاتورة / كشف حساب · عقد ${esc(c.number)}</h2>
+    <p class="muted">${esc(c.customer?.full_name || '—')}</p>
     <table>
       <tr><th>إيجار الفترة</th><td>${rent != null ? formatMoney(rent) : '—'}</td></tr>
       <tr><th>كيلومترات زيادة</th><td>${formatMoney(excess)}</td></tr>
@@ -135,13 +206,14 @@ function invoiceBody(tenant: PrintPayload['tenant'], c: PrintContract) {
     <p class="foot">${esc(tenant.print_footer || '')}</p>`
 }
 
-function receiptBody(tenant: PrintPayload['tenant'], c: PrintContract) {
+function receiptBody(tenant: PrintTenant, c: PrintContract) {
   const handover = (c.inspections || []).find((i) => i.type === 'handover')
   const ret = (c.inspections || []).find((i) => i.type === 'return')
   const deposit = c.deposit
   return `
-    <h1>${esc(tenant.center_name || 'سند قبض')}</h1>
-    <p class="muted">سند قبض التأمين ومحضر التسليم/الاستلام · عقد ${esc(c.number)}</p>
+    ${headerBlock(tenant)}
+    <h2>سند قبض التأمين ومحضر التسليم/الاستلام</h2>
+    <p class="muted">عقد ${esc(c.number)}</p>
     <h2>بيانات العميل والعربية</h2>
     <table>
       <tr><th>العميل</th><td>${esc(c.customer?.full_name || '—')}${c.customer?.phone ? ` · <span dir="ltr">${esc(c.customer.phone)}</span>` : ''}</td></tr>
@@ -172,10 +244,15 @@ function receiptBody(tenant: PrintPayload['tenant'], c: PrintContract) {
 async function loadPrintPayload(id: number): Promise<PrintPayload> {
   const res = await api<{ data: PrintPayload }>(`/contracts/${id}/print`)
   const { tenant, contract } = res.data
-  if (!contract?.number) {
+  const number = String(contract?.number || (contract as any)?.code || '').trim()
+  if (!number) {
     throw Object.assign(new Error('تعذّر تحميل بيانات العقد للطباعة.'), { status: 422 })
   }
-  return { tenant, contract }
+  const logo_src = await resolveLogoSrc(tenant?.logo_path)
+  return {
+    tenant: { ...tenant, logo_src },
+    contract: { ...contract, number },
+  }
 }
 
 function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
@@ -186,7 +263,7 @@ function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
   return shell(title, contractBody(tenant, contract))
 }
 
-/** Print one of the three core contract documents. */
+/** Print one of the three core contract documents via hidden iframe. */
 export async function printContractDocument(
   id: number,
   kind: PrintDocKind,

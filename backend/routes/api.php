@@ -68,8 +68,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/employees/lookup', [OperationsController::class, 'employeesLookup'])
         ->middleware('permission:hr.view,hr.salaries,hr.custody,hr.advances,petty_cash.view,petty_cash.manage,maintenance.view');
-    Route::middleware('permission:hr.view,hr.salaries,hr.custody,hr.advances,hr.expenses')->group(function () {
+    Route::middleware('permission:hr.view,hr.salaries,hr.custody,hr.advances,hr.expenses,staff.view')->group(function () {
         Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::get('/employees/{employee}', [EmployeeController::class, 'show']);
     });
     Route::middleware('permission:hr.salaries,hr.view')->group(function () {
         Route::get('/payroll', [PayrollController::class, 'index']);

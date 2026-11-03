@@ -103,10 +103,21 @@ class VehicleController extends Controller
                 $q->whereHas('contracts', fn ($c) => $c->where('status', 'active'));
             } elseif ($status === 'reserved') {
                 $q->whereHas('contracts', fn ($c) => $c->where('status', 'approved'));
+            } elseif ($status === 'expiring') {
+                $within = max(0, (int) $request->integer('within_days', 2));
+                $from = now()->startOfDay();
+                $until = now()->addDays($within)->endOfDay();
+                $q->whereHas('contracts', function ($c) use ($from, $until) {
+                    $c->where('status', 'active')
+                        ->where('planned_ends_at', '>=', $from)
+                        ->where('planned_ends_at', '<=', $until);
+                });
             }
         }
 
-        $q->with('owner:id,full_name,phone');
+        $q->with(['owner:id,full_name,phone', 'contracts' => function ($c) {
+            $c->where('status', 'active')->latest('planned_ends_at');
+        }]);
         $rows = $q->paginate((int) $request->integer('per_page', 50));
 
         $data = collect($rows->items())->map(function (Vehicle $v) {
@@ -380,7 +391,10 @@ class VehicleController extends Controller
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): JsonResponse
     {
         try {
-            $vehicle = $this->vehicles->update($vehicle, $request->validated());
+            $data = $request->validated();
+            $addonIds = array_key_exists('addon_ids', $data) ? ($data['addon_ids'] ?? []) : null;
+            unset($data['addon_ids']);
+            $vehicle = $this->vehicles->update($vehicle, $data, is_array($addonIds) ? $addonIds : null);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -447,9 +461,23 @@ class VehicleController extends Controller
             'accessories' => $v->relationLoaded('accessories') ? $v->accessories : null,
             'documents' => $v->relationLoaded('documents') ? $v->documents : null,
             'notes' => $v->notes,
+            'active_contract_ends_at' => $this->activeContractEndsAt($v),
             'created_at' => $v->created_at?->toIso8601String(),
             'updated_at' => $v->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function activeContractEndsAt(Vehicle $v): ?string
+    {
+        if ($v->relationLoaded('contracts')) {
+            $active = $v->contracts->firstWhere('status', 'active') ?? $v->contracts->first();
+
+            return $active?->planned_ends_at?->toIso8601String();
+        }
+
+        $active = $v->contracts()->where('status', 'active')->orderBy('planned_ends_at')->first();
+
+        return $active?->planned_ends_at?->toIso8601String();
     }
 
     /**

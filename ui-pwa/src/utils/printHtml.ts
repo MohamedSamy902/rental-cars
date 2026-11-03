@@ -69,8 +69,28 @@ export function printHtmlDocument(html: string): void {
     }
   }
 
+  const waitForImages = (): Promise<void> => {
+    const images = Array.from(doc.images || [])
+    if (!images.length) return Promise.resolve()
+    return Promise.all(
+      images.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete) {
+              resolve()
+              return
+            }
+            img.addEventListener('load', () => resolve(), { once: true })
+            img.addEventListener('error', () => resolve(), { once: true })
+          }),
+      ),
+    ).then(() => undefined)
+  }
+
   const schedulePrint = () => {
-    window.setTimeout(runPrint, SETTLE_MS)
+    void waitForImages().finally(() => {
+      window.setTimeout(runPrint, SETTLE_MS)
+    })
   }
 
   doc.open()

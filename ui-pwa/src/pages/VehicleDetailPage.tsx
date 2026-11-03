@@ -659,7 +659,6 @@ export function VehicleDetailPage() {
         <Fact label="الإيجار اليومي" value={formatMoney(v.daily_rate)} />
         <Fact label="التأمين النقدي" value={formatMoney(v.default_deposit)} />
         <Fact label="المستهدف الشهري" value={v.target_monthly_income != null ? formatMoney(v.target_monthly_income) : '—'} />
-        <Fact label="تقدير قيمة الشراء" value={v.purchase_value_estimate != null ? formatMoney(v.purchase_value_estimate) : '—'} />
         <Fact label="الحالة التشغيلية" value={statusLabel[v.status] || v.status} />
         <Fact label="حالة يدوية" value={v.manual_status || '—'} />
         <Fact label="نشطة" value={v.is_active === false ? 'لا' : 'نعم'} />

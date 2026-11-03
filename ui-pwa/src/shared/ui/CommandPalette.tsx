@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
-  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart, IconChat,
+  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart,
   IconClipboard, IconClose, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
   IconQueue, IconReceipt, IconSearch, IconSettings, IconStore, IconUserCog, IconUsers,
   IconWallet, IconWrench,
@@ -42,7 +42,6 @@ const ITEMS: Item[] = [
   { to: '/audit-logs', label: 'سجل التعديلات', group: 'النظام', icon: <IconHistory />, permission: 'audit.view' },
   { to: '/notifications', label: 'الإشعارات', group: 'النظام', icon: <IconBell />, permission: 'notifications.view' },
   { to: '/hr', label: 'الموارد البشرية', group: 'النظام', icon: <IconBriefcase />, feature: 'hr', permission: 'hr.view' },
-  { to: '/chat', label: 'محادثة التشغيل', group: 'النظام', icon: <IconChat />, feature: 'chat' },
   { to: '/settings', label: 'الإعدادات', group: 'النظام', icon: <IconSettings />, permission: 'settings.view' },
 ]
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
@@ -66,9 +67,7 @@ const emptyUserForm = {
   phone: '',
   password: '',
   role_id: '',
-  employee_id: '',
   is_active: true,
-  session_minutes: '',
   create_employee: true,
   job_title: '',
   hired_on: '',
@@ -87,6 +86,7 @@ const StaffPageTabs = ['users', 'permissions', 'hr'] as const satisfies readonly
 
 export function StaffPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [tab, setTab] = useQueryTab<TabId>({ allowed: StaffPageTabs, defaultValue: 'users' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -195,9 +195,7 @@ export function StaffPage() {
       phone: user.phone || '',
       password: '',
       role_id: user.role_id ? String(user.role_id) : '',
-      employee_id: user.employee_id ? String(user.employee_id) : '',
       is_active: user.is_active,
-      session_minutes: user.session_minutes ? String(user.session_minutes) : '',
       create_employee: false,
       job_title: '',
       hired_on: '',
@@ -216,23 +214,22 @@ export function StaffPage() {
         email: userForm.email,
         phone: userForm.phone || null,
         role_id: Number(userForm.role_id),
-        employee_id: userForm.employee_id ? Number(userForm.employee_id) : null,
         is_active: userForm.is_active,
-        session_minutes: userForm.session_minutes ? Number(userForm.session_minutes) : null,
       }
 
       if (editingUser) {
         if (userForm.password) payload.password = userForm.password
+        // Keep existing HR link; do not expose manual re-link in the form.
+        if (editingUser.employee_id) payload.employee_id = editingUser.employee_id
         await api(`/staff/${editingUser.id}`, { method: 'PUT', json: payload })
         toast.success('تم تحديث الموظف.')
       } else {
         payload.password = userForm.password
-        payload.create_employee = userForm.create_employee
-        if (userForm.create_employee) {
-          payload.job_title = userForm.job_title || null
-          payload.hired_on = userForm.hired_on || null
-          payload.base_salary = userForm.base_salary ? Number(userForm.base_salary) : 0
-        }
+        // Always auto-create/link HR employee record behind the scenes.
+        payload.create_employee = true
+        payload.job_title = userForm.job_title || null
+        payload.hired_on = userForm.hired_on || null
+        payload.base_salary = userForm.base_salary ? Number(userForm.base_salary) : 0
         await api('/staff', { method: 'POST', json: payload })
         toast.success('تم إضافة الموظف.')
       }
@@ -414,7 +411,7 @@ export function StaffPage() {
         {([
           {
             id: 'users' as const,
-            label: 'حسابات الدخول',
+            label: 'الموظفون',
             attention: (users.some((u) => !u.is_active) ? 'warning' : null) as 'warning' | null,
             attentionLabel: 'حسابات موقوفة',
           },
@@ -451,8 +448,8 @@ export function StaffPage() {
           >
             <div className="st-panel__head">
               <div>
-                <h2>حسابات الموظفين</h2>
-                <p>كل حساب مربوط بدور صريح ويمكن ربطه بسجل موظف اختياريًا.</p>
+                <h2>قائمة الموظفين</h2>
+                <p>كل موظف مربوط بدور صريح وصلاحيات واضحة.</p>
               </div>
               <label className="st-search">
                 <IconSearch size={16} />
@@ -500,8 +497,13 @@ export function StaffPage() {
                     </div>
                   </dl>
                   <footer className="st-user__foot">
+                    {u.employee_id ? (
+                      <Button size="sm" variant="secondary" onClick={() => navigate(`/employees/${u.employee_id}`)}>
+                        عرض الملف الكامل
+                      </Button>
+                    ) : null}
                     <Button size="sm" variant="secondary" iconStart={<IconEdit size={15} />} onClick={() => openEditUser(u)}>
-                      تعديل الحساب
+                      تعديل
                     </Button>
                   </footer>
                 </motion.article>
@@ -634,6 +636,9 @@ export function StaffPage() {
                       status={emp.status === 'active' ? 'active' : 'completed'}
                       label={emp.status === 'active' ? 'على رأس العمل' : 'منتهٍ'}
                     />
+                    <Button size="sm" variant="secondary" onClick={() => navigate(`/employees/${emp.id}`)}>
+                      عرض الملف الكامل
+                    </Button>
                   </div>
                 </article>
               ))}
@@ -674,23 +679,6 @@ export function StaffPage() {
             error={userErrors.role_id}
             onChange={(e) => setUserForm({ ...userForm, role_id: e.target.value })}
           />
-          <SelectField
-            label="ربط بسجل موظف"
-            options={[
-              { value: '', label: 'بدون ربط' },
-              ...employees.map((e) => ({ value: String(e.id), label: `${e.name}${e.job_title ? ` · ${e.job_title}` : ''}` })),
-            ]}
-            value={userForm.employee_id}
-            error={userErrors.employee_id}
-            onChange={(e) => setUserForm({ ...userForm, employee_id: e.target.value, create_employee: false })}
-          />
-          <NumberField
-            label="مدة الجلسة بالدقائق"
-            value={userForm.session_minutes}
-            error={userErrors.session_minutes}
-            hint="فارغ = من إعدادات النظام"
-            onChange={(e) => setUserForm({ ...userForm, session_minutes: e.target.value })}
-          />
           <SwitchField
             label="الحساب نشط"
             checked={userForm.is_active}
@@ -699,18 +687,9 @@ export function StaffPage() {
 
           {!editingUser ? (
             <>
-              <SwitchField
-                label="إنشاء سجل موارد بشرية مع الحساب"
-                checked={userForm.create_employee}
-                onChange={(next) => setUserForm({ ...userForm, create_employee: next })}
-              />
-              {userForm.create_employee ? (
-                <>
-                  <TextField label="المسمى الوظيفي" value={userForm.job_title} onChange={(e) => setUserForm({ ...userForm, job_title: e.target.value })} />
-                  <TextField label="تاريخ التعيين" type="date" value={userForm.hired_on} onChange={(e) => setUserForm({ ...userForm, hired_on: e.target.value })} />
-                  <MoneyField label="الراتب الأساسي" value={userForm.base_salary} onChange={(e) => setUserForm({ ...userForm, base_salary: e.target.value })} />
-                </>
-              ) : null}
+              <TextField label="المسمى الوظيفي" value={userForm.job_title} onChange={(e) => setUserForm({ ...userForm, job_title: e.target.value })} />
+              <TextField label="تاريخ التعيين" type="date" value={userForm.hired_on} onChange={(e) => setUserForm({ ...userForm, hired_on: e.target.value })} />
+              <MoneyField label="الراتب الأساسي" value={userForm.base_salary} onChange={(e) => setUserForm({ ...userForm, base_salary: e.target.value })} />
             </>
           ) : null}
         </div>

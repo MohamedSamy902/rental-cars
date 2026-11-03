@@ -67,10 +67,11 @@ class VehicleService
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  list<int>|null  $addonIds  when non-null, sync catalog add-ons onto vehicle accessories
      */
-    public function update(Vehicle $vehicle, array $data): Vehicle
+    public function update(Vehicle $vehicle, array $data, ?array $addonIds = null): Vehicle
     {
-        return DB::transaction(function () use ($vehicle, $data) {
+        return DB::transaction(function () use ($vehicle, $data, $addonIds) {
             if (array_key_exists('plate', $data) || isset($data['plate_letters']) || isset($data['plate_numbers'])) {
                 $data['plate'] = $this->normalizePlate(array_merge(
                     ['plate' => $vehicle->plate, 'plate_letters' => null, 'plate_numbers' => null],
@@ -92,6 +93,10 @@ class VehicleService
             unset($data['code'], $data['plate_letters'], $data['plate_numbers'], $data['owner_inline'], $data['addon_ids']);
 
             $vehicle->update($data);
+
+            if ($addonIds !== null) {
+                $this->syncAddonsFromCatalog($vehicle, $addonIds);
+            }
 
             return $vehicle->fresh(['owner', 'accessories', 'documents']);
         });
@@ -243,6 +248,77 @@ class VehicleService
             $vehicle->accessories()->create([
                 'name' => $catalog->name,
                 'default_qty' => is_array($entry) ? (int) ($entry['default_qty'] ?? $catalog->default_qty) : $catalog->default_qty,
+                'required_each_rental' => $catalog->required_each_rental,
+                'is_active' => true,
+                'notes' => $catalog->notes,
+                'sort_order' => $catalog->sort_order,
+            ]);
+        }
+    }
+
+    /**
+     * Sync catalog-based add-ons onto vehicle accessories (create missing, remove deselected catalog matches).
+     *
+     * @param  list<int|array<string, mixed>>  $addonIds
+     */
+    private function syncAddonsFromCatalog(Vehicle $vehicle, array $addonIds): void
+    {
+        $selectedIds = [];
+        foreach ($addonIds as $entry) {
+            $id = is_array($entry) ? (int) ($entry['id'] ?? 0) : (int) $entry;
+            if ($id > 0) {
+                $selectedIds[] = $id;
+            }
+        }
+        $selectedIds = array_values(array_unique($selectedIds));
+
+        $catalogRows = VehicleAddonCatalog::query()
+            ->whereIn('id', $selectedIds)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id');
+
+        $selectedNames = $catalogRows->pluck('name')->map(fn ($n) => mb_strtolower(trim((string) $n)))->all();
+        $allCatalogNames = VehicleAddonCatalog::query()
+            ->pluck('name')
+            ->map(fn ($n) => mb_strtolower(trim((string) $n)))
+            ->all();
+
+        $existing = $vehicle->accessories()->get();
+        foreach ($existing as $acc) {
+            $nameKey = mb_strtolower(trim((string) $acc->name));
+            if (! in_array($nameKey, $allCatalogNames, true)) {
+                // Manually added accessory — leave alone.
+                continue;
+            }
+            if (! in_array($nameKey, $selectedNames, true)) {
+                $acc->delete();
+            }
+        }
+
+        $remainingNames = $vehicle->accessories()->pluck('name')
+            ->map(fn ($n) => mb_strtolower(trim((string) $n)))
+            ->all();
+
+        foreach ($selectedIds as $id) {
+            $catalog = $catalogRows->get($id);
+            if (! $catalog) {
+                continue;
+            }
+            $nameKey = mb_strtolower(trim((string) $catalog->name));
+            if (in_array($nameKey, $remainingNames, true)) {
+                $vehicle->accessories()
+                    ->whereRaw('LOWER(name) = ?', [$nameKey])
+                    ->update([
+                        'is_active' => true,
+                        'default_qty' => $catalog->default_qty,
+                        'required_each_rental' => $catalog->required_each_rental,
+                    ]);
+                continue;
+            }
+            $vehicle->accessories()->create([
+                'name' => $catalog->name,
+                'default_qty' => $catalog->default_qty,
                 'required_each_rental' => $catalog->required_each_rental,
                 'is_active' => true,
                 'notes' => $catalog->notes,

@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable,
-  useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench,
+  useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench, IconEdit,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './pages.css'
 
-const VEHICLE_TABS = ['all', 'available', 'rented', 'reserved', 'maintenance'] as const
+const VEHICLE_TABS = ['all', 'available', 'rented', 'reserved', 'maintenance', 'expiring'] as const
+const EXPIRING_PRESETS = [1, 2, 3, 7] as const
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
 
@@ -37,6 +38,16 @@ type Vehicle = {
   owner_monthly_amount?: number | null
   owner_since?: string | null
   owner?: OwnerOption | null
+  active_contract_ends_at?: string | null
+  accessories?: Array<{ id?: number; name?: string | null }> | null
+  purchase_value_estimate?: number | null
+  color?: string | null
+  transmission?: string | null
+  chassis_number?: string | null
+  engine_number?: string | null
+  engine_capacity?: string | null
+  seats?: number | null
+  target_monthly_income?: number | null
 }
 
 const statusLabel: Record<string, string> = {
@@ -45,6 +56,7 @@ const statusLabel: Record<string, string> = {
   rented: 'مؤجرة',
   maintenance: 'في صيانة',
   out_of_service: 'خارج الخدمة',
+  expiring: 'قاربت على الانتهاء',
 }
 
 export function VehiclesPage() {
@@ -54,9 +66,13 @@ export function VehiclesPage() {
   const [summary, setSummary] = useState({ total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0 })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: VEHICLE_TABS, defaultValue: 'all' })
+  const [withinDays, setWithinDays] = useState(2)
+  const [customDays, setCustomDays] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
+  const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null)
+
   const chips = useMemo(
     () => [
       { id: 'all', label: 'الكل' },
@@ -79,17 +95,24 @@ export function VehiclesPage() {
         attention: summary.maintenance > 0 ? ('critical' as const) : null,
         attentionLabel: 'عربيات في الصيانة',
       },
+      {
+        id: 'expiring',
+        label: 'قاربت على الانتهاء',
+        attention: 'warning' as const,
+        attentionLabel: `خلال ${withinDays} يوم`,
+      },
     ],
-    [summary.rented, summary.reserved, summary.maintenance],
+    [summary.rented, summary.reserved, summary.maintenance, withinDays],
   )
 
-  async function load(nextSearch = search, nextChip = chip) {
+  async function load(nextSearch = search, nextChip = chip, days = withinDays) {
     setLoading(true)
     setError('')
     try {
       const qs = new URLSearchParams()
       if (nextSearch.trim()) qs.set('search', nextSearch.trim())
       if (nextChip !== 'all') qs.set('status', nextChip)
+      if (nextChip === 'expiring') qs.set('within_days', String(days))
       const res = await api<{ data: Vehicle[]; summary: typeof summary }>(`/vehicles?${qs}`)
       setRows(res.data)
       setSummary(res.summary)
@@ -103,7 +126,7 @@ export function VehiclesPage() {
   useEffect(() => {
     const t = window.setTimeout(() => load(), 250)
     return () => window.clearTimeout(t)
-  }, [search, chip])
+  }, [search, chip, withinDays])
 
   const columns: DataColumn<Vehicle>[] = [
     {
@@ -136,8 +159,15 @@ export function VehiclesPage() {
     {
       id: 'status',
       header: 'الحالة',
-      cell: (v) => <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />,
-      sortValue: (v) => v.status,
+      cell: (v) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+          <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+          {chip === 'expiring' && v.active_contract_ends_at ? (
+            <span className="rpm-table__sub">ينتهي {formatDate(v.active_contract_ends_at)}</span>
+          ) : null}
+        </div>
+      ),
+      sortValue: (v) => v.active_contract_ends_at || v.status,
       mobile: 'badge',
     },
     {
@@ -168,10 +198,20 @@ export function VehiclesPage() {
     },
   ]
 
+  async function openEdit(v: Vehicle) {
+    try {
+      const res = await api<{ data: Vehicle }>(`/vehicles/${v.id}`)
+      setEditVehicle(res.data)
+    } catch {
+      setEditVehicle(v)
+    }
+  }
+
   function vehicleMenu(v: Vehicle): MenuItem[] {
     return [
       { id: 'open', label: 'فتح الملف الكامل', icon: <IconEye size={16} />, onSelect: () => navigate(`/vehicles/${v.id}`) },
-      { id: 'calendar', label: 'تقويم الأسطول', icon: <IconCalendar size={16} />, onSelect: () => navigate('/calendar') },
+      { id: 'edit', label: 'تعديل بيانات العربية', icon: <IconEdit size={16} />, onSelect: () => void openEdit(v) },
+      { id: 'calendar', label: 'تقويم العربيات', icon: <IconCalendar size={16} />, onSelect: () => navigate('/calendar') },
       {
         id: 'copy',
         label: 'نسخ رقم اللوحة',
@@ -184,6 +224,15 @@ export function VehiclesPage() {
         },
       },
     ]
+  }
+
+  function applyCustomDays() {
+    const n = Number(customDays)
+    if (!Number.isFinite(n) || n < 0 || n > 60) {
+      toast.error('أدخل عدد أيام بين 0 و 60.')
+      return
+    }
+    setWithinDays(Math.round(n))
   }
 
   return (
@@ -222,6 +271,39 @@ export function VehiclesPage() {
         placeholder="بحث بالكود أو اللوحة أو الموديل…"
       />
 
+      {chip === 'expiring' ? (
+        <div className="rpm-dense-row" style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+          <span className="muted">خلال:</span>
+          {EXPIRING_PRESETS.map((d) => (
+            <Button
+              key={d}
+              type="button"
+              size="sm"
+              variant={withinDays === d ? 'accent' : 'secondary'}
+              onClick={() => { setWithinDays(d); setCustomDays('') }}
+            >
+              {d === 1 ? '1 يوم' : d === 2 ? '2 يوم' : `${d} أيام`}
+            </Button>
+          ))}
+          <label className="rpm-field" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span className="muted">مخصص</span>
+            <input
+              className="rpm-input"
+              style={{ width: '4.5rem' }}
+              type="number"
+              min={0}
+              max={60}
+              value={customDays}
+              placeholder={String(withinDays)}
+              onChange={(e) => setCustomDays(e.target.value)}
+              onBlur={() => { if (customDays !== '') applyCustomDays() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyCustomDays() }}
+              aria-label="عدد الأيام المخصص"
+            />
+          </label>
+        </div>
+      ) : null}
+
       {error ? (
         <ErrorState title="تعذّر تحميل العربيات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
       ) : (
@@ -246,6 +328,18 @@ export function VehiclesPage() {
         onSaved={(id) => {
           void load()
           if (id) navigate(`/vehicles/${id}`)
+        }}
+      />
+
+      <VehicleFormSheet
+        open={!!editVehicle}
+        mode="edit"
+        vehicleId={editVehicle?.id}
+        initial={editVehicle}
+        onClose={() => setEditVehicle(null)}
+        onSaved={() => {
+          setEditVehicle(null)
+          void load()
         }}
       />
     </div>

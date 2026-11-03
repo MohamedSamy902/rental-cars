@@ -181,14 +181,43 @@ class ContractController extends Controller
     {
         $contract->load(['customer', 'vehicle.documents', 'vehicle.accessories', 'deposit.deductions', 'inspections.damages']);
         $tenant = TenantSetting::query()->first();
+        $ops = is_array($tenant?->operational) ? $tenant->operational : [];
+
+        $payments = \App\Models\Payment::query()
+            ->where('link_type', 'contract')
+            ->where('link_id', $contract->id)
+            ->orderBy('paid_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($p) => [
+                'amount' => (int) $p->amount,
+                'direction' => $p->direction,
+                'method' => $p->method,
+                'reference' => $p->reference ?? null,
+                'paid_at' => $p->paid_at?->toDateString(),
+                'date' => $p->paid_at?->toDateString(),
+            ])
+            ->values()
+            ->all();
+
+        $payload = $contract->toArray();
+        $payload['payments'] = $payments;
+        // Ensure print consumers always see a stable document number.
+        $payload['number'] = $contract->number ?: ('C-'.$contract->id);
 
         return response()->json([
             'data' => [
                 'tenant' => [
                     'center_name' => $tenant?->center_name,
                     'print_footer' => $tenant?->print_footer,
+                    'logo_path' => $tenant?->logo_path,
+                    'print_phone' => $ops['print_phone'] ?? null,
+                    'print_address' => $ops['print_address'] ?? null,
+                    'print_commercial_register' => $ops['print_commercial_register'] ?? null,
+                    'print_tax_info' => $ops['print_tax_info'] ?? null,
+                    'contract_terms' => $ops['contract_terms'] ?? null,
                 ],
-                'contract' => $contract,
+                'contract' => $payload,
             ],
         ]);
     }
