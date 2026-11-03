@@ -182,11 +182,18 @@ input.rpm-input[type='datetime-local'] {
 }
 
 @media (max-width: 980px) {
+  .rpm-field {
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .rpm-input {
     min-height: 48px;
+    max-width: 100%;
     border-radius: 14px;
     background: var(--surface-2);
     border-color: var(--border);
+    /* ≥16px avoids iOS focus zoom on search/text inputs inside sheets */
     font-size: 1rem;
   }
 

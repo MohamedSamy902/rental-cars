@@ -183,6 +183,39 @@ class AuditNarrator
     }
 
     /**
+     * Known action keys → Arabic labels for audit filter dropdowns.
+     *
+     * @return array<string, string>
+     */
+    public function actionLabels(): array
+    {
+        return [
+            'created' => 'إضافة سجل',
+            'approved' => 'اعتماد عقد',
+            'handover' => 'تسليم العربية',
+            'completed' => 'استلام وإقفال',
+            'cancelled' => 'إلغاء عقد',
+            'price_override' => 'تعديل أسعار',
+            'swapped' => 'تبديل عربية',
+            'deposit_received' => 'قبض تأمين',
+            'deposit_deducted' => 'خصم من التأمين',
+            'deposit_returned' => 'رد تأمين',
+            'payment_recorded' => 'تسجيل دفعة',
+            'month_locked' => 'إقفال شهر',
+            'month_reopened' => 'إعادة فتح شهر',
+            'salary_advance_recorded' => 'سلفة موظف',
+            'salary_advance_deleted' => 'حذف سلفة',
+            'payroll_payout' => 'صرف راتب',
+            'petty_cash_opened' => 'فتح عهدة',
+            'petty_cash_topup' => 'تغذية عهدة',
+            'work_order_opened' => 'فتح أمر شغل',
+            'work_order_closed' => 'إغلاق أمر شغل',
+            'vehicle_updated' => 'تعديل عربية',
+            'customer_updated' => 'تعديل عميل',
+        ];
+    }
+
+    /**
      * @param  list<AuditLog>|\Illuminate\Support\Collection<int, AuditLog>  $logs
      * @return array<int, string> keyed by user id
      */

@@ -407,8 +407,16 @@ Query: `filter=all|one|today|week|range`
 - `range` → `from` & `to` (dates)  
 يتطلب `feature_flags.department_notice !== false`.
 
-### `GET /audit-logs?limit=50`
-آخر سجلات `audit_logs`.
+### `GET /audit-logs`
+آخر سجلات `audit_logs` بجمل عربية + خيارات فلترة.
+
+Query:
+- `limit` (1–200، افتراضي 50)
+- `user_id` — مستخدم نفّذ الحركة
+- `action` — مفتاح نوع الحدث (مثل `handover` · `created`)
+- `date_from` / `date_to` — تاريخ `YYYY-MM-DD` على `created_at`
+
+الاستجابة: `{ data: [...], meta: { users: [{id,name}], actions: [{value,label}], filters } }`.
 
 ---
 
