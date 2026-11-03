@@ -79,6 +79,8 @@ class EntityEditCapabilityTest extends TestCase
 
         $id = (int) $created->json('data.id');
 
+        $originalCode = (string) $created->json('data.code');
+
         $this->putJson("/api/inventory/items/{$id}", [
             'code' => 'OIL-9',
             'name' => 'زيت محرك محدث',
@@ -88,13 +90,19 @@ class EntityEditCapabilityTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('data.name', 'زيت محرك محدث')
             ->assertJsonPath('data.unit', 'علبة')
-            ->assertJsonPath('data.reorder_level', 8);
+            ->assertJsonPath('data.reorder_level', 8)
+            ->assertJsonPath('data.code', $originalCode);
 
+        // Codes are system-owned — client-supplied code on update is ignored.
         $this->assertDatabaseHas('inventory_items', [
             'id' => $id,
-            'code' => 'OIL-9',
+            'code' => $originalCode,
             'name' => 'زيت محرك محدث',
             'reorder_level' => 8,
+        ]);
+        $this->assertDatabaseMissing('inventory_items', [
+            'id' => $id,
+            'code' => 'OIL-9',
         ]);
         $this->assertInstanceOf(InventoryItem::class, InventoryItem::query()->find($id));
     }

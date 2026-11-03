@@ -15,13 +15,28 @@ class ExpenseController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = Expense::query()->with(['vehicle', 'employee', 'workOrder'])->latest('id');
+        $q = Expense::query()->with(['vehicle', 'employee', 'workOrder', 'recorder:id,name'])->latest('id');
         if ($vehicleId = $request->integer('vehicle_id')) {
             $q->where('vehicle_id', $vehicleId);
         }
+        if ($scope = $request->string('scope')->toString()) {
+            if ($scope === 'general') {
+                $q->whereNull('vehicle_id');
+            } elseif ($scope === 'vehicle') {
+                $q->whereNotNull('vehicle_id');
+            }
+        }
+
+        $rows = $q->limit(100)->get()->map(function (Expense $e) {
+            $arr = $e->toArray();
+            $arr['recorded_by_name'] = $e->recorder?->name;
+            $arr['scope'] = $e->vehicle_id ? 'vehicle' : 'general';
+
+            return $arr;
+        });
 
         return response()->json([
-            'data' => $q->limit(100)->get(),
+            'data' => $rows,
         ]);
     }
 

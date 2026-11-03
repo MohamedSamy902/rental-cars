@@ -294,7 +294,7 @@ export function DashboardPage() {
     return {
       occupancy: [
         go('fleet', 'عرض الأسطول', '/vehicles', <IconCar size={16} />),
-        go('maintenance', 'الصيانة وأوامر الشغل', '/maintenance', <IconWrench size={16} />),
+        go('maintenance', 'الصيانة', '/maintenance', <IconWrench size={16} />),
         ...tail,
       ],
       operations: [
@@ -654,53 +654,96 @@ export function DashboardPage() {
           <header className="db-prep__head">
             <div>
               <h2>تجهيز العربيات اليومي</h2>
-              <p>
-                اليوم · غداً · الثلاثة أيام التالية — مجموعات العمل: تسليم · استلام · صيانة
-                {' · '}
-                الإجمالي {formatNumber(data.fleet_prep.totals.total)}
-              </p>
+              <p>ماذا يحدث اليوم وغداً والأيام التالية — تسليم · استلام · صيانة</p>
             </div>
-            <Link to="/calendar" className="db-prep__link">التقويم</Link>
+            <div className="db-prep__summary">
+              <span>تسليم <b className="tabular-nums">{formatNumber(data.fleet_prep.totals.pickups)}</b></span>
+              <span>استلام <b className="tabular-nums">{formatNumber(data.fleet_prep.totals.returns)}</b></span>
+              <span>صيانة <b className="tabular-nums">{formatNumber(data.fleet_prep.totals.maintenance)}</b></span>
+              <Link to="/calendar" className="db-prep__link">التقويم</Link>
+            </div>
           </header>
           <div className="db-prep__days">
-            {data.fleet_prep.days.map((day) => (
-              <article key={day.date} className={`db-prep-day ${day.is_today ? 'is-today' : ''} ${day.is_tomorrow ? 'is-tomorrow' : ''}`.trim()}>
-                <header className="db-prep-day__head">
-                  <strong>{day.label}</strong>
-                  <span className="tabular-nums">{formatNumber(day.counts.total)}</span>
-                </header>
-                <div className="db-prep-day__groups">
-                  {(
-                    [
-                      { key: 'pickups' as const, label: 'تسليم', tone: 'brand' as BadgeTone },
-                      { key: 'returns' as const, label: 'استلام', tone: 'warning' as BadgeTone },
-                      { key: 'maintenance' as const, label: 'صيانة', tone: 'steel' as BadgeTone },
-                    ]
-                  ).map((g) => (
-                    <div key={g.key} className="db-prep-group">
-                      <div className="db-prep-group__label">
-                        <Badge tone={g.tone} dot={false}>{g.label}</Badge>
-                        <span className="tabular-nums">{formatNumber(day.counts[g.key])}</span>
-                      </div>
-                      {day.groups[g.key].length === 0 ? (
-                        <p className="db-prep-group__empty">—</p>
-                      ) : (
-                        <ul className="db-prep-group__list">
-                          {day.groups[g.key].slice(0, 4).map((item) => (
-                            <li key={`${g.key}-${item.id}`}>
-                              <Link to={g.key === 'maintenance' ? '/maintenance' : `/contracts/${item.number ? item.id : item.id}`}>
-                                <strong>{item.vehicle?.plate || item.title || item.number || `#${item.id}`}</strong>
-                                <span>{item.customer || item.vehicle?.label || item.title || ''}</span>
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+            {data.fleet_prep.days.map((day) => {
+              const dayTitle = day.is_today ? 'اليوم' : day.is_tomorrow ? 'غداً' : day.label
+              const groups: Array<{
+                key: 'pickups' | 'returns' | 'maintenance'
+                verb: string
+                empty: string
+                href: (item: FleetPrepItem) => string
+              }> = [
+                {
+                  key: 'pickups',
+                  verb: 'تسليم',
+                  empty: 'لا تسليمات',
+                  href: (item) => `/contracts/${item.id}`,
+                },
+                {
+                  key: 'returns',
+                  verb: 'استلام',
+                  empty: 'لا استلامات',
+                  href: (item) => `/contracts/${item.id}`,
+                },
+                {
+                  key: 'maintenance',
+                  verb: 'صيانة',
+                  empty: 'لا صيانة',
+                  href: () => '/maintenance',
+                },
+              ]
+              return (
+                <article
+                  key={day.date}
+                  className={`db-prep-day ${day.is_today ? 'is-today' : ''} ${day.is_tomorrow ? 'is-tomorrow' : ''}`.trim()}
+                >
+                  <header className="db-prep-day__head">
+                    <div>
+                      <strong>{dayTitle}</strong>
+                      <span className="db-prep-day__date">{day.date}</span>
                     </div>
-                  ))}
-                </div>
-              </article>
-            ))}
+                    <span className="db-prep-day__count tabular-nums">
+                      {day.counts.total === 0 ? 'هادئ' : `${formatNumber(day.counts.total)} حركة`}
+                    </span>
+                  </header>
+                  <div className="db-prep-day__groups">
+                    {groups.map((g) => {
+                      const items = day.groups[g.key]
+                      return (
+                        <div key={g.key} className={`db-prep-lane db-prep-lane--${g.key}`}>
+                          <div className="db-prep-lane__label">
+                            <span>{g.verb}</span>
+                            <b className="tabular-nums">{formatNumber(items.length)}</b>
+                          </div>
+                          {items.length === 0 ? (
+                            <p className="db-prep-lane__empty">{g.empty}</p>
+                          ) : (
+                            <ul className="db-prep-lane__list">
+                              {items.slice(0, 5).map((item) => {
+                                const plate = item.vehicle?.plate || item.number || `#${item.id}`
+                                const who = item.customer || item.vehicle?.label || item.title || '—'
+                                const when = item.at ? formatTime(item.at) : null
+                                return (
+                                  <li key={`${g.key}-${item.id}`}>
+                                    <Link to={g.href(item)} className="db-prep-card">
+                                      <span className="db-prep-card__plate">{plate}</span>
+                                      <span className="db-prep-card__who">{who}</span>
+                                      {when ? <span className="db-prep-card__when tabular-nums">{when}</span> : null}
+                                    </Link>
+                                  </li>
+                                )
+                              })}
+                              {items.length > 5 ? (
+                                <li className="db-prep-lane__more muted">+{items.length - 5} أخرى</li>
+                              ) : null}
+                            </ul>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </article>
+              )
+            })}
           </div>
         </section>
       ) : null}

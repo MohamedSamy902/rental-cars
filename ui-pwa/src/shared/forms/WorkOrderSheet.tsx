@@ -100,6 +100,8 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
       if (!form.unit_price || Number(form.unit_price) < 0) next.unit_price = 'أدخل سعر الشراء.'
     }
     if (!form.quantity || Number(form.quantity) < 1) next.quantity = 'الكمية يجب أن تكون ١ فأكثر.'
+    if (!form.next_service_on) next.next_service_on = 'موعد الصيانة التالية إلزامي للتنبيه.'
+    if (!form.next_service_odometer) next.next_service_odometer = 'عداد الصيانة التالية إلزامي للتنبيه.'
     setFieldErrors(next)
     return Object.keys(next).length === 0
   }
@@ -144,7 +146,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           ],
         },
       })
-      toast.success('تم فتح أمر الشغل.')
+      toast.success('تم فتح أمر الصيانة.')
       onClose()
       onSaved?.()
     } catch (e) {
@@ -162,11 +164,11 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
   return (
     <Sheet
       open={open}
-      title={vehicle ? `صيانة · ${vehicle.label}` : 'أمر شغل'}
+      title={vehicle ? `صيانة · ${vehicle.label}` : 'صيانة جديدة'}
       onClose={onClose}
       footer={
         <>
-          <Button loading={saving} onClick={() => void save()}>فتح أمر الشغل</Button>
+          <Button loading={saving} onClick={() => void save()}>فتح أمر الصيانة</Button>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
         </>
       }
@@ -287,15 +289,25 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
         />
         <DateField
           label="موعد الصيانة التالية"
+          required
+          error={fieldErrors.next_service_on}
           value={form.next_service_on}
-          onChange={(e) => setForm({ ...form, next_service_on: e.target.value })}
-          hint="تذكير زمني اختياري"
+          onChange={(e) => {
+            setForm({ ...form, next_service_on: e.target.value })
+            setFieldErrors((prev) => ({ ...prev, next_service_on: '' }))
+          }}
+          hint="يُستخدم لإشعار الفريق قبل الموعد"
         />
         <NumberField
           label="عداد الصيانة التالية"
+          required
+          error={fieldErrors.next_service_odometer}
           value={form.next_service_odometer}
-          onChange={(e) => setForm({ ...form, next_service_odometer: e.target.value })}
-          hint="تذكير بالكيلومترات اختياري"
+          onChange={(e) => {
+            setForm({ ...form, next_service_odometer: e.target.value })
+            setFieldErrors((prev) => ({ ...prev, next_service_odometer: '' }))
+          }}
+          hint="يُستخدم لإشعار عند بلوغ العداد"
         />
       </div>
     </Sheet>

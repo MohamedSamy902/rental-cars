@@ -16,6 +16,8 @@ export type ExpenseEditInitial = {
   work_order_id?: number | null
   employee_id?: number | null
   from_petty_cash?: boolean
+  scope?: 'vehicle' | 'general' | string | null
+  recorded_by_name?: string | null
   vehicle?: { id: number; brand?: string; model?: string; plate?: string } | null
 }
 
@@ -39,6 +41,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 const emptyForm = () => ({
   title: '',
   category: 'تشغيل',
+  scope: 'general' as 'general' | 'vehicle',
   amount: '',
   spent_on: today(),
   payment_method: 'cash',
@@ -67,9 +70,11 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
   useEffect(() => {
     if (!open) return
     if (initial) {
+      const hasVehicle = Boolean(initial.vehicle_id || vehicle?.id)
       setForm({
         title: initial.title || '',
         category: initial.category || 'تشغيل',
+        scope: hasVehicle || initial.scope === 'vehicle' ? 'vehicle' : 'general',
         amount: String(initial.amount ?? ''),
         spent_on: spentOnValue(initial.spent_on),
         payment_method: initial.from_petty_cash ? 'cash' : (initial.payment_method || 'cash'),
@@ -82,6 +87,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
     } else {
       setForm({
         ...emptyForm(),
+        scope: vehicle?.id ? 'vehicle' : 'general',
         vehicle_id: vehicle?.id ? String(vehicle.id) : '',
         from_petty_cash: Boolean(custodyEmployee?.id),
         employee_id: custodyEmployee?.id ? String(custodyEmployee.id) : '',
@@ -110,6 +116,9 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
     setSaving(true)
     setErrors({})
     try {
+      const linkedVehicle = form.scope === 'vehicle'
+        ? (form.vehicle_id ? Number(form.vehicle_id) : vehicle?.id)
+        : undefined
       const payload = {
         title: form.title,
         category: form.category,
@@ -117,7 +126,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
         spent_on: form.spent_on,
         payment_method: form.from_petty_cash ? 'petty_cash' : form.payment_method,
         notes: form.notes || undefined,
-        vehicle_id: form.vehicle_id ? Number(form.vehicle_id) : vehicle?.id,
+        vehicle_id: linkedVehicle || null,
         work_order_id: form.category === 'صيانة' && form.work_order_id ? Number(form.work_order_id) : undefined,
         from_petty_cash: form.from_petty_cash,
         employee_id: form.from_petty_cash && form.employee_id ? Number(form.employee_id) : undefined,
@@ -165,21 +174,47 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
       <div className="rpm-form-grid">
         <TextField label="العنوان" required value={form.title} error={errors.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
         <MoneyField label="المبلغ" required value={form.amount} error={errors.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+        {!vehicle ? (
+          <SelectField
+            label="نوع المصروف"
+            value={form.scope}
+            onChange={(e) => {
+              const scope = e.target.value as 'general' | 'vehicle'
+              setForm({
+                ...form,
+                scope,
+                vehicle_id: scope === 'general' ? '' : form.vehicle_id,
+                work_order_id: '',
+                category: scope === 'general' && form.category === 'صيانة' ? 'تشغيل' : form.category,
+              })
+            }}
+            options={[
+              { value: 'general', label: 'مصروف عام / فرع' },
+              { value: 'vehicle', label: 'مرتبط بعربية' },
+            ]}
+            hint="المصروف العام يُسجَّل على الفرع دون ربط بعربية"
+          />
+        ) : null}
         <SelectField
           label="التصنيف"
           value={form.category}
           onChange={(e) => setForm({ ...form, category: e.target.value, work_order_id: '' })}
-          options={[{ value: 'تشغيل', label: 'تشغيل' }, { value: 'صيانة', label: 'صيانة' }, { value: 'أخرى', label: 'أخرى' }]}
+          options={[
+            { value: 'تشغيل', label: 'تشغيل' },
+            ...(form.scope === 'vehicle' || vehicle ? [{ value: 'صيانة', label: 'صيانة' }] : []),
+            { value: 'فرع', label: 'فرع / موقع' },
+            { value: 'أخرى', label: 'أخرى' },
+          ]}
         />
-        <DateField label="التاريخ" required value={form.spent_on} error={errors.spent_on} onChange={(e) => setForm({ ...form, spent_on: e.target.value })} />
-        {!vehicle ? (
+        <DateField label="تاريخ الصرف" required value={form.spent_on} error={errors.spent_on} onChange={(e) => setForm({ ...form, spent_on: e.target.value })} />
+        {(form.scope === 'vehicle' || vehicle) && !vehicle ? (
           <SelectField
             label="العربية"
             required={form.category === 'صيانة'}
             value={form.vehicle_id}
             error={errors.vehicle_id}
             options={[
-              { value: '', label: form.category === 'صيانة' ? 'اختر عربية…' : '— بدون عربية —' },
+              { value: '', label: form.category === 'صيانة' ? 'اختر عربية…' : '— اختر عربية —' },
               ...vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` })),
             ]}
             onChange={(e) => setForm({ ...form, vehicle_id: e.target.value, work_order_id: '' })}
@@ -187,12 +222,12 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
         ) : null}
         {form.category === 'صيانة' ? (
           <SelectField
-            label="أمر الشغل المرتبط"
+            label="أمر الصيانة المرتبط"
             value={form.work_order_id}
             error={errors.work_order_id}
             hint="يربط المصروف بسجل صيانة العربية محاسبياً"
             options={[
-              { value: '', label: '— بدون أمر شغل —' },
+              { value: '', label: '— بدون أمر صيانة —' },
               ...workOrders.map((w) => ({
                 value: String(w.id),
                 label: `#${w.id} · ${w.status}${w.opened_on ? ` · ${w.opened_on}` : ''}${w.workshop ? ` · ${w.workshop}` : ''}`,
@@ -208,7 +243,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
         />
         {form.from_petty_cash ? (
           <SelectField
-            label="موظف العهدة"
+            label="موظف العهدة (من دفع)"
             required
             value={form.employee_id}
             error={errors.employee_id}
@@ -226,6 +261,9 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
             options={[{ value: 'cash', label: 'نقدي' }, { value: 'transfer', label: 'تحويل' }, { value: 'card', label: 'بطاقة' }]}
           />
         )}
+        {editing && initial?.recorded_by_name ? (
+          <TextField label="سجّله" value={initial.recorded_by_name} disabled onChange={() => undefined} />
+        ) : null}
         <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       </div>
     </Sheet>

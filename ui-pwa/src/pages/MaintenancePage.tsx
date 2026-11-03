@@ -47,7 +47,7 @@ const columns: DataColumn<WorkOrder>[] = [
   },
 ]
 
-const MaintenancePageTabs = ['open', 'closed'] as const
+const MaintenancePageTabs = ['all', 'open', 'closed'] as const
 
 export function MaintenancePage() {
   const toast = useToast()
@@ -56,7 +56,7 @@ export function MaintenancePage() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useQueryTab({ allowed: MaintenancePageTabs, defaultValue: 'open' })
+  const [chip, setChip] = useQueryTab({ allowed: MaintenancePageTabs, defaultValue: 'all' })
 
   async function load() {
     setLoading(true)
@@ -73,6 +73,7 @@ export function MaintenancePage() {
 
   const chips = useMemo(
     () => [
+      { id: 'all', label: 'الكل' },
       {
         id: 'open',
         label: 'مفتوح',
@@ -80,7 +81,6 @@ export function MaintenancePage() {
         attentionLabel: `${summary.open} أمر شغل مفتوح`,
       },
       { id: 'closed', label: 'مغلق' },
-      { id: 'all', label: 'الكل' },
     ],
     [summary.open],
   )
@@ -99,7 +99,7 @@ export function MaintenancePage() {
   async function closeOrder(id: number) {
     try {
       await api(`/work-orders/${id}/close`, { method: 'POST' })
-      toast.success('تم إغلاق أمر الشغل.')
+      toast.success('تم إغلاق أمر الصيانة.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -108,10 +108,10 @@ export function MaintenancePage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="أوامر الشغل" subtitle="صرف FIFO أو شراء · تعارض الصيانة مع الحجوزات" action={<Button onClick={() => setOpen(true)}>أمر شغل</Button>} mobileFab />
-      <Fab label="أمر شغل" onClick={() => setOpen(true)} />
+      <PageHeader title="الصيانة" subtitle="فتح صيانة · صرف من المخزون أو العهدة · تنبيه الصيانة التالية" action={<Button onClick={() => setOpen(true)}>صيانة جديدة</Button>} mobileFab />
+      <Fab label="صيانة جديدة" onClick={() => setOpen(true)} />
       <MetricCardGrid
-        label="ملخص أوامر الشغل"
+        label="ملخص الصيانة"
         mobile="wrap"
         items={[
           { id: 'open', label: 'أوامر مفتوحة', value: summary.open, tone: 'warning', icon: <IconWrench size={16} /> },
@@ -131,7 +131,7 @@ export function MaintenancePage() {
         placeholder="بحث بالعربية أو الورشة…"
       />
       <DataTable
-        label="أوامر الشغل"
+        label="أوامر الصيانة"
         rows={filtered}
         columns={columns}
         rowKey={(r) => r.id}

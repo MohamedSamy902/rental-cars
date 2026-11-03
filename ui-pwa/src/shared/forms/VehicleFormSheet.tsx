@@ -79,6 +79,10 @@ type FormState = {
   owner_phone: string
   owner_national_id: string
   owner_notes: string
+  has_license: boolean
+  license_expires_on: string
+  license_issued_on: string
+  license_status: 'none' | 'active' | 'expired'
 }
 
 function emptyForm(): FormState {
@@ -113,6 +117,10 @@ function emptyForm(): FormState {
     owner_phone: '',
     owner_national_id: '',
     owner_notes: '',
+    has_license: false,
+    license_expires_on: '',
+    license_issued_on: '',
+    license_status: 'none',
   }
 }
 
@@ -178,7 +186,20 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
     if (!open) return
     setErrors({})
     setSelectedAddons([])
-    setForm(mode === 'edit' ? fromInitial(initial) : emptyForm())
+    const next = mode === 'edit' ? fromInitial(initial) : emptyForm()
+    if (mode === 'edit' && initial) {
+      const docs = (initial as VehicleFormInitial & { documents?: Array<{ type?: string; expires_on?: string | null; issued_on?: string | null }> }).documents || []
+      const lic = docs.find((d) => /رخص|license/i.test(d.type || ''))
+      if (lic) {
+        const exp = lic.expires_on ? String(lic.expires_on).slice(0, 10) : ''
+        const expired = Boolean(exp && exp < new Date().toISOString().slice(0, 10))
+        next.has_license = true
+        next.license_expires_on = exp
+        next.license_issued_on = lic.issued_on ? String(lic.issued_on).slice(0, 10) : ''
+        next.license_status = expired ? 'expired' : 'active'
+      }
+    }
+    setForm(next)
     void api<{ data: { brands: Brand[]; addons: Addon[]; next_code: string } }>('/vehicles/catalogs')
       .then((res) => {
         const brandList = res.data.brands || []
@@ -246,6 +267,14 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       const payload = corePayload()
 
       payload.addon_ids = selectedAddons
+      payload.license = {
+        has_license: form.has_license,
+        expires_on: form.has_license && form.license_expires_on ? form.license_expires_on : null,
+        issued_on: form.has_license && form.license_issued_on ? form.license_issued_on : null,
+        notes: form.has_license
+          ? (form.license_status === 'expired' ? 'رخصة منتهية' : (form.license_status === 'active' ? 'رخصة سارية' : null))
+          : 'بدون رخصة تسيير',
+      }
       if (mode === 'create') {
         if (form.owner_mode === 'existing' && form.owner_id) {
           payload.owner_id = Number(form.owner_id)
@@ -412,6 +441,56 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
             })}
             {!addons.length ? <span className="muted">لا توجد بيانات إضافة بعد</span> : null}
           </div>
+        </div>
+
+        <div className="rpm-inline-box" style={{ margin: 0, gridColumn: '1 / -1' }}>
+          <p className="rpm-inline-box__title">رخصة التسيير</p>
+          <SwitchField
+            label="يوجد رخصة تسيير"
+            checked={form.has_license}
+            onChange={(has_license) => setForm({
+              ...form,
+              has_license,
+              license_status: has_license ? (form.license_status === 'none' ? 'active' : form.license_status) : 'none',
+            })}
+          />
+          {form.has_license ? (
+            <div className="rpm-form-grid" style={{ marginBlockStart: '0.5rem' }}>
+              <SelectField
+                label="حالة الرخصة"
+                value={form.license_status === 'none' ? 'active' : form.license_status}
+                onChange={(e) => setForm({ ...form, license_status: e.target.value as FormState['license_status'] })}
+                options={[
+                  { value: 'active', label: 'سارية' },
+                  { value: 'expired', label: 'منتهية' },
+                ]}
+              />
+              <TextField
+                label="تاريخ الإصدار"
+                type="date"
+                value={form.license_issued_on}
+                onChange={(e) => setForm({ ...form, license_issued_on: e.target.value })}
+              />
+              <TextField
+                label="تاريخ الانتهاء"
+                type="date"
+                value={form.license_expires_on}
+                error={errors['license.expires_on']}
+                onChange={(e) => {
+                  const license_expires_on = e.target.value
+                  const expired = license_expires_on && license_expires_on < new Date().toISOString().slice(0, 10)
+                  setForm({
+                    ...form,
+                    license_expires_on,
+                    license_status: expired ? 'expired' : 'active',
+                  })
+                }}
+                hint="يُسمح برخصة منتهية — يُحدَّث الحالة تلقائياً"
+              />
+            </div>
+          ) : (
+            <p className="muted" style={{ marginBlockStart: '0.35rem' }}>يمكن إضافة العربية بدون رخصة تسيير وتسجيلها لاحقاً من ملف العربية.</p>
+          )}
         </div>
 
         <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

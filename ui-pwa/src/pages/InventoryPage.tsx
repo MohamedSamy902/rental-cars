@@ -112,7 +112,8 @@ export function InventoryPage() {
     setSavingItem(true)
     try {
       const payload = {
-        code: itemForm.code || undefined,
+        // Codes are system-owned — never send a manual/placeholder value on create.
+        ...(editingItem ? {} : {}),
         name: itemForm.name,
         category: itemForm.category,
         unit: itemForm.unit,
@@ -218,9 +219,10 @@ export function InventoryPage() {
         <div className="rpm-form-grid">
           <TextField
             label="الكود"
-            value={itemForm.code}
-            hint={editingItem ? 'اختياري — اتركه كما هو أو عدّله' : 'اختياري — يُولَّد تلقائياً إن تُرك فارغاً'}
-            onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })}
+            value={editingItem ? itemForm.code : (itemForm.code || 'يُولَّد تلقائياً')}
+            disabled
+            hint={editingItem ? 'يُدار تلقائياً ولا يُعدَّل يدوياً' : 'يُولَّد تلقائياً عند الحفظ'}
+            onChange={() => undefined}
           />
           <TextField label="الاسم" required value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} />
           <TextField label="التصنيف" required value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -71,6 +71,7 @@ const emptyForm = {
 
 export function OwnerDetailPage() {
   const { id } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const toast = useToast()
   const { openNewContract } = useNewContract()
   const [owner, setOwner] = useState<Owner | null>(null)
@@ -113,6 +114,15 @@ export function OwnerDetailPage() {
   }
 
   useEffect(() => { void load() }, [id])
+
+  useEffect(() => {
+    if (searchParams.get('edit') === '1' && owner && !loading) {
+      setEditing(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete('edit')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, owner, loading, setSearchParams])
 
   async function onUpdate() {
     if (!owner) return

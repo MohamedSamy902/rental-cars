@@ -143,6 +143,31 @@ class ContractLifecycleService
                 ],
             ]);
 
+            $paymentAmount = (int) ($data['payment_amount'] ?? 0);
+            if ($paymentAmount > 0) {
+                $this->accounting->recordPayment([
+                    'amount' => $paymentAmount,
+                    'method' => $data['payment_method'] ?? 'cash',
+                    'direction' => 'in',
+                    'reference' => $data['payment_reference'] ?? ('NEW-'.$contract->number),
+                    'link_type' => 'contract',
+                    'link_id' => $contract->id,
+                    'notes' => $data['payment_notes'] ?? 'دفعة عند إنشاء الحجز',
+                ], $userId);
+
+                AuditLog::query()->create([
+                    'user_id' => $userId,
+                    'action' => 'payment_recorded',
+                    'record_type' => Contract::class,
+                    'record_id' => $contract->id,
+                    'after' => [
+                        'number' => $contract->number,
+                        'amount' => $paymentAmount,
+                        'method' => $data['payment_method'] ?? 'cash',
+                    ],
+                ]);
+            }
+
             return $contract->load(['customer', 'vehicle', 'salesUser:id,name']);
         });
     }

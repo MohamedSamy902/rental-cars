@@ -51,7 +51,7 @@ class StoreCustomerRequest extends FormRequest
             'birth_date' => ['required', 'date'],
             'address' => ['nullable', 'string'],
             'license_number' => ['required', 'string', 'max:50'],
-            'license_expires_on' => ['required', 'date'],
+            'license_expires_on' => ['required', 'date', 'after_or_equal:today'],
             'national_id_image_path' => ['nullable', 'string', 'max:500', new MediaReference],
             'national_id_back_path' => ['nullable', 'string', 'max:500', new MediaReference],
             'license_image_path' => ['nullable', 'string', 'max:500', new MediaReference],
@@ -99,6 +99,7 @@ class StoreCustomerRequest extends FormRequest
             'birth_date.required' => 'تاريخ الميلاد مطلوب.',
             'license_number.required' => 'رقم الرخصة مطلوب.',
             'license_expires_on.required' => 'انتهاء الرخصة مطلوب.',
+            'license_expires_on.after_or_equal' => 'رخصة العميل منتهية — حدّث تاريخ الانتهاء قبل التسجيل.',
             'email.email' => 'البريد الإلكتروني غير صالح.',
         ];
     }

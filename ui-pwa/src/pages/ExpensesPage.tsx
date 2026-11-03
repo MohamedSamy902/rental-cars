@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatDateTime } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  PageHeader, Button, Fab, MetricCardGrid, useToast, DataTable, Badge,
+  PageHeader, Button, Fab, FilterBar, MetricCardGrid, useToast, DataTable, Badge,
   IconReceipt, IconCalendar, IconWallet, IconChart, IconEdit, type DataColumn,
 } from '@/shared/ui'
 import { ExpenseSheet, type ExpenseEditInitial } from '@/shared/forms/ExpenseSheet'
@@ -12,9 +13,12 @@ type Expense = ExpenseEditInitial & {
   category: string
   payment_method: string
   from_petty_cash: boolean
+  recorded_by_name?: string | null
+  scope?: 'vehicle' | 'general' | string | null
 }
 
-const methodLabel: Record<string, string> = { cash: 'نقدي', transfer: 'تحويل', card: 'بطاقة' }
+const methodLabel: Record<string, string> = { cash: 'نقدي', transfer: 'تحويل', card: 'بطاقة', petty_cash: 'عهدة' }
+const ExpensesPageTabs = ['all', 'vehicle', 'general'] as const
 
 const columns: DataColumn<Expense>[] = [
   {
@@ -30,7 +34,25 @@ const columns: DataColumn<Expense>[] = [
     mobile: 'title',
   },
   { id: 'date', header: 'التاريخ', cell: (r) => formatDateTime(r.spent_on).split('،')[0] || r.spent_on.slice(0, 10), sortValue: (r) => r.spent_on, mobile: 'subtitle' },
+  {
+    id: 'scope',
+    header: 'النطاق',
+    cell: (r) => (
+      <Badge tone={r.vehicle_id ? 'brand' : 'muted'} dot={false}>
+        {r.vehicle_id
+          ? (r.vehicle ? `${r.vehicle.plate || r.vehicle.brand || 'عربية'}` : 'عربية')
+          : 'عام / فرع'}
+      </Badge>
+    ),
+    sortValue: (r) => (r.vehicle_id ? 1 : 0),
+  },
   { id: 'category', header: 'التصنيف', cell: (r) => <Badge tone="muted" dot={false}>{r.category}</Badge>, sortValue: (r) => r.category },
+  {
+    id: 'who',
+    header: 'من سجّل',
+    cell: (r) => r.recorded_by_name || '—',
+    sortValue: (r) => r.recorded_by_name || '',
+  },
   {
     id: 'method',
     header: 'الدفع',
@@ -46,11 +68,24 @@ export function ExpensesPage() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<ExpenseEditInitial | null>(null)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useQueryTab({ allowed: ExpensesPageTabs, defaultValue: 'all' })
+
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      { id: 'vehicle', label: 'عربيات' },
+      { id: 'general', label: 'عام / فرع' },
+    ],
+    [],
+  )
 
   async function load() {
     setLoading(true)
     try {
-      const res = await api<{ data: Expense[] }>('/expenses')
+      const qs = new URLSearchParams()
+      if (chip === 'general' || chip === 'vehicle') qs.set('scope', chip)
+      const res = await api<{ data: Expense[] }>(`/expenses?${qs}`)
       setRows(res.data)
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -59,7 +94,24 @@ export function ExpensesPage() {
     }
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => { void load() }, [chip])
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter((r) => {
+      const hay = [
+        r.title,
+        r.category,
+        r.notes,
+        r.recorded_by_name,
+        r.vehicle?.plate,
+        r.vehicle?.brand,
+        r.vehicle?.model,
+      ].filter(Boolean).join(' ').toLowerCase()
+      return hay.includes(q)
+    })
+  }, [rows, search])
 
   const stats = useMemo(() => {
     const ym = new Date().toISOString().slice(0, 7)
@@ -88,7 +140,7 @@ export function ExpensesPage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="المصروفات" subtitle="تشغيل · صيانة · أخرى مع ترحيل محاسبي" action={<Button onClick={openCreate}>مصروف جديد</Button>} mobileFab />
+      <PageHeader title="المصروفات" subtitle="تشغيل · فرع · صيانة · مع تتبّع من دفع ومتى" action={<Button onClick={openCreate}>مصروف جديد</Button>} mobileFab />
       <Fab label="مصروف جديد" onClick={openCreate} />
 
       <MetricCardGrid
@@ -104,9 +156,18 @@ export function ExpensesPage() {
         ]}
       />
 
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="بحث بالبند أو من سجّل أو اللوحة…"
+        chips={chips}
+        activeChip={chip}
+        onChipChange={setChip}
+      />
+
       <DataTable
         label="المصروفات"
-        rows={rows}
+        rows={visible}
         columns={columns}
         rowKey={(r) => r.id}
         loading={loading}
@@ -115,7 +176,7 @@ export function ExpensesPage() {
           { id: 'edit', label: 'تعديل', icon: <IconEdit size={16} />, onSelect: () => openEdit(r) },
         ]}
         emptyTitle="لا مصروفات بعد"
-        emptyDescription="سجّل أول مصروف ليظهر هنا مع ترحيله المحاسبي."
+        emptyDescription="سجّل مصروفاً عاماً للفرع أو مرتبطاً بعربية ليظهر هنا."
       />
       <ExpenseSheet
         open={open}
