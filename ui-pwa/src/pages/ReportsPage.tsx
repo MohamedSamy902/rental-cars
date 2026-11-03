@@ -259,7 +259,7 @@ export function ReportsPage() {
   ]
 
   return (
-    <div className="rpm-stack">
+    <div className="rpm-stack rp-page">
       <PageHeader
         title="التقارير"
         subtitle="إشغال أيامي · ميزان مراجعة · قائمة دخل · ربحية تشغيل"
@@ -279,6 +279,7 @@ export function ReportsPage() {
         <div className="rp-section">
           <MetricCardGrid
             label="المؤشرات المالية"
+            mobile="wrap"
             items={[
               { id: 'receivables', label: 'ذمم عقود', value: data.receivables, format: 'money', tone: 'warning', icon: <IconWallet size={16} /> },
               { id: 'in', label: 'مقبوضات', value: data.payments_in, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
@@ -404,6 +405,7 @@ export function ReportsPage() {
           <div className="rp-section__body">
             <MetricCardGrid
               label="ملخص الفترة"
+              mobile="wrap"
               items={[
                 { id: 'inc', label: 'إيرادات', value: income.income_total, format: 'money', tone: 'success' },
                 { id: 'exp', label: 'مصروفات', value: income.expense_total, format: 'money', tone: 'warning' },
@@ -584,6 +586,7 @@ function ProfitPanel({ data }: { data: ProfitCompare }) {
     <div className="rp-section">
       <MetricCardGrid
         label={`${data.current_month} مقابل ${data.previous_month}`}
+        mobile="wrap"
         items={[
           { id: 'cur', label: 'ربح التشغيل الحالي', value: data.fleet.current.operating_profit, format: 'money', tone: 'success' },
           { id: 'prev', label: 'الشهر السابق', value: data.fleet.previous.operating_profit, format: 'money' },

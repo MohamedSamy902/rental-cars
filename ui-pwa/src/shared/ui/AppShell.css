@@ -569,20 +569,36 @@
   background: var(--text-faint);
 }
 .shell-drawer__head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.65rem;
+  column-gap: 0.65rem;
   padding-block-end: 0.75rem;
   border-block-end: 1px solid var(--border);
 }
-.shell-drawer__head .rpm-logo {
-  --logo-h: 28px;
-}
 .shell-drawer__title {
-  flex: 1;
+  grid-column: 1;
+  justify-self: start;
+  text-align: start;
+  min-width: 0;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.95rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-drawer__brand,
+.shell-drawer__head .rpm-logo {
+  grid-column: 2;
+  justify-self: center;
+  --logo-h: 28px;
+}
+.shell-drawer__head-spacer {
+  grid-column: 3;
+  min-width: 0;
+  pointer-events: none;
 }
 .shell-drawer__grid {
   flex: 1 1 auto;
