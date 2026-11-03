@@ -35,6 +35,10 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    // Self-service profile — any authenticated user; no RBAC permission middleware.
+    Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::match(['put', 'patch'], '/auth/profile', [AuthController::class, 'updateProfile']);
+    Route::match(['put', 'patch'], '/profile', [AuthController::class, 'updateProfile']);
     Route::get('/dashboard', DashboardController::class)->middleware('permission:reports.view|contracts.view|vehicles.view');
     Route::get('/attention', AttentionController::class);
 

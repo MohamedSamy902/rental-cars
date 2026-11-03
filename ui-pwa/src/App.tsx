@@ -34,6 +34,7 @@ import { HrPage } from '@/pages/HrPage'
 import { ChatPage } from '@/pages/ChatPage'
 import { CustomerDetailPage } from '@/pages/CustomerDetailPage'
 import { EmployeeDetailPage } from '@/pages/EmployeeDetailPage'
+import { ProfilePage } from '@/pages/ProfilePage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -98,6 +99,8 @@ export default function App() {
                 <Route path="staff" element={<StaffPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="integrator" element={<IntegratorPage />} />
+                {/* Self-profile: any authenticated user — no permission gate */}
+                <Route path="profile" element={<ProfilePage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>

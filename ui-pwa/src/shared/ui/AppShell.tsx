@@ -8,10 +8,11 @@ import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import { AttentionDot } from './AttentionDot'
 import { BrandLogo } from './BrandLogo'
 import { CommandPalette } from './CommandPalette'
+import { ProfileSheet } from '@/shared/forms/ProfileSheet'
 import { useSheetDrag } from './useSheetDrag'
 import {
   IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart,
-  IconChevron, IconClipboard, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
+  IconChevron, IconClipboard, IconEdit, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
   IconLogout, IconMenu, IconMoon, IconPlus, IconQueue, IconReceipt, IconSearch, IconSettings,
   IconStore, IconSun, IconUserCog, IconUsers, IconWallet, IconWrench,
 } from './Icons'
@@ -72,6 +73,7 @@ export function AppShell() {
   const location = useLocation()
   const [cmdOpen, setCmdOpen] = useState(false)
   const [drawer, setDrawer] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [unread, setUnread] = useState(0)
   const { byPath: attentionByPath, counts: attentionCounts } = useAttentionSignals(
     Boolean(user),
@@ -262,7 +264,13 @@ export function AppShell() {
                 </span>
                 <span className="rpm-btn__label">عقد جديد</span>
               </button>
-              <div className="shell-user shell-user--desk">
+              <button
+                type="button"
+                className="shell-user shell-user--desk shell-user--action"
+                onClick={() => setProfileOpen(true)}
+                title="حسابي / تعديل البيانات"
+                aria-label={`حسابي · ${user?.name || 'تعديل البيانات'}`}
+              >
                 <span className="shell-user__avatar" aria-hidden>
                   {(user?.name || 'م').slice(0, 1)}
                 </span>
@@ -270,7 +278,10 @@ export function AppShell() {
                   <strong>{user?.name}</strong>
                   <em>{user?.role || 'مستخدم'}</em>
                 </span>
-              </div>
+                <span className="shell-user__edit" aria-hidden>
+                  <IconEdit size={14} />
+                </span>
+              </button>
             </div>
           </div>
         </header>
@@ -371,6 +382,17 @@ export function AppShell() {
                 })}
               </div>
               <div className="shell-drawer__foot">
+                <button
+                  type="button"
+                  className="shell-drawer__action shell-drawer__action--profile"
+                  onClick={() => {
+                    closeDrawer()
+                    setProfileOpen(true)
+                  }}
+                >
+                  <IconEdit size={18} />
+                  <span>حسابي الشخصي</span>
+                </button>
                 <button type="button" className="shell-drawer__action" onClick={toggleTheme}>
                   {theme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
                   <span>{theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
@@ -400,6 +422,7 @@ export function AppShell() {
       </AnimatePresence>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   )
 }
