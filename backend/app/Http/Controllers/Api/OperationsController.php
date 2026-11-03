@@ -242,7 +242,11 @@ class OperationsController extends Controller
 
         $limit = (int) ($validated['limit'] ?? 50);
 
-        $query = AuditLog::query()->with('user:id,name');
+        $query = AuditLog::query()->with([
+            'user:id,name,role_id,employee_id',
+            'user.role:id,name,label',
+            'user.employee:id,job_title',
+        ]);
 
         if (! empty($validated['user_id'])) {
             $query->where('user_id', (int) $validated['user_id']);
@@ -260,16 +264,20 @@ class OperationsController extends Controller
         $rows = $query->latest('id')->limit($limit)->get();
 
         $data = $rows->map(function (AuditLog $log) use ($narrator) {
-            $userName = $log->user?->name;
+            $user = $log->user;
+            $userName = $user?->name;
+            $roleTitle = $user ? $narrator->resolveRoleTitle($user) : null;
 
             return [
                 'id' => $log->id,
                 'action' => $log->action,
-                'summary' => $narrator->summarize($log, $userName),
+                'summary' => $narrator->summarizeForUser($log, $user),
                 'record_type' => $log->record_type,
                 'record_id' => $log->record_id,
                 'user_id' => $log->user_id,
                 'user_name' => $userName,
+                'user_role_title' => $roleTitle,
+                'user_phrase' => $narrator->actorPhrase($userName, $roleTitle),
                 'before' => $log->before,
                 'after' => $log->after,
                 'created_at' => $log->created_at?->toIso8601String(),
@@ -301,13 +309,23 @@ class OperationsController extends Controller
         $actionOptions = $catalog->concat($extra)->values()->all();
 
         $users = User::query()
+            ->with(['role:id,name,label', 'employee:id,job_title'])
             ->where(function ($q) {
                 $q->where('is_active', true)
                     ->orWhereIn('id', AuditLog::query()->whereNotNull('user_id')->distinct()->select('user_id'));
             })
             ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+            ->get(['id', 'name', 'role_id', 'employee_id'])
+            ->map(function (User $u) use ($narrator) {
+                $title = $narrator->resolveRoleTitle($u);
+
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'role_title' => $title,
+                    'label' => $title ? "{$title} — {$u->name}" : $u->name,
+                ];
+            })
             ->values()
             ->all();
 

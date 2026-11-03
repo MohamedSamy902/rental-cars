@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuditLog;
 use App\Models\Contract;
 use App\Models\Customer;
+use App\Models\PettyCashAccount;
 use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -66,9 +67,38 @@ class ClientFinalPolishesTest extends TestCase
         $this->assertStringContainsString('قام', $res['data'][0]['summary']);
         $this->assertStringContainsString('حجز', $res['data'][0]['summary']);
         $this->assertSame('أحمد', $res['data'][0]['user_name']);
+        $this->assertSame('مدير النظام', $res['data'][0]['user_role_title']);
+        $this->assertStringContainsString('مدير النظام', $res['data'][0]['summary']);
+        $this->assertStringContainsString('أحمد', $res['data'][0]['summary']);
         $this->assertNotEmpty($res['meta']['users']);
         $this->assertNotEmpty($res['meta']['actions']);
         $this->assertTrue(collect($res['meta']['actions'])->contains(fn ($a) => ($a['value'] ?? '') === 'created'));
+    }
+
+    public function test_audit_narrator_pairs_role_title_with_name(): void
+    {
+        $narrator = app(AuditNarrator::class);
+        $this->assertSame(
+            'المحاسب (أحمد محمد)',
+            $narrator->actorPhrase('أحمد محمد', 'المحاسب'),
+        );
+        $this->assertSame(
+            'مسؤول الموارد البشرية (محمود إبراهيم)',
+            $narrator->actorPhrase('محمود إبراهيم', 'مسؤول الموارد البشرية'),
+        );
+        $this->assertSame(
+            'مدير التشغيل (محمد سامي)',
+            $narrator->actorPhrase('محمد سامي', 'مدير التشغيل'),
+        );
+
+        $log = new AuditLog([
+            'action' => 'petty_cash_topup',
+            'record_type' => PettyCashAccount::class,
+            'record_id' => 1,
+            'after' => ['employee_name' => 'عمرو سائق'],
+        ]);
+        $sentence = $narrator->summarize($log, 'أحمد محمد', 'المحاسب');
+        $this->assertSame('قام المحاسب (أحمد محمد) بتسجيل عهدة للموظف عمرو سائق', $sentence);
     }
 
     public function test_audit_logs_filter_by_user_action_and_date(): void
