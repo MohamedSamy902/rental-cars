@@ -52,10 +52,11 @@ class VehicleService
                 $data['owner_monthly_amount'] = null;
             }
 
+            unset($data['rental_priority'], $data['owner_inline'], $data['addon_ids'], $data['plate_letters'], $data['plate_numbers']);
+
             $vehicle = Vehicle::query()->create([
                 ...$data,
                 'odometer_source' => 'manual',
-                'rental_priority' => $data['rental_priority'] ?? 50,
                 'is_active' => $data['is_active'] ?? true,
             ]);
 
@@ -90,7 +91,7 @@ class VehicleService
             }
 
             // Internal code stays system-owned after create.
-            unset($data['code'], $data['plate_letters'], $data['plate_numbers'], $data['owner_inline'], $data['addon_ids']);
+            unset($data['code'], $data['plate_letters'], $data['plate_numbers'], $data['owner_inline'], $data['addon_ids'], $data['rental_priority']);
 
             $vehicle->update($data);
 

@@ -46,7 +46,6 @@ class VehicleAccessoryCrudTest extends TestCase
             'odometer_source' => 'manual',
             'daily_rate' => 30000,
             'default_deposit' => 50000,
-            'rental_priority' => 50,
             'is_active' => true,
         ]);
     }

@@ -42,7 +42,7 @@ class OperationsController extends Controller
             ->pluck('vehicle_id')
             ->flip();
 
-        $rows = Vehicle::query()->where('is_active', true)->orderByDesc('rental_priority')->get()
+        $rows = Vehicle::query()->where('is_active', true)->orderBy('brand')->orderBy('model')->get()
             ->map(function (Vehicle $v) use ($activeIds, $reservedIds) {
                 $status = $this->availability->statusOnDate([
                     'manual_status' => $v->manual_status,
@@ -229,14 +229,32 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function auditLogs(Request $request): JsonResponse
+    public function auditLogs(Request $request, \App\Services\Operations\AuditNarrator $narrator): JsonResponse
     {
         $rows = AuditLog::query()
+            ->with('user:id,name')
             ->latest('id')
             ->limit((int) $request->input('limit', 50))
             ->get();
 
-        return response()->json(['data' => $rows]);
+        $data = $rows->map(function (AuditLog $log) use ($narrator) {
+            $userName = $log->user?->name;
+
+            return [
+                'id' => $log->id,
+                'action' => $log->action,
+                'summary' => $narrator->summarize($log, $userName),
+                'record_type' => $log->record_type,
+                'record_id' => $log->record_id,
+                'user_id' => $log->user_id,
+                'user_name' => $userName,
+                'before' => $log->before,
+                'after' => $log->after,
+                'created_at' => $log->created_at?->toIso8601String(),
+            ];
+        })->values();
+
+        return response()->json(['data' => $data]);
     }
 
     public function pettyCashIndex(): JsonResponse

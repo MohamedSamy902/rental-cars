@@ -12,7 +12,6 @@ export type Inspection = {
   type: string
   inspected_at?: string | null
   odometer?: number | null
-  fuel_level?: number | null
   notes?: string | null
   damages?: InspectionDamage[]
 }
@@ -46,7 +45,7 @@ export type RelatedContract = {
   relation: string
 }
 
-export type TimelineItem = { id: number; action: string; at?: string | null; user?: string | null }
+export type TimelineItem = { id: number; action: string; summary?: string; at?: string | null; user?: string | null }
 
 export type Contract = {
   id: number
@@ -57,6 +56,7 @@ export type Contract = {
   actual_ends_at?: string | null
   frozen_daily_rate: number
   frozen_agreed_deposit?: number
+  approved_days?: number
   odometer_out?: number
   odometer_in?: number
   final_total?: number
@@ -64,8 +64,10 @@ export type Contract = {
   damage_fee?: number
   excess_km_amount?: number
   notes?: string | null
+  created_by?: string | null
+  sales_user?: { id: number; name: string } | null
   vehicle_id?: number
-  customer?: { id: number; full_name: string; phone?: string }
+  customer?: { id: number; full_name: string; phone?: string; national_id_image_path?: string | null; national_id_back_path?: string | null }
   vehicle?: { id: number; brand: string; model: string; plate: string; odometer?: number }
   deposit?: Deposit | null
   inspections?: Inspection[]

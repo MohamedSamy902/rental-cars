@@ -71,7 +71,6 @@ type Vehicle = {
   purchase_value_estimate?: number | null
   status: string
   manual_status?: string | null
-  rental_priority: number
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
   notes?: string | null

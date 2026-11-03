@@ -113,7 +113,6 @@ class EntityEditCapabilityTest extends TestCase
             'odometer_source' => 'manual',
             'daily_rate' => 600,
             'default_deposit' => 1000,
-            'rental_priority' => 50,
             'is_active' => true,
         ]);
 

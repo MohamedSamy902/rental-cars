@@ -1,22 +1,27 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, MediaUpload, useToast,
+  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, MediaUpload, NumberField, useToast,
 } from '@/shared/ui'
 import { toApiDateTime } from '@/shared/lib/format'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
-type Vehicle = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number }
-type RankedVehicle = Vehicle & {
-  category?: string
-  rental_priority?: number
-  scores?: { underuse: number; availability: number; manual: number; display: number }
+type Accessory = { id: number; name: string; qty?: number }
+type Vehicle = {
+  id: number
+  brand: string
+  model: string
+  plate: string
+  daily_rate: number
+  default_deposit: number
+  odometer?: number
+  accessories?: Accessory[]
 }
 
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
-  daily_rate: '', deposit: '', notes: '',
+  daily_rate: '', deposit: '', odometer: '', notes: '',
 }
 
 const emptyCustomer = {
@@ -39,12 +44,12 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [createdVersion, setCreatedVersion] = useState(0)
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [vehicles, setVehicles] = useState<RankedVehicle[]>([])
-  const [weights, setWeights] = useState<{ underuse: number; availability: number; manual: number } | null>(null)
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [inlineCustomer, setInlineCustomer] = useState(false)
   const [newCustomer, setNewCustomer] = useState(emptyCustomer)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [accessoryIds, setAccessoryIds] = useState<number[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [lockedVehicleId, setLockedVehicleId] = useState<number | undefined>()
 
@@ -55,9 +60,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     const qs = params.toString()
     const path = qs ? `/vehicles/recommend?${qs}` : '/vehicles/recommend'
     try {
-      const v = await api<{ data: RankedVehicle[]; weights?: { underuse: number; availability: number; manual: number } }>(path)
+      const v = await api<{ data: Vehicle[] }>(path)
       setVehicles(v.data)
-      setWeights(v.weights ?? null)
       if (preferredId && !v.data.some((x) => x.id === preferredId)) {
         const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=100').catch(() => ({ data: [] as Vehicle[] }))
         const found = fallback.data.find((x) => x.id === preferredId)
@@ -66,9 +70,19 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       return v.data
     } catch {
       const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=100')
-      setVehicles(fallback.data as RankedVehicle[])
-      setWeights(null)
-      return fallback.data as RankedVehicle[]
+      setVehicles(fallback.data)
+      return fallback.data
+    }
+  }, [])
+
+  const applyVehicleDefaults = useCallback((v: Vehicle | undefined, prev: typeof emptyForm) => {
+    if (!v) return prev
+    return {
+      ...prev,
+      vehicle_id: String(v.id),
+      daily_rate: String(v.daily_rate),
+      deposit: String(v.default_deposit),
+      odometer: v.odometer != null ? String(v.odometer) : prev.odometer,
     }
   }, [])
 
@@ -77,6 +91,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     setInlineCustomer(false)
     setErrors({})
     setNewCustomer(emptyCustomer)
+    setAccessoryIds([])
     setLockedVehicleId(opts?.vehicleId)
     setForm({
       ...emptyForm,
@@ -89,25 +104,20 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     ])
       .then(([c, v]) => {
         setCustomers(c.data)
-        setForm((f) => ({
-          ...f,
-          customer_id: opts?.customerId ? String(opts.customerId) : f.customer_id,
-          ...(opts?.vehicleId
-            ? (() => {
-                const picked = v.find((x) => x.id === opts.vehicleId)
-                return picked
-                  ? {
-                      vehicle_id: String(picked.id),
-                      daily_rate: String(picked.daily_rate),
-                      deposit: String(picked.default_deposit),
-                    }
-                  : {}
-              })()
-            : {}),
-        }))
+        setForm((f) => {
+          const next = {
+            ...f,
+            customer_id: opts?.customerId ? String(opts.customerId) : f.customer_id,
+          }
+          if (!opts?.vehicleId) return next
+          const picked = v.find((x) => x.id === opts.vehicleId)
+          if (!picked) return next
+          setAccessoryIds((picked.accessories || []).map((a) => a.id))
+          return applyVehicleDefaults(picked, next)
+        })
       })
       .catch((e) => toast.error((e as ApiError).message))
-  }, [loadVehicles, toast])
+  }, [applyVehicleDefaults, loadVehicles, toast])
 
   useEffect(() => {
     if (!open) return
@@ -115,7 +125,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     const handle = window.setTimeout(() => {
       void loadVehicles(form.starts_at, form.planned_ends_at, lockedVehicleId).then((list) => {
         if (form.vehicle_id && !list.some((v) => String(v.id) === form.vehicle_id) && Number(form.vehicle_id) !== lockedVehicleId) {
-          setForm((f) => ({ ...f, vehicle_id: '', daily_rate: '', deposit: '' }))
+          setForm((f) => ({ ...f, vehicle_id: '', daily_rate: '', deposit: '', odometer: '' }))
+          setAccessoryIds([])
           toast.info('العربية المختارة غير متاحة في هذه الفترة — اختر عربية أخرى.')
         }
       })
@@ -169,11 +180,14 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           planned_ends_at: toApiDateTime(form.planned_ends_at),
           daily_rate: form.daily_rate ? Number(form.daily_rate) : undefined,
           deposit: form.deposit ? Number(form.deposit) : undefined,
+          odometer: form.odometer !== '' ? Number(form.odometer) : undefined,
+          accessory_ids: accessoryIds,
           notes: form.notes || undefined,
         },
       })
       toast.success('تم إنشاء العقد.')
       setForm(emptyForm)
+      setAccessoryIds([])
       setOpen(false)
       setCreatedVersion((v) => v + 1)
     } catch (e) {
@@ -189,6 +203,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ openNewContract, createdVersion }), [openNewContract, createdVersion])
   const selected = vehicles.find((v) => String(v.id) === form.vehicle_id)
+  const availableAccessories = selected?.accessories || []
 
   return (
     <NewContractContext.Provider value={value}>
@@ -289,9 +304,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               { value: '', label: vehicles.length ? 'اختر عربية…' : 'لا عربيات متاحة في هذه الفترة' },
               ...vehicles.map((v) => ({
                 value: String(v.id),
-                label: v.scores
-                  ? `${v.brand} ${v.model} · ${v.plate} · درجة ${Math.round(v.scores.display)}`
-                  : `${v.brand} ${v.model} · ${v.plate}`,
+                label: `${v.brand} ${v.model} · ${v.plate}`,
               })),
             ]}
             value={form.vehicle_id}
@@ -299,24 +312,53 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             onChange={(e) => {
               const id = e.target.value
               const v = vehicles.find((x) => String(x.id) === id)
-              setForm({
-                ...form,
-                vehicle_id: id,
-                daily_rate: v ? String(v.daily_rate) : form.daily_rate,
-                deposit: v ? String(v.default_deposit) : form.deposit,
-              })
+              setForm(applyVehicleDefaults(v, { ...form, vehicle_id: id }))
+              setAccessoryIds((v?.accessories || []).map((a) => a.id))
             }}
           />
-          {selected?.scores || weights ? (
-            <p className="muted" style={{ margin: 0 }}>
-              {selected?.scores
-                ? `درجة الظهور ${Math.round(selected.scores.display)} · قلة استخدام ${selected.scores.underuse} · توفر ${selected.scores.availability} · أولوية يدوية ${selected.scores.manual}`
-                : null}
-              {weights ? ` · أوزان ${weights.underuse}/${weights.availability}/${weights.manual}` : null}
-            </p>
-          ) : null}
-          <MoneyField label="السعر اليومي" value={form.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
+
+          <MoneyField
+            label="السعر اليومي"
+            required
+            value={form.daily_rate}
+            error={errors.daily_rate}
+            onChange={(e) => setForm({ ...form, daily_rate: e.target.value })}
+            hint="يُعبَّأ تلقائياً من العربية ويمكن تعديله"
+          />
           <MoneyField label="التأمين النقدي المتفق" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} />
+          <NumberField
+            label="العداد الحالي"
+            value={form.odometer}
+            error={errors.odometer}
+            onChange={(e) => setForm({ ...form, odometer: e.target.value })}
+            hint="يُحدَّث عداد العربية عند الحفظ"
+          />
+
+          {availableAccessories.length > 0 ? (
+            <fieldset className="rpm-inline-box" style={{ margin: 0 }}>
+              <legend className="rpm-inline-box__title">مستلزمات العربية</legend>
+              <div className="rpm-form-grid" style={{ gap: '0.5rem' }}>
+                {availableAccessories.map((a) => {
+                  const checked = accessoryIds.includes(a.id)
+                  return (
+                    <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setAccessoryIds((prev) =>
+                            checked ? prev.filter((id) => id !== a.id) : [...prev, a.id],
+                          )
+                        }}
+                      />
+                      <span>{a.name}{a.qty ? ` × ${a.qty}` : ''}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} hint="نص حر فقط — لا ينشئ قواعد مالية" />
         </div>
       </Sheet>

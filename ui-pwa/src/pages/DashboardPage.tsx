@@ -521,6 +521,134 @@ export function DashboardPage() {
         ))}
       </section>
 
+      <section className={`db-bento db-bento--charts ${refreshing ? 'is-refreshing' : ''}`.trim()} aria-label="الرسوم البيانية" aria-busy={refreshing}>
+        <motion.div
+          className="db-span-7"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.35 }}
+        >
+          <Card>
+            <CardHeader
+              title="اتجاه الإيراد"
+              description={revenueRangeLabel}
+              action={
+                <strong className="db-card__figure">
+                  <AnimatedNumber
+                    value={revenueRange === 'week' ? data.kpis.expected_revenue || 0 : revenueTotal}
+                    kind="money"
+                  />
+                </strong>
+              }
+            />
+            <CardContent dense>
+              <div className="db-range" role="tablist" aria-label="نطاق الإيراد">
+                {(
+                  [
+                    { id: 'week', label: 'أسبوعي' },
+                    { id: 'month', label: 'شهري' },
+                    { id: 'year', label: 'سنوي' },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={revenueRange === tab.id}
+                    className={`db-range__btn ${revenueRange === tab.id ? 'is-active' : ''}`}
+                    onClick={() => setRevenueRange(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <div className="db-chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={revenueSeries} margin={{ top: 6, right: 2, left: 0, bottom: 0 }}>
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: palette.axis, fontSize: 11 }}
+                      interval={revenueRange === 'year' ? 1 : 0}
+                      height={28}
+                    />
+                    <YAxis hide domain={['dataMin', 'dataMax']} />
+                    <Tooltip
+                      content={<ChartTooltip />}
+                      cursor={{ stroke: palette.cursor, strokeWidth: 1 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke={palette.line}
+                      strokeWidth={2.5}
+                      fill={palette.line}
+                      fillOpacity={0.08}
+                      animationDuration={850}
+                      activeDot={{ r: 4, fill: palette.dot, stroke: palette.dotRing, strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          className="db-span-5"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22, duration: 0.35 }}
+        >
+          <Card>
+            <CardHeader
+              title="حالة الأسطول"
+              description="توزيع العربيات"
+              action={<CardMenu label="خيارات الأسطول" items={menus.fleet} />}
+            />
+            <CardContent>
+              <div className="db-fleet">
+                <div className="db-fleet__chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={donut}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="64%"
+                        outerRadius="90%"
+                        paddingAngle={4}
+                        stroke={palette.slice}
+                        strokeWidth={3}
+                      >
+                        {donut.map((entry) => (
+                          <Cell key={entry.key} fill={palette.fleet[entry.key] || palette.fallback} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="db-fleet__center">
+                    <strong className="tabular-nums">{formatNumber(data.fleet_total)}</strong>
+                    <span>عربية</span>
+                  </div>
+                </div>
+                <ul className="db-fleet__legend">
+                  {donut.map((item) => (
+                    <li key={item.key}>
+                      <i style={{ background: palette.fleet[item.key] || palette.fallback }} />
+                      <span>{item.name}</span>
+                      <b className="tabular-nums">{formatNumber(item.value)}</b>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+      </section>
+
       {data.fleet_prep ? (
         <section className="db-prep" aria-label="تجهيز العربيات اليومي">
           <header className="db-prep__head">
@@ -708,131 +836,6 @@ export function DashboardPage() {
                     )}
                   </tbody>
                 </table>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          className="db-span-7"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, duration: 0.35 }}
-        >
-          <Card>
-            <CardHeader
-              title="اتجاه الإيراد"
-              description={revenueRangeLabel}
-              action={
-                <strong className="db-card__figure">
-                  <AnimatedNumber
-                    value={revenueRange === 'week' ? data.kpis.expected_revenue || 0 : revenueTotal}
-                    kind="money"
-                  />
-                </strong>
-              }
-            />
-            <CardContent dense>
-              <div className="db-range" role="tablist" aria-label="نطاق الإيراد">
-                {(
-                  [
-                    { id: 'week', label: 'أسبوعي' },
-                    { id: 'month', label: 'شهري' },
-                    { id: 'year', label: 'سنوي' },
-                  ] as const
-                ).map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={revenueRange === tab.id}
-                    className={`db-range__btn ${revenueRange === tab.id ? 'is-active' : ''}`}
-                    onClick={() => setRevenueRange(tab.id)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-              <div className="db-chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revenueSeries} margin={{ top: 6, right: 2, left: 0, bottom: 0 }}>
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: palette.axis, fontSize: 11 }}
-                      interval={revenueRange === 'year' ? 1 : 0}
-                      height={28}
-                    />
-                    <YAxis hide domain={['dataMin', 'dataMax']} />
-                    <Tooltip
-                      content={<ChartTooltip />}
-                      cursor={{ stroke: palette.cursor, strokeWidth: 1 }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="value"
-                      stroke={palette.line}
-                      strokeWidth={2.5}
-                      fill={palette.line}
-                      fillOpacity={0.08}
-                      animationDuration={850}
-                      activeDot={{ r: 4, fill: palette.dot, stroke: palette.dotRing, strokeWidth: 2 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          className="db-span-5"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.22, duration: 0.35 }}
-        >
-          <Card>
-            <CardHeader
-              title="حالة الأسطول"
-              description="توزيع العربيات"
-              action={<CardMenu label="خيارات الأسطول" items={menus.fleet} />}
-            />
-            <CardContent>
-              <div className="db-fleet">
-                <div className="db-fleet__chart">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={donut}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius="64%"
-                        outerRadius="90%"
-                        paddingAngle={4}
-                        stroke={palette.slice}
-                        strokeWidth={3}
-                      >
-                        {donut.map((entry) => (
-                          <Cell key={entry.key} fill={palette.fleet[entry.key] || palette.fallback} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="db-fleet__center">
-                    <strong className="tabular-nums">{formatNumber(data.fleet_total)}</strong>
-                    <span>عربية</span>
-                  </div>
-                </div>
-                <ul className="db-fleet__legend">
-                  {donut.map((item) => (
-                    <li key={item.key}>
-                      <i style={{ background: palette.fleet[item.key] || palette.fallback }} />
-                      <span>{item.name}</span>
-                      <b className="tabular-nums">{formatNumber(item.value)}</b>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </CardContent>
           </Card>

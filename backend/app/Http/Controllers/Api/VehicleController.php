@@ -71,7 +71,6 @@ class VehicleController extends Controller
 
         return response()->json([
             'data' => $this->recommendation->rankAvailable($category ?: null, null, $from, $to),
-            'weights' => $this->recommendation->weights(),
         ]);
     }
 
@@ -464,7 +463,6 @@ class VehicleController extends Controller
             'default_deposit' => $v->default_deposit,
             'target_monthly_income' => $v->target_monthly_income,
             'purchase_value_estimate' => $v->purchase_value_estimate,
-            'rental_priority' => $v->rental_priority,
             'tracker_device_number' => $v->tracker_device_number,
             'tracker_sim_number' => $v->tracker_sim_number,
             'manual_status' => $v->manual_status,

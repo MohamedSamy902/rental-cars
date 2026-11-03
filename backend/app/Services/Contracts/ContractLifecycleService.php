@@ -95,6 +95,16 @@ class ContractLifecycleService
                 ? (int) $data['excess_km_rate']
                 : 5;
 
+            $accessories = $this->resolveAccessoriesSnapshot($vehicle, $data['accessory_ids'] ?? null);
+
+            if (array_key_exists('odometer', $data) && $data['odometer'] !== null) {
+                $odo = (int) $data['odometer'];
+                if ($odo < (int) $vehicle->odometer) {
+                    throw new DomainException('العداد الحالي أقل من عداد العربية المسجّل.');
+                }
+                $vehicle->update(['odometer' => $odo, 'odometer_source' => 'manual']);
+            }
+
             $contract = Contract::query()->create([
                 'number' => $number,
                 'customer_id' => $data['customer_id'],
@@ -114,6 +124,7 @@ class ContractLifecycleService
                 'other_fees_description' => $data['other_fees_description'] ?? null,
                 'sales_user_id' => $userId,
                 'notes' => $data['notes'] ?? null,
+                'accessories_json' => $accessories,
                 'extended_from_contract_id' => $data['extended_from_contract_id'] ?? null,
                 'swapped_from_contract_id' => $data['swapped_from_contract_id'] ?? null,
                 'swap_reason' => $data['swap_reason'] ?? null,
@@ -124,11 +135,40 @@ class ContractLifecycleService
                 'action' => 'created',
                 'record_type' => Contract::class,
                 'record_id' => $contract->id,
-                'after' => $contract->toArray(),
+                'after' => [
+                    'number' => $contract->number,
+                    'vehicle_id' => $contract->vehicle_id,
+                    'plate' => $vehicle->plate,
+                    'customer_id' => $contract->customer_id,
+                ],
             ]);
 
-            return $contract->load(['customer', 'vehicle']);
+            return $contract->load(['customer', 'vehicle', 'salesUser:id,name']);
         });
+    }
+
+    /**
+     * @param  list<int|string>|null  $accessoryIds
+     * @return list<array{id:int,name:string,qty:int}>
+     */
+    private function resolveAccessoriesSnapshot(Vehicle $vehicle, ?array $accessoryIds): array
+    {
+        $vehicle->loadMissing('accessories');
+        $all = $vehicle->accessories->where('is_active', true);
+        if ($accessoryIds === null) {
+            return $all->map(fn ($a) => [
+                'id' => (int) $a->id,
+                'name' => (string) $a->name,
+                'qty' => (int) ($a->default_qty ?? 1),
+            ])->values()->all();
+        }
+        $wanted = collect($accessoryIds)->map(fn ($id) => (int) $id)->filter()->all();
+
+        return $all->whereIn('id', $wanted)->map(fn ($a) => [
+            'id' => (int) $a->id,
+            'name' => (string) $a->name,
+            'qty' => (int) ($a->default_qty ?? 1),
+        ])->values()->all();
     }
 
     public function approve(Contract $contract, ?int $userId = null, bool $reSnapshotRatesFromVehicle = true): Contract
@@ -295,13 +335,23 @@ class ContractLifecycleService
                 throw new DomainException('عداد الخروج أقل من عداد العربية المسجّل.');
             }
 
+            $accessories = $inspection['accessories'] ?? [];
+            if ($accessories === [] && is_array($locked->accessories_json)) {
+                $accessories = collect($locked->accessories_json)->map(fn ($a) => [
+                    'name' => $a['name'] ?? 'مستلزم',
+                    'expected_qty' => (int) ($a['qty'] ?? 1),
+                    'actual_qty' => (int) ($a['qty'] ?? 1),
+                    'ok' => true,
+                    'accessory_id' => $a['id'] ?? null,
+                ])->all();
+            }
+
             $this->inspections->record($locked->id, [
                 'type' => 'handover',
                 'odometer' => $odometerOut,
-                'fuel_level' => (int) ($inspection['fuel_level'] ?? 50),
                 'notes' => $inspection['notes'] ?? null,
                 'signature_data' => $inspection['signature_data'] ?? null,
-                'accessories' => $inspection['accessories'] ?? [],
+                'accessories' => $accessories,
                 'damages' => $inspection['damages'] ?? [],
             ], $userId);
 
@@ -312,12 +362,42 @@ class ContractLifecycleService
 
             $vehicle->update(['odometer' => $odometerOut]);
 
+            $paymentAmount = (int) ($inspection['payment_amount'] ?? 0);
+            if ($paymentAmount > 0) {
+                $this->accounting->recordPayment([
+                    'amount' => $paymentAmount,
+                    'method' => $inspection['payment_method'] ?? 'cash',
+                    'direction' => 'in',
+                    'reference' => $inspection['payment_reference'] ?? ('HO-'.$locked->number),
+                    'link_type' => 'contract',
+                    'link_id' => $locked->id,
+                    'notes' => 'دفعة عند التسليم'.($paymentAmount > 0 ? ' (جزئية أو كاملة)' : ''),
+                ], $userId);
+
+                AuditLog::query()->create([
+                    'user_id' => $userId,
+                    'action' => 'payment_recorded',
+                    'record_type' => Contract::class,
+                    'record_id' => $locked->id,
+                    'after' => [
+                        'number' => $locked->number,
+                        'amount' => $paymentAmount,
+                        'method' => $inspection['payment_method'] ?? 'cash',
+                    ],
+                ]);
+            }
+
             AuditLog::query()->create([
                 'user_id' => $userId,
                 'action' => 'handover',
                 'record_type' => Contract::class,
                 'record_id' => $locked->id,
-                'after' => ['status' => 'active', 'odometer_out' => $odometerOut],
+                'after' => [
+                    'number' => $locked->number,
+                    'status' => 'active',
+                    'odometer_out' => $odometerOut,
+                    'plate' => $vehicle->plate,
+                ],
             ]);
 
             $this->notifyLifecycle(
@@ -327,7 +407,7 @@ class ContractLifecycleService
                 $userId,
             );
 
-            return $locked->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages']);
+            return $locked->fresh(['customer', 'vehicle', 'deposit', 'inspections.damages', 'salesUser:id,name']);
         });
     }
 
@@ -357,7 +437,6 @@ class ContractLifecycleService
             $this->inspections->record($locked->id, [
                 'type' => 'return',
                 'odometer' => $odometerIn,
-                'fuel_level' => (int) ($inspection['fuel_level'] ?? 50),
                 'notes' => $inspection['notes'] ?? null,
                 'signature_data' => $inspection['signature_data'] ?? null,
                 'accessories' => $inspection['accessories'] ?? [],
@@ -652,9 +731,8 @@ class ContractLifecycleService
             if ($handover) {
                 $handover->fill([
                     'odometer' => $odometerOut,
-                    'fuel_level' => (int) ($data['fuel_level'] ?? $handover->fuel_level ?? 50),
                     'notes' => trim(($handover->notes ? $handover->notes."\n" : '').'تسليم البديلة عند التبديل بسبب عطل'),
-                    'signature_data' => $data['signature_data'] ?? $handover->signature_data ?? ('swap-ack:'.str_repeat('0', 48)),
+                    'signature_data' => $data['signature_data'] ?? $handover->signature_data,
                     'accessories_json' => $data['accessories'] ?? $handover->accessories_json ?? [],
                     'inspected_at' => now(),
                     'inspector_id' => $userId ?? $handover->inspector_id,
@@ -663,9 +741,8 @@ class ContractLifecycleService
                 $this->inspections->record($locked->id, [
                     'type' => 'handover',
                     'odometer' => $odometerOut,
-                    'fuel_level' => (int) ($data['fuel_level'] ?? 50),
                     'notes' => 'تسليم البديلة عند التبديل بسبب عطل',
-                    'signature_data' => $data['signature_data'] ?? ('swap-ack:'.str_repeat('0', 48)),
+                    'signature_data' => $data['signature_data'] ?? null,
                     'accessories' => $data['accessories'] ?? [],
                     'damages' => $data['damages'] ?? [],
                 ], $userId);
@@ -673,7 +750,7 @@ class ContractLifecycleService
 
             AuditLog::query()->create([
                 'user_id' => $userId,
-                'action' => 'vehicle_swapped_fault',
+                'action' => 'swapped',
                 'record_type' => Contract::class,
                 'record_id' => $locked->id,
                 'after' => [

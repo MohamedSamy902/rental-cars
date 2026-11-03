@@ -157,6 +157,7 @@ export function ContractDetailPage() {
             { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },
             { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },
             { label: 'التأمين المتفق', value: formatMoney(row.frozen_agreed_deposit || 0) },
+            { label: 'أنشأه', value: row.created_by || row.sales_user?.name || '—' },
             { label: 'عداد الخروج', value: row.odometer_out != null ? `${formatNumber(row.odometer_out)} كم` : '—' },
             { label: 'عداد العودة', value: row.odometer_in != null ? `${formatNumber(row.odometer_in)} كم` : '—' },
             { label: 'كيلومترات زيادة', value: row.excess_km_amount ? formatMoney(row.excess_km_amount) : '—' },
@@ -178,7 +179,6 @@ export function ContractDetailPage() {
                 </header>
                 <p className="muted">
                   عداد {ins.odometer != null ? `${formatNumber(ins.odometer)} كم` : '—'}
-                  {ins.fuel_level != null ? ` · بنزين ${ins.fuel_level}%` : ''}
                 </p>
                 {ins.notes ? <p>{ins.notes}</p> : null}
                 {(ins.damages ?? []).map((d, i) => (
@@ -247,7 +247,7 @@ export function ContractDetailPage() {
           <ol className="cd-timeline">
             {timeline.map((t) => (
               <li key={t.id}>
-                <strong>{timelineLabel[t.action] || t.action}</strong>
+                <strong>{t.summary || timelineLabel[t.action] || t.action}</strong>
                 <span className="muted">{t.user || 'النظام'} · {t.at ? formatDateTime(t.at) : '—'}</span>
               </li>
             ))}

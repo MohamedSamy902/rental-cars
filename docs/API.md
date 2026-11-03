@@ -735,7 +735,7 @@ password: password
 | GET/POST/DELETE | `/salary-advances` · `/salary-advances/{id}` | `hr.advances` — سلف الشهر تُخصم من المسودة |
 | POST | `/payroll/lines/{id}/payout` | صرف جزئي أو كامل بعد الاعتماد؛ المتبقي يُرحَّل |
 | GET/POST | `/employee-assignments` · `…/acknowledge` | `hr.custody` — تأكيد استلام الأدمن |
-| GET | `/vehicles/recommend` | ترتيب متاح بأوزان ٦٫٢ |
+| GET | `/vehicles/recommend` | العربيات المتاحة في الفترة (بلا أوزان/درجات) |
 | GET/POST | `/vehicles/{id}/tires|batteries|downtime|consumables` | أصول المركبة ٦٫٩–٦٫١١ · ١٤٫١ |
 | GET/POST | `/consumable-templates` | قوالب قطع استهلاكية |
 | GET/POST | `/evaluations` | خلف `feature:evaluations` |

@@ -27,13 +27,22 @@ class ContractController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = Contract::query()->with(['customer', 'vehicle', 'deposit'])->latest('id');
+        $q = Contract::query()->with(['customer', 'vehicle', 'deposit', 'salesUser:id,name'])->latest('id');
         $user = $request->user();
         if ($user && $user->role?->name === 'sales' && ! $user->hasPermission('contracts.approve')) {
             $q->where('sales_user_id', $user->id);
         }
         if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);
+        }
+        if ($tab = $request->string('tab')->toString()) {
+            if ($tab === 'upcoming') {
+                $q->whereIn('status', ['pending', 'approved'])
+                    ->where('starts_at', '>', now()->endOfDay());
+            } elseif ($tab === 'handover_today') {
+                $q->whereIn('status', ['pending', 'approved'])
+                    ->whereDate('starts_at', now()->toDateString());
+            }
         }
         if ($search = $request->string('search')->toString()) {
             $q->where(function ($qq) use ($search) {
@@ -49,9 +58,15 @@ class ContractController extends Controller
         $data = collect($rows->items())->map(function (Contract $c) {
             $arr = $c->toArray();
             $arr['progress'] = $this->progress->forContract($c);
+            $arr['created_by'] = $c->salesUser?->name;
+            $arr['sales_user'] = $c->salesUser
+                ? ['id' => $c->salesUser->id, 'name' => $c->salesUser->name]
+                : null;
 
             return $arr;
         })->all();
+
+        $today = now()->toDateString();
 
         return response()->json([
             'data' => $data,
@@ -67,6 +82,14 @@ class ContractController extends Controller
                 'active' => Contract::query()->where('status', 'active')->count(),
                 'completed' => Contract::query()->where('status', 'completed')->count(),
                 'cancelled' => Contract::query()->where('status', 'cancelled')->count(),
+                'upcoming' => Contract::query()
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->where('starts_at', '>', now()->endOfDay())
+                    ->count(),
+                'handover_today' => Contract::query()
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->whereDate('starts_at', $today)
+                    ->count(),
             ],
         ]);
     }
@@ -116,9 +139,11 @@ class ContractController extends Controller
     {
         $data = $request->validate([
             'odometer_out' => ['required', 'integer', 'min:0'],
-            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string'],
             'signature_data' => ['nullable', 'string'],
+            'payment_amount' => ['nullable', 'integer', 'min:0'],
+            'payment_method' => ['nullable', 'string', 'in:cash,card,transfer'],
+            'payment_reference' => ['nullable', 'string', 'max:100'],
             'accessories' => ['nullable', 'array'],
             'accessories.*.name' => ['required_with:accessories', 'string'],
             'accessories.*.expected_qty' => ['nullable', 'integer', 'min:0'],
@@ -127,7 +152,11 @@ class ContractController extends Controller
             'damages' => ['nullable', 'array'],
             'damages.*.position' => ['required_with:damages', 'string'],
             'damages.*.description' => ['required_with:damages', 'string'],
-        ], [], ['odometer_out' => 'عداد الخروج', 'signature_data' => 'توقيع العميل']);
+        ], [], [
+            'odometer_out' => 'عداد الخروج',
+            'payment_amount' => 'مبلغ الدفعة',
+            'payment_method' => 'طريقة الدفع',
+        ]);
 
         try {
             $contract = $this->lifecycle->activateOnHandover(
@@ -149,7 +178,6 @@ class ContractController extends Controller
             'odometer_in' => ['required', 'integer', 'min:0'],
             'returned_at' => ['nullable', 'date'],
             'damage_fee' => ['nullable', 'integer', 'min:0'],
-            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string'],
             'signature_data' => ['nullable', 'string'],
             'accessories' => ['nullable', 'array'],
@@ -160,7 +188,7 @@ class ContractController extends Controller
             'damages' => ['nullable', 'array'],
             'damages.*.position' => ['required_with:damages', 'string'],
             'damages.*.description' => ['required_with:damages', 'string'],
-        ], [], ['odometer_in' => 'عداد العودة', 'signature_data' => 'توقيع العميل']);
+        ], [], ['odometer_in' => 'عداد العودة']);
 
         $returnedAt = isset($data['returned_at']) ? new \DateTimeImmutable($data['returned_at']) : null;
 
@@ -300,8 +328,7 @@ class ContractController extends Controller
             'odometer_out' => ['required', 'integer', 'min:0'],
             'planned_ends_at' => ['nullable', 'date'],
             'damage_fee' => ['nullable', 'integer', 'min:0'],
-            'signature_data' => ['nullable', 'string', 'min:40'],
-            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'signature_data' => ['nullable', 'string'],
             'damages' => ['nullable', 'array'],
             'damages.*.position' => ['required_with:damages', 'string', 'max:120'],
             'damages.*.description' => ['required_with:damages', 'string', 'max:500'],
@@ -312,8 +339,6 @@ class ContractController extends Controller
             'replacement_vehicle_id' => 'العربية البديلة',
             'odometer_in' => 'عداد العربية القديمة',
             'odometer_out' => 'عداد العربية البديلة',
-            'signature_data' => 'توقيع العميل',
-            'fuel_level' => 'مستوى البنزين',
             'damages' => 'الأضرار',
         ]);
 

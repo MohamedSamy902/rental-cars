@@ -8,7 +8,12 @@ export type PrintDocKind = 'contract' | 'invoice' | 'receipt'
 type PrintContract = Record<string, unknown> & {
   number: string
   status: string
-  customer?: { full_name?: string; phone?: string }
+  customer?: {
+    full_name?: string
+    phone?: string
+    national_id_image_path?: string | null
+    national_id_back_path?: string | null
+  }
   vehicle?: { brand: string; model: string; plate: string }
   starts_at: string
   planned_ends_at: string
@@ -30,7 +35,6 @@ type PrintContract = Record<string, unknown> & {
   inspections?: Array<{
     type: string
     odometer?: number | null
-    fuel_level?: number | null
     inspected_at?: string | null
   }>
   payments?: Array<{
@@ -41,6 +45,8 @@ type PrintContract = Record<string, unknown> & {
     paid_at?: string | null
     date?: string | null
   }>
+  _id_front_src?: string | null
+  _id_back_src?: string | null
 }
 
 type PrintTenant = {
@@ -159,6 +165,10 @@ function shell(title: string, body: string) {
       .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;color:#0f766e;font-size:12px}
       .print-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
       .print-logo{width:96px;height:auto;object-fit:contain}
+      .id-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+      .id-grid figure{margin:0;border:1px solid #cbd5e1;padding:8px;text-align:center}
+      .id-grid img{max-width:100%;max-height:220px;object-fit:contain}
+      .id-grid figcaption{margin-top:6px;font-size:12px;color:#64748b}
       @media print{.print-logo{max-width:110px}}
     </style>
   </head><body>${body}</body></html>`
@@ -222,6 +232,24 @@ function invoiceBody(tenant: PrintTenant, c: PrintContract) {
     <p class="foot">${esc(tenant.print_footer || '')}</p>`
 }
 
+function idCardsBlock(c: PrintContract) {
+  const front = c._id_front_src
+  const back = c._id_back_src
+  if (!front && !back) return ''
+  return `
+    <h2>صورة البطاقة الشخصية</h2>
+    <div class="id-grid">
+      <figure>
+        ${front ? `<img src="${esc(front)}" alt="وش البطاقة" />` : '<p class="muted">—</p>'}
+        <figcaption>وش البطاقة</figcaption>
+      </figure>
+      <figure>
+        ${back ? `<img src="${esc(back)}" alt="ضهر البطاقة" />` : '<p class="muted">—</p>'}
+        <figcaption>ضهر البطاقة</figcaption>
+      </figure>
+    </div>`
+}
+
 function receiptBody(tenant: PrintTenant, c: PrintContract) {
   const handover = (c.inspections || []).find((i) => i.type === 'handover')
   const ret = (c.inspections || []).find((i) => i.type === 'return')
@@ -235,6 +263,7 @@ function receiptBody(tenant: PrintTenant, c: PrintContract) {
       <tr><th>العميل</th><td>${esc(c.customer?.full_name || '—')}${c.customer?.phone ? ` · <span dir="ltr">${esc(c.customer.phone)}</span>` : ''}</td></tr>
       <tr><th>العربية</th><td>${c.vehicle ? esc(`${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}`) : '—'}</td></tr>
     </table>
+    ${idCardsBlock(c)}
     <h2>بيانات التأمين</h2>
     <table>
       <tr><th>مبلغ التأمين</th><td>${formatMoney(deposit?.original_amount ?? c.frozen_agreed_deposit ?? 0)}</td></tr>
@@ -245,16 +274,39 @@ function receiptBody(tenant: PrintTenant, c: PrintContract) {
     <h2>عند التسليم</h2>
     <table>
       <tr><th>عداد الخروج</th><td>${handover?.odometer ?? c.odometer_out ?? '—'}</td></tr>
-      <tr><th>مستوى البنزين</th><td>${handover?.fuel_level != null ? `${handover.fuel_level}%` : '—'}</td></tr>
       <tr><th>وقت التسليم</th><td>${handover?.inspected_at ? formatDate(handover.inspected_at) : '—'}</td></tr>
     </table>
     <h2>عند الاستلام</h2>
     <table>
       <tr><th>عداد العودة</th><td>${ret?.odometer ?? c.odometer_in ?? '—'}</td></tr>
-      <tr><th>مستوى البنزين</th><td>${ret?.fuel_level != null ? `${ret.fuel_level}%` : '—'}</td></tr>
       <tr><th>وقت الاستلام</th><td>${ret?.inspected_at ? formatDate(ret.inspected_at) : (c.actual_ends_at ? formatDate(c.actual_ends_at) : '—')}</td></tr>
     </table>
     <p class="foot">${esc(tenant.print_footer || '')}</p>`
+}
+
+async function resolveMediaSrc(path?: string | null): Promise<string | null> {
+  if (!path) return null
+  try {
+    const resolved = path.startsWith('/api/')
+      ? path
+      : path.startsWith('/media/')
+        ? `/api${path}`
+        : path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:')
+          ? path
+          : `/api${path.startsWith('/') ? path : `/${path}`}`
+    if (resolved.startsWith('http') || resolved.startsWith('data:') || resolved.startsWith('blob:')) {
+      return resolved
+    }
+    const headers: HeadersInit = { Accept: '*/*' }
+    const token = getToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(resolved, { headers })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  } catch {
+    return null
+  }
 }
 
 async function loadPrintPayload(id: number): Promise<PrintPayload> {
@@ -265,9 +317,13 @@ async function loadPrintPayload(id: number): Promise<PrintPayload> {
     throw Object.assign(new Error('تعذّر تحميل بيانات العقد للطباعة.'), { status: 422 })
   }
   const logo_src = await resolveLogoSrc(tenant?.logo_path)
+  const [_id_front_src, _id_back_src] = await Promise.all([
+    resolveMediaSrc(contract.customer?.national_id_image_path),
+    resolveMediaSrc(contract.customer?.national_id_back_path),
+  ])
   return {
     tenant: { ...tenant, logo_src },
-    contract: { ...contract, number },
+    contract: { ...contract, number, _id_front_src, _id_back_src },
     templates,
   }
 }

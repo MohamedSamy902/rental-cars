@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Inspection extends Model
 {
     protected $fillable = [
-        'contract_id', 'type', 'inspected_at', 'odometer', 'fuel_level', 'notes',
+        'contract_id', 'type', 'inspected_at', 'odometer', 'notes',
         'inspector_id', 'signature_path', 'signature_data', 'accessories_json',
     ];
 

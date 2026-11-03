@@ -22,7 +22,7 @@ class ContractDossierService
      */
     public function build(Contract $contract): array
     {
-        $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections.damages']);
+        $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections.damages', 'salesUser:id,name']);
 
         $depositId = $contract->deposit?->id;
         $payments = Payment::query()
@@ -96,19 +96,38 @@ class ContractDossierService
             ->limit(50)
             ->get();
         $users = User::query()->whereKey($logs->pluck('user_id')->filter()->unique()->all())->pluck('name', 'id');
-        $timeline = $logs->map(fn (AuditLog $log) => [
-            'id' => $log->id,
-            'action' => $log->action,
-            'at' => $log->created_at?->toIso8601String(),
-            'user' => $log->user_id ? $users->get($log->user_id) : null,
-        ])->values();
+        $narrator = app(\App\Services\Operations\AuditNarrator::class);
+        $timeline = $logs->map(function (AuditLog $log) use ($users, $narrator) {
+            $name = $log->user_id ? $users->get($log->user_id) : null;
+
+            return [
+                'id' => $log->id,
+                'action' => $log->action,
+                'summary' => $narrator->summarize($log, $name),
+                'at' => $log->created_at?->toIso8601String(),
+                'user' => $name,
+            ];
+        })->values();
 
         $in = (int) $payments->where('direction', 'in')->where('link_type', 'contract')->sum('amount');
         $out = (int) $payments->where('direction', 'out')->where('link_type', 'contract')->sum('amount');
         $total = (int) ($contract->final_total ?? 0);
+        if ($total <= 0) {
+            $days = max(1, (int) ($contract->approved_days ?? 0));
+            if ($days <= 0 && $contract->starts_at && $contract->planned_ends_at) {
+                $days = max(1, (int) $contract->starts_at->diffInDays($contract->planned_ends_at) + 1);
+            }
+            $total = $days * (int) $contract->frozen_daily_rate
+                + (int) $contract->other_fees
+                - (int) $contract->discount;
+        }
 
         return [
             ...$contract->toArray(),
+            'created_by' => $contract->salesUser?->name,
+            'sales_user' => $contract->salesUser
+                ? ['id' => $contract->salesUser->id, 'name' => $contract->salesUser->name]
+                : null,
             'progress' => $this->progress->forContract($contract),
             'payments' => $payments,
             'documents' => $documents,

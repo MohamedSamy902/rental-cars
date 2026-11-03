@@ -33,6 +33,7 @@ class StoreContractRequest extends FormRequest
             'min_days',
             'discount',
             'other_fees',
+            'odometer',
             'extended_from_contract_id',
             'swapped_from_contract_id',
         ];
@@ -67,6 +68,9 @@ class StoreContractRequest extends FormRequest
             'other_fees' => ['nullable', 'integer', 'min:0'],
             'other_fees_description' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
+            'odometer' => ['nullable', 'integer', 'min:0'],
+            'accessory_ids' => ['nullable', 'array'],
+            'accessory_ids.*' => ['integer', 'exists:vehicle_accessories,id'],
             'extended_from_contract_id' => [
                 'nullable',
                 Rule::exists('contracts', 'id')->whereNull('deleted_at'),
@@ -99,6 +103,8 @@ class StoreContractRequest extends FormRequest
             'other_fees' => 'رسوم أخرى',
             'other_fees_description' => 'وصف الرسوم الأخرى',
             'notes' => 'الملاحظات',
+            'odometer' => 'العداد الحالي',
+            'accessory_ids' => 'المستلزمات',
             'extended_from_contract_id' => 'عقد التمديد السابق',
             'swapped_from_contract_id' => 'عقد التبديل السابق',
             'swap_reason' => 'سبب التبديل',
