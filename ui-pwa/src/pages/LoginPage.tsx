@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
+import { accessHelpersFromUser, firstAccessiblePath } from '@/shared/auth/routeAccess'
 import { BrandLogo, Button, useToast } from '@/shared/ui'
 import { IconCheck, IconEye, IconEyeOff, IconLock, IconMail } from '@/shared/ui/Icons'
 import type { ApiError } from '@/shared/api/client'
@@ -77,7 +78,7 @@ function AuthInput({ label, icon, type, value, autoComplete, error, onChange, tr
 }
 
 export function LoginPage() {
-  const { user, loading, login } = useAuth()
+  const { user, loading, login, can, featureEnabled, isIntegrator } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
   const [email, setEmail] = useState(() => readRememberedEmail() || (IS_DEV ? DEMO.email : ''))
@@ -88,7 +89,8 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState('')
 
-  if (!loading && user) return <Navigate to="/" replace />
+  const homePath = firstAccessiblePath({ can, featureEnabled, isIntegrator })
+  if (!loading && user) return <Navigate to={homePath} replace />
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -96,10 +98,10 @@ export function LoginPage() {
     setErrors({})
     setFormError('')
     try {
-      await login(email, password)
+      const loggedIn = await login(email, password)
       persistRememberedEmail(remember, email)
       toast.success('مرحباً بك في آر بي إم')
-      navigate('/')
+      navigate(firstAccessiblePath(accessHelpersFromUser(loggedIn)))
     } catch (err) {
       const apiErr = err as ApiError
       const topMessage = apiErr.message || 'تعذّر الدخول. تحقق من البريد وكلمة المرور.'

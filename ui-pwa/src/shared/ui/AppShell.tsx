@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
+import { PermissionGate, RequireRouteAccess } from '@/shared/auth/PermissionGate'
+import { canSeeNavTo, firstAccessiblePath } from '@/shared/auth/routeAccess'
 import { useTheme } from '@/shared/theme/ThemeContext'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
@@ -24,33 +26,31 @@ type NavItem = {
   label: string
   icon: React.ReactNode
   end?: boolean
-  feature?: string
-  permission?: string
 }
 
 const railNav: NavItem[] = [
   { to: '/', label: 'لوحة اليوم', icon: <IconHome />, end: true },
-  { to: '/vehicles', label: 'العربيات', icon: <IconCar />, permission: 'vehicles.view' },
-  { to: '/bookings', label: 'العقود', icon: <IconClipboard />, permission: 'contracts.view' },
-  { to: '/calendar', label: 'التقويم', icon: <IconCalendar />, permission: 'contracts.view' },
-  { to: '/waitlist', label: 'الانتظار', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
-  { to: '/showroom', label: 'المعرض', icon: <IconStore />, feature: 'showroom', permission: 'showroom.run' },
-  { to: '/maintenance', label: 'الصيانة', icon: <IconWrench />, permission: 'maintenance.view' },
-  { to: '/inventory', label: 'المخزون', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
-  { to: '/petty-cash', label: 'العهدة', icon: <IconWallet />, feature: 'petty_cash', permission: 'petty_cash.view' },
-  { to: '/expenses', label: 'المصروفات', icon: <IconReceipt />, permission: 'expenses.view' },
-  { to: '/owners', label: 'ملاك العربيات', icon: <IconKey />, permission: 'owners.view' },
-  { to: '/violations', label: 'المخالفات', icon: <IconAlert />, permission: 'violations.view' },
-  { to: '/customers', label: 'العملاء', icon: <IconUsers />, permission: 'customers.view' },
-  { to: '/department-notice', label: 'إخطار القسم', icon: <IconFileText />, feature: 'department_notice', permission: 'department_notice.print' },
-  { to: '/accounts', label: 'الحسابات', icon: <IconLandmark />, permission: 'accounting.view' },
-  { to: '/reports', label: 'التقارير', icon: <IconChart />, permission: 'reports.view' },
-  { to: '/hr', label: 'الموارد البشرية', icon: <IconBriefcase />, feature: 'hr', permission: 'hr.view' },
-  { to: '/chat', label: 'المحادثة', icon: <IconChat />, feature: 'chat' },
-  { to: '/staff', label: 'الموظفون', icon: <IconUserCog />, permission: 'staff.view' },
-  { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconHistory />, permission: 'audit.view' },
-  { to: '/notifications', label: 'الإشعارات', icon: <IconBell />, permission: 'notifications.view' },
-  { to: '/settings', label: 'الإعدادات', icon: <IconSettings />, permission: 'settings.view' },
+  { to: '/vehicles', label: 'العربيات', icon: <IconCar /> },
+  { to: '/bookings', label: 'العقود', icon: <IconClipboard /> },
+  { to: '/calendar', label: 'التقويم', icon: <IconCalendar /> },
+  { to: '/waitlist', label: 'الانتظار', icon: <IconQueue /> },
+  { to: '/showroom', label: 'المعرض', icon: <IconStore /> },
+  { to: '/maintenance', label: 'الصيانة', icon: <IconWrench /> },
+  { to: '/inventory', label: 'المخزون', icon: <IconBox /> },
+  { to: '/petty-cash', label: 'العهدة', icon: <IconWallet /> },
+  { to: '/expenses', label: 'المصروفات', icon: <IconReceipt /> },
+  { to: '/owners', label: 'ملاك العربيات', icon: <IconKey /> },
+  { to: '/violations', label: 'المخالفات', icon: <IconAlert /> },
+  { to: '/customers', label: 'العملاء', icon: <IconUsers /> },
+  { to: '/department-notice', label: 'إخطار القسم', icon: <IconFileText /> },
+  { to: '/accounts', label: 'الحسابات', icon: <IconLandmark /> },
+  { to: '/reports', label: 'التقارير', icon: <IconChart /> },
+  { to: '/hr', label: 'الموارد البشرية', icon: <IconBriefcase /> },
+  { to: '/chat', label: 'المحادثة', icon: <IconChat /> },
+  { to: '/staff', label: 'الموظفون', icon: <IconUserCog /> },
+  { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconHistory /> },
+  { to: '/notifications', label: 'الإشعارات', icon: <IconBell /> },
+  { to: '/settings', label: 'الإعدادات', icon: <IconSettings /> },
 ]
 
 const mobileNav: NavItem[] = [
@@ -65,7 +65,7 @@ const RAIL_KEY = 'rpm.shell.rail'
 const WA_URL = 'https://wa.me/201150100104'
 
 export function AppShell() {
-  const { user, logout, can, featureEnabled } = useAuth()
+  const { user, logout, can, featureEnabled, isIntegrator } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { openNewContract } = useNewContract()
   const navigate = useNavigate()
@@ -78,17 +78,10 @@ export function AppShell() {
     location.pathname,
   )
 
-  const visibleRail = railNav.filter((item) => {
-    if (item.feature && !featureEnabled(item.feature)) return false
-    if (item.permission && !can(item.permission)) return false
-    return true
-  })
-  const visibleMobile = mobileNav.filter((item) => {
-    const full = railNav.find((r) => r.to === item.to)
-    if (full?.feature && !featureEnabled(full.feature)) return false
-    if (full?.permission && !can(full.permission)) return false
-    return true
-  })
+  const access = { can, featureEnabled, isIntegrator }
+  const homePath = firstAccessiblePath(access)
+  const visibleRail = railNav.filter((item) => canSeeNavTo(item.to, access))
+  const visibleMobile = mobileNav.filter((item) => canSeeNavTo(item.to, access))
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(RAIL_KEY) !== 'collapsed'
@@ -141,7 +134,7 @@ export function AppShell() {
       <aside className="shell-rail" aria-label="التنقّل الرئيسي">
         <div className="shell-rail__inner">
           <div className="shell-rail__brand-row">
-            <NavLink to="/" className="shell-rail__brand" title="RPM Rent A Car" aria-label="لوحة اليوم">
+            <NavLink to={homePath} className="shell-rail__brand" title="RPM Rent A Car" aria-label="الصفحة الرئيسية">
               <BrandLogo variant="mark" />
             </NavLink>
             <button
@@ -220,7 +213,7 @@ export function AppShell() {
               <IconMenu size={18} />
             </button>
 
-            <NavLink to="/" className="shell-top__brand-mobile" aria-label="لوحة اليوم">
+            <NavLink to={homePath} className="shell-top__brand-mobile" aria-label="الصفحة الرئيسية">
               <BrandLogo variant="mark" />
             </NavLink>
 
@@ -239,29 +232,33 @@ export function AppShell() {
               >
                 <IconSearch size={18} />
               </button>
-              <button
-                type="button"
-                className="shell-icon shell-icon--bell"
-                aria-label={unread > 0 ? `إشعارات · ${unread} غير مقروء` : 'إشعارات'}
-                onClick={() => navigate('/notifications')}
-              >
-                <IconBell size={18} />
-                {unread > 0 ? (
-                  <span className="shell-badge" aria-hidden>
-                    {unread > 99 ? '99+' : unread}
+              <PermissionGate permission="notifications.view">
+                <button
+                  type="button"
+                  className="shell-icon shell-icon--bell"
+                  aria-label={unread > 0 ? `إشعارات · ${unread} غير مقروء` : 'إشعارات'}
+                  onClick={() => navigate('/notifications')}
+                >
+                  <IconBell size={18} />
+                  {unread > 0 ? (
+                    <span className="shell-badge" aria-hidden>
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  ) : null}
+                </button>
+              </PermissionGate>
+              <PermissionGate permission="contracts.create">
+                <button
+                  type="button"
+                  className="rpm-btn rpm-btn--primary rpm-btn--md shell-cta--desk"
+                  onClick={() => openNewContract()}
+                >
+                  <span className="rpm-btn__icon" aria-hidden>
+                    <IconPlus size={16} />
                   </span>
-                ) : null}
-              </button>
-              <button
-                type="button"
-                className="rpm-btn rpm-btn--primary rpm-btn--md shell-cta--desk"
-                onClick={() => openNewContract()}
-              >
-                <span className="rpm-btn__icon" aria-hidden>
-                  <IconPlus size={16} />
-                </span>
-                <span className="rpm-btn__label">عقد جديد</span>
-              </button>
+                  <span className="rpm-btn__label">عقد جديد</span>
+                </button>
+              </PermissionGate>
               <div className="shell-user shell-user--desk">
                 <span className="shell-user__avatar" aria-hidden>
                   {(user?.name || 'م').slice(0, 1)}
@@ -284,7 +281,9 @@ export function AppShell() {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             >
-              <Outlet />
+              <RequireRouteAccess>
+                <Outlet />
+              </RequireRouteAccess>
             </motion.div>
           </AnimatePresence>
         </main>
