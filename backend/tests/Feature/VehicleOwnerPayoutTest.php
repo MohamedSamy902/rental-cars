@@ -49,6 +49,7 @@ class VehicleOwnerPayoutTest extends TestCase
 
     protected function tearDown(): void
     {
+        Carbon::setTestNow();
         CarbonImmutable::setTestNow();
         parent::tearDown();
     }
