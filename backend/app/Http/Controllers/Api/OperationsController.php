@@ -11,6 +11,7 @@ use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
 use App\Models\PrintSnapshot;
 use App\Models\TenantSetting;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleDocumentHistory;
 use App\Models\WorkOrder;
@@ -231,11 +232,32 @@ class OperationsController extends Controller
 
     public function auditLogs(Request $request, \App\Services\Operations\AuditNarrator $narrator): JsonResponse
     {
-        $rows = AuditLog::query()
-            ->with('user:id,name')
-            ->latest('id')
-            ->limit((int) $request->input('limit', 50))
-            ->get();
+        $validated = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'action' => ['nullable', 'string', 'max:80'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $limit = (int) ($validated['limit'] ?? 50);
+
+        $query = AuditLog::query()->with('user:id,name');
+
+        if (! empty($validated['user_id'])) {
+            $query->where('user_id', (int) $validated['user_id']);
+        }
+        if (! empty($validated['action'])) {
+            $query->where('action', $validated['action']);
+        }
+        if (! empty($validated['date_from'])) {
+            $query->whereDate('created_at', '>=', $validated['date_from']);
+        }
+        if (! empty($validated['date_to'])) {
+            $query->whereDate('created_at', '<=', $validated['date_to']);
+        }
+
+        $rows = $query->latest('id')->limit($limit)->get();
 
         $data = $rows->map(function (AuditLog $log) use ($narrator) {
             $userName = $log->user?->name;
@@ -254,7 +276,55 @@ class OperationsController extends Controller
             ];
         })->values();
 
-        return response()->json(['data' => $data]);
+        $labels = $narrator->actionLabels();
+        $seenActions = AuditLog::query()
+            ->select('action')
+            ->distinct()
+            ->orderBy('action')
+            ->pluck('action');
+
+        $actions = $seenActions
+            ->map(fn (string $key) => [
+                'value' => $key,
+                'label' => $labels[$key] ?? $key,
+            ])
+            ->values()
+            ->all();
+
+        // Prefer known catalog order, then any unseen keys that appeared in the DB.
+        $catalog = collect($labels)
+            ->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])
+            ->values();
+        $extra = collect($actions)->reject(
+            fn (array $row) => $catalog->contains(fn (array $c) => $c['value'] === $row['value'])
+        );
+        $actionOptions = $catalog->concat($extra)->values()->all();
+
+        $users = User::query()
+            ->where(function ($q) {
+                $q->where('is_active', true)
+                    ->orWhereIn('id', AuditLog::query()->whereNotNull('user_id')->distinct()->select('user_id'));
+            })
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+            ->values()
+            ->all();
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'users' => $users,
+                'actions' => $actionOptions,
+                'filters' => [
+                    'user_id' => $validated['user_id'] ?? null,
+                    'action' => $validated['action'] ?? null,
+                    'date_from' => $validated['date_from'] ?? null,
+                    'date_to' => $validated['date_to'] ?? null,
+                    'limit' => $limit,
+                ],
+            ],
+        ]);
     }
 
     public function pettyCashIndex(): JsonResponse

@@ -60,12 +60,63 @@ class ClientFinalPolishesTest extends TestCase
 
         $res = $this->getJson('/api/audit-logs?limit=5')
             ->assertOk()
-            ->json('data');
+            ->json();
 
-        $this->assertNotEmpty($res);
-        $this->assertStringContainsString('قام', $res[0]['summary']);
-        $this->assertStringContainsString('حجز', $res[0]['summary']);
-        $this->assertSame('أحمد', $res[0]['user_name']);
+        $this->assertNotEmpty($res['data']);
+        $this->assertStringContainsString('قام', $res['data'][0]['summary']);
+        $this->assertStringContainsString('حجز', $res['data'][0]['summary']);
+        $this->assertSame('أحمد', $res['data'][0]['user_name']);
+        $this->assertNotEmpty($res['meta']['users']);
+        $this->assertNotEmpty($res['meta']['actions']);
+        $this->assertTrue(collect($res['meta']['actions'])->contains(fn ($a) => ($a['value'] ?? '') === 'created'));
+    }
+
+    public function test_audit_logs_filter_by_user_action_and_date(): void
+    {
+        $other = User::factory()->create([
+            'name' => 'سارة',
+            'role_id' => $this->admin->role_id,
+            'is_active' => true,
+        ]);
+
+        $old = AuditLog::query()->create([
+            'user_id' => $this->admin->id,
+            'action' => 'handover',
+            'record_type' => Contract::class,
+            'record_id' => 10,
+            'after' => ['number' => 'C-H-1'],
+        ]);
+        AuditLog::query()->whereKey($old->id)->update([
+            'created_at' => now()->subDays(2),
+            'updated_at' => now()->subDays(2),
+        ]);
+        AuditLog::query()->create([
+            'user_id' => $other->id,
+            'action' => 'completed',
+            'record_type' => Contract::class,
+            'record_id' => 11,
+            'after' => ['number' => 'C-H-2'],
+        ]);
+
+        $byUser = $this->getJson('/api/audit-logs?user_id='.$other->id.'&limit=20')
+            ->assertOk()
+            ->json('data');
+        $this->assertCount(1, $byUser);
+        $this->assertSame($other->id, $byUser[0]['user_id']);
+        $this->assertSame('completed', $byUser[0]['action']);
+
+        $byAction = $this->getJson('/api/audit-logs?action=handover&limit=20')
+            ->assertOk()
+            ->json('data');
+        $this->assertNotEmpty($byAction);
+        $this->assertTrue(collect($byAction)->every(fn ($row) => $row['action'] === 'handover'));
+
+        $from = now()->toDateString();
+        $byDate = $this->getJson('/api/audit-logs?date_from='.$from.'&date_to='.$from.'&limit=20')
+            ->assertOk()
+            ->json('data');
+        $this->assertNotEmpty($byDate);
+        $this->assertTrue(collect($byDate)->every(fn ($row) => $row['action'] === 'completed'));
     }
 
     public function test_audit_narrator_vehicle_example(): void
