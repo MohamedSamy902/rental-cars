@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, setToken } from '@/shared/api/client'
 
 export type AuthUser = {
   id: number
   name: string
   email: string
+  phone?: string | null
   role?: string | null
   role_name?: string | null
   permissions?: string[]
@@ -17,6 +18,10 @@ type AuthApi = {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  /** Replace session user after self-profile save (keeps token; no logout). */
+  applyUser: (next: AuthUser) => void
+  /** Re-fetch GET /me into AuthContext. */
+  refreshUser: () => Promise<AuthUser | null>
   can: (permission: string) => boolean
   featureEnabled: (flag: string) => boolean
   isIntegrator: boolean
@@ -41,6 +46,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
+  const applyUser = useCallback((next: AuthUser) => {
+    setUser(next)
+  }, [])
+
+  const refreshUser = useCallback(async () => {
+    const token = getToken()
+    if (!token) {
+      setUser(null)
+      return null
+    }
+    try {
+      const next = await api<AuthUser>('/me')
+      setUser(next)
+      return next
+    } catch {
+      setToken(null)
+      setUser(null)
+      return null
+    }
+  }, [])
+
   const value = useMemo<AuthApi>(() => {
     const isIntegrator = Boolean(user?.is_integrator || user?.role_name === 'super_admin')
     const perms = user?.permissions || []
@@ -50,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       isIntegrator,
       featureFlags,
+      applyUser,
+      refreshUser,
       can(permission: string) {
         if (!user) return false
         if (isIntegrator) return true
@@ -77,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
       },
     }
-  }, [user, loading])
+  }, [user, loading, applyUser, refreshUser])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

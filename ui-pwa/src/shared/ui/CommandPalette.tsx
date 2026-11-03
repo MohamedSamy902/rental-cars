@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
   IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart,
-  IconClipboard, IconClose, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
+  IconClipboard, IconClose, IconEdit, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
   IconQueue, IconReceipt, IconSearch, IconSettings, IconStore, IconUserCog, IconUsers,
   IconWallet, IconWrench,
 } from './Icons'
@@ -43,6 +43,8 @@ const ITEMS: Item[] = [
   { to: '/notifications', label: 'الإشعارات', group: 'النظام', icon: <IconBell />, permission: 'notifications.view' },
   { to: '/hr', label: 'الموارد البشرية', group: 'النظام', icon: <IconBriefcase />, feature: 'hr', permission: 'hr.view' },
   { to: '/settings', label: 'الإعدادات', group: 'النظام', icon: <IconSettings />, permission: 'settings.view' },
+  // Unrestricted for any authenticated user (no permission key).
+  { to: '/profile', label: 'حسابي الشخصي', group: 'النظام', icon: <IconEdit /> },
 ]
 
 type Props = { open: boolean; onClose: () => void }

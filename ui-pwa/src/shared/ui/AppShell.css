@@ -368,6 +368,29 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
+.shell-user--action {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
+}
+.shell-user--action:hover {
+  background: var(--surface-hover, color-mix(in srgb, var(--surface) 88%, var(--action) 12%));
+  border-color: color-mix(in srgb, var(--border) 60%, var(--action) 40%);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--action) 18%, transparent);
+}
+.shell-user--action:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+.shell-user--action:active {
+  transform: scale(0.985);
+}
 .shell-user__avatar {
   width: 32px;
   height: 32px;
@@ -390,6 +413,22 @@
   font-style: normal;
   font-size: 0.68rem;
   color: var(--text-muted);
+}
+.shell-user__edit {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-2, var(--bg)) 80%, transparent);
+  opacity: 0.72;
+  transition: opacity var(--motion-fast) ease, color var(--motion-fast) ease, background-color var(--motion-fast) ease;
+}
+.shell-user--action:hover .shell-user__edit {
+  opacity: 1;
+  color: var(--action);
+  background: color-mix(in srgb, var(--action) 12%, transparent);
 }
 
 .shell-main {
@@ -565,6 +604,12 @@
 .shell-drawer__action:active {
   transform: scale(0.98);
   background: var(--surface-hover);
+}
+.shell-drawer__action--profile {
+  grid-column: 1 / -1;
+  color: var(--action);
+  border-color: color-mix(in srgb, var(--action) 28%, var(--border));
+  background: color-mix(in srgb, var(--action) 8%, var(--surface-2));
 }
 .shell-drawer__action--quit {
   color: var(--danger-ink);
