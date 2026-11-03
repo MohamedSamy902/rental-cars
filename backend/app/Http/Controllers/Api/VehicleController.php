@@ -92,13 +92,33 @@ class VehicleController extends Controller
             if ($status === 'maintenance') {
                 $q->where('manual_status', 'maintenance');
             } elseif ($status === 'available') {
+                $periodFrom = $request->filled('from')
+                    ? \Carbon\Carbon::parse((string) $request->input('from'))
+                    : null;
+                $periodTo = $request->filled('to')
+                    ? \Carbon\Carbon::parse((string) $request->input('to'))
+                    : null;
                 $q->where(function ($qq) {
-                    $qq->whereNull('manual_status')->orWhere('manual_status', '');
-                })->whereDoesntHave('contracts', function ($c) {
-                    $c->whereIn('status', ['approved', 'active'])
-                        ->where('starts_at', '<=', now())
-                        ->where('planned_ends_at', '>=', now());
+                    $qq->whereNull('manual_status')->orWhereNotIn('manual_status', ['maintenance', 'out_of_service', 'sold']);
                 });
+                if ($periodFrom && $periodTo && $periodTo->gte($periodFrom)) {
+                    // Future-window availability: exclude cars whose contracts overlap [from, to).
+                    $q->whereDoesntHave('contracts', function ($c) use ($periodFrom, $periodTo) {
+                        $c->whereIn('status', ['pending', 'approved', 'active'])
+                            ->where('starts_at', '<', $periodTo)
+                            ->where(function ($qq) use ($periodFrom) {
+                                $qq->where(function ($inner) use ($periodFrom) {
+                                    $inner->whereNull('actual_ends_at')->where('planned_ends_at', '>', $periodFrom);
+                                })->orWhere('actual_ends_at', '>', $periodFrom);
+                            });
+                    });
+                } else {
+                    $q->whereDoesntHave('contracts', function ($c) {
+                        $c->whereIn('status', ['approved', 'active'])
+                            ->where('starts_at', '<=', now())
+                            ->where('planned_ends_at', '>=', now());
+                    });
+                }
             } elseif ($status === 'rented') {
                 $q->whereHas('contracts', fn ($c) => $c->where('status', 'active'));
             } elseif ($status === 'reserved') {

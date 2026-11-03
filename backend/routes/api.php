@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DocumentTemplateController;
 use App\Http\Controllers\Api\EmployeeAssignmentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\FleetPrepController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\OperationsController;
@@ -119,6 +120,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vehicles/catalogs', [VehicleController::class, 'catalogs'])->middleware('permission:vehicles.view,vehicles.create,vehicles.update');
     Route::post('/vehicles/brands', [VehicleController::class, 'storeBrand'])->middleware('permission:vehicles.create,vehicles.update');
     Route::get('/vehicles/recommend', [VehicleController::class, 'recommend'])->middleware('permission:vehicles.view,contracts.create');
+    Route::get('/fleet/daily-prep', [FleetPrepController::class, 'daily'])
+        ->middleware('permission:vehicles.view|contracts.view|maintenance.view');
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
     Route::get('/vehicles/{vehicle}/dossier', [VehicleController::class, 'dossier'])->middleware('permission:vehicles.view');
     Route::get('/vehicles/{vehicle}/document-history', [OperationsController::class, 'vehicleDocumentHistory'])

@@ -5,6 +5,135 @@
   gap: 1.25rem;
 }
 
+/* ── Daily fleet prep ── */
+.db-prep {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius-lg, 0.875rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+}
+
+.db-prep__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.db-prep__head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.db-prep__head p {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.db-prep__link {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--action);
+  text-decoration: none;
+}
+
+.db-prep__days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.db-prep-day {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2, var(--bg));
+  min-width: 0;
+}
+
+.db-prep-day.is-today {
+  border-color: color-mix(in srgb, var(--action) 40%, var(--border));
+  background: color-mix(in srgb, var(--action) 8%, var(--surface));
+}
+
+.db-prep-day__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+}
+
+.db-prep-day__groups {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.db-prep-group__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.db-prep-group__empty {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+}
+
+.db-prep-group__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.db-prep-group__list a {
+  display: grid;
+  gap: 0.05rem;
+  text-decoration: none;
+  color: inherit;
+  padding: 0.3rem 0.4rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+
+.db-prep-group__list strong {
+  font-size: 0.78rem;
+}
+
+.db-prep-group__list span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .db-prep__days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .db-prep__days {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ── Hero ── */
 .db-hero {
   display: flex;

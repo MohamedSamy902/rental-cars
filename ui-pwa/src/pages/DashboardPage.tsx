@@ -61,6 +61,29 @@ type ProfitCompare = {
   }>
 }
 
+type FleetPrepItem = {
+  id: number
+  kind: string
+  number?: string
+  title?: string
+  customer?: string | null
+  vehicle?: { id: number; label: string; plate: string } | null
+  at?: string | null
+}
+
+type FleetPrepDay = {
+  date: string
+  label: string
+  is_today: boolean
+  is_tomorrow: boolean
+  counts: { pickups: number; returns: number; maintenance: number; total: number }
+  groups: {
+    pickups: FleetPrepItem[]
+    returns: FleetPrepItem[]
+    maintenance: FleetPrepItem[]
+  }
+}
+
 type Dash = {
   occupancy_pct: number
   fleet_total: number
@@ -68,6 +91,11 @@ type Dash = {
   profitability_compare?: ProfitCompare
   kpis: Record<string, number>
   tasks: { id: number; title: string; subtitle: string; status: string; at: string }[]
+  fleet_prep?: {
+    horizon_days: number
+    days: FleetPrepDay[]
+    totals: { pickups: number; returns: number; maintenance: number; total: number }
+  }
   recent_contracts: {
     id: number
     number: string
@@ -492,6 +520,62 @@ export function DashboardPage() {
           </motion.div>
         ))}
       </section>
+
+      {data.fleet_prep ? (
+        <section className="db-prep" aria-label="تجهيز العربيات اليومي">
+          <header className="db-prep__head">
+            <div>
+              <h2>تجهيز العربيات اليومي</h2>
+              <p>
+                اليوم · غداً · الثلاثة أيام التالية — مجموعات العمل: تسليم · استلام · صيانة
+                {' · '}
+                الإجمالي {formatNumber(data.fleet_prep.totals.total)}
+              </p>
+            </div>
+            <Link to="/calendar" className="db-prep__link">التقويم</Link>
+          </header>
+          <div className="db-prep__days">
+            {data.fleet_prep.days.map((day) => (
+              <article key={day.date} className={`db-prep-day ${day.is_today ? 'is-today' : ''} ${day.is_tomorrow ? 'is-tomorrow' : ''}`.trim()}>
+                <header className="db-prep-day__head">
+                  <strong>{day.label}</strong>
+                  <span className="tabular-nums">{formatNumber(day.counts.total)}</span>
+                </header>
+                <div className="db-prep-day__groups">
+                  {(
+                    [
+                      { key: 'pickups' as const, label: 'تسليم', tone: 'brand' as BadgeTone },
+                      { key: 'returns' as const, label: 'استلام', tone: 'warning' as BadgeTone },
+                      { key: 'maintenance' as const, label: 'صيانة', tone: 'steel' as BadgeTone },
+                    ]
+                  ).map((g) => (
+                    <div key={g.key} className="db-prep-group">
+                      <div className="db-prep-group__label">
+                        <Badge tone={g.tone} dot={false}>{g.label}</Badge>
+                        <span className="tabular-nums">{formatNumber(day.counts[g.key])}</span>
+                      </div>
+                      {day.groups[g.key].length === 0 ? (
+                        <p className="db-prep-group__empty">—</p>
+                      ) : (
+                        <ul className="db-prep-group__list">
+                          {day.groups[g.key].slice(0, 4).map((item) => (
+                            <li key={`${g.key}-${item.id}`}>
+                              <Link to={g.key === 'maintenance' ? '/maintenance' : `/contracts/${item.number ? item.id : item.id}`}>
+                                <strong>{item.vehicle?.plate || item.title || item.number || `#${item.id}`}</strong>
+                                <span>{item.customer || item.vehicle?.label || item.title || ''}</span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className={`db-bento ${refreshing ? 'is-refreshing' : ''}`.trim()} aria-busy={refreshing}>
         <motion.div

@@ -16,7 +16,8 @@ export type AuthUser = {
 type AuthApi = {
   user: AuthUser | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  /** Login with email or Egyptian mobile phone. */
+  login: (login: string, password: string) => Promise<void>
   logout: () => Promise<void>
   /** Replace session user after self-profile save (keeps token; no logout). */
   applyUser: (next: AuthUser) => void
@@ -87,10 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!(flag in featureFlags)) return true
         return Boolean(featureFlags[flag])
       },
-      async login(email, password) {
+      async login(login, password) {
+        const identifier = login.trim()
+        const payload = identifier.includes('@')
+          ? { login: identifier, email: identifier, password }
+          : { login: identifier, phone: identifier, password }
         const res = await api<{ token: string; user: AuthUser }>('/login', {
           method: 'POST',
-          json: { email, password },
+          json: payload,
         })
         setToken(res.token)
         setUser(res.user)

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\TenantSetting;
 use App\Models\User;
+use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,21 +17,40 @@ class AuthController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
+        // Accept email, phone, or unified "login" identifier (phone preferred for field staff).
         $data = $request->validate([
-            'email' => ['required', 'email'],
+            'login' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
             'password' => ['required', 'string'],
         ], [
-            'email.required' => 'البريد الإلكتروني مطلوب.',
-            'email.email' => 'البريد الإلكتروني غير صالح.',
             'password.required' => 'كلمة المرور مطلوبة.',
+        ], [
+            'login' => 'البريد أو رقم الموبايل',
+            'email' => 'البريد الإلكتروني',
+            'phone' => 'رقم الموبايل',
+            'password' => 'كلمة المرور',
         ]);
 
+        $identifier = trim((string) (
+            $data['login']
+            ?? $data['phone']
+            ?? $data['email']
+            ?? ''
+        ));
+
+        if ($identifier === '') {
+            throw ValidationException::withMessages([
+                'login' => ['أدخل البريد الإلكتروني أو رقم الموبايل.'],
+            ]);
+        }
+
         /** @var User|null $user */
-        $user = User::query()->with('role')->where('email', $data['email'])->first();
+        $user = $this->findUserByLoginIdentifier($identifier);
 
         if (! $user || ! Hash::check($data['password'], $user->password) || ! $user->is_active) {
             throw ValidationException::withMessages([
-                'email' => ['بيانات الدخول غير صحيحة.'],
+                'login' => ['بيانات الدخول غير صحيحة.'],
             ]);
         }
 
@@ -40,6 +60,29 @@ class AuthController extends Controller
             'token' => $token,
             'user' => $this->presentUser($user),
         ]);
+    }
+
+    private function findUserByLoginIdentifier(string $identifier): ?User
+    {
+        $query = User::query()->with('role');
+
+        if (str_contains($identifier, '@')) {
+            return $query->where('email', $identifier)->first();
+        }
+
+        if (Phone::looksLikePhone($identifier) || Phone::normalize($identifier)) {
+            $variants = Phone::lookupVariants($identifier);
+
+            return $query->where(function ($q) use ($variants, $identifier) {
+                $q->whereIn('phone', $variants);
+                // Also allow email fallback if someone typed a non-phone string without @
+                if (! Phone::looksLikePhone($identifier)) {
+                    $q->orWhere('email', $identifier);
+                }
+            })->first();
+        }
+
+        return $query->where('email', $identifier)->orWhere('phone', $identifier)->first();
     }
 
     public function me(Request $request): JsonResponse
