@@ -211,8 +211,8 @@ export function StaffPage() {
     try {
       const payload: Record<string, unknown> = {
         name: userForm.name,
-        email: userForm.email,
-        phone: userForm.phone || null,
+        phone: userForm.phone.trim(),
+        email: userForm.email.trim() || null,
         role_id: Number(userForm.role_id),
         is_active: userForm.is_active,
       }
@@ -467,7 +467,19 @@ export function StaffPage() {
               {users.map((u, i) => (
                 <motion.article
                   key={u.id}
-                  className="st-user"
+                  className={`st-user ${u.employee_id ? 'is-clickable' : ''}`}
+                  role={u.employee_id ? 'link' : undefined}
+                  tabIndex={u.employee_id ? 0 : undefined}
+                  onClick={() => {
+                    if (u.employee_id) navigate(`/staff/${u.employee_id}`)
+                  }}
+                  onKeyDown={(e) => {
+                    if (!u.employee_id) return
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigate(`/staff/${u.employee_id}`)
+                    }
+                  }}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(i, 8) * 0.03, duration: 0.3, ease }}
@@ -488,18 +500,18 @@ export function StaffPage() {
                   </header>
                   <dl className="st-user__contact">
                     <div>
-                      <dt><IconMail size={14} /><span>البريد</span></dt>
-                      <dd dir="ltr">{u.email}</dd>
-                    </div>
-                    <div>
-                      <dt><IconPhone size={14} /><span>الهاتف</span></dt>
+                      <dt><IconPhone size={14} /><span>الموبايل</span></dt>
                       <dd dir="ltr" className="tabular-nums">{u.phone || '—'}</dd>
                     </div>
+                    <div>
+                      <dt><IconMail size={14} /><span>البريد</span></dt>
+                      <dd dir="ltr">{u.email || '—'}</dd>
+                    </div>
                   </dl>
-                  <footer className="st-user__foot">
+                  <footer className="st-user__foot" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                     {u.employee_id ? (
-                      <Button size="sm" variant="secondary" onClick={() => navigate(`/employees/${u.employee_id}`)}>
-                        عرض الملف الكامل
+                      <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/${u.employee_id}`)}>
+                        عرض الملف
                       </Button>
                     ) : null}
                     <Button size="sm" variant="secondary" iconStart={<IconEdit size={15} />} onClick={() => openEditUser(u)}>
@@ -625,7 +637,19 @@ export function StaffPage() {
 
             <div className="st-hr-list">
               {employees.map((emp) => (
-                <article key={emp.id} className="st-hr">
+                <article
+                  key={emp.id}
+                  className="st-hr is-clickable"
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(`/staff/${emp.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigate(`/staff/${emp.id}`)
+                    }
+                  }}
+                >
                   <div>
                     <strong>{emp.name}</strong>
                     <p>{emp.job_title || 'بدون مسمى'} · تعيين {emp.hired_on || '—'}</p>
@@ -636,8 +660,15 @@ export function StaffPage() {
                       status={emp.status === 'active' ? 'active' : 'completed'}
                       label={emp.status === 'active' ? 'على رأس العمل' : 'منتهٍ'}
                     />
-                    <Button size="sm" variant="secondary" onClick={() => navigate(`/employees/${emp.id}`)}>
-                      عرض الملف الكامل
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/staff/${emp.id}`)
+                      }}
+                    >
+                      عرض الملف
                     </Button>
                   </div>
                 </article>
@@ -660,8 +691,26 @@ export function StaffPage() {
       >
         <div className="rpm-form-grid">
           <TextField label="الاسم" required value={userForm.name} error={userErrors.name} onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} />
-          <TextField label="البريد الإلكتروني" required type="email" value={userForm.email} error={userErrors.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
-          <TextField label="الهاتف" value={userForm.phone} error={userErrors.phone} onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })} />
+          <TextField
+            label="رقم الموبايل"
+            required
+            type="tel"
+            inputMode="tel"
+            dir="ltr"
+            value={userForm.phone}
+            error={userErrors.phone}
+            hint="مطلوب لتسجيل الدخول"
+            onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+          />
+          <TextField
+            label="البريد الإلكتروني"
+            type="email"
+            dir="ltr"
+            value={userForm.email}
+            error={userErrors.email}
+            hint="اختياري"
+            onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+          />
           <TextField
             label={editingUser ? 'كلمة مرور جديدة' : 'كلمة المرور'}
             required={!editingUser}

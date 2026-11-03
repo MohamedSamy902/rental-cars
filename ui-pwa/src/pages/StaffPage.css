@@ -235,7 +235,17 @@
   border-radius: var(--radius);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+.st-user.is-clickable {
+  cursor: pointer;
+}
+.st-user.is-clickable:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.st-user.is-clickable:active {
+  transform: scale(0.99);
 }
 .st-user:hover {
   border-color: var(--border-strong);
@@ -489,6 +499,18 @@
   padding: 0.95rem 1rem;
   border-radius: 16px;
   background: var(--surface-2);
+  border: 1px solid transparent;
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+.st-hr.is-clickable {
+  cursor: pointer;
+}
+.st-hr.is-clickable:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.st-hr.is-clickable:active {
+  transform: scale(0.99);
 }
 
 .st-hr p {

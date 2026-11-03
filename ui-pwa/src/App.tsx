@@ -90,6 +90,7 @@ export default function App() {
                 <Route path="petty-cash" element={<PettyCashPage />} />
                 <Route path="petty-cash/:id" element={<PettyCashDetailPage />} />
                 <Route path="hr" element={<HrPage />} />
+                <Route path="staff/:id" element={<EmployeeDetailPage />} />
                 <Route path="employees/:id" element={<EmployeeDetailPage />} />
                 <Route path="users/:id" element={<EmployeeDetailPage />} />
                 <Route path="chat" element={<ChatPage />} />
