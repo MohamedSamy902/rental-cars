@@ -7,7 +7,6 @@ use App\Models\InventoryItem;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
 {
@@ -48,7 +47,6 @@ class InventoryController extends Controller
     public function updateItem(Request $request, InventoryItem $item): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('inventory_items', 'code')->ignore($item->id)],
             'name' => ['required', 'string'],
             'category' => ['required', 'string'],
             'unit' => ['required', 'string'],
@@ -56,12 +54,14 @@ class InventoryController extends Controller
             'location' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
         ], [], [
-            'code' => 'الكود',
             'name' => 'الاسم',
             'category' => 'التصنيف',
             'unit' => 'وحدة القياس',
             'reorder_level' => 'حد التنبيه',
         ]);
+
+        // Codes are system-owned and never editable after creation.
+        unset($data['code']);
 
         $item = $this->inventory->updateItem($item, $data);
 

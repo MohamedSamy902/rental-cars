@@ -5,10 +5,8 @@ import { formatMoney } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, DetailList, DataTable, TextField, MoneyField,
-  SelectField, TextAreaField, SwitchField, StatusPill, useToast, SkeletonBlock, IconEye, MediaUpload,
-  PhoneActions,
-  type DataColumn,
+  PageHeader, FilterBar, Button, Sheet, Fab, DataTable, TextField, TextAreaField, SwitchField,
+  StatusPill, useToast, IconEye, MediaUpload, PhoneActions, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -36,33 +34,6 @@ type Owner = {
   balance?: Balance | null
 }
 
-type OwnerVehicle = {
-  id: number
-  code: string
-  plate: string
-  brand: string
-  model: string
-  owner_monthly_amount?: number | null
-  owner_since?: string | null
-  is_active: boolean
-}
-
-type Payout = {
-  id: number
-  amount: number
-  paid_on: string
-  payment_method: string
-  notes?: string | null
-  vehicle?: { id: number; code: string; plate: string } | null
-}
-
-type Due = {
-  id: number
-  year_month: string
-  amount: number
-  vehicle?: { id: number; code: string; plate: string; brand?: string; model?: string } | null
-}
-
 const emptyForm = {
   full_name: '', phone: '', phone_alt: '', national_id: '', id_front_path: '', id_back_path: '',
   license_front_path: '', license_back_path: '', notes: '', is_active: true,
@@ -80,13 +51,6 @@ export function OwnersPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [detail, setDetail] = useState<(Owner & { vehicles?: OwnerVehicle[]; dues?: Due[]; payouts?: Payout[] }) | null>(null)
-  const [detailLoading] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [payoutOpen, setPayoutOpen] = useState(false)
-  const [payoutForm, setPayoutForm] = useState({
-    amount: '', paid_on: new Date().toISOString().slice(0, 10), payment_method: 'cash', vehicle_id: '', notes: '',
-  })
   const [chip, setChip] = useQueryTab({ allowed: OwnersPageTabs, defaultValue: 'all' })
   const { counts: attention } = useAttentionSignals(true)
 
@@ -126,10 +90,6 @@ export function OwnersPage() {
     return () => window.clearTimeout(t)
   }, [search])
 
-  async function openDetail(id: number) {
-    navigate(`/owners/${id}`)
-  }
-
   function mapApiErrors(e: unknown) {
     const apiErr = e as ApiError
     const next: Record<string, string> = {}
@@ -156,54 +116,6 @@ export function OwnersPage() {
     }
   }
 
-  async function onUpdate() {
-    if (!detail) return
-    setSaving(true)
-    setFieldErrors({})
-    try {
-      const res = await api<{ data: Owner; message: string }>(`/owners/${detail.id}`, {
-        method: 'PUT',
-        json: form,
-      })
-      toast.success(res.message || 'تم التحديث.')
-      setEditing(false)
-      await openDetail(detail.id)
-      await load()
-    } catch (e) {
-      mapApiErrors(e)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function onPayout() {
-    if (!detail) return
-    setSaving(true)
-    try {
-      const res = await api<{ message: string; balance: Balance }>(`/owners/${detail.id}/payouts`, {
-        method: 'POST',
-        json: {
-          amount: Number(payoutForm.amount),
-          paid_on: payoutForm.paid_on,
-          payment_method: payoutForm.payment_method,
-          vehicle_id: payoutForm.vehicle_id ? Number(payoutForm.vehicle_id) : undefined,
-          notes: payoutForm.notes || undefined,
-        },
-      })
-      toast.success(res.message || 'تم الصرف.')
-      setPayoutOpen(false)
-      setPayoutForm({
-        amount: '', paid_on: new Date().toISOString().slice(0, 10), payment_method: 'cash', vehicle_id: '', notes: '',
-      })
-      await openDetail(detail.id)
-      await load()
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const formFields = (
     <div className="rpm-form-grid">
       <TextField label="اسم المالك" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
@@ -216,8 +128,6 @@ export function OwnersPage() {
         collection="owner_ids"
         purpose="national_id"
         accept="both"
-        attachableType={detail ? 'vehicle_owner' : undefined}
-        attachableId={detail?.id}
         onChange={(path) => setForm({ ...form, id_front_path: path || '' })}
       />
       <MediaUpload
@@ -226,8 +136,6 @@ export function OwnersPage() {
         collection="owner_ids"
         purpose="national_id"
         accept="both"
-        attachableType={detail ? 'vehicle_owner' : undefined}
-        attachableId={detail?.id}
         onChange={(path) => setForm({ ...form, id_back_path: path || '' })}
       />
       <MediaUpload
@@ -288,17 +196,15 @@ export function OwnersPage() {
     },
   ]
 
-  const bal = detail?.balance
-
   return (
     <div className="rpm-stack">
       <PageHeader
         title="ملاك العربيات"
         subtitle="عربيات الغير · مبلغ شهري · سحب جزئي ورصيد متبقي"
-        action={<Button onClick={() => setOpen(true)}>إضافة مالك</Button>}
+        action={<Button onClick={() => { setForm(emptyForm); setFieldErrors({}); setOpen(true) }}>إضافة مالك</Button>}
         mobileFab
       />
-      <Fab label="إضافة مالك" onClick={() => setOpen(true)} />
+      <Fab label="إضافة مالك" onClick={() => { setForm(emptyForm); setFieldErrors({}); setOpen(true) }} />
       <FilterBar search={search} onSearchChange={setSearch} placeholder="بحث بالاسم أو الهاتف…" chips={chips} activeChip={chip} onChipChange={setChip} />
       <DataTable
         label="الملاك"
@@ -309,7 +215,8 @@ export function OwnersPage() {
         loading={loading}
         onRowClick={(o) => navigate(`/owners/${o.id}`)}
         rowActions={(o) => [
-          { id: 'view', label: 'كشف الحساب', icon: <IconEye size={16} />, onSelect: () => void openDetail(o.id) },
+          { id: 'view', label: 'عرض الملف', icon: <IconEye size={16} />, onSelect: () => navigate(`/owners/${o.id}`) },
+          { id: 'edit', label: 'تعديل', onSelect: () => navigate(`/owners/${o.id}?edit=1`) },
         ]}
         emptyTitle="لا ملاك بعد"
         emptyDescription="أضف مالكاً ثم اربطه من شاشة العربيات مع المبلغ الشهري"
@@ -317,127 +224,6 @@ export function OwnersPage() {
 
       <Sheet open={open} title="إضافة مالك" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         {formFields}
-      </Sheet>
-
-      <Sheet
-        open={false}
-        title={detail?.full_name || 'تفاصيل المالك'}
-        onClose={() => setDetail(null)}
-        closeLabel="إغلاق"
-        footer={
-          detail ? (
-            <>
-              {editing ? (
-                <Button loading={saving} onClick={() => void onUpdate()}>حفظ التعديل</Button>
-              ) : (
-                <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
-              )}
-              <Button onClick={() => setPayoutOpen(true)}>صرف للمالك</Button>
-            </>
-          ) : null
-        }
-      >
-        {detailLoading && !detail ? <SkeletonBlock rows={5} /> : null}
-        {detail && editing ? formFields : null}
-        {detail && !editing ? (
-          <>
-            <DetailList
-              rows={[
-                { label: 'الهاتف', value: detail.phone ? <PhoneActions phone={detail.phone} name={detail.full_name} /> : '—' },
-                { label: 'الرقم القومي', value: detail.national_id || '—' },
-                { label: 'المبلغ الشهري (كل العربيات)', value: formatMoney(bal?.vehicles_monthly_total || 0) },
-                { label: 'مستحق إجمالي', value: formatMoney(bal?.accrued_total || 0) },
-                { label: 'مصروف إجمالي', value: formatMoney(bal?.paid_total || 0) },
-                { label: 'المتبقي', value: formatMoney(bal?.remaining || 0) },
-                { label: `استحقاق ${bal?.month || ''}`, value: formatMoney(bal?.month_accrued || 0) },
-                { label: `صرف ${bal?.month || ''}`, value: formatMoney(bal?.month_paid || 0) },
-                { label: 'ملاحظات', value: detail.notes || '—' },
-              ]}
-            />
-
-            <section className="rpm-panel" style={{ marginTop: '0.75rem' }}>
-              <div className="rpm-panel__head"><h3>العربيات</h3></div>
-              {(detail.vehicles || []).length === 0 ? <p className="muted">لا عربيات مربوطة — اربط من شاشة العربيات</p> : null}
-              <div className="rpm-dense-list">
-                {(detail.vehicles || []).map((v) => (
-                  <div key={v.id} className="rpm-dense-row">
-                    <div>
-                      <strong>{v.brand} {v.model} · {v.plate}</strong>
-                      <p className="muted">{v.code} · شهري {formatMoney(v.owner_monthly_amount || 0)} · من {v.owner_since || '—'}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rpm-panel" style={{ marginTop: '0.75rem' }}>
-              <div className="rpm-panel__head"><h3>سجل الصرف</h3></div>
-              {(detail.payouts || []).length === 0 ? <p className="muted">لا سحوبات بعد</p> : null}
-              <div className="rpm-dense-list">
-                {(detail.payouts || []).map((p) => (
-                  <div key={p.id} className="rpm-dense-row">
-                    <div>
-                      <strong>{formatMoney(p.amount)}</strong>
-                      <p className="muted">{p.paid_on} · {p.payment_method}{p.vehicle ? ` · ${p.vehicle.plate}` : ''}{p.notes ? ` · ${p.notes}` : ''}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rpm-panel" style={{ marginTop: '0.75rem' }}>
-              <div className="rpm-panel__head"><h3>الاستحقاقات الشهرية</h3></div>
-              <div className="rpm-dense-list">
-                {(detail.dues || []).map((d) => (
-                  <div key={d.id} className="rpm-dense-row">
-                    <div>
-                      <strong>{d.year_month} · {formatMoney(d.amount)}</strong>
-                      <p className="muted">{d.vehicle ? `${d.vehicle.code} · ${d.vehicle.plate}` : '—'}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </>
-        ) : null}
-      </Sheet>
-
-      <Sheet
-        open={payoutOpen}
-        title="صرف للمالك"
-        onClose={() => setPayoutOpen(false)}
-        footer={<><Button loading={saving} onClick={() => void onPayout()}>تأكيد الصرف</Button><Button variant="secondary" onClick={() => setPayoutOpen(false)}>إلغاء</Button></>}
-      >
-        <p className="muted" style={{ marginBottom: '0.75rem' }}>
-          المتبقي حالياً: {formatMoney(detail?.balance?.remaining || 0)} — يمكن سحب جزء في أي يوم من الشهر.
-        </p>
-        <div className="rpm-form-grid">
-          <MoneyField label="المبلغ" required value={payoutForm.amount} onChange={(e) => setPayoutForm({ ...payoutForm, amount: e.target.value })} />
-          <TextField label="تاريخ الصرف" type="date" required value={payoutForm.paid_on} onChange={(e) => setPayoutForm({ ...payoutForm, paid_on: e.target.value })} />
-          <SelectField
-            label="طريقة الدفع"
-            value={payoutForm.payment_method}
-            onChange={(e) => setPayoutForm({ ...payoutForm, payment_method: e.target.value })}
-            options={[
-              { value: 'cash', label: 'نقدي' },
-              { value: 'transfer', label: 'تحويل بنكي' },
-              { value: 'card', label: 'بطاقة' },
-            ]}
-          />
-          <SelectField
-            label="عربية (اختياري)"
-            value={payoutForm.vehicle_id}
-            onChange={(e) => setPayoutForm({ ...payoutForm, vehicle_id: e.target.value })}
-            options={[
-              { value: '', label: '— بدون ربط —' },
-              ...(detail?.vehicles || []).map((v) => ({
-                value: String(v.id),
-                label: `${v.plate} · ${v.brand} ${v.model}`,
-              })),
-            ]}
-          />
-          <TextAreaField label="ملاحظات" value={payoutForm.notes} onChange={(e) => setPayoutForm({ ...payoutForm, notes: e.target.value })} />
-        </div>
       </Sheet>
     </div>
   )

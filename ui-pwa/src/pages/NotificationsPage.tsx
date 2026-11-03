@@ -38,7 +38,7 @@ function relativeDay(iso: string) {
   return formatDateTime(iso).split('،')[0] || formatDateTime(iso)
 }
 
-const NotificationsPageTabs = ['unread', 'all'] as const
+const NotificationsPageTabs = ['all', 'unread'] as const
 
 export function NotificationsPage() {
   const toast = useToast()
@@ -49,17 +49,17 @@ export function NotificationsPage() {
   const [devices, setDevices] = useState(0)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [chip, setChip] = useQueryTab({ allowed: NotificationsPageTabs, defaultValue: 'unread' })
+  const [chip, setChip] = useQueryTab({ allowed: NotificationsPageTabs, defaultValue: 'all' })
 
   const chips = useMemo(
     () => [
+      { id: 'all', label: 'الكل' },
       {
         id: 'unread',
         label: 'غير مقروء',
         attention: unread > 0 ? ('warning' as const) : null,
         attentionLabel: `${unread} إشعار غير مقروء`,
       },
-      { id: 'all', label: 'الكل' },
     ],
     [unread],
   )

@@ -58,7 +58,7 @@ class ExpenseService
 
             $this->postExpenseAccounting($expense, $userId);
 
-            return $expense->load(['vehicle', 'employee', 'workOrder']);
+            return $expense->load(['vehicle', 'employee', 'workOrder', 'recorder:id,name']);
         });
     }
 
@@ -109,7 +109,7 @@ class ExpenseService
 
             $this->postExpenseAccounting($locked->fresh() ?? $locked, $userId);
 
-            return ($locked->fresh() ?? $locked)->load(['vehicle', 'employee', 'workOrder']);
+            return ($locked->fresh() ?? $locked)->load(['vehicle', 'employee', 'workOrder', 'recorder:id,name']);
         });
     }
 

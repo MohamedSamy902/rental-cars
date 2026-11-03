@@ -60,7 +60,7 @@ const emptyForm = () => ({
   status: 'new',
 })
 
-const ViolationsPageTabs = ['open', 'done', 'all'] as const
+const ViolationsPageTabs = ['all', 'open', 'done'] as const
 
 export function ViolationsPage() {
   const toast = useToast()
@@ -71,7 +71,7 @@ export function ViolationsPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Violation | null>(null)
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useQueryTab({ allowed: ViolationsPageTabs, defaultValue: 'open' })
+  const [chip, setChip] = useQueryTab({ allowed: ViolationsPageTabs, defaultValue: 'all' })
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -82,6 +82,7 @@ export function ViolationsPage() {
   )
   const chips = useMemo(
     () => [
+      { id: 'all', label: 'الكل' },
       {
         id: 'open',
         label: 'مفتوحة',
@@ -89,7 +90,6 @@ export function ViolationsPage() {
         attentionLabel: `${openCount} مخالفة مفتوحة`,
       },
       { id: 'done', label: 'مغلقة' },
-      { id: 'all', label: 'الكل' },
     ],
     [openCount],
   )

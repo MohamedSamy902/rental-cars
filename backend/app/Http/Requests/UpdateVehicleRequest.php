@@ -96,6 +96,13 @@ class UpdateVehicleRequest extends FormRequest
             'owner_since' => ['nullable', 'date'],
             'addon_ids' => ['nullable', 'array'],
             'addon_ids.*' => ['integer', 'exists:vehicle_addon_catalog,id'],
+            'license' => ['nullable', 'array'],
+            'license.has_license' => ['nullable', 'boolean'],
+            'license.expires_on' => ['nullable', 'date'],
+            'license.issued_on' => ['nullable', 'date'],
+            'license.file_path' => ['nullable', 'string', 'max:500'],
+            'license.file_path_back' => ['nullable', 'string', 'max:500'],
+            'license.notes' => ['nullable', 'string', 'max:500'],
         ];
     }
 

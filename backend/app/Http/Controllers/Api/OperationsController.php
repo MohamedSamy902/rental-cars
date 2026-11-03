@@ -120,8 +120,8 @@ class OperationsController extends Controller
         }
 
         $rows = $q->limit(200)->get([
-            'id', 'full_name', 'phone', 'national_id', 'national_id_image_path',
-            'license_number', 'license_expires_on', 'license_image_path', 'birth_date', 'status',
+            'id', 'full_name', 'phone', 'national_id', 'national_id_image_path', 'national_id_back_path',
+            'license_number', 'license_expires_on', 'license_image_path', 'license_back_path', 'birth_date', 'status',
         ]);
 
         return response()->json([

@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import {
   Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, MediaUpload, NumberField, useToast,
 } from '@/shared/ui'
-import { toApiDateTime } from '@/shared/lib/format'
+import { toApiDateTime, formatMoney } from '@/shared/lib/format'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
@@ -22,6 +22,7 @@ type Vehicle = {
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
   daily_rate: '', deposit: '', odometer: '', notes: '',
+  payment_amount: '', payment_method: 'cash', payment_notes: '',
 }
 
 const emptyCustomer = {
@@ -182,6 +183,9 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           deposit: form.deposit ? Number(form.deposit) : undefined,
           odometer: form.odometer !== '' ? Number(form.odometer) : undefined,
           accessory_ids: accessoryIds,
+          payment_amount: form.payment_amount !== '' ? Number(form.payment_amount) : undefined,
+          payment_method: form.payment_method || 'cash',
+          payment_notes: form.payment_notes || undefined,
           notes: form.notes || undefined,
         },
       })
@@ -204,6 +208,24 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ openNewContract, createdVersion }), [openNewContract, createdVersion])
   const selected = vehicles.find((v) => String(v.id) === form.vehicle_id)
   const availableAccessories = selected?.accessories || []
+
+  const estimatedDays = useMemo(() => {
+    if (!form.starts_at || !form.planned_ends_at) return 0
+    const a = new Date(form.starts_at)
+    const b = new Date(form.planned_ends_at)
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b <= a) return 0
+    const ms = b.getTime() - a.getTime()
+    return Math.max(1, Math.ceil(ms / 86400000))
+  }, [form.starts_at, form.planned_ends_at])
+
+  const estimatedTotal = useMemo(() => {
+    const rate = Number(form.daily_rate || 0)
+    if (!estimatedDays || !rate) return 0
+    return estimatedDays * rate
+  }, [estimatedDays, form.daily_rate])
+
+  const paidNow = Number(form.payment_amount || 0)
+  const remainingBalance = Math.max(0, estimatedTotal - paidNow)
 
   return (
     <NewContractContext.Provider value={value}>
@@ -332,6 +354,46 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             error={errors.odometer}
             onChange={(e) => setForm({ ...form, odometer: e.target.value })}
             hint="يُحدَّث عداد العربية عند الحفظ"
+          />
+
+          {estimatedDays > 0 && estimatedTotal > 0 ? (
+            <div className="rpm-inline-box" style={{ margin: 0, gridColumn: '1 / -1' }}>
+              <p className="rpm-inline-box__title">حساب الإيجار</p>
+              <p style={{ margin: 0 }}>
+                {estimatedDays} يوم × {formatMoney(Number(form.daily_rate || 0))} = <strong>{formatMoney(estimatedTotal)}</strong>
+              </p>
+              {paidNow > 0 ? (
+                <p className="muted" style={{ marginBlockStart: '0.35rem' }}>
+                  مدفوع الآن {formatMoney(paidNow)} · المتبقي على العميل {formatMoney(remainingBalance)}
+                </p>
+              ) : (
+                <p className="muted" style={{ marginBlockStart: '0.35rem' }}>يمكن تسجيل دفعة جزئية الآن أو لاحقاً عند التسليم</p>
+              )}
+            </div>
+          ) : null}
+
+          <MoneyField
+            label="دفعة عند الإنشاء"
+            value={form.payment_amount}
+            error={errors.payment_amount}
+            onChange={(e) => setForm({ ...form, payment_amount: e.target.value })}
+            hint="اختياري — يسجّل دفعة جزئية أو كاملة في دفتر العميل"
+          />
+          <SelectField
+            label="طريقة الدفعة"
+            value={form.payment_method}
+            onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+            options={[
+              { value: 'cash', label: 'نقدي' },
+              { value: 'card', label: 'بطاقة' },
+              { value: 'transfer', label: 'تحويل' },
+            ]}
+          />
+          <TextField
+            label="ملاحظة الدفعة / موعد المتبقي"
+            value={form.payment_notes}
+            onChange={(e) => setForm({ ...form, payment_notes: e.target.value })}
+            hint="مثال: الباقي عند التسليم"
           />
 
           {availableAccessories.length > 0 ? (

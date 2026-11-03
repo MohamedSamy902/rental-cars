@@ -52,7 +52,15 @@ class VehicleService
                 $data['owner_monthly_amount'] = null;
             }
 
-            unset($data['rental_priority'], $data['owner_inline'], $data['addon_ids'], $data['plate_letters'], $data['plate_numbers']);
+            $license = $data['license'] ?? null;
+            unset(
+                $data['rental_priority'],
+                $data['owner_inline'],
+                $data['addon_ids'],
+                $data['plate_letters'],
+                $data['plate_numbers'],
+                $data['license'],
+            );
 
             $vehicle = Vehicle::query()->create([
                 ...$data,
@@ -61,8 +69,9 @@ class VehicleService
             ]);
 
             $this->attachAddons($vehicle, $addonIds);
+            $this->syncLicenseDocument($vehicle, is_array($license) ? $license : null);
 
-            return $vehicle->load(['owner', 'accessories']);
+            return $vehicle->load(['owner', 'accessories', 'documents']);
         });
     }
 
@@ -91,16 +100,70 @@ class VehicleService
             }
 
             // Internal code stays system-owned after create.
-            unset($data['code'], $data['plate_letters'], $data['plate_numbers'], $data['owner_inline'], $data['addon_ids'], $data['rental_priority']);
+            $license = $data['license'] ?? null;
+            unset(
+                $data['code'],
+                $data['plate_letters'],
+                $data['plate_numbers'],
+                $data['owner_inline'],
+                $data['addon_ids'],
+                $data['rental_priority'],
+                $data['license'],
+            );
 
             $vehicle->update($data);
 
             if ($addonIds !== null) {
                 $this->syncAddonsFromCatalog($vehicle, $addonIds);
             }
+            if (is_array($license)) {
+                $this->syncLicenseDocument($vehicle, $license);
+            }
 
             return $vehicle->fresh(['owner', 'accessories', 'documents']);
         });
+    }
+
+    /**
+     * Optional traffic license on create/edit — allowed missing or expired.
+     *
+     * @param  array{has_license?: bool|int|string|null, expires_on?: string|null, issued_on?: string|null, file_path?: string|null, file_path_back?: string|null, notes?: string|null}|null  $license
+     */
+    private function syncLicenseDocument(Vehicle $vehicle, ?array $license): void
+    {
+        if ($license === null) {
+            return;
+        }
+
+        $has = filter_var($license['has_license'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $existing = $vehicle->documents()
+            ->where(function ($q) {
+                $q->where('type', 'رخصة تسيير')
+                    ->orWhere('type', 'like', '%رخص%')
+                    ->orWhere('type', 'like', '%license%');
+            })
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $has) {
+            // Keep historical rows; do not force-delete — just leave absent.
+            return;
+        }
+
+        $payload = [
+            'type' => 'رخصة تسيير',
+            'file_path' => $license['file_path'] ?? $existing?->file_path ?? 'manual/رخصة تسيير',
+            'file_path_back' => $license['file_path_back'] ?? $existing?->file_path_back,
+            'issued_on' => $license['issued_on'] ?? $existing?->issued_on,
+            'expires_on' => $license['expires_on'] ?? null,
+            'notes' => $license['notes'] ?? $existing?->notes,
+        ];
+
+        if ($existing) {
+            $existing->update($payload);
+        } else {
+            $vehicle->documents()->create($payload);
+        }
     }
 
     public function nextInternalCode(): string
