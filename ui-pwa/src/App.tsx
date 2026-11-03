@@ -34,6 +34,7 @@ import { ChatPage } from '@/pages/ChatPage'
 import { CustomerDetailPage } from '@/pages/CustomerDetailPage'
 import { EmployeeDetailPage } from '@/pages/EmployeeDetailPage'
 import { ProfilePage } from '@/pages/ProfilePage'
+import { WaitlistPage } from '@/pages/WaitlistPage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -72,6 +73,7 @@ export default function App() {
                 <Route path="bookings" element={<BookingsPage />} />
                 <Route path="bookings/:id" element={<ContractDetailPage />} />
                 <Route path="contracts/:id" element={<ContractDetailPage />} />
+                <Route path="waitlist" element={<WaitlistPage />} />
                 <Route path="calendar" element={<CalendarPage />} />
                 <Route path="maintenance" element={<MaintenancePage />} />
                 <Route path="inventory" element={<InventoryPage />} />
