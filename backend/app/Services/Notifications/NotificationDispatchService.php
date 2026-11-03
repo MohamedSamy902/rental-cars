@@ -7,10 +7,12 @@ use App\Models\PushSubscription;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Minishlink\WebPush\Subscription;
-use Minishlink\WebPush\WebPush;
 
 class NotificationDispatchService
 {
+    /** سبب آخر فشل إرسال: no_devices | vapid_missing | delivery_rejected | delivery_failed */
+    public ?string $lastPushError = null;
+
     /**
      * يسجّل إشعاراً داخل النظام ويرسل Web Push لكل أجهزة المستخدم إن وُجدت.
      */
@@ -36,13 +38,18 @@ class NotificationDispatchService
 
     public function pushToUser(User $user, string $title, string $body, string $path = '/notifications', ?int $notificationId = null): int
     {
+        $this->lastPushError = null;
         $subs = PushSubscription::query()->where('user_id', $user->id)->get();
         if ($subs->isEmpty()) {
+            $this->lastPushError = 'no_devices';
+
             return 0;
         }
 
         $webPush = $this->client();
         if (! $webPush) {
+            $this->lastPushError = 'vapid_missing';
+
             return 0;
         }
 
@@ -56,6 +63,7 @@ class NotificationDispatchService
         ], JSON_UNESCAPED_UNICODE);
 
         $sent = 0;
+        $lastStatus = null;
         foreach ($subs as $sub) {
             try {
                 $webPush->queueNotification(
@@ -63,7 +71,7 @@ class NotificationDispatchService
                         'endpoint' => $sub->endpoint,
                         'publicKey' => $sub->public_key,
                         'authToken' => $sub->auth_token,
-                        'contentEncoding' => $sub->content_encoding ?: 'aesgcm',
+                        'contentEncoding' => $this->encodingFor($sub),
                     ]),
                     $payload ?: '{}',
                 );
@@ -76,22 +84,28 @@ class NotificationDispatchService
             $endpoint = $report->getRequest()->getUri()->__toString();
             if ($report->isSuccess()) {
                 $sent++;
-                PushSubscription::query()->where('endpoint', $endpoint)->update(['last_used_at' => now()]);
+                PushSubscription::query()->where('endpoint', $endpoint)->update([
+                    'last_used_at' => now(),
+                    'content_encoding' => 'aes128gcm',
+                ]);
 
                 continue;
             }
 
             $code = $report->getResponse()?->getStatusCode();
+            $lastStatus = $code;
+            Log::warning('push.delivery_failed', [
+                'status' => $code,
+                'reason' => $report->getReason(),
+            ]);
             // اشتراك منتهٍ أو غير صالح
             if (in_array($code, [404, 410], true)) {
                 PushSubscription::query()->where('endpoint', $endpoint)->delete();
-            } else {
-                Log::warning('push.delivery_failed', [
-                    'endpoint' => $endpoint,
-                    'reason' => $report->getReason(),
-                    'status' => $code,
-                ]);
             }
+        }
+
+        if ($sent < 1) {
+            $this->lastPushError = $lastStatus ? 'delivery_rejected' : 'delivery_failed';
         }
 
         return $sent;
@@ -104,7 +118,25 @@ class NotificationDispatchService
         return is_string($key) && $key !== '' ? $key : null;
     }
 
-    private function client(): ?WebPush
+    /**
+     * المتصفحات الحالية (Chrome / Firefox / Safari) لا تعرض الحمولة إلا بترميز aes128gcm.
+     */
+    private function encodingFor(PushSubscription $sub): string
+    {
+        $endpoint = $sub->endpoint;
+        $modern = str_contains($endpoint, 'fcm.googleapis.com')
+            || str_contains($endpoint, 'mozilla.com')
+            || str_contains($endpoint, 'windows.com')
+            || str_contains($endpoint, 'push.apple.com');
+
+        if ($modern || $sub->content_encoding !== 'aesgcm') {
+            return 'aes128gcm';
+        }
+
+        return 'aesgcm';
+    }
+
+    private function client(): ?WebPushClient
     {
         $public = config('services.webpush.vapid.public_key');
         $private = config('services.webpush.vapid.private_key');
@@ -116,7 +148,7 @@ class NotificationDispatchService
             return null;
         }
 
-        return new WebPush([
+        return new WebPushClient([
             'VAPID' => [
                 'subject' => $subject,
                 'publicKey' => $public,

@@ -141,6 +141,12 @@ export function NotificationsPage() {
   async function onTestPush() {
     setBusy(true)
     try {
+      const enabled = await enableWebPush()
+      if (!enabled.ok) {
+        toast.error(enabled.message)
+        return
+      }
+      await loadPushStatus()
       const message = await sendTestPush()
       toast.success(message)
     } catch (e) {
@@ -194,11 +200,9 @@ export function NotificationsPage() {
         </p>
         <div className="rpm-actions-row">
           <Button loading={busy} onClick={() => void onEnablePush()}>تفعيل على هذا الجهاز</Button>
+          <Button variant="secondary" loading={busy} onClick={() => void onTestPush()}>إرسال تجربة</Button>
           {devices > 0 ? (
-            <>
-              <Button variant="secondary" loading={busy} onClick={() => void onTestPush()}>إرسال تجربة</Button>
-              <Button variant="secondary" loading={busy} onClick={() => void onDisablePush()}>إيقاف هذا الجهاز</Button>
-            </>
+            <Button variant="secondary" loading={busy} onClick={() => void onDisablePush()}>إيقاف هذا الجهاز</Button>
           ) : null}
         </div>
       </section>
