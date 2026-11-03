@@ -95,17 +95,21 @@ class ContractDossierService
             ->latest('id')
             ->limit(50)
             ->get();
-        $users = User::query()->whereKey($logs->pluck('user_id')->filter()->unique()->all())->pluck('name', 'id');
         $narrator = app(\App\Services\Operations\AuditNarrator::class);
-        $timeline = $logs->map(function (AuditLog $log) use ($users, $narrator) {
-            $name = $log->user_id ? $users->get($log->user_id) : null;
+        $actors = $narrator->resolveActors($logs);
+        $timeline = $logs->map(function (AuditLog $log) use ($actors, $narrator) {
+            $actor = $log->user_id ? ($actors[(int) $log->user_id] ?? null) : null;
+            $name = $actor['name'] ?? null;
+            $title = $actor['role_title'] ?? null;
 
             return [
                 'id' => $log->id,
                 'action' => $log->action,
-                'summary' => $narrator->summarize($log, $name),
+                'summary' => $narrator->summarize($log, $name, $title),
                 'at' => $log->created_at?->toIso8601String(),
-                'user' => $name,
+                'user' => $actor['phrase'] ?? $name,
+                'user_name' => $name,
+                'user_role_title' => $title,
             ];
         })->values();
 

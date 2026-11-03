@@ -34,7 +34,7 @@ class DemoSeeder extends Seeder
         $user = User::query()->updateOrCreate(
             ['email' => 'admin@rpm.local'],
             [
-                'name' => 'مدير النظام',
+                'name' => 'أحمد المنصور',
                 'password' => Hash::make('password'),
                 'phone' => '01000000000',
                 'role_id' => $adminRole->id,
@@ -44,13 +44,13 @@ class DemoSeeder extends Seeder
 
         $roleUsers = [
             // [email, name, phone] — stable phones for phone-login demos
-            'ops_manager' => ['ops@rpm.local', 'مدير التشغيل', '01000000001'],
-            'sales' => ['sales@rpm.local', 'موظف مبيعات', '01000000002'],
-            'fleet' => ['fleet@rpm.local', 'مسؤول أسطول', '01000000003'],
-            'maintenance' => ['maint@rpm.local', 'مسؤول صيانة', '01000000004'],
-            'accounts' => ['accounts@rpm.local', 'محاسب', '01000000005'],
-            'hr' => ['hr@rpm.local', 'موارد بشرية', '01000000006'],
-            'viewer' => ['viewer@rpm.local', 'مشاهدة فقط', '01000000007']
+            'ops_manager' => ['ops@rpm.local', 'محمد سامي', '01000000001'],
+            'sales' => ['sales@rpm.local', 'سارة أحمد', '01000000002'],
+            'fleet' => ['fleet@rpm.local', 'خالد حسن', '01000000003'],
+            'maintenance' => ['maint@rpm.local', 'يوسف علي', '01000000004'],
+            'accounts' => ['accounts@rpm.local', 'أحمد محمد', '01000000005'],
+            'hr' => ['hr@rpm.local', 'محمود إبراهيم', '01000000006'],
+            'viewer' => ['viewer@rpm.local', 'نور الدين', '01000000007']
         ];
         foreach ($roleUsers as $roleName => [$email, $name, $phone]) {
             $role = Role::query()->where('name', $roleName)->first();

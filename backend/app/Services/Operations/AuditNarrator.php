@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\MonthLock;
 use App\Models\PayrollLine;
 use App\Models\PettyCashAccount;
+use App\Models\Role;
 use App\Models\SalaryAdvance;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -20,9 +21,13 @@ use App\Models\WorkOrder;
  */
 class AuditNarrator
 {
-    public function summarize(AuditLog $log, ?string $userName = null): string
+    /**
+     * @param  string|null  $userName  Display name of the actor
+     * @param  string|null  $roleTitle  Job title / role label (e.g. المحاسب)
+     */
+    public function summarize(AuditLog $log, ?string $userName = null, ?string $roleTitle = null): string
     {
-        $who = $userName ?: 'مستخدم النظام';
+        $who = $this->actorPhrase($userName, $roleTitle);
         $after = is_array($log->after) ? $log->after : [];
         $before = is_array($log->before) ? $log->before : [];
 
@@ -49,6 +54,80 @@ class AuditNarrator
             'vehicle_updated' => "قام {$who} بتعديل بيانات السيارة".$this->vehicleRef($after),
             'customer_updated' => "قام {$who} بتعديل بيانات عميل".$this->customerRef($after),
             default => $this->fallback($who, $log, $after),
+        };
+    }
+
+    /**
+     * Summarize using a loaded User (role + employee job title).
+     */
+    public function summarizeForUser(AuditLog $log, ?User $user): string
+    {
+        if (! $user) {
+            return $this->summarize($log, null, null);
+        }
+
+        return $this->summarize($log, $user->name, $this->resolveRoleTitle($user));
+    }
+
+    /**
+     * Build «المحاسب (أحمد محمد)» — role/title outside, name in parentheses.
+     */
+    public function actorPhrase(?string $userName, ?string $roleTitle = null): string
+    {
+        $name = trim((string) $userName);
+        $title = trim((string) $roleTitle);
+
+        if ($name === '' && $title === '') {
+            return 'مستخدم النظام';
+        }
+        if ($name === '') {
+            return $title;
+        }
+        if ($title === '') {
+            return $name;
+        }
+        // Seeded demos sometimes used the role as the user name — avoid «المحاسب (محاسب)»
+        if ($this->sameActorIdentity($name, $title)) {
+            return $title;
+        }
+
+        return "{$title} ({$name})";
+    }
+
+    /**
+     * Prefer employee job_title, else a narrative role label.
+     */
+    public function resolveRoleTitle(User $user): ?string
+    {
+        $user->loadMissing(['employee', 'role']);
+
+        $job = $user->employee?->job_title;
+        if (is_string($job) && trim($job) !== '') {
+            return trim($job);
+        }
+
+        return $this->narrativeRoleLabel($user->role);
+    }
+
+    /**
+     * Arabic role wording suited for audit sentences.
+     */
+    public function narrativeRoleLabel(?Role $role): ?string
+    {
+        if (! $role) {
+            return null;
+        }
+
+        return match ($role->name) {
+            'super_admin' => 'مدير النظام',
+            'ops_manager' => 'مدير التشغيل',
+            'sales' => 'مسؤول المبيعات',
+            'fleet' => 'مسؤول الأسطول',
+            'maintenance' => 'مسؤول الصيانة',
+            'accounts' => 'المحاسب',
+            'hr' => 'مسؤول الموارد البشرية',
+            'viewer' => 'المشاهد',
+            default => is_string($role->label) && $role->label !== '' ? $role->label : null,
         };
     }
 
@@ -182,6 +261,26 @@ class AuditNarrator
         return '';
     }
 
+    private function sameActorIdentity(string $a, string $b): bool
+    {
+        $norm = static function (string $s): string {
+            $s = preg_replace('/\s+/u', '', $s) ?? $s;
+            $s = preg_replace('/^ال/u', '', $s) ?? $s;
+
+            return mb_strtolower($s);
+        };
+        $na = $norm($a);
+        $nb = $norm($b);
+        if ($na === '' || $nb === '') {
+            return false;
+        }
+        if ($na === $nb) {
+            return true;
+        }
+
+        return str_contains($na, $nb) || str_contains($nb, $na);
+    }
+
     /**
      * Known action keys → Arabic labels for audit filter dropdowns.
      *
@@ -217,15 +316,49 @@ class AuditNarrator
 
     /**
      * @param  list<AuditLog>|\Illuminate\Support\Collection<int, AuditLog>  $logs
-     * @return array<int, string> keyed by user id
+     * @return array<int, array{name: string, role_title: string|null, phrase: string}>
      */
-    public function resolveUserNames($logs): array
+    public function resolveActors($logs): array
     {
         $ids = collect($logs)->pluck('user_id')->filter()->unique()->values()->all();
         if ($ids === []) {
             return [];
         }
 
-        return User::query()->whereKey($ids)->pluck('name', 'id')->all();
+        $users = User::query()
+            ->with(['role:id,name,label', 'employee:id,job_title'])
+            ->whereKey($ids)
+            ->get()
+            ->keyBy('id');
+
+        $out = [];
+        foreach ($ids as $id) {
+            /** @var User|null $user */
+            $user = $users->get($id);
+            if (! $user) {
+                continue;
+            }
+            $title = $this->resolveRoleTitle($user);
+            $out[(int) $id] = [
+                'name' => (string) $user->name,
+                'role_title' => $title,
+                'phrase' => $this->actorPhrase($user->name, $title),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  list<AuditLog>|\Illuminate\Support\Collection<int, AuditLog>  $logs
+     * @return array<int, string> keyed by user id
+     *
+     * @deprecated Prefer resolveActors(); kept for call-site compatibility.
+     */
+    public function resolveUserNames($logs): array
+    {
+        return collect($this->resolveActors($logs))
+            ->mapWithKeys(fn (array $a, int $id) => [$id => $a['name']])
+            ->all();
     }
 }

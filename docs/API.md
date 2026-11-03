@@ -416,7 +416,9 @@ Query:
 - `action` — مفتاح نوع الحدث (مثل `handover` · `created`)
 - `date_from` / `date_to` — تاريخ `YYYY-MM-DD` على `created_at`
 
-الاستجابة: `{ data: [...], meta: { users: [{id,name}], actions: [{value,label}], filters } }`.
+الاستجابة: `{ data: [{ …, summary, user_name, user_role_title, user_phrase }], meta: { users: [{id,name,role_title,label}], actions: [{value,label}], filters } }`.
+
+`summary` بصيغة عربية: «قام {الدور/المسمى} ({الاسم}) ب…» — يُفضَّل `employee.job_title` ثم تسمية الدور السردية.
 
 ---
 

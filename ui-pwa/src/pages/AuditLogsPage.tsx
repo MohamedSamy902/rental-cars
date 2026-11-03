@@ -16,10 +16,12 @@ type Log = {
   record_id?: number
   user_id?: number
   user_name?: string | null
+  user_role_title?: string | null
+  user_phrase?: string | null
   created_at?: string
 }
 
-type FilterUser = { id: number; name: string }
+type FilterUser = { id: number; name: string; role_title?: string | null; label?: string }
 type FilterAction = { value: string; label: string }
 
 type AuditMeta = {
@@ -98,7 +100,10 @@ export function AuditLogsPage() {
   const userOptions = useMemo(
     () => [
       { value: '', label: 'كل المستخدمين' },
-      ...meta.users.map((u) => ({ value: String(u.id), label: u.name })),
+      ...meta.users.map((u) => ({
+        value: String(u.id),
+        label: u.label || (u.role_title ? `${u.role_title} — ${u.name}` : u.name),
+      })),
     ],
     [meta.users],
   )
@@ -214,7 +219,14 @@ export function AuditLogsPage() {
                 </span>
               </div>
               <div className="rpm-card__meta">
-                <span>{r.user_name || (r.user_id ? `مستخدم #${r.user_id}` : 'النظام')}</span>
+                <span>
+                  {r.user_phrase
+                    || (r.user_role_title && r.user_name
+                      ? `${r.user_role_title} (${r.user_name})`
+                      : null)
+                    || r.user_name
+                    || (r.user_id ? `مستخدم #${r.user_id}` : 'النظام')}
+                </span>
                 {r.action ? <span className="audit-log-card__action">{r.action}</span> : null}
               </div>
             </article>
