@@ -38,12 +38,12 @@ export function ProfilePage() {
             <strong>{user?.name || '—'}</strong>
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>البريد الإلكتروني</div>
-            <strong dir="ltr" style={{ unicodeBidi: 'plaintext' }}>{user?.email || '—'}</strong>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>رقم الموبايل</div>
+            <strong dir="ltr" style={{ unicodeBidi: 'plaintext' }}>{user?.phone || '—'}</strong>
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>رقم الهاتف</div>
-            <strong dir="ltr" style={{ unicodeBidi: 'plaintext' }}>{user?.phone || '—'}</strong>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>البريد الإلكتروني</div>
+            <strong dir="ltr" style={{ unicodeBidi: 'plaintext' }}>{user?.email || '—'}</strong>
           </div>
           <div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBlockEnd: '0.35rem' }}>الدور الوظيفي</div>

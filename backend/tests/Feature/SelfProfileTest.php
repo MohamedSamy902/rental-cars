@@ -149,10 +149,44 @@ class SelfProfileTest extends TestCase
         $this->putJson('/api/auth/profile', [
             'name' => $viewer->name,
             'email' => $viewer->email,
-            'phone' => null,
+            'phone' => '01044444444',
             'password' => 'another-pass',
             'password_confirmation' => 'another-pass',
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['current_password']);
+    }
+
+    public function test_profile_requires_phone_and_allows_null_email(): void
+    {
+        $viewerRole = Role::query()->where('name', 'viewer')->firstOrFail();
+        $viewer = User::factory()->create([
+            'email' => 'viewer3@rpm.local',
+            'phone' => '01055555555',
+            'password' => Hash::make('password'),
+            'role_id' => $viewerRole->id,
+            'is_active' => true,
+        ]);
+        Sanctum::actingAs($viewer);
+
+        $this->putJson('/api/auth/profile', [
+            'name' => 'بدون بريد',
+            'phone' => '',
+            'email' => null,
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['phone']);
+
+        $this->putJson('/api/auth/profile', [
+            'name' => 'بدون بريد',
+            'phone' => '01055555555',
+            'email' => null,
+        ])->assertOk()
+            ->assertJsonPath('data.phone', '01055555555')
+            ->assertJsonPath('data.email', null);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $viewer->id,
+            'phone' => '01055555555',
+            'email' => null,
+        ]);
     }
 }

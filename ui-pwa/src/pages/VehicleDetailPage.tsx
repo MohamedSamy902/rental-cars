@@ -1274,8 +1274,8 @@ export function VehicleDetailPage() {
 
   const overviewCombined = (
     <>
-      {overviewPanel}
       {chartsPanel}
+      {overviewPanel}
     </>
   )
 
@@ -1389,7 +1389,7 @@ export function VehicleDetailPage() {
 
       <div className="vd-no-print">{panelByTab[tab]}</div>
       <div className="vd-print-all">
-        {overviewPanel}{chartsPanel}{accessoriesPanel}{assetsPanel}{bookingsPanel}{maintenancePanel}{expensesPanel}{docsPanel}{ownerPanel}
+        {chartsPanel}{overviewPanel}{accessoriesPanel}{assetsPanel}{bookingsPanel}{maintenancePanel}{expensesPanel}{docsPanel}{ownerPanel}
       </div>
 
       <Sheet

@@ -140,7 +140,7 @@ export function LoginPage() {
         <div className="auth-card__body">
           <div className="auth-card__intro">
             <h1>تسجيل الدخول</h1>
-            <p>ادخل برقم الموبايل أو البريد الإلكتروني للوصول إلى لوحة التشغيل.</p>
+            <p>ادخل برقم الموبايل للوصول إلى لوحة التشغيل. البريد الإلكتروني مقبول كبديل اختياري.</p>
           </div>
 
           {formError ? (
@@ -150,13 +150,13 @@ export function LoginPage() {
           ) : null}
 
           <AuthInput
-            label="رقم الموبايل أو البريد"
+            label="رقم الموبايل"
             icon={<IconPhone size={18} />}
             type="text"
             inputMode="tel"
-            autoComplete="username"
+            autoComplete="tel"
             value={loginId}
-            error={errors.login || errors.email || errors.phone}
+            error={errors.login || errors.phone || errors.email}
             onChange={setLoginId}
           />
 
