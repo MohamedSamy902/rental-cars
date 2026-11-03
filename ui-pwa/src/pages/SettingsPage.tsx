@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
+import { DocumentTemplatesPanel } from '@/shared/forms/DocumentTemplatesPanel'
 import {
   PageHeader, Button, TextField, TextAreaField, NumberField, SwitchField, MediaUpload, useToast, SkeletonBlock,
 } from '@/shared/ui'
@@ -151,6 +152,13 @@ export function SettingsPage() {
             hint="سطر ختامي على العقد والفاتورة وسند القبض"
           />
         </div>
+      </section>
+
+      <section className="rpm-stack" style={{ gap: '0.75rem' }}>
+        <header className="rpm-panel__head" style={{ margin: 0 }}>
+          <h3 style={{ margin: 0 }}>قوالب العقود والمستندات</h3>
+        </header>
+        <DocumentTemplatesPanel />
       </section>
 
       <section className="rpm-panel">

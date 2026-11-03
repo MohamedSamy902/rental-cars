@@ -7,10 +7,12 @@ use App\Http\Requests\ExtendContractRequest;
 use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\UpdateContractPricingRequest;
 use App\Models\Contract;
+use App\Models\DocumentTemplate;
 use App\Models\TenantSetting;
 use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
 use App\Services\Contracts\RentalProgressService;
+use App\Services\Documents\DocumentTemplateService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,6 +22,7 @@ class ContractController extends Controller
     public function __construct(
         private readonly ContractLifecycleService $lifecycle,
         private readonly RentalProgressService $progress,
+        private readonly DocumentTemplateService $documentTemplates,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -205,6 +208,11 @@ class ContractController extends Controller
         // Ensure print consumers always see a stable document number.
         $payload['number'] = $contract->number ?: ('C-'.$contract->id);
 
+        $contractTpl = $this->documentTemplates->getActive(DocumentTemplate::TYPE_CONTRACT);
+        $handoverTpl = $this->documentTemplates->getActive(DocumentTemplate::TYPE_HANDOVER_RECEIPT);
+        $contractVars = $this->documentTemplates->variablesForContract($contract, $tenant, $contractTpl);
+        $handoverVars = $this->documentTemplates->variablesForContract($contract, $tenant, $handoverTpl);
+
         return response()->json([
             'data' => [
                 'tenant' => [
@@ -218,6 +226,26 @@ class ContractController extends Controller
                     'contract_terms' => $ops['contract_terms'] ?? null,
                 ],
                 'contract' => $payload,
+                'templates' => [
+                    'contract' => $contractTpl ? [
+                        ...$this->documentTemplates->present($contractTpl),
+                        'rendered_html' => $this->documentTemplates->render(
+                            $contractTpl->content,
+                            $contractTpl->format,
+                            $contractVars,
+                        ),
+                        'variables' => $contractVars,
+                    ] : null,
+                    'handover_receipt' => $handoverTpl ? [
+                        ...$this->documentTemplates->present($handoverTpl),
+                        'rendered_html' => $this->documentTemplates->render(
+                            $handoverTpl->content,
+                            $handoverTpl->format,
+                            $handoverVars,
+                        ),
+                        'variables' => $handoverVars,
+                    ] : null,
+                ],
             ],
         ]);
     }

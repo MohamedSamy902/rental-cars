@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CollaborationController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DocumentTemplateController;
 use App\Http\Controllers\Api\EmployeeAssignmentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
@@ -58,6 +59,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:settings.update');
     Route::put('/integrator/tenant', [OperationsController::class, 'updateIntegrator'])
         ->middleware('integrator');
+
+    // Document print templates (RSD §١٧) — view for settings/print consumers; mutate for admins.
+    Route::get('/document-templates', [DocumentTemplateController::class, 'index'])
+        ->middleware('permission:settings.view|settings.update|contracts.print');
+    Route::post('/document-templates', [DocumentTemplateController::class, 'store'])
+        ->middleware('permission:settings.update');
+    Route::post('/document-templates/preview', [DocumentTemplateController::class, 'preview'])
+        ->middleware('permission:settings.view|settings.update');
 
     Route::middleware('permission:staff.view')->group(function () {
         Route::get('/staff', [StaffController::class, 'index']);
