@@ -5,7 +5,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  Button, Sheet, Fab, TextField, SelectField, NumberField, MoneyField, SwitchField,
+  Button, Sheet, Fab, TextField, SelectField, MoneyField, SwitchField,
   useToast, EmptyState, ErrorState, SkeletonBlock, StatusPill, AttentionDot,
   IconPlus, IconShield, IconBadge, IconUsers, IconSearch,
 } from '@/shared/ui'

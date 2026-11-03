@@ -275,7 +275,7 @@ export function EmployeeDetailPage() {
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>البيانات الأساسية</h3></div>
         <DetailList
-          items={[
+          rows={[
             { label: 'الاسم', value: emp.name },
             { label: 'المسمى الوظيفي', value: emp.job_title || '—' },
             { label: 'تاريخ التعيين', value: emp.hired_on ? formatDate(emp.hired_on) : '—' },
@@ -300,7 +300,7 @@ export function EmployeeDetailPage() {
         </div>
         {user ? (
           <DetailList
-            items={[
+            rows={[
               { label: 'اسم الحساب', value: user.name },
               { label: 'البريد', value: <span dir="ltr">{user.email}</span> },
               { label: 'الهاتف', value: user.phone || '—' },
@@ -333,7 +333,7 @@ export function EmployeeDetailPage() {
         </div>
         {petty ? (
           <DetailList
-            items={[
+            rows={[
               { label: 'الرصيد الحالي', value: formatMoney(petty.balance) },
               {
                 label: 'الحالة',
