@@ -33,6 +33,9 @@ export type VehicleFormInitial = {
   purchase_value_estimate?: number | string | null
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
+  tracker_sim_last_recharged_on?: string | null
+  tracker_sim_next_recharge_on?: string | null
+  tracker_sim_recharge_cycle_days?: number | string | null
   notes?: string | null
   is_active?: boolean | null
   owner_id?: number | string | null
@@ -70,6 +73,9 @@ type FormState = {
   purchase_value_estimate: string
   tracker_device_number: string
   tracker_sim_number: string
+  tracker_sim_last_recharged_on: string
+  tracker_sim_next_recharge_on: string
+  tracker_sim_recharge_cycle_days: string
   notes: string
   is_active: boolean
   owner_id: string
@@ -110,6 +116,9 @@ function emptyForm(): FormState {
     purchase_value_estimate: '',
     tracker_device_number: '',
     tracker_sim_number: '',
+    tracker_sim_last_recharged_on: '',
+    tracker_sim_next_recharge_on: '',
+    tracker_sim_recharge_cycle_days: '30',
     notes: '',
     is_active: true,
     owner_id: '',
@@ -162,6 +171,13 @@ function fromInitial(initial?: VehicleFormInitial | null): FormState {
     purchase_value_estimate: str(initial.purchase_value_estimate),
     tracker_device_number: str(initial.tracker_device_number),
     tracker_sim_number: str(initial.tracker_sim_number),
+    tracker_sim_last_recharged_on: initial.tracker_sim_last_recharged_on
+      ? String(initial.tracker_sim_last_recharged_on).slice(0, 10)
+      : '',
+    tracker_sim_next_recharge_on: initial.tracker_sim_next_recharge_on
+      ? String(initial.tracker_sim_next_recharge_on).slice(0, 10)
+      : '',
+    tracker_sim_recharge_cycle_days: str(initial.tracker_sim_recharge_cycle_days, '30'),
     notes: str(initial.notes),
     is_active: initial.is_active !== false,
     owner_id: str(initial.owner_id),
@@ -271,6 +287,11 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       target_monthly_income: form.target_monthly_income !== '' ? Number(form.target_monthly_income) : null,
       tracker_device_number: form.tracker_device_number || null,
       tracker_sim_number: form.tracker_sim_number || null,
+      tracker_sim_last_recharged_on: form.tracker_sim_last_recharged_on || null,
+      tracker_sim_next_recharge_on: form.tracker_sim_next_recharge_on || null,
+      tracker_sim_recharge_cycle_days: form.tracker_sim_recharge_cycle_days !== ''
+        ? Number(form.tracker_sim_recharge_cycle_days)
+        : null,
       notes: form.notes || null,
       is_active: form.is_active,
     }
@@ -387,6 +408,35 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         <MoneyField label="المستهدف الشهري" value={form.target_monthly_income} onChange={(e) => setForm({ ...form, target_monthly_income: e.target.value })} />
         <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
         <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
+        <TextField
+          label="آخر شحن للشريحة"
+          type="date"
+          value={form.tracker_sim_last_recharged_on}
+          onChange={(e) => {
+            const last = e.target.value
+            const cycle = Number(form.tracker_sim_recharge_cycle_days) || 30
+            let next = form.tracker_sim_next_recharge_on
+            if (last) {
+              const d = new Date(`${last}T12:00:00`)
+              d.setDate(d.getDate() + cycle)
+              next = d.toISOString().slice(0, 10)
+            }
+            setForm({ ...form, tracker_sim_last_recharged_on: last, tracker_sim_next_recharge_on: next })
+          }}
+          hint="عند التعديل يُحسب ميعاد الشحن القادم من دورة الشحن"
+        />
+        <TextField
+          label="ميعاد الشحن القادم"
+          type="date"
+          value={form.tracker_sim_next_recharge_on}
+          onChange={(e) => setForm({ ...form, tracker_sim_next_recharge_on: e.target.value })}
+        />
+        <NumberField
+          label="دورة الشحن بالأيام"
+          value={form.tracker_sim_recharge_cycle_days}
+          onChange={(e) => setForm({ ...form, tracker_sim_recharge_cycle_days: e.target.value })}
+          hint="افتراضي 30 — تُستخدم عند تسجيل شحن جديد"
+        />
 
         {mode === 'create' ? (
           <>
