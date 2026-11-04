@@ -19,7 +19,6 @@ use App\Models\VehicleConsumableState;
 use App\Models\VehicleDocument;
 use App\Models\VehicleTire;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Services\Contracts\ContractPricingService;
 use Carbon\Carbon;
@@ -99,10 +98,11 @@ class DueNotificationService
             $this->violationAlerts($scanned),
             $this->lowStockAlerts($scanned),
             $this->documentAlerts($scanned),
+            $this->trackerSimRechargeAlerts($scanned),
+            $this->ownerAgreementAlerts($scanned),
             $this->maintenanceAlerts($scanned),
             $this->consumableAlerts($scanned),
             $this->tireAndBatteryAlerts($scanned),
-            $this->waitlistAlerts($scanned),
             $this->assignmentAlerts($scanned),
             $this->evaluationAlerts($scanned),
         );
@@ -197,16 +197,6 @@ class DueNotificationService
 
         $reminder->last_sent_at = now();
         $reminder->save();
-
-        if ($alert->ruleKey === 'waitlist_available') {
-            WaitlistRequest::query()
-                ->whereKey($alert->subjectId)
-                ->where('status', 'waiting')
-                ->update([
-                    'status' => 'notified',
-                    'notified_at' => now(),
-                ]);
-        }
 
         return $sent;
     }
@@ -589,6 +579,108 @@ class DueNotificationService
      * @param  list<string>  $scanned
      * @return list<DueAlert>
      */
+    /**
+     * @param  list<string>  $scanned
+     * @return list<DueAlert>
+     */
+    private function trackerSimRechargeAlerts(array &$scanned): array
+    {
+        if (! Schema::hasTable('vehicles') || ! Schema::hasColumn('vehicles', 'tracker_sim_next_recharge_on')) {
+            return [];
+        }
+
+        $this->mark($scanned, 'tracker_sim_recharge');
+        $deadline = now()->copy()->startOfDay()->addDays(self::LEAD_DAYS)->toDateString();
+        $alerts = [];
+
+        $vehicles = Vehicle::query()
+            ->where('is_active', true)
+            ->whereNotNull('tracker_sim_next_recharge_on')
+            ->whereDate('tracker_sim_next_recharge_on', '<=', $deadline)
+            ->get(['id', 'plate', 'code', 'tracker_sim_number', 'tracker_sim_next_recharge_on', 'tracker_sim_last_recharged_on']);
+
+        foreach ($vehicles as $vehicle) {
+            $plate = $vehicle->plate ?: ($vehicle->code ?: 'عربية');
+            $sim = $vehicle->tracker_sim_number ? " · شريحة {$vehicle->tracker_sim_number}" : '';
+            $next = $vehicle->tracker_sim_next_recharge_on?->toDateString();
+            $last = $vehicle->tracker_sim_last_recharged_on?->toDateString();
+            $body = $last
+                ? "ميعاد الشحن القادم {$next}. آخر شحن كان {$last}{$sim}."
+                : "ميعاد الشحن القادم {$next}{$sim}.";
+
+            $alerts[] = new DueAlert(
+                ruleKey: 'tracker_sim_recharge',
+                subjectType: 'vehicle',
+                subjectId: (int) $vehicle->id,
+                title: "شحن شريحة تتبع قريب: {$plate}",
+                body: $body,
+                linkType: 'vehicle',
+                linkId: (int) $vehicle->id,
+                permissions: ['vehicles.view'],
+            );
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * عقد تأجير العربية من المالك: تنبيه يومي بدءاً من قبل شهر من نهاية العقد.
+     *
+     * @param  list<string>  $scanned
+     * @return list<DueAlert>
+     */
+    private function ownerAgreementAlerts(array &$scanned): array
+    {
+        if (! Schema::hasTable('vehicles') || ! Schema::hasColumn('vehicles', 'owner_agreement_ends_on')) {
+            return [];
+        }
+
+        $this->mark($scanned, 'owner_agreement_end');
+        $leadDays = 30;
+        $deadline = now()->copy()->startOfDay()->addDays($leadDays)->toDateString();
+        $alerts = [];
+
+        $vehicles = Vehicle::query()
+            ->with('owner:id,full_name,phone')
+            ->where('is_active', true)
+            ->whereNotNull('owner_agreement_ends_on')
+            ->whereDate('owner_agreement_ends_on', '<=', $deadline)
+            ->get([
+                'id', 'plate', 'code', 'owner_id',
+                'owner_agreement_starts_on', 'owner_agreement_ends_on',
+                'owner_agreement_number', 'owner_agreement_notes',
+            ]);
+
+        foreach ($vehicles as $vehicle) {
+            $plate = $vehicle->plate ?: ($vehicle->code ?: 'عربية');
+            $ownerName = $vehicle->owner?->full_name ?: 'مالك';
+            $ends = $vehicle->owner_agreement_ends_on?->toDateString();
+            $starts = $vehicle->owner_agreement_starts_on?->toDateString();
+            $number = $vehicle->owner_agreement_number ? " · عقد {$vehicle->owner_agreement_number}" : '';
+            $range = $starts ? "من {$starts} إلى {$ends}" : "ينتهي {$ends}";
+            $notes = $vehicle->owner_agreement_notes
+                ? ' · '.mb_substr(trim((string) $vehicle->owner_agreement_notes), 0, 120)
+                : '';
+
+            $alerts[] = new DueAlert(
+                ruleKey: 'owner_agreement_end',
+                subjectType: 'vehicle',
+                subjectId: (int) $vehicle->id,
+                title: "عقد مالك يقترب من الانتهاء: {$plate}",
+                body: "المالك {$ownerName}{$number} · {$range}{$notes}.",
+                linkType: 'vehicle',
+                linkId: (int) $vehicle->id,
+                permissions: ['vehicles.view', 'owners.view'],
+            );
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * @param  list<string>  $scanned
+     * @return list<DueAlert>
+     */
     private function documentAlerts(array &$scanned): array
     {
         $alerts = [];
@@ -839,88 +931,6 @@ class DueNotificationService
         }
 
         return $alerts;
-    }
-
-    /**
-     * @param  list<string>  $scanned
-     * @return list<DueAlert>
-     */
-    private function waitlistAlerts(array &$scanned): array
-    {
-        if (! Schema::hasTable('waitlist_requests') || ! Schema::hasTable('vehicles')) {
-            return [];
-        }
-
-        $this->mark($scanned, 'waitlist_available');
-
-        $requests = WaitlistRequest::query()
-            ->with('customer:id,full_name')
-            ->whereIn('status', ['waiting', 'notified'])
-            ->whereNull('resulting_contract_id')
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->get();
-
-        $alerts = [];
-        foreach ($requests as $request) {
-            $match = $this->availableVehicle($request);
-            if (! $match) {
-                continue;
-            }
-            $who = $request->customer?->full_name ?: 'عميل';
-            $alerts[] = new DueAlert(
-                ruleKey: 'waitlist_available',
-                subjectType: 'waitlist_request',
-                subjectId: (int) $request->id,
-                title: "سيارة متاحة لطلب انتظار: {$who}",
-                body: "{$match->plate} ({$match->category}) متاحة للفترة المطلوبة. لا يُنشأ عقد تلقائياً.",
-                linkType: 'waitlist',
-                linkId: (int) $request->id,
-                permissions: ['waitlist.view'],
-            );
-        }
-
-        return $alerts;
-    }
-
-    private function availableVehicle(WaitlistRequest $request): ?Vehicle
-    {
-        $from = $request->desired_start ? Carbon::parse($request->desired_start)->startOfDay() : now()->copy()->startOfDay();
-        $to = $request->desired_end ? Carbon::parse($request->desired_end)->endOfDay() : $from->copy()->endOfDay();
-
-        $candidates = Vehicle::query()
-            ->where('is_active', true)
-            ->when($request->preferred_vehicle_id, fn ($query) => $query->whereKey($request->preferred_vehicle_id))
-            ->when(! $request->preferred_vehicle_id && $request->category, fn ($query) => $query->where('category', $request->category))
-            ->get();
-
-        if ($candidates->isEmpty()) {
-            return null;
-        }
-
-        $blocked = Contract::query()
-            ->whereIn('vehicle_id', $candidates->pluck('id'))
-            ->whereIn('status', ['pending', 'approved', 'active'])
-            ->where('starts_at', '<', $to)
-            ->where('planned_ends_at', '>', $from)
-            ->pluck('vehicle_id');
-
-        $maintenance = Schema::hasTable('work_orders')
-            ? WorkOrder::query()
-                ->whereIn('vehicle_id', $candidates->pluck('id'))
-                ->where('puts_in_maintenance', true)
-                ->whereIn('status', ['open', 'in_progress'])
-                ->pluck('vehicle_id')
-            : collect();
-
-        return $candidates->first(function (Vehicle $vehicle) use ($blocked, $maintenance) {
-            if (in_array($vehicle->manual_status, ['maintenance', 'out_of_service', 'sold'], true)) {
-                return false;
-            }
-
-            return ! $blocked->contains($vehicle->id) && ! $maintenance->contains($vehicle->id);
-        });
     }
 
     /**

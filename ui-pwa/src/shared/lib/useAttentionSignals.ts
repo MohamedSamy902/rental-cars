@@ -23,7 +23,6 @@ export type AttentionCounts = {
   pending_hr_acks: number
   draft_payroll_runs: number
   blacklisted_customers: number
-  waiting_requests: number
   owners_unpaid: number
 }
 
@@ -40,7 +39,6 @@ const EMPTY: AttentionCounts = {
   pending_hr_acks: 0,
   draft_payroll_runs: 0,
   blacklisted_customers: 0,
-  waiting_requests: 0,
   owners_unpaid: 0,
 }
 
@@ -63,7 +61,6 @@ function normalizeCounts(raw: Partial<AttentionCounts> | null | undefined): Atte
     pending_hr_acks: n(raw?.pending_hr_acks),
     draft_payroll_runs: n(raw?.draft_payroll_runs),
     blacklisted_customers: n(raw?.blacklisted_customers),
-    waiting_requests: n(raw?.waiting_requests),
     owners_unpaid: n(raw?.owners_unpaid),
   }
 }

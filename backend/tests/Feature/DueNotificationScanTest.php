@@ -22,7 +22,6 @@ use App\Models\VehicleDocument;
 use App\Models\VehicleOwner;
 use App\Models\VehicleTire;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Services\Notifications\DueNotificationService;
 use App\Support\PermissionCatalog;
@@ -184,7 +183,7 @@ class DueNotificationScanTest extends TestCase
         $this->travelBack();
     }
 
-    public function test_stock_documents_owner_payroll_and_waitlist(): void
+    public function test_stock_documents_owner_payroll_and_evaluations(): void
     {
         $low = InventoryItem::query()->create([
             'code' => 'OIL-LOW', 'name' => 'زيت ناقص', 'category' => 'زيوت', 'unit' => 'لتر', 'reorder_level' => 5, 'is_active' => true,
@@ -290,14 +289,15 @@ class DueNotificationScanTest extends TestCase
             'paid_amount' => 0,
         ]);
 
-        $waiting = WaitlistRequest::query()->create([
-            'customer_id' => $this->customer->id,
-            'category' => 'اقتصادي',
-            'status' => 'waiting',
-            'desired_start' => now()->toDateString(),
-            'desired_end' => now()->addDays(2)->toDateString(),
-            'created_by' => $this->admin->id,
-            'expires_at' => now()->addDays(7),
+        $this->vehicle->update([
+            'tracker_sim_number' => '01009998887',
+            'tracker_sim_last_recharged_on' => now()->subDays(28)->toDateString(),
+            'tracker_sim_next_recharge_on' => now()->addDay()->toDateString(),
+            'tracker_sim_recharge_cycle_days' => 30,
+            'owner_agreement_starts_on' => now()->subMonths(11)->toDateString(),
+            'owner_agreement_ends_on' => now()->addDays(10)->toDateString(),
+            'owner_agreement_number' => 'OWN-SCAN-1',
+            'owner_agreement_notes' => 'عقد سنوي',
         ]);
 
         app(DueNotificationService::class)->scan();
@@ -315,9 +315,12 @@ class DueNotificationScanTest extends TestCase
         $this->assertSame(1, $this->titlesLike('راتب لم يُصرف: راتب معلّق'));
         $this->assertSame(0, $this->titlesLike('راتب لم يُصرف: راتب مسودة'));
         $this->assertSame(1, $this->titlesLike('تقييم معلّق: راتب معلّق'));
-        $this->assertSame(1, $this->titlesLike('سيارة متاحة لطلب انتظار'));
-        $waiting->refresh();
-        $this->assertSame('notified', $waiting->status);
+        $this->assertSame(1, $this->titlesLike('شحن شريحة تتبع قريب'));
+        $this->assertSame(1, NotificationReminder::query()->where('rule_key', 'tracker_sim_recharge')->count());
+        $this->assertSame(1, $this->titlesLike('عقد مالك يقترب من الانتهاء'));
+        $this->assertSame(1, NotificationReminder::query()->where('rule_key', 'owner_agreement_end')->count());
+        $this->assertSame(0, $this->titlesLike('سيارة متاحة لطلب انتظار'));
+
 
         Evaluation::query()->create([
             'employee_id' => $unpaidEmployee->id,

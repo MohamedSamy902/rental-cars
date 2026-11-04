@@ -15,6 +15,7 @@ import { MaintenancePage } from '@/pages/MaintenancePage'
 import { CustomersPage } from '@/pages/CustomersPage'
 import { InventoryPage } from '@/pages/InventoryPage'
 import { ViolationsPage } from '@/pages/ViolationsPage'
+import { ViolationInquiriesPage } from '@/pages/ViolationInquiriesPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { AccountsPage } from '@/pages/AccountsPage'
@@ -34,7 +35,6 @@ import { ChatPage } from '@/pages/ChatPage'
 import { CustomerDetailPage } from '@/pages/CustomerDetailPage'
 import { EmployeeDetailPage } from '@/pages/EmployeeDetailPage'
 import { ProfilePage } from '@/pages/ProfilePage'
-import { WaitlistPage } from '@/pages/WaitlistPage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -73,13 +73,13 @@ export default function App() {
                 <Route path="bookings" element={<BookingsPage />} />
                 <Route path="bookings/:id" element={<ContractDetailPage />} />
                 <Route path="contracts/:id" element={<ContractDetailPage />} />
-                <Route path="waitlist" element={<WaitlistPage />} />
                 <Route path="calendar" element={<CalendarPage />} />
                 <Route path="maintenance" element={<MaintenancePage />} />
                 <Route path="inventory" element={<InventoryPage />} />
                 <Route path="customers" element={<CustomersPage />} />
                 <Route path="customers/:id" element={<CustomerDetailPage />} />
                 <Route path="violations" element={<ViolationsPage />} />
+                <Route path="violation-inquiries" element={<ViolationInquiriesPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="accounts" element={<AccountsPage />} />

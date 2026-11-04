@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class VehicleDocumentHistory extends Model
 {
     protected $fillable = [
-        'vehicle_id', 'vehicle_document_id', 'type', 'file_path', 'file_path_back', 'issued_on', 'expires_on',
-        'notes', 'archived_at', 'archived_by',
+        'vehicle_id', 'vehicle_document_id', 'type', 'document_number', 'file_path', 'file_path_back',
+        'issued_on', 'expires_on', 'notes', 'archived_at', 'archived_by',
     ];
 
     protected function casts(): array

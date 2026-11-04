@@ -74,6 +74,38 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             onChange={(e) => patch({ odometer_in: e.target.value })}
           />
         ) : null}
+        {action === 'return' && (selected?.open_violations_total ?? 0) > 0 ? (
+          <div
+            className="rpm-due-banner"
+            role="status"
+            style={{
+              padding: '0.85rem 1rem',
+              borderRadius: 'var(--radius-sm, 12px)',
+              background: 'var(--warning-soft)',
+              color: 'var(--warning-ink)',
+              border: '1px solid color-mix(in srgb, var(--warning) 35%, var(--border))',
+              display: 'grid',
+              gap: '0.35rem',
+            }}
+          >
+            <strong>مبلغ مطلوب · مخالفات مفتوحة</strong>
+            <span style={{ fontSize: '1.15rem', fontWeight: 800 }}>{formatMoney(selected?.open_violations_total ?? 0)}</span>
+            <span className="muted" style={{ color: 'inherit', opacity: 0.85 }}>للمتابعة فقط — بلا ترحيل محاسبي</span>
+            {(selected?.open_violations?.length ?? 0) > 0 ? (
+              <ul style={{ margin: 0, paddingInlineStart: '1.1rem' }}>
+                {(selected?.open_violations || []).map((v) => (
+                  <li key={v.id}>
+                    {formatMoney(v.amount)}
+                    {v.occurred_at ? ` · ${v.occurred_at}` : ''}
+                    {v.created_by_name ? ` · رفعها ${v.created_by_name}` : ''}
+                  </li>
+                ))}
+              </ul>
+            ) : (selected?.open_violations_count ?? 0) > 0 ? (
+              <span>{selected?.open_violations_count} مخالفة مفتوحة على هذا الحجز</span>
+            ) : null}
+          </div>
+        ) : null}
         {action === 'return' || action === 'swap' ? (
           <MoneyField label="رسوم أضرار" value={form.damage_fee} onChange={(e) => patch({ damage_fee: e.target.value })} />
         ) : null}

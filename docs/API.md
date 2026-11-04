@@ -101,9 +101,33 @@ Query شائع: `?per_page=50&page=1&search=...`
     "open_violations": 0, "low_stock": 0
   },
   "tasks": [{ "id": 1, "title": "...", "subtitle": "...", "status": "active", "at": "..." }],
+  "important_tasks": [
+    {
+      "id": "contract_pending:12",
+      "rule": "contract_pending",
+      "severity": "critical",
+      "title": "اعتماد حجز معلّق · C-12",
+      "subtitle": "عميل · ماركة موديل · لوحة",
+      "href": "/contracts/12",
+      "due_on": "2026-11-05"
+    }
+  ],
+  "fleet_prep": { "horizon_days": 5, "days": [], "totals": {} },
   "unread_notifications": 1
 }
 ```
+
+`important_tasks` قائمة مهام تشغيلية للوحة اليوم (حد أقصى ٢٠)، مرتّبة بالحرج ثم التاريخ، ومفلترة بصلاحيات المستخدم الحالي:
+
+| `rule` | صلاحية | متى يظهر |
+|--------|--------|----------|
+| `contract_overdue` / `contract_pending` / `contract_pickup` / `contract_return` | `contracts.view` | استلام متأخر · حجز معلّق · تسليم/استلام اليوم |
+| `work_order_open` / `maintenance_due` | `maintenance.view` أو `vehicles.view` | أمر شغل مفتوح · صيانة مستحقة خلال ٧ أيام |
+| `license_expiring` | `vehicles.view` | رخصة تسيير ≤ ٣٠ يوماً |
+| `sim_recharge` | `vehicles.view` | شحن شريحة تتبع ≤ ١٤ يوماً |
+| `owner_agreement_end` | `vehicles.view` أو `owners.view` | عقد مالك ≤ ٣٠ يوماً |
+| `violation_open` | `violations.view` | مخالفة غير مدفوعة/مؤكّدة |
+| `low_stock` | `inventory.view` | صنف تحت حد التنبيه |
 
 ---
 
@@ -194,15 +218,15 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | وصف |
 |--------|------|-----|
-| GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&per_page=` |
+| GET | `/vehicles` | قائمة + summary — `status=license_expiring` (٣٠) · `sim_recharge` (١٤) · `owner_agreement_expiring` (٣٠) · حقول `license_expires_on` · `tracker_sim_*` · `owner_agreement_*` · `summary.*` |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
 | POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية من نموذج العربية |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
-| PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) |
+| PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) · عند تغيير رخصة التسيير (تاريخ/صورة) تُؤرشف السابقة تلقائياً ثم تُكتب الجديدة |
 | DELETE | `/vehicles/{vehicle}` | أرشفة ناعمة (apiResource) |
-| POST | `/vehicles/{vehicle}/documents` | مستند |
-| PUT | `/vehicles/{vehicle}/documents/{id}` | تحديث؛ رخصة تسيير مع `archive_previous` تؤرشف السجل القديم |
+| POST | `/vehicles/{vehicle}/documents` | مستند (`type` · `document_number` · وش/ضهر · تواريخ) |
+| PUT | `/vehicles/{vehicle}/documents/{id}` | تحديث؛ رخصة تسيير مع `archive_previous` تؤرشف السجل القديم (يشمل رقم الرخصة) |
 | GET | `/vehicles/{vehicle}/document-history` | سجل الرخص/المستندات المؤرشفة |
 | POST | `/vehicles/{vehicle}/accessories` | مستلزم |
 
@@ -211,7 +235,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 **POST /vehicles — حقول أساسية**
 `plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit`  
 الكود: يُولَّد تلقائياً إن لم يُرسل.  
-اختياري: `chassis_number`, `engine_number`, `rental_priority`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_inline{full_name,phone,…}`, `addon_ids[]`
+اختياري: `chassis_number`, `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_agreement_number`, `owner_agreement_notes`, `owner_inline{full_name,phone,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}`  
+**ملغى:** `rental_priority` · قائمة الانتظار · `fuel_level` في الفحص.
 
 **POST documents**
 ```json
@@ -310,7 +335,6 @@ Query شائع: `?per_page=50&page=1&search=...`
 ```json
 {
   "odometer_out": 18200,
-  "fuel_level": 70,
   "notes": null,
   "signature_data": "data:image/png;base64,...",
   "accessories": [
@@ -321,7 +345,7 @@ Query شائع: `?per_page=50&page=1&search=...`
   ]
 }
 ```
-التوقيع إلزامي افتراضياً (`operational.require_handover_signature`).
+التوقيع إلزامي افتراضياً (`operational.require_handover_signature`). بلا `fuel_level`.
 
 ### POST …/return
 ```json
@@ -329,7 +353,6 @@ Query شائع: `?per_page=50&page=1&search=...`
   "odometer_in": 18600,
   "returned_at": null,
   "damage_fee": 100,
-  "fuel_level": 40,
   "notes": null,
   "signature_data": "...",
   "accessories": [],
@@ -595,15 +618,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ---
 
-## ١٥) قائمة الانتظار · الإشعارات
-
-### Waitlist
-| Method | Path |
-|--------|------|
-| GET | `/waitlist` |
-| POST | `/waitlist` | `{ customer_id, category, preferred_vehicle_id?, desired_start?, desired_end?, priority?, notes? }` |
-
-الحالة الابتدائية: `waiting` · انتهاء افتراضي بعد ٧ أيام.
+## ١٥) الإشعارات
 
 ### `GET /attention`
 عدّادات خفيفة لنقاط الانتباه في القائمة وتبويبات الصفحات. بلا أثر جانبي (لا استحقاق جماعي للملاك).
@@ -621,7 +636,6 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | `pending_hr_acks` | إسناد `pending_ack` | الموارد البشرية · حرج |
 | `draft_payroll_runs` | مسيرات `draft` | الموارد البشرية · تحذير |
 | `blacklisted_customers` | عملاء `blacklist` | العملاء · تحذير |
-| `waiting_requests` | طلبات انتظار `waiting` غير المحذوفة | الانتظار · تحذير |
 | `owners_unpaid` | ملاك استحقاقهم المسجّل أكبر من مجموع الصرف | الملاك · تحذير |
 
 العهدة والمصروفات وإخطار القسم بلا طابور معلّق في البيانات، فلا نقطة لها.
@@ -633,7 +647,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/notifications/unread-count` | `{ "unread": N }` |
 | POST | `/notifications/{id}/read` | تعليم مقروء (مالك الإشعار فقط — حماية IDOR) |
 
-الماسح `php artisan notifications:scan` يشتغل كل ساعة من `schedule:run` (Cron على cPanel). يرسل الإشعار الأول عند تحقق الشرط ثم تذكيراً كل ٢٤ ساعة لنفس السجل ونفس القاعدة: بداية حجز معلّق/معتمد أو نهاية عقد نشط قبلها بيومين، والمستحقات المالية (عقد، تأمين، مالك، راتب معتمد، مخالفة)، ونقص المخزون، والمستندات، والصيانة، والانتظار. Web Push يُرسل مع نفس الصف إن وُجد VAPID.
+الماسح `php artisan notifications:scan` يشتغل كل ساعة من `schedule:run` (Cron على cPanel). يرسل الإشعار الأول عند تحقق الشرط ثم تذكيراً كل ٢٤ ساعة لنفس السجل ونفس القاعدة: بداية حجز معلّق/معتمد أو نهاية عقد نشط قبلها بيومين، والمستحقات المالية (عقد، تأمين، مالك، راتب معتمد، مخالفة)، ونقص المخزون، والمستندات، والصيانة. Web Push يُرسل مع نفس الصف إن وُجد VAPID.
 
 ### Web Push (موبايل)
 صلاحية `notifications.view` · يحتاج VAPID في `.env` (`php artisan push:vapid --write`) وHTTPS. `VAPID_SUBJECT` لازم يكون `https://` لنفس الموقع؛ عنوان `mailto` على نطاق غير عام (مثل `.local`) يرفضه آيفون بـ 403.
@@ -655,13 +669,12 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | أسطول | `/vehicles*` | `/vehicles` |
 | عقود | `/contracts*` | `/bookings` |
 | تقويم | عبر contracts | `/calendar` |
-| انتظار | `/waitlist` | `/waitlist` |
 | معرض | `/showroom` | `/showroom` |
 | QR | `/qr` | من تفاصيل مركبة |
 | فحص/توقيع | handover/return | Bookings sheet |
 | وديعة | `/contracts/.../deposit*` | Bookings |
 | عملاء/سوداء | `/customers` | `/customers` |
-| مخالفات | `/violations` | `/violations` |
+| مخالفات | `/violations` · `/violation-inquiries` | `/violations` · `/violation-inquiries` |
 | صيانة | `/work-orders` | `/maintenance` |
 | مخزون | `/inventory*` | `/inventory` |
 | عهدة | `/petty-cash*` | `/petty-cash` |
@@ -692,7 +705,9 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/owners/{id}/payouts` | `owners.payout` (حسّاسة) |
 | GET | `/owner-payouts` | `owners.view` |
 
-**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since`
+**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · عقد المالك (`owner_agreement_*`)
+
+**حقول المالك:** اسم · هاتف · هاتف بديل · رقم قومي · بطاقة وش/ضهر · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
 
 **ترحيل محاسبي**
 - استحقاق شهري: مدين `5200` مصروف إيجار ملاك · دائن `2100` مستحقات ملاك

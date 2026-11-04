@@ -41,7 +41,7 @@ class HappyPathE2ETest extends TestCase
             'center_name' => 'مركز اختبار E2E',
             'print_footer' => 'تذييل طباعة E2E',
             'feature_flags' => [
-                'showroom' => true, 'petty_cash' => true, 'waitlist' => true, 'inventory' => true,
+                'showroom' => true, 'petty_cash' => true, 'inventory' => true,
                 'department_notice' => true, 'chat' => true, 'evaluations' => true, 'hr' => true,
             ],
             'operational' => [

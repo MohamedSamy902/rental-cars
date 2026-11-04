@@ -41,6 +41,7 @@ type Accessory = {
 type Document = {
   id: number
   type: string
+  document_number?: string | null
   file_path?: string | null
   file_path_back?: string | null
   expires_on?: string | null
@@ -73,6 +74,13 @@ type Vehicle = {
   manual_status?: string | null
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
+  tracker_sim_last_recharged_on?: string | null
+  tracker_sim_next_recharge_on?: string | null
+  tracker_sim_recharge_cycle_days?: number | null
+  owner_agreement_starts_on?: string | null
+  owner_agreement_ends_on?: string | null
+  owner_agreement_number?: string | null
+  owner_agreement_notes?: string | null
   notes?: string | null
   is_active?: boolean
   owner_id?: number | null
@@ -261,9 +269,9 @@ export function VehicleDetailPage() {
   const [tab, setTab] = useQueryTab<TabId>({ allowed: VEHICLE_DETAIL_TABS, defaultValue: 'overview' })
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
+  const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', document_number: '', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
   const [docEdit, setDocEdit] = useState<Document | null>(null)
-  const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
+  const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; document_number?: string | null; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
   const [accOpen, setAccOpen] = useState(false)
   const [accEdit, setAccEdit] = useState<Accessory | null>(null)
   const [accForm, setAccForm] = useState(emptyAcc)
@@ -500,6 +508,7 @@ export function VehicleDetailPage() {
         method: 'POST',
         json: {
           type: docForm.type,
+          document_number: docForm.document_number || undefined,
           file_path: docForm.file_path || undefined,
           file_path_back: docForm.file_path_back || undefined,
           expires_on: docForm.expires_on || undefined,
@@ -508,7 +517,7 @@ export function VehicleDetailPage() {
         },
       })
       toast.success('تم تسجيل المستند.')
-      setDocForm({ type: 'رخصة تسيير', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
+      setDocForm({ type: 'رخصة تسيير', document_number: '', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -526,6 +535,7 @@ export function VehicleDetailPage() {
         method: 'PUT',
         json: {
           type: docEdit.type,
+          document_number: docEdit.document_number || undefined,
           file_path: docEdit.file_path || undefined,
           file_path_back: docEdit.file_path_back || undefined,
           expires_on: docEdit.expires_on || undefined,
@@ -663,6 +673,9 @@ export function VehicleDetailPage() {
         <Fact label="نشطة" value={v.is_active === false ? 'لا' : 'نعم'} />
         <Fact label="جهاز التتبع" value={v.tracker_device_number || '—'} />
         <Fact label="شريحة التتبع" value={v.tracker_sim_number || '—'} />
+        <Fact label="آخر شحن شريحة" value={shortDate(v.tracker_sim_last_recharged_on)} />
+        <Fact label="شحن الشريحة القادم" value={shortDate(v.tracker_sim_next_recharge_on)} />
+        <Fact label="دورة شحن الشريحة" value={v.tracker_sim_recharge_cycle_days != null ? `${v.tracker_sim_recharge_cycle_days} يوماً` : '—'} />
         <Fact label="أُنشئت" value={shortDate(v.created_at)} />
         <Fact label="آخر تحديث" value={shortDate(v.updated_at)} />
         <Fact label="ملاحظات" value={v.notes || '—'} wide />
@@ -999,6 +1012,7 @@ export function VehicleDetailPage() {
                 <strong>{d.type}</strong>
                 <div>
                   <span>
+                    {d.document_number ? `رقم ${d.document_number} · ` : ''}
                     صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}
                     {d.file_path ? ' · وجه' : ''}
                     {d.file_path_back ? ' · ظهر' : ''}
@@ -1025,6 +1039,11 @@ export function VehicleDetailPage() {
               { value: 'فحص فني', label: 'فحص فني' },
               { value: 'أخرى', label: 'أخرى' },
             ]}
+          />
+          <TextField
+            label={/رخص|license/i.test(docForm.type) ? 'رقم الرخصة' : 'رقم المستند'}
+            value={docForm.document_number}
+            onChange={(e) => setDocForm({ ...docForm, document_number: e.target.value })}
           />
           <DateField label="تاريخ الإصدار" value={docForm.issued_on} onChange={(e) => setDocForm({ ...docForm, issued_on: e.target.value })} />
           <DateField label="تاريخ الانتهاء" value={docForm.expires_on} onChange={(e) => setDocForm({ ...docForm, expires_on: e.target.value })} />
@@ -1066,6 +1085,7 @@ export function VehicleDetailPage() {
                 <strong>{h.type}</strong>
                 <div>
                   <span>
+                    {h.document_number ? `رقم ${h.document_number} · ` : ''}
                     صدر {h.issued_on || '—'} · ينتهي {h.expires_on || '—'} · أُرشف {h.archived_at ? h.archived_at.slice(0, 16).replace('T', ' ') : '—'}
                   </span>
                 </div>
@@ -1123,6 +1143,12 @@ export function VehicleDetailPage() {
               )}
               <span>شهري {formatMoney(v.owner_monthly_amount || 0)} · ربط منذ {v.owner_since || '—'}</span>
             </div>
+          </div>
+          <div className="vd-facts" style={{ marginBlockStart: '0.75rem' }}>
+            <Fact label="رقم عقد المالك" value={v.owner_agreement_number || '—'} />
+            <Fact label="بداية العقد" value={shortDate(v.owner_agreement_starts_on)} />
+            <Fact label="نهاية العقد" value={shortDate(v.owner_agreement_ends_on)} />
+            <Fact label="تفاصيل العقد" value={v.owner_agreement_notes || '—'} wide />
           </div>
           <Link className="vd-no-print rpm-link-btn" to={v.owner ? `/owners/${v.owner.id}` : '/owners'}>{v.owner ? 'ملف المالك' : 'صفحة الملاك'}</Link>
         </div>
@@ -1515,6 +1541,11 @@ export function VehicleDetailPage() {
                 { value: 'فحص فني', label: 'فحص فني' },
                 { value: 'أخرى', label: 'أخرى' },
               ]}
+            />
+            <TextField
+              label={/رخص|license/i.test(docEdit.type) ? 'رقم الرخصة' : 'رقم المستند'}
+              value={docEdit.document_number || ''}
+              onChange={(e) => setDocEdit({ ...docEdit, document_number: e.target.value })}
             />
             <DateField label="تاريخ الإصدار" value={docEdit.issued_on || ''} onChange={(e) => setDocEdit({ ...docEdit, issued_on: e.target.value })} />
             <DateField label="تاريخ الانتهاء" value={docEdit.expires_on || ''} onChange={(e) => setDocEdit({ ...docEdit, expires_on: e.target.value })} />

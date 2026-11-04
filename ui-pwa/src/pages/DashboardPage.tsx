@@ -84,6 +84,16 @@ type FleetPrepDay = {
   }
 }
 
+type ImportantTask = {
+  id: string
+  rule: string
+  severity: 'critical' | 'warning' | 'info'
+  title: string
+  subtitle: string
+  href: string
+  due_on: string | null
+}
+
 type Dash = {
   occupancy_pct: number
   fleet_total: number
@@ -91,6 +101,7 @@ type Dash = {
   profitability_compare?: ProfitCompare
   kpis: Record<string, number>
   tasks: { id: number; title: string; subtitle: string; status: string; at: string }[]
+  important_tasks?: ImportantTask[]
   fleet_prep?: {
     horizon_days: number
     days: FleetPrepDay[]
@@ -147,14 +158,32 @@ function startOfDay(d: Date) {
   return x
 }
 
-function urgencyPill(at: string, status: string): { label: string; tone: BadgeTone } {
-  if (status === 'completed') return { label: 'مكتمل', tone: 'success' }
-  const diffH = (new Date(at).getTime() - Date.now()) / 36e5
-  if (diffH < 0) return { label: 'متأخر', tone: 'danger' }
-  if (diffH < 24) return { label: 'اليوم', tone: 'warning' }
-  if (diffH < 48) return { label: 'غداً', tone: 'warning' }
-  const days = Math.ceil(diffH / 24)
-  return { label: `${days} يوم`, tone: 'muted' }
+function severityPill(severity: ImportantTask['severity'], dueOn: string | null): { label: string; tone: BadgeTone } {
+  if (severity === 'critical') {
+    if (dueOn && startOfDay(new Date(dueOn)).getTime() < startOfDay(new Date()).getTime()) {
+      return { label: 'متأخر', tone: 'danger' }
+    }
+    return { label: 'عاجل', tone: 'danger' }
+  }
+  if (severity === 'warning') {
+    if (!dueOn) return { label: 'يحتاج متابعة', tone: 'warning' }
+    const diffH = (startOfDay(new Date(dueOn)).getTime() - startOfDay(new Date()).getTime()) / 36e5
+    if (diffH <= 0) return { label: 'اليوم', tone: 'warning' }
+    if (diffH < 48) return { label: 'غداً', tone: 'warning' }
+    return { label: `${Math.ceil(diffH / 24)} يوم`, tone: 'warning' }
+  }
+  return { label: 'متابعة', tone: 'muted' }
+}
+
+function taskIcon(rule: string) {
+  if (rule.startsWith('work_order') || rule.startsWith('maintenance')) return <IconWrench size={14} />
+  if (rule.startsWith('license') || rule.startsWith('sim') || rule.startsWith('owner_agreement')) {
+    return <IconCar size={14} />
+  }
+  if (rule.startsWith('violation')) return <IconClipboard size={14} />
+  if (rule.startsWith('stock')) return <IconStore size={14} />
+  if (rule.includes('return')) return <IconReturn size={14} />
+  return <IconClipboard size={14} />
 }
 
 function contractStatusPill(status: string): { label: string; tone: BadgeTone } {
@@ -418,7 +447,7 @@ export function DashboardPage() {
   }
 
   const displayName = (user?.name || '').trim() || 'مستخدم'
-  const openTasks = data.tasks.length
+  const openTasks = (data.important_tasks ?? data.tasks ?? []).length
   const ring = Math.PI * 2 * 54
 
   const revenueSpark = revenueSeries.map((d) => d.value)
@@ -828,65 +857,64 @@ export function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.14, duration: 0.35 }}
         >
-          <Card>
+          <Card className="db-tasks-card">
             <CardHeader
-              title="عمليات قادمة"
-              description="ما يحتاج قراراً أولاً"
+              title="مهام مهمة"
+              description="ما يجب تنفيذه حسب صلاحياتك"
               action={
                 <>
-                  <Link to="/bookings">العقود</Link>
-                  <CardMenu label="خيارات العمليات" items={menus.operations} />
+                  <span className="db-tasks__count tabular-nums">
+                    {(data.important_tasks ?? []).length}
+                  </span>
+                  <CardMenu label="خيارات المهام" items={menus.operations} />
                 </>
               }
             />
             <CardContent flush>
-              <div className="db-table-wrap">
-                <table className="db-table">
-                  <thead>
-                    <tr>
-                      <th>المهمة</th>
-                      <th>التفاصيل</th>
-                      <th>الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.tasks.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="db-empty-cell">
-                          لا تذكيرات معلّقة
-                        </td>
-                      </tr>
-                    ) : (
-                      data.tasks.map((task, i) => {
-                        const pill = urgencyPill(task.at, task.status)
-                        return (
-                          <motion.tr
-                            key={task.id}
-                            initial={{ opacity: 0, x: 8 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.03 * i }}
-                          >
-                            <td>
-                              <div className="db-table__primary">
-                                <span className="db-table__ico" aria-hidden>
-                                  <IconClipboard size={14} />
-                                </span>
-                                <strong>{task.title}</strong>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="db-table__muted">{task.subtitle}</span>
-                            </td>
-                            <td>
-                              <Badge tone={pill.tone}>{pill.label}</Badge>
-                            </td>
-                          </motion.tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              {(data.important_tasks ?? []).length === 0 ? (
+                <div className="db-tasks__empty" role="status">
+                  <IconClipboard size={22} />
+                  <strong>لا مهام عاجلة حالياً</strong>
+                  <span>كل شيء ضمن الصلاحيات المتاحة تحت السيطرة</span>
+                </div>
+              ) : (
+                <ul className="db-tasks">
+                  {(data.important_tasks ?? []).map((task, i) => {
+                    const pill = severityPill(task.severity, task.due_on)
+                    return (
+                      <motion.li
+                        key={task.id}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.03 * i, type: 'spring', stiffness: 380, damping: 28 }}
+                      >
+                        <button
+                          type="button"
+                          className={`db-task db-task--${task.severity}`}
+                          onClick={() => navigate(task.href)}
+                        >
+                          <span className="db-task__rail" aria-hidden />
+                          <span className="db-task__ico" aria-hidden>
+                            {taskIcon(task.rule)}
+                          </span>
+                          <span className="db-task__body">
+                            <strong>{task.title}</strong>
+                            <span className="db-task__sub">{task.subtitle}</span>
+                          </span>
+                          <span className="db-task__meta">
+                            <Badge tone={pill.tone}>{pill.label}</Badge>
+                            {task.due_on ? (
+                              <time className="db-task__due tabular-nums" dateTime={task.due_on}>
+                                {formatDayShort(task.due_on)}
+                              </time>
+                            ) : null}
+                          </span>
+                        </button>
+                      </motion.li>
+                    )
+                  })}
+                </ul>
+              )}
             </CardContent>
           </Card>
         </motion.div>

@@ -131,12 +131,36 @@ class VehicleController extends Controller
                         ->where('planned_ends_at', '>=', $from)
                         ->where('planned_ends_at', '<=', $until);
                 });
+            } elseif ($status === 'license_expiring') {
+                $within = max(0, (int) $request->integer('within_days', 30));
+                $until = now()->addDays($within)->toDateString();
+                $q->whereHas('documents', function ($d) use ($until) {
+                    $this->constrainLicenseDocuments($d)
+                        ->whereNotNull('expires_on')
+                        ->whereDate('expires_on', '<=', $until);
+                });
+            } elseif ($status === 'sim_recharge') {
+                $within = max(0, (int) $request->integer('within_days', 14));
+                $until = now()->addDays($within)->toDateString();
+                $q->whereNotNull('tracker_sim_next_recharge_on')
+                    ->whereDate('tracker_sim_next_recharge_on', '<=', $until);
+            } elseif ($status === 'owner_agreement_expiring') {
+                $within = max(0, (int) $request->integer('within_days', 30));
+                $until = now()->addDays($within)->toDateString();
+                $q->whereNotNull('owner_agreement_ends_on')
+                    ->whereDate('owner_agreement_ends_on', '<=', $until);
             }
         }
 
-        $q->with(['owner:id,full_name,phone', 'contracts' => function ($c) {
-            $c->where('status', 'active')->latest('planned_ends_at');
-        }]);
+        $q->with([
+            'owner:id,full_name,phone',
+            'contracts' => function ($c) {
+                $c->where('status', 'active')->latest('planned_ends_at');
+            },
+            'documents' => function ($d) {
+                $this->constrainLicenseDocuments($d)->orderByDesc('id');
+            },
+        ]);
         $rows = $q->paginate((int) $request->integer('per_page', 50));
 
         $data = collect($rows->items())->map(function (Vehicle $v) {
@@ -465,12 +489,21 @@ class VehicleController extends Controller
             'purchase_value_estimate' => $v->purchase_value_estimate,
             'tracker_device_number' => $v->tracker_device_number,
             'tracker_sim_number' => $v->tracker_sim_number,
+            'tracker_sim_last_recharged_on' => $v->tracker_sim_last_recharged_on?->toDateString(),
+            'tracker_sim_next_recharge_on' => $v->tracker_sim_next_recharge_on?->toDateString(),
+            'tracker_sim_recharge_cycle_days' => $v->tracker_sim_recharge_cycle_days !== null
+                ? (int) $v->tracker_sim_recharge_cycle_days
+                : null,
             'manual_status' => $v->manual_status,
             'is_active' => $v->is_active,
             'status' => $status,
             'owner_id' => $v->owner_id !== null ? (int) $v->owner_id : null,
             'owner_monthly_amount' => $v->owner_monthly_amount !== null ? (int) $v->owner_monthly_amount : null,
             'owner_since' => $v->owner_since?->toDateString(),
+            'owner_agreement_starts_on' => $v->owner_agreement_starts_on?->toDateString(),
+            'owner_agreement_ends_on' => $v->owner_agreement_ends_on?->toDateString(),
+            'owner_agreement_number' => $v->owner_agreement_number,
+            'owner_agreement_notes' => $v->owner_agreement_notes,
             'owner' => $v->relationLoaded('owner') && $v->owner ? [
                 'id' => $v->owner->id,
                 'full_name' => $v->owner->full_name,
@@ -480,9 +513,49 @@ class VehicleController extends Controller
             'documents' => $v->relationLoaded('documents') ? $v->documents : null,
             'notes' => $v->notes,
             'active_contract_ends_at' => $this->activeContractEndsAt($v),
+            'license_expires_on' => $this->licenseExpiresOn($v),
             'created_at' => $v->created_at?->toIso8601String(),
             'updated_at' => $v->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\VehicleDocument>|\Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\VehicleDocument, \App\Models\Vehicle>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\VehicleDocument>|\Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\VehicleDocument, \App\Models\Vehicle>
+     */
+    private function constrainLicenseDocuments($query)
+    {
+        return $query->where(function ($qq) {
+            $qq->where('type', 'رخصة تسيير')
+                ->orWhere('type', 'like', '%رخص%')
+                ->orWhere('type', 'like', '%license%');
+        });
+    }
+
+    private function licenseExpiresOn(Vehicle $v): ?string
+    {
+        if ($v->relationLoaded('documents')) {
+            $license = $v->documents->first(function ($doc) {
+                $type = (string) ($doc->type ?? '');
+
+                return $type === 'رخصة تسيير'
+                    || str_contains($type, 'رخص')
+                    || str_contains(mb_strtolower($type), 'license');
+            });
+
+            return $license?->expires_on?->toDateString();
+        }
+
+        $license = $v->documents()
+            ->where(function ($qq) {
+                $qq->where('type', 'رخصة تسيير')
+                    ->orWhere('type', 'like', '%رخص%')
+                    ->orWhere('type', 'like', '%license%');
+            })
+            ->orderByDesc('id')
+            ->first();
+
+        return $license?->expires_on?->toDateString();
     }
 
     private function activeContractEndsAt(Vehicle $v): ?string
@@ -504,13 +577,46 @@ class VehicleController extends Controller
     private function summary(): array
     {
         $all = Vehicle::query()->where('is_active', true)->get();
-        $counts = ['total' => $all->count(), 'available' => 0, 'rented' => 0, 'reserved' => 0, 'maintenance' => 0];
+        $counts = [
+            'total' => $all->count(),
+            'available' => 0,
+            'rented' => 0,
+            'reserved' => 0,
+            'maintenance' => 0,
+            'license_expiring' => 0,
+            'sim_recharge' => 0,
+            'owner_agreement_expiring' => 0,
+        ];
         foreach ($all as $v) {
             $status = $this->present($v)['status'];
-            if (isset($counts[$status])) {
+            if (isset($counts[$status]) && ! in_array($status, ['license_expiring', 'sim_recharge', 'owner_agreement_expiring'], true)) {
                 $counts[$status]++;
             }
         }
+
+        $licenseUntil = now()->addDays(30)->toDateString();
+        $counts['license_expiring'] = Vehicle::query()
+            ->where('is_active', true)
+            ->whereHas('documents', function ($d) use ($licenseUntil) {
+                $this->constrainLicenseDocuments($d)
+                    ->whereNotNull('expires_on')
+                    ->whereDate('expires_on', '<=', $licenseUntil);
+            })
+            ->count();
+
+        $simUntil = now()->addDays(14)->toDateString();
+        $counts['sim_recharge'] = Vehicle::query()
+            ->where('is_active', true)
+            ->whereNotNull('tracker_sim_next_recharge_on')
+            ->whereDate('tracker_sim_next_recharge_on', '<=', $simUntil)
+            ->count();
+
+        $agreementUntil = now()->addDays(30)->toDateString();
+        $counts['owner_agreement_expiring'] = Vehicle::query()
+            ->where('is_active', true)
+            ->whereNotNull('owner_agreement_ends_on')
+            ->whereDate('owner_agreement_ends_on', '<=', $agreementUntil)
+            ->count();
 
         return $counts;
     }

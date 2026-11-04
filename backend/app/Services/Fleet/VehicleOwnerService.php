@@ -32,8 +32,6 @@ class VehicleOwnerService
             'national_id' => $data['national_id'] ?? null,
             'id_front_path' => $data['id_front_path'] ?? null,
             'id_back_path' => $data['id_back_path'] ?? null,
-            'license_front_path' => $data['license_front_path'] ?? null,
-            'license_back_path' => $data['license_back_path'] ?? null,
             'notes' => $data['notes'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ]);
@@ -44,6 +42,12 @@ class VehicleOwnerService
      */
     public function updateOwner(VehicleOwner $owner, array $data): VehicleOwner
     {
+        unset(
+            $data['license_front_path'],
+            $data['license_back_path'],
+            $data['license_number'],
+            $data['license_expires_on'],
+        );
         $owner->update($data);
 
         return $owner->fresh();

@@ -25,10 +25,10 @@ use App\Http\Controllers\Api\VehicleAssetController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\ViolationController;
+use App\Http\Controllers\Api\ViolationInquiryController;
 use App\Http\Controllers\Api\WorkOrderController;
 use App\Models\Notification;
 use App\Models\TenantSetting;
-use App\Services\Operations\WaitlistService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -241,27 +241,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/violations/{violation}', [ViolationController::class, 'update'])->middleware('permission:violations.update');
     Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment'])->middleware('permission:violations.update');
 
-    Route::middleware(['feature:waitlist', 'permission:waitlist.view'])->get('/waitlist', function (WaitlistService $service) {
-        return response()->json(['data' => $service->list()]);
-    });
-    Route::middleware(['feature:waitlist', 'permission:waitlist.create'])->post('/waitlist', function (Request $request, WaitlistService $service) {
-        $data = $request->validate([
-            'customer_id' => ['required', 'exists:customers,id'],
-            'category' => ['required', 'string'],
-            'preferred_vehicle_id' => ['nullable', 'exists:vehicles,id'],
-            'desired_start' => ['nullable', 'date'],
-            'desired_end' => ['nullable', 'date'],
-            'priority' => ['nullable', 'integer'],
-            'notes' => ['nullable', 'string'],
-        ], [], [
-            'customer_id' => 'العميل',
-            'category' => 'الفئة المطلوبة',
-        ]);
-
-        $row = $service->create($data, (int) $request->user()->id);
-
-        return response()->json(['data' => $row, 'message' => 'تم إضافة طلب الانتظار.'], 201);
-    });
+    Route::get('/violation-inquiries', [ViolationInquiryController::class, 'index'])->middleware('permission:violations.view');
+    Route::post('/violation-inquiries/{vehicle}/mark', [ViolationInquiryController::class, 'mark'])->middleware('permission:violations.update');
 
     Route::middleware(['feature:chat'])->group(function () {
         Route::get('/chat', [CollaborationController::class, 'chatIndex'])->middleware('permission:chat.view');

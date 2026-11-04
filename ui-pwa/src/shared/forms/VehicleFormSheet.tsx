@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { BrandSelectField } from '@/shared/forms/BrandSelectField'
 import {
   Button, Sheet, TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
-  PlateField, splitPlate, useToast,
+  MediaUpload, PlateField, splitPlate, useToast,
 } from '@/shared/ui'
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
@@ -33,10 +33,17 @@ export type VehicleFormInitial = {
   purchase_value_estimate?: number | string | null
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
+  tracker_sim_last_recharged_on?: string | null
+  tracker_sim_next_recharge_on?: string | null
+  tracker_sim_recharge_cycle_days?: number | string | null
   notes?: string | null
   is_active?: boolean | null
   owner_id?: number | string | null
   owner_monthly_amount?: number | string | null
+  owner_agreement_starts_on?: string | null
+  owner_agreement_ends_on?: string | null
+  owner_agreement_number?: string | null
+  owner_agreement_notes?: string | null
 }
 
 type Props = {
@@ -70,6 +77,9 @@ type FormState = {
   purchase_value_estimate: string
   tracker_device_number: string
   tracker_sim_number: string
+  tracker_sim_last_recharged_on: string
+  tracker_sim_next_recharge_on: string
+  tracker_sim_recharge_cycle_days: string
   notes: string
   is_active: boolean
   owner_id: string
@@ -79,10 +89,17 @@ type FormState = {
   owner_phone: string
   owner_national_id: string
   owner_notes: string
+  owner_agreement_starts_on: string
+  owner_agreement_ends_on: string
+  owner_agreement_number: string
+  owner_agreement_notes: string
   has_license: boolean
+  license_number: string
   license_expires_on: string
   license_issued_on: string
   license_status: 'none' | 'active' | 'expired'
+  license_file_path: string
+  license_file_path_back: string
 }
 
 function emptyForm(): FormState {
@@ -108,6 +125,9 @@ function emptyForm(): FormState {
     purchase_value_estimate: '',
     tracker_device_number: '',
     tracker_sim_number: '',
+    tracker_sim_last_recharged_on: '',
+    tracker_sim_next_recharge_on: '',
+    tracker_sim_recharge_cycle_days: '30',
     notes: '',
     is_active: true,
     owner_id: '',
@@ -117,10 +137,17 @@ function emptyForm(): FormState {
     owner_phone: '',
     owner_national_id: '',
     owner_notes: '',
+    owner_agreement_starts_on: '',
+    owner_agreement_ends_on: '',
+    owner_agreement_number: '',
+    owner_agreement_notes: '',
     has_license: false,
+    license_number: '',
     license_expires_on: '',
     license_issued_on: '',
     license_status: 'none',
+    license_file_path: '',
+    license_file_path_back: '',
   }
 }
 
@@ -158,12 +185,64 @@ function fromInitial(initial?: VehicleFormInitial | null): FormState {
     purchase_value_estimate: str(initial.purchase_value_estimate),
     tracker_device_number: str(initial.tracker_device_number),
     tracker_sim_number: str(initial.tracker_sim_number),
+    tracker_sim_last_recharged_on: initial.tracker_sim_last_recharged_on
+      ? String(initial.tracker_sim_last_recharged_on).slice(0, 10)
+      : '',
+    tracker_sim_next_recharge_on: initial.tracker_sim_next_recharge_on
+      ? String(initial.tracker_sim_next_recharge_on).slice(0, 10)
+      : '',
+    tracker_sim_recharge_cycle_days: str(initial.tracker_sim_recharge_cycle_days, '30'),
     notes: str(initial.notes),
     is_active: initial.is_active !== false,
     owner_id: str(initial.owner_id),
     owner_monthly_amount: str(initial.owner_monthly_amount),
     owner_mode: initial.owner_id ? 'existing' : 'none',
+    owner_agreement_starts_on: initial.owner_agreement_starts_on
+      ? String(initial.owner_agreement_starts_on).slice(0, 10)
+      : '',
+    owner_agreement_ends_on: initial.owner_agreement_ends_on
+      ? String(initial.owner_agreement_ends_on).slice(0, 10)
+      : '',
+    owner_agreement_number: str(initial.owner_agreement_number),
+    owner_agreement_notes: str(initial.owner_agreement_notes),
   }
+}
+
+function ownerAgreementFields(
+  form: FormState,
+  setForm: (next: FormState) => void,
+  errors: Record<string, string>,
+) {
+  return (
+    <>
+      <TextField
+        label="بداية عقد المالك"
+        type="date"
+        value={form.owner_agreement_starts_on}
+        error={errors.owner_agreement_starts_on}
+        onChange={(e) => setForm({ ...form, owner_agreement_starts_on: e.target.value })}
+      />
+      <TextField
+        label="نهاية عقد المالك"
+        type="date"
+        value={form.owner_agreement_ends_on}
+        error={errors.owner_agreement_ends_on}
+        onChange={(e) => setForm({ ...form, owner_agreement_ends_on: e.target.value })}
+        hint="يُنبَّه يومياً قبل الانتهاء بشهر"
+      />
+      <TextField
+        label="رقم عقد المالك"
+        value={form.owner_agreement_number}
+        onChange={(e) => setForm({ ...form, owner_agreement_number: e.target.value })}
+      />
+      <TextAreaField
+        label="تفاصيل عقد المالك"
+        value={form.owner_agreement_notes}
+        onChange={(e) => setForm({ ...form, owner_agreement_notes: e.target.value })}
+        hint="مدة العقد · شروط التسليم · أي ملاحظات مهمة عند الانتهاء"
+      />
+    </>
+  )
 }
 
 /**
@@ -188,15 +267,29 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
     setSelectedAddons([])
     const next = mode === 'edit' ? fromInitial(initial) : emptyForm()
     if (mode === 'edit' && initial) {
-      const docs = (initial as VehicleFormInitial & { documents?: Array<{ type?: string; expires_on?: string | null; issued_on?: string | null }> }).documents || []
+      const docs = (initial as VehicleFormInitial & {
+        documents?: Array<{
+          type?: string
+          document_number?: string | null
+          expires_on?: string | null
+          issued_on?: string | null
+          file_path?: string | null
+          file_path_back?: string | null
+        }>
+      }).documents || []
       const lic = docs.find((d) => /رخص|license/i.test(d.type || ''))
       if (lic) {
         const exp = lic.expires_on ? String(lic.expires_on).slice(0, 10) : ''
         const expired = Boolean(exp && exp < new Date().toISOString().slice(0, 10))
         next.has_license = true
+        next.license_number = lic.document_number ? String(lic.document_number) : ''
         next.license_expires_on = exp
         next.license_issued_on = lic.issued_on ? String(lic.issued_on).slice(0, 10) : ''
         next.license_status = expired ? 'expired' : 'active'
+        next.license_file_path = lic.file_path && !String(lic.file_path).startsWith('manual/')
+          ? String(lic.file_path)
+          : ''
+        next.license_file_path_back = lic.file_path_back ? String(lic.file_path_back) : ''
       }
     }
     setForm(next)
@@ -255,6 +348,11 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       target_monthly_income: form.target_monthly_income !== '' ? Number(form.target_monthly_income) : null,
       tracker_device_number: form.tracker_device_number || null,
       tracker_sim_number: form.tracker_sim_number || null,
+      tracker_sim_last_recharged_on: form.tracker_sim_last_recharged_on || null,
+      tracker_sim_next_recharge_on: form.tracker_sim_next_recharge_on || null,
+      tracker_sim_recharge_cycle_days: form.tracker_sim_recharge_cycle_days !== ''
+        ? Number(form.tracker_sim_recharge_cycle_days)
+        : null,
       notes: form.notes || null,
       is_active: form.is_active,
     }
@@ -269,8 +367,11 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       payload.addon_ids = selectedAddons
       payload.license = {
         has_license: form.has_license,
+        document_number: form.has_license && form.license_number ? form.license_number : null,
         expires_on: form.has_license && form.license_expires_on ? form.license_expires_on : null,
         issued_on: form.has_license && form.license_issued_on ? form.license_issued_on : null,
+        file_path: form.has_license && form.license_file_path ? form.license_file_path : null,
+        file_path_back: form.has_license && form.license_file_path_back ? form.license_file_path_back : null,
         notes: form.has_license
           ? (form.license_status === 'expired' ? 'رخصة منتهية' : (form.license_status === 'active' ? 'رخصة سارية' : null))
           : 'بدون رخصة تسيير',
@@ -279,6 +380,10 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         if (form.owner_mode === 'existing' && form.owner_id) {
           payload.owner_id = Number(form.owner_id)
           payload.owner_monthly_amount = form.owner_monthly_amount !== '' ? Number(form.owner_monthly_amount) : null
+          payload.owner_agreement_starts_on = form.owner_agreement_starts_on || null
+          payload.owner_agreement_ends_on = form.owner_agreement_ends_on || null
+          payload.owner_agreement_number = form.owner_agreement_number || null
+          payload.owner_agreement_notes = form.owner_agreement_notes || null
         } else if (form.owner_mode === 'new') {
           payload.owner_inline = {
             full_name: form.owner_full_name,
@@ -287,6 +392,10 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
             notes: form.owner_notes || null,
           }
           payload.owner_monthly_amount = form.owner_monthly_amount !== '' ? Number(form.owner_monthly_amount) : null
+          payload.owner_agreement_starts_on = form.owner_agreement_starts_on || null
+          payload.owner_agreement_ends_on = form.owner_agreement_ends_on || null
+          payload.owner_agreement_number = form.owner_agreement_number || null
+          payload.owner_agreement_notes = form.owner_agreement_notes || null
         }
         const res = await api<{ data: { id: number } }>('/vehicles', { method: 'POST', json: payload })
         toast.success('تم إضافة العربية.')
@@ -298,6 +407,17 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         payload.owner_monthly_amount = form.owner_id && form.owner_monthly_amount !== ''
           ? Number(form.owner_monthly_amount)
           : null
+        if (form.owner_id) {
+          payload.owner_agreement_starts_on = form.owner_agreement_starts_on || null
+          payload.owner_agreement_ends_on = form.owner_agreement_ends_on || null
+          payload.owner_agreement_number = form.owner_agreement_number || null
+          payload.owner_agreement_notes = form.owner_agreement_notes || null
+        } else {
+          payload.owner_agreement_starts_on = null
+          payload.owner_agreement_ends_on = null
+          payload.owner_agreement_number = null
+          payload.owner_agreement_notes = null
+        }
         await api(`/vehicles/${vehicleId}`, { method: 'PUT', json: payload })
         toast.success('تم تحديث العربية.')
         onClose()
@@ -369,6 +489,35 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         <MoneyField label="المستهدف الشهري" value={form.target_monthly_income} onChange={(e) => setForm({ ...form, target_monthly_income: e.target.value })} />
         <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
         <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
+        <TextField
+          label="آخر شحن للشريحة"
+          type="date"
+          value={form.tracker_sim_last_recharged_on}
+          onChange={(e) => {
+            const last = e.target.value
+            const cycle = Number(form.tracker_sim_recharge_cycle_days) || 30
+            let next = form.tracker_sim_next_recharge_on
+            if (last) {
+              const d = new Date(`${last}T12:00:00`)
+              d.setDate(d.getDate() + cycle)
+              next = d.toISOString().slice(0, 10)
+            }
+            setForm({ ...form, tracker_sim_last_recharged_on: last, tracker_sim_next_recharge_on: next })
+          }}
+          hint="عند التعديل يُحسب ميعاد الشحن القادم من دورة الشحن"
+        />
+        <TextField
+          label="ميعاد الشحن القادم"
+          type="date"
+          value={form.tracker_sim_next_recharge_on}
+          onChange={(e) => setForm({ ...form, tracker_sim_next_recharge_on: e.target.value })}
+        />
+        <NumberField
+          label="دورة الشحن بالأيام"
+          value={form.tracker_sim_recharge_cycle_days}
+          onChange={(e) => setForm({ ...form, tracker_sim_recharge_cycle_days: e.target.value })}
+          hint="افتراضي 30 — تُستخدم عند تسجيل شحن جديد"
+        />
 
         {mode === 'create' ? (
           <>
@@ -403,11 +552,14 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
               </>
             ) : null}
             {form.owner_mode !== 'none' ? (
-              <MoneyField
-                label="المبلغ الشهري للمالك"
-                value={form.owner_monthly_amount}
-                onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })}
-              />
+              <>
+                <MoneyField
+                  label="المبلغ الشهري للمالك"
+                  value={form.owner_monthly_amount}
+                  onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })}
+                />
+                {ownerAgreementFields(form, setForm, errors)}
+              </>
             ) : null}
           </>
         ) : (
@@ -422,7 +574,10 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
               ]}
             />
             {form.owner_id ? (
-              <MoneyField label="المبلغ الشهري للمالك" required value={form.owner_monthly_amount} onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })} />
+              <>
+                <MoneyField label="المبلغ الشهري للمالك" required value={form.owner_monthly_amount} onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })} />
+                {ownerAgreementFields(form, setForm, errors)}
+              </>
             ) : null}
           </>
         )}
@@ -456,6 +611,12 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
           />
           {form.has_license ? (
             <div className="rpm-form-grid" style={{ marginBlockStart: '0.5rem' }}>
+              <TextField
+                label="رقم الرخصة"
+                value={form.license_number}
+                error={errors['license.document_number']}
+                onChange={(e) => setForm({ ...form, license_number: e.target.value })}
+              />
               <SelectField
                 label="حالة الرخصة"
                 value={form.license_status === 'none' ? 'active' : form.license_status}
@@ -487,6 +648,29 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
                 }}
                 hint="يُسمح برخصة منتهية — يُحدَّث الحالة تلقائياً"
               />
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gap: '0.75rem', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}>
+                <MediaUpload
+                  label="صورة الرخصة (وش)"
+                  value={form.license_file_path || null}
+                  collection="vehicle_docs"
+                  purpose="document"
+                  accept="image"
+                  attachableType={vehicleId ? 'vehicle' : undefined}
+                  attachableId={vehicleId}
+                  onChange={(path) => setForm((f) => ({ ...f, license_file_path: path || '' }))}
+                  hint={mode === 'edit' ? 'عند رفع صورة جديدة تُحفظ الرخصة السابقة في السجل التاريخي' : undefined}
+                />
+                <MediaUpload
+                  label="صورة الرخصة (ضهر)"
+                  value={form.license_file_path_back || null}
+                  collection="vehicle_docs"
+                  purpose="document"
+                  accept="image"
+                  attachableType={vehicleId ? 'vehicle' : undefined}
+                  attachableId={vehicleId}
+                  onChange={(path) => setForm((f) => ({ ...f, license_file_path_back: path || '' }))}
+                />
+              </div>
             </div>
           ) : (
             <p className="muted" style={{ marginBlockStart: '0.35rem' }}>يمكن إضافة العربية بدون رخصة تسيير وتسجيلها لاحقاً من ملف العربية.</p>
