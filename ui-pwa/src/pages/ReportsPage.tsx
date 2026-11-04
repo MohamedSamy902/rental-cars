@@ -10,6 +10,7 @@ import {
   IconCash, IconReturn, IconTrend, IconWallet, IconClipboard, IconCheck, IconUsers, IconBan, IconAlert,
   type BadgeTone,
 } from '@/shared/ui'
+import { contractStatusLabel } from '@/shared/lib/statusLabels'
 import './pages.css'
 import './ReportsPage.css'
 
@@ -103,12 +104,13 @@ function ymLabel(ym: string) {
 
 function contractStatusMeta(status: string): { label: string; tone: BadgeTone; key: string } {
   const key = (status || '').toLowerCase()
-  if (key === 'pending') return { label: 'معلّق', tone: 'warning', key: 'pending' }
-  if (key === 'approved' || key === 'confirmed') return { label: 'معتمد', tone: 'steel', key: 'approved' }
-  if (key === 'active' || key === 'handed_over') return { label: 'نشط / مسلّم', tone: 'success', key: 'active' }
-  if (key === 'completed' || key === 'returned' || key === 'closed') return { label: 'مكتمل', tone: 'muted', key: 'completed' }
-  if (key === 'cancelled' || key === 'canceled') return { label: 'ملغي', tone: 'danger', key: 'cancelled' }
-  return { label: status || '—', tone: 'muted', key: key || 'muted' }
+  const label = contractStatusLabel[key] || contractStatusLabel[status] || status || '—'
+  if (key === 'pending') return { label, tone: 'warning', key: 'pending' }
+  if (key === 'approved' || key === 'confirmed') return { label, tone: 'steel', key: 'approved' }
+  if (key === 'active' || key === 'handed_over') return { label, tone: 'success', key: 'active' }
+  if (key === 'completed' || key === 'returned' || key === 'closed') return { label, tone: 'muted', key: 'completed' }
+  if (key === 'cancelled' || key === 'canceled') return { label, tone: 'danger', key: 'cancelled' }
+  return { label, tone: 'muted', key: key || 'muted' }
 }
 
 function esc(s: string) {

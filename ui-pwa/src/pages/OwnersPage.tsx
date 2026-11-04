@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { debounceAbortable } from '@/shared/lib/debounceAbort'
 import { formatMoney } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
@@ -71,24 +72,28 @@ export function OwnersPage() {
     [rows, chip],
   )
 
-  async function load() {
+  async function load(signal?: AbortSignal) {
     setLoading(true)
     try {
       const qs = new URLSearchParams()
       if (search.trim()) qs.set('search', search.trim())
-      const res = await api<{ data: Owner[] }>(`/owners?${qs}`)
+      const res = await api<{ data: Owner[] }>(`/owners?${qs}`, { signal })
+      if (signal?.aborted) return
       setRows(res.data)
     } catch (e) {
+      if (signal?.aborted) return
       toast.error((e as ApiError).message)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }
 
+  const searchDebounce = useMemo(() => debounceAbortable(250), [])
+
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 250)
-    return () => window.clearTimeout(t)
-  }, [search])
+    searchDebounce.schedule((signal) => load(signal))
+    return () => searchDebounce.cancel()
+  }, [search, searchDebounce])
 
   function mapApiErrors(e: unknown) {
     const apiErr = e as ApiError

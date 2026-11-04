@@ -4,6 +4,7 @@ import { api } from '@/shared/api/client'
 import { formatTime } from '@/shared/lib/format'
 import { PageHeader, StatusPill, SkeletonBlock, IconChevron } from '@/shared/ui'
 import { useIsMobile } from '@/shared/ui/useSheetDrag'
+import { contractStatusLabel } from '@/shared/lib/statusLabels'
 import './CalendarPage.css'
 
 type Contract = {
@@ -14,13 +15,6 @@ type Contract = {
   planned_ends_at: string
   customer?: { full_name: string }
   vehicle?: { brand: string; model: string; plate: string }
-}
-
-const statusLabel: Record<string, string> = {
-  pending: 'معلّق',
-  approved: 'معتمد',
-  active: 'نشط',
-  completed: 'مكتمل',
 }
 
 const WEEKDAYS = ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'] // سبت → جمعة
@@ -201,7 +195,7 @@ export function CalendarPage() {
                           key={e.id}
                           type="button"
                           className={`cal-chip is-${e.status} ${focusId === e.id ? 'is-focus' : ''}`}
-                          title={`${e.number} · ${e.customer?.full_name || ''} · ${statusLabel[e.status] || e.status}`}
+                          title={`${e.number} · ${e.customer?.full_name || ''} · ${contractStatusLabel[e.status] || e.status}`}
                           onClick={() => pickDay(day, e.id)}
                         >
                           <span className="cal-chip__text">{shortLabel(e)}</span>
@@ -256,7 +250,7 @@ export function CalendarPage() {
               >
                 <div className="cal-event__top">
                   <strong className="tabular-nums">{b.number}</strong>
-                  <StatusPill status={b.status} label={statusLabel[b.status] || b.status} />
+                  <StatusPill status={b.status} label={contractStatusLabel[b.status] || b.status} />
                 </div>
                 <p className="cal-event__who">{b.customer?.full_name}</p>
                 <dl className="cal-event__meta">

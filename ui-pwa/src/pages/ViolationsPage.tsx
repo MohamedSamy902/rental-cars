@@ -6,6 +6,7 @@ import {
   PageHeader, FilterBar, Button, Sheet, Fab, SelectField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck, IconEdit,
   MediaUpload, type DataColumn,
 } from '@/shared/ui'
+import { violationStatusLabel } from '@/shared/lib/statusLabels'
 import './pages.css'
 
 type Violation = {
@@ -54,10 +55,6 @@ function contractLabel(c: ContractOption): string {
     ? `${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}`.trim()
     : ''
   return car ? `${no} · ${customer} · ${day} (${car})` : `${no} · ${customer} · ${day}`
-}
-
-const statusLabel: Record<string, string> = {
-  new: 'جديدة', assigned: 'مسندة', confirmed: 'مؤكّد السداد', paid: 'مدفوعة للجهة',
 }
 
 const emptyForm = () => ({
@@ -142,7 +139,7 @@ export function ViolationsPage() {
     {
       id: 'status',
       header: 'الحالة',
-      cell: (r) => <StatusPill status={r.status === 'confirmed' ? 'completed' : 'pending'} label={statusLabel[r.status] || r.status} />,
+      cell: (r) => <StatusPill status={r.status === 'confirmed' ? 'completed' : 'pending'} label={violationStatusLabel[r.status] || r.status} />,
       sortValue: (r) => r.status,
       mobile: 'badge',
     },
@@ -153,6 +150,8 @@ export function ViolationsPage() {
     try {
       const res = await api<{ data: Violation[] }>('/violations')
       setRows(res.data)
+    } catch (e) {
+      toast.error((e as ApiError).message)
     } finally {
       setLoading(false)
     }
@@ -362,10 +361,10 @@ export function ViolationsPage() {
               value={form.status}
               error={fieldErrors.status}
               options={[
-                { value: 'new', label: statusLabel.new },
-                { value: 'assigned', label: statusLabel.assigned },
-                { value: 'confirmed', label: statusLabel.confirmed },
-                { value: 'paid', label: statusLabel.paid },
+                { value: 'new', label: violationStatusLabel.new },
+                { value: 'assigned', label: violationStatusLabel.assigned },
+                { value: 'confirmed', label: violationStatusLabel.confirmed },
+                { value: 'paid', label: violationStatusLabel.paid },
               ]}
               onChange={(e) => setForm({ ...form, status: e.target.value })}
             />

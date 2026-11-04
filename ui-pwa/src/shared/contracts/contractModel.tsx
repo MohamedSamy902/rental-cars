@@ -101,9 +101,7 @@ export type VehicleOption = { id: number; brand: string; model: string; plate: s
 
 export type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposit' | 'deduct' | 'refund' | null
 
-export const statusLabel: Record<string, string> = {
-  pending: 'معلّق', approved: 'معتمد', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغى',
-}
+export { contractStatusLabel as statusLabel } from '@/shared/lib/statusLabels'
 
 export const depositLabel: Record<string, { label: string; tone: 'success' | 'warning' | 'steel' | 'muted' | 'danger' }> = {
   received: { label: 'مقبوض', tone: 'success' },

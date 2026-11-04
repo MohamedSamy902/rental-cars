@@ -7,6 +7,7 @@ import {
   IconCheck, IconWrench, IconCash, type DataColumn,
 } from '@/shared/ui'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
+import { workOrderStatusLabel } from '@/shared/lib/statusLabels'
 import './pages.css'
 
 type WorkOrder = {
@@ -16,10 +17,6 @@ type WorkOrder = {
   parts_cost: number
   labor_cost: number
   vehicle?: { brand: string; model: string; plate: string }
-}
-
-const statusLabel: Record<string, string> = {
-  open: 'مفتوح', in_progress: 'قيد التنفيذ', closed: 'مغلق', cancelled: 'ملغى',
 }
 
 const columns: DataColumn<WorkOrder>[] = [
@@ -41,7 +38,7 @@ const columns: DataColumn<WorkOrder>[] = [
   {
     id: 'status',
     header: 'الحالة',
-    cell: (r) => <StatusPill status={r.status === 'closed' ? 'completed' : 'maintenance'} label={statusLabel[r.status] || r.status} />,
+    cell: (r) => <StatusPill status={r.status === 'closed' ? 'completed' : 'maintenance'} label={workOrderStatusLabel[r.status] || r.status} />,
     sortValue: (r) => r.status,
     mobile: 'badge',
   },
