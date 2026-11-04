@@ -377,6 +377,15 @@ class DemoSeeder extends Seeder
                 'owner_monthly_amount' => 8500
             ]
         ];
+        // اربط باقي الأسطول النشط بنفس المالك إن لم يكن له مالك — لشاشة استعلامات المخالفات
+        Vehicle::query()
+            ->where('is_active', true)
+            ->whereNull('owner_id')
+            ->update([
+                'owner_id' => $owner->id,
+                'owner_since' => now()->subMonths(2)->toDateString(),
+            ]);
+
         foreach ($ownerVehicles as $row) {
             $v = Vehicle::query()->updateOrCreate(
                 ['code' => $row['code']],
