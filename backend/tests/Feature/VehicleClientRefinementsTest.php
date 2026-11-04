@@ -76,6 +76,62 @@ class VehicleClientRefinementsTest extends TestCase
         $this->assertTrue($names->contains('لاند روفر'));
     }
 
+    public function test_sim_recharge_filter_and_fields(): void
+    {
+        $due = Vehicle::query()->create([
+            'code' => 'VEH-SIM-1',
+            'plate' => 'س ج 9001',
+            'brand' => 'تويوتا',
+            'model' => 'كورولا',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 700,
+            'default_deposit' => 1500,
+            'is_active' => true,
+            'tracker_sim_number' => '01001234567',
+            'tracker_sim_last_recharged_on' => now()->subDays(25)->toDateString(),
+            'tracker_sim_next_recharge_on' => now()->addDays(5)->toDateString(),
+            'tracker_sim_recharge_cycle_days' => 30,
+        ]);
+        $later = Vehicle::query()->create([
+            'code' => 'VEH-SIM-2',
+            'plate' => 'س ج 9002',
+            'brand' => 'هيونداي',
+            'model' => 'إلنترا',
+            'year' => 2021,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 2000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 750,
+            'default_deposit' => 1500,
+            'is_active' => true,
+            'tracker_sim_number' => '01007654321',
+            'tracker_sim_next_recharge_on' => now()->addDays(40)->toDateString(),
+            'tracker_sim_recharge_cycle_days' => 30,
+        ]);
+
+        $res = $this->getJson('/api/vehicles?status=sim_recharge&within_days=14')->assertOk();
+        $ids = collect($res->json('data'))->pluck('id')->all();
+        $this->assertContains($due->id, $ids);
+        $this->assertNotContains($later->id, $ids);
+        $row = collect($res->json('data'))->firstWhere('id', $due->id);
+        $this->assertSame('01001234567', $row['tracker_sim_number'] ?? null);
+        $this->assertSame(now()->addDays(5)->toDateString(), $row['tracker_sim_next_recharge_on'] ?? null);
+        $this->assertGreaterThanOrEqual(1, (int) $res->json('summary.sim_recharge'));
+
+        $this->putJson("/api/vehicles/{$due->id}", [
+            'tracker_sim_last_recharged_on' => now()->toDateString(),
+            'tracker_sim_next_recharge_on' => now()->addDays(30)->toDateString(),
+            'tracker_sim_recharge_cycle_days' => 30,
+        ])->assertOk()
+            ->assertJsonPath('data.tracker_sim_last_recharged_on', now()->toDateString())
+            ->assertJsonPath('data.tracker_sim_next_recharge_on', now()->addDays(30)->toDateString());
+    }
+
     public function test_license_expiring_filter_lists_vehicles_within_window(): void
     {
         $soon = Vehicle::query()->create([

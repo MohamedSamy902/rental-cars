@@ -16,6 +16,7 @@ class Vehicle extends Model
         'category', 'engine_capacity', 'transmission', 'fuel_type', 'seats', 'odometer',
         'odometer_source', 'daily_rate', 'default_deposit', 'target_monthly_income',
         'purchase_value_estimate', 'tracker_device_number', 'tracker_sim_number',
+        'tracker_sim_last_recharged_on', 'tracker_sim_next_recharge_on', 'tracker_sim_recharge_cycle_days',
         'notes', 'is_active', 'manual_status', 'branch_id',
         'owner_id', 'owner_monthly_amount', 'owner_since',
     ];
@@ -30,6 +31,9 @@ class Vehicle extends Model
             'default_deposit' => 'integer',
             'owner_monthly_amount' => 'integer',
             'owner_since' => 'date',
+            'tracker_sim_last_recharged_on' => 'date',
+            'tracker_sim_next_recharge_on' => 'date',
+            'tracker_sim_recharge_cycle_days' => 'integer',
         ];
     }
 

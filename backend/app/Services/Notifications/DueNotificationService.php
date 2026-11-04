@@ -99,6 +99,7 @@ class DueNotificationService
             $this->violationAlerts($scanned),
             $this->lowStockAlerts($scanned),
             $this->documentAlerts($scanned),
+            $this->trackerSimRechargeAlerts($scanned),
             $this->maintenanceAlerts($scanned),
             $this->consumableAlerts($scanned),
             $this->tireAndBatteryAlerts($scanned),
@@ -579,6 +580,54 @@ class DueNotificationService
                 linkType: 'inventory',
                 linkId: (int) $item->id,
                 permissions: ['inventory.view'],
+            );
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * @param  list<string>  $scanned
+     * @return list<DueAlert>
+     */
+    /**
+     * @param  list<string>  $scanned
+     * @return list<DueAlert>
+     */
+    private function trackerSimRechargeAlerts(array &$scanned): array
+    {
+        if (! Schema::hasTable('vehicles') || ! Schema::hasColumn('vehicles', 'tracker_sim_next_recharge_on')) {
+            return [];
+        }
+
+        $this->mark($scanned, 'tracker_sim_recharge');
+        $deadline = now()->copy()->startOfDay()->addDays(self::LEAD_DAYS)->toDateString();
+        $alerts = [];
+
+        $vehicles = Vehicle::query()
+            ->where('is_active', true)
+            ->whereNotNull('tracker_sim_next_recharge_on')
+            ->whereDate('tracker_sim_next_recharge_on', '<=', $deadline)
+            ->get(['id', 'plate', 'code', 'tracker_sim_number', 'tracker_sim_next_recharge_on', 'tracker_sim_last_recharged_on']);
+
+        foreach ($vehicles as $vehicle) {
+            $plate = $vehicle->plate ?: ($vehicle->code ?: 'عربية');
+            $sim = $vehicle->tracker_sim_number ? " · شريحة {$vehicle->tracker_sim_number}" : '';
+            $next = $vehicle->tracker_sim_next_recharge_on?->toDateString();
+            $last = $vehicle->tracker_sim_last_recharged_on?->toDateString();
+            $body = $last
+                ? "ميعاد الشحن القادم {$next}. آخر شحن كان {$last}{$sim}."
+                : "ميعاد الشحن القادم {$next}{$sim}.";
+
+            $alerts[] = new DueAlert(
+                ruleKey: 'tracker_sim_recharge',
+                subjectType: 'vehicle',
+                subjectId: (int) $vehicle->id,
+                title: "شحن شريحة تتبع قريب: {$plate}",
+                body: $body,
+                linkType: 'vehicle',
+                linkId: (int) $vehicle->id,
+                permissions: ['vehicles.view'],
             );
         }
 

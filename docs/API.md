@@ -194,7 +194,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | وصف |
 |--------|------|-----|
-| GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&within_days=&per_page=` · `status=license_expiring` لرخص تسيير تنتهي خلال `within_days` (افتراضي ٣٠) وتشمل المنتهية · الحقل `license_expires_on` · `summary.license_expiring` لعدّ ٣٠ يوماً |
+| GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&within_days=&per_page=` · `status=license_expiring` لرخص تسيير تنتهي خلال `within_days` (افتراضي ٣٠) · `status=sim_recharge` لشرائح تتبع ميعاد شحنها خلال `within_days` (افتراضي ١٤) · الحقول `license_expires_on` · `tracker_sim_*` · `summary.license_expiring` / `summary.sim_recharge` |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
 | POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية من نموذج العربية |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
@@ -211,7 +211,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 **POST /vehicles — حقول أساسية**
 `plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit`  
 الكود: يُولَّد تلقائياً إن لم يُرسل.  
-اختياري: `chassis_number`, `engine_number`, `rental_priority`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_inline{full_name,phone,…}`, `addon_ids[]`
+اختياري: `chassis_number`, `engine_number`, `rental_priority`, `tracker_device_number`, `tracker_sim_number`, `tracker_sim_last_recharged_on`, `tracker_sim_next_recharge_on`, `tracker_sim_recharge_cycle_days`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_inline{full_name,phone,…}`, `addon_ids[]`
 
 **POST documents**
 ```json

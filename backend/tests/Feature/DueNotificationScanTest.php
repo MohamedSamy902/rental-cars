@@ -300,6 +300,13 @@ class DueNotificationScanTest extends TestCase
             'expires_at' => now()->addDays(7),
         ]);
 
+        $this->vehicle->update([
+            'tracker_sim_number' => '01009998887',
+            'tracker_sim_last_recharged_on' => now()->subDays(28)->toDateString(),
+            'tracker_sim_next_recharge_on' => now()->addDay()->toDateString(),
+            'tracker_sim_recharge_cycle_days' => 30,
+        ]);
+
         app(DueNotificationService::class)->scan();
 
         $this->assertSame(1, $this->titlesLike('صنف تحت حد التنبيه: زيت ناقص'));
@@ -315,6 +322,8 @@ class DueNotificationScanTest extends TestCase
         $this->assertSame(1, $this->titlesLike('راتب لم يُصرف: راتب معلّق'));
         $this->assertSame(0, $this->titlesLike('راتب لم يُصرف: راتب مسودة'));
         $this->assertSame(1, $this->titlesLike('تقييم معلّق: راتب معلّق'));
+        $this->assertSame(1, $this->titlesLike('شحن شريحة تتبع قريب'));
+        $this->assertSame(1, NotificationReminder::query()->where('rule_key', 'tracker_sim_recharge')->count());
         $this->assertSame(1, $this->titlesLike('سيارة متاحة لطلب انتظار'));
         $waiting->refresh();
         $this->assertSame('notified', $waiting->status);

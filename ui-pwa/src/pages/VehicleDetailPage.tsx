@@ -73,6 +73,9 @@ type Vehicle = {
   manual_status?: string | null
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
+  tracker_sim_last_recharged_on?: string | null
+  tracker_sim_next_recharge_on?: string | null
+  tracker_sim_recharge_cycle_days?: number | null
   notes?: string | null
   is_active?: boolean
   owner_id?: number | null
@@ -663,6 +666,9 @@ export function VehicleDetailPage() {
         <Fact label="نشطة" value={v.is_active === false ? 'لا' : 'نعم'} />
         <Fact label="جهاز التتبع" value={v.tracker_device_number || '—'} />
         <Fact label="شريحة التتبع" value={v.tracker_sim_number || '—'} />
+        <Fact label="آخر شحن شريحة" value={shortDate(v.tracker_sim_last_recharged_on)} />
+        <Fact label="شحن الشريحة القادم" value={shortDate(v.tracker_sim_next_recharge_on)} />
+        <Fact label="دورة شحن الشريحة" value={v.tracker_sim_recharge_cycle_days != null ? `${v.tracker_sim_recharge_cycle_days} يوماً` : '—'} />
         <Fact label="أُنشئت" value={shortDate(v.created_at)} />
         <Fact label="آخر تحديث" value={shortDate(v.updated_at)} />
         <Fact label="ملاحظات" value={v.notes || '—'} wide />

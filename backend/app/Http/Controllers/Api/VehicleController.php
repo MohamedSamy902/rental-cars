@@ -139,6 +139,11 @@ class VehicleController extends Controller
                         ->whereNotNull('expires_on')
                         ->whereDate('expires_on', '<=', $until);
                 });
+            } elseif ($status === 'sim_recharge') {
+                $within = max(0, (int) $request->integer('within_days', 14));
+                $until = now()->addDays($within)->toDateString();
+                $q->whereNotNull('tracker_sim_next_recharge_on')
+                    ->whereDate('tracker_sim_next_recharge_on', '<=', $until);
             }
         }
 
@@ -479,6 +484,11 @@ class VehicleController extends Controller
             'purchase_value_estimate' => $v->purchase_value_estimate,
             'tracker_device_number' => $v->tracker_device_number,
             'tracker_sim_number' => $v->tracker_sim_number,
+            'tracker_sim_last_recharged_on' => $v->tracker_sim_last_recharged_on?->toDateString(),
+            'tracker_sim_next_recharge_on' => $v->tracker_sim_next_recharge_on?->toDateString(),
+            'tracker_sim_recharge_cycle_days' => $v->tracker_sim_recharge_cycle_days !== null
+                ? (int) $v->tracker_sim_recharge_cycle_days
+                : null,
             'manual_status' => $v->manual_status,
             'is_active' => $v->is_active,
             'status' => $status,
@@ -565,22 +575,30 @@ class VehicleController extends Controller
             'reserved' => 0,
             'maintenance' => 0,
             'license_expiring' => 0,
+            'sim_recharge' => 0,
         ];
         foreach ($all as $v) {
             $status = $this->present($v)['status'];
-            if (isset($counts[$status])) {
+            if (isset($counts[$status]) && ! in_array($status, ['license_expiring', 'sim_recharge'], true)) {
                 $counts[$status]++;
             }
         }
 
-        $until = now()->addDays(30)->toDateString();
+        $licenseUntil = now()->addDays(30)->toDateString();
         $counts['license_expiring'] = Vehicle::query()
             ->where('is_active', true)
-            ->whereHas('documents', function ($d) use ($until) {
+            ->whereHas('documents', function ($d) use ($licenseUntil) {
                 $this->constrainLicenseDocuments($d)
                     ->whereNotNull('expires_on')
-                    ->whereDate('expires_on', '<=', $until);
+                    ->whereDate('expires_on', '<=', $licenseUntil);
             })
+            ->count();
+
+        $simUntil = now()->addDays(14)->toDateString();
+        $counts['sim_recharge'] = Vehicle::query()
+            ->where('is_active', true)
+            ->whereNotNull('tracker_sim_next_recharge_on')
+            ->whereDate('tracker_sim_next_recharge_on', '<=', $simUntil)
             ->count();
 
         return $counts;
