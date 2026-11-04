@@ -6,7 +6,7 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import {
   IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart,
   IconClipboard, IconClose, IconEdit, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
-  IconQueue, IconReceipt, IconSearch, IconSettings, IconStore, IconUserCog, IconUsers,
+  IconReceipt, IconSearch, IconSettings, IconStore, IconUserCog, IconUsers,
   IconWallet, IconWrench,
 } from './Icons'
 import { useIsMobile, useSheetDrag } from './useSheetDrag'
@@ -25,7 +25,6 @@ const ITEMS: Item[] = [
   { to: '/', label: 'لوحة اليوم', group: 'التشغيل', icon: <IconHome /> },
   { to: '/vehicles', label: 'العربيات', group: 'التشغيل', icon: <IconCar />, permission: 'vehicles.view' },
   { to: '/bookings', label: 'العقود والحجوزات', group: 'التشغيل', icon: <IconClipboard />, permission: 'contracts.view' },
-  { to: '/waitlist', label: 'قائمة الانتظار', group: 'التشغيل', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
   { to: '/calendar', label: 'التقويم', group: 'التشغيل', icon: <IconCalendar />, permission: 'contracts.view' },
   { to: '/showroom', label: 'وضع عرض المعرض', group: 'التشغيل', icon: <IconStore />, feature: 'showroom', permission: 'showroom.run' },
   { to: '/department-notice', label: 'إخطار القسم', group: 'التشغيل', icon: <IconFileText />, feature: 'department_notice', permission: 'department_notice.print' },

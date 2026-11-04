@@ -73,7 +73,6 @@ class DemoSeeder extends Seeder
                                 ->orWhere('key', 'like', 'deposits.%')
                                 ->orWhere('key', 'like', 'media.%')
                                 ->orWhere('key', 'like', 'notifications.%')
-                                ->orWhere('key', 'like', 'waitlist.%')
                                 ->orWhere('key', 'like', 'reports.%')
                                 ->orWhere('key', 'like', 'chat.%');
                         })
@@ -157,7 +156,6 @@ class DemoSeeder extends Seeder
             'feature_flags' => [
                 'inventory' => true,
                 'petty_cash' => true,
-                'waitlist' => true,
                 'showroom' => true,
                 'department_notice' => true,
                 'chat' => true,

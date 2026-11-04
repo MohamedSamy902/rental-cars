@@ -619,15 +619,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ---
 
-## ١٥) قائمة الانتظار · الإشعارات
-
-### Waitlist
-| Method | Path |
-|--------|------|
-| GET | `/waitlist` |
-| POST | `/waitlist` | `{ customer_id, category, preferred_vehicle_id?, desired_start?, desired_end?, priority?, notes? }` |
-
-الحالة الابتدائية: `waiting` · انتهاء افتراضي بعد ٧ أيام.
+## ١٥) الإشعارات
 
 ### `GET /attention`
 عدّادات خفيفة لنقاط الانتباه في القائمة وتبويبات الصفحات. بلا أثر جانبي (لا استحقاق جماعي للملاك).
@@ -645,7 +637,6 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | `pending_hr_acks` | إسناد `pending_ack` | الموارد البشرية · حرج |
 | `draft_payroll_runs` | مسيرات `draft` | الموارد البشرية · تحذير |
 | `blacklisted_customers` | عملاء `blacklist` | العملاء · تحذير |
-| `waiting_requests` | طلبات انتظار `waiting` غير المحذوفة | الانتظار · تحذير |
 | `owners_unpaid` | ملاك استحقاقهم المسجّل أكبر من مجموع الصرف | الملاك · تحذير |
 
 العهدة والمصروفات وإخطار القسم بلا طابور معلّق في البيانات، فلا نقطة لها.
@@ -657,7 +648,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/notifications/unread-count` | `{ "unread": N }` |
 | POST | `/notifications/{id}/read` | تعليم مقروء (مالك الإشعار فقط — حماية IDOR) |
 
-الماسح `php artisan notifications:scan` يشتغل كل ساعة من `schedule:run` (Cron على cPanel). يرسل الإشعار الأول عند تحقق الشرط ثم تذكيراً كل ٢٤ ساعة لنفس السجل ونفس القاعدة: بداية حجز معلّق/معتمد أو نهاية عقد نشط قبلها بيومين، والمستحقات المالية (عقد، تأمين، مالك، راتب معتمد، مخالفة)، ونقص المخزون، والمستندات، والصيانة، والانتظار. Web Push يُرسل مع نفس الصف إن وُجد VAPID.
+الماسح `php artisan notifications:scan` يشتغل كل ساعة من `schedule:run` (Cron على cPanel). يرسل الإشعار الأول عند تحقق الشرط ثم تذكيراً كل ٢٤ ساعة لنفس السجل ونفس القاعدة: بداية حجز معلّق/معتمد أو نهاية عقد نشط قبلها بيومين، والمستحقات المالية (عقد، تأمين، مالك، راتب معتمد، مخالفة)، ونقص المخزون، والمستندات، والصيانة. Web Push يُرسل مع نفس الصف إن وُجد VAPID.
 
 ### Web Push (موبايل)
 صلاحية `notifications.view` · يحتاج VAPID في `.env` (`php artisan push:vapid --write`) وHTTPS. `VAPID_SUBJECT` لازم يكون `https://` لنفس الموقع؛ عنوان `mailto` على نطاق غير عام (مثل `.local`) يرفضه آيفون بـ 403.
@@ -679,7 +670,6 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | أسطول | `/vehicles*` | `/vehicles` |
 | عقود | `/contracts*` | `/bookings` |
 | تقويم | عبر contracts | `/calendar` |
-| انتظار | `/waitlist` | `/waitlist` |
 | معرض | `/showroom` | `/showroom` |
 | QR | `/qr` | من تفاصيل مركبة |
 | فحص/توقيع | handover/return | Bookings sheet |

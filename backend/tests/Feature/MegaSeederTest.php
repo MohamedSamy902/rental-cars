@@ -9,7 +9,6 @@ use App\Models\Employee;
 use App\Models\Expense;
 use App\Models\Vehicle;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Services\Operations\AuditNarrator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,7 +29,6 @@ class MegaSeederTest extends TestCase
         $this->assertGreaterThanOrEqual(30, WorkOrder::query()->count());
         $this->assertGreaterThanOrEqual(20, Violation::query()->count());
         $this->assertGreaterThanOrEqual(20, Expense::query()->count());
-        $this->assertGreaterThanOrEqual(10, WaitlistRequest::query()->count());
         $this->assertGreaterThanOrEqual(200, AuditLog::query()->count());
 
         $this->assertTrue(Contract::query()->where('status', 'active')->exists());

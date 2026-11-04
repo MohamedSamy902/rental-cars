@@ -19,7 +19,6 @@ use App\Models\Vehicle;
 use App\Models\VehicleAccessory;
 use App\Models\VehicleDocument;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
 use Illuminate\Database\Seeder;
@@ -44,8 +43,6 @@ class MegaSeeder extends Seeder
     private const TARGET_VIOLATIONS = 25;
 
     private const TARGET_EXPENSES = 25;
-
-    private const TARGET_WAITLIST = 15;
 
     private const TARGET_AUDIT = 220;
 
@@ -97,11 +94,10 @@ class MegaSeeder extends Seeder
         $this->seedContracts((int) $sales->id, (int) $ops->id);
         $this->seedMaintenance($employees, (int) $maint->id);
         $this->seedViolationsAndExpenses((int) $accounts->id, (int) $admin->id, $employees);
-        $this->seedWaitlist((int) $sales->id);
         $this->seedAuditLogs($actors);
 
         $this->command?->info(sprintf(
-            'MegaSeeder totals — vehicles:%d contracts:%d customers:%d employees:%d WO:%d violations:%d expenses:%d waitlist:%d audit:%d',
+            'MegaSeeder totals — vehicles:%d contracts:%d customers:%d employees:%d WO:%d violations:%d expenses:%d audit:%d',
             Vehicle::query()->count(),
             Contract::query()->count(),
             Customer::query()->count(),
@@ -109,7 +105,6 @@ class MegaSeeder extends Seeder
             WorkOrder::query()->count(),
             Violation::query()->count(),
             Expense::query()->count(),
-            WaitlistRequest::query()->count(),
             AuditLog::query()->count(),
         ));
     }
@@ -538,33 +533,6 @@ class MegaSeeder extends Seeder
                 'from_petty_cash' => (bool) $fromPetty,
                 'recorded_by' => $n % 2 === 0 ? $accountsId : $adminId,
                 'notes' => 'مصروف ميجا',
-            ]);
-        }
-    }
-
-    private function seedWaitlist(int $salesId): void
-    {
-        $have = WaitlistRequest::query()->count();
-        $need = max(0, self::TARGET_WAITLIST - $have);
-        $customers = Customer::query()->where('status', 'active')->pluck('id')->all();
-        $vehicles = Vehicle::query()->pluck('id')->all();
-        if ($customers === [] || $need === 0) {
-            return;
-        }
-        for ($i = 1; $i <= $need; $i++) {
-            $n = $have + $i;
-            WaitlistRequest::query()->create([
-                'customer_id' => $customers[$n % count($customers)],
-                'category' => $this->categories[$n % count($this->categories)],
-                'preferred_vehicle_id' => $n % 2 === 0 && $vehicles !== [] ? $vehicles[$n % count($vehicles)] : null,
-                'desired_start' => now()->addDays(2 + ($n % 20))->toDateString(),
-                'desired_end' => now()->addDays(6 + ($n % 20))->toDateString(),
-                'priority' => 1 + ($n % 5),
-                'status' => ['waiting', 'waiting', 'notified', 'waiting'][$n % 4],
-                'notified_at' => $n % 4 === 2 ? now()->subHours($n) : null,
-                'expires_at' => now()->addDays(14),
-                'created_by' => $salesId,
-                'notes' => 'انتظار ميجا #'.$n,
             ]);
         }
     }
