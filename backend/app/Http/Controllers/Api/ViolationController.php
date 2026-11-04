@@ -15,13 +15,16 @@ class ViolationController extends Controller
     public function index(): JsonResponse
     {
         $rows = Violation::query()->with(['vehicle', 'customer', 'contract'])->latest('id')->paginate(50);
+        $data = collect($rows->items())->map(fn (Violation $v) => $this->serialize($v))->all();
 
-        return response()->json(['data' => $rows->items(), 'meta' => ['total' => $rows->total()]]);
+        return response()->json(['data' => $data, 'meta' => ['total' => $rows->total()]]);
     }
 
     public function store(StoreViolationRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $photos = $this->normalizePhotos($data);
+        unset($data['photo_paths']);
 
         [$contractId, $customerId] = $this->resolveContractLink($data);
 
@@ -29,11 +32,13 @@ class ViolationController extends Controller
             ...$data,
             'contract_id' => $contractId,
             'customer_id' => $customerId,
+            'photo_path' => $photos[0] ?? ($data['photo_path'] ?? null),
+            'photo_paths' => $photos === [] ? null : $photos,
             'status' => $contractId ? 'assigned' : 'new',
         ]);
 
         return response()->json([
-            'data' => $violation->load(['vehicle', 'customer', 'contract']),
+            'data' => $this->serialize($violation->load(['vehicle', 'customer', 'contract'])),
             'message' => 'تم تسجيل المخالفة للمتابعة (بلا ترحيل محاسبي).',
         ], 201);
     }
@@ -41,6 +46,10 @@ class ViolationController extends Controller
     public function update(UpdateViolationRequest $request, Violation $violation): JsonResponse
     {
         $data = $request->validated();
+        $photos = array_key_exists('photo_paths', $data) || array_key_exists('photo_path', $data)
+            ? $this->normalizePhotos($data)
+            : null;
+        unset($data['photo_paths']);
 
         $vehicleId = (int) ($data['vehicle_id'] ?? $violation->vehicle_id);
         $occurredAt = (string) ($data['occurred_at'] ?? $violation->occurred_at);
@@ -69,6 +78,11 @@ class ViolationController extends Controller
             'status' => $status,
         ];
 
+        if ($photos !== null) {
+            $payload['photo_path'] = $photos[0] ?? null;
+            $payload['photo_paths'] = $photos === [] ? null : $photos;
+        }
+
         if (($status === 'confirmed' || $status === 'paid') && ! $violation->confirmed_at) {
             $payload['confirmed_at'] = now();
             $payload['confirmed_by'] = $request->user()?->id;
@@ -81,7 +95,7 @@ class ViolationController extends Controller
         $violation->update($payload);
 
         return response()->json([
-            'data' => $violation->fresh()->load(['vehicle', 'customer', 'contract']),
+            'data' => $this->serialize($violation->fresh()->load(['vehicle', 'customer', 'contract'])),
             'message' => 'تم تحديث المخالفة.',
         ]);
     }
@@ -100,7 +114,7 @@ class ViolationController extends Controller
         ]);
 
         return response()->json([
-            'data' => $violation->fresh(),
+            'data' => $this->serialize($violation->fresh()->load(['vehicle', 'customer', 'contract'])),
             'message' => 'تم تأكيد السداد دون قيد محاسبي.',
         ]);
     }
@@ -134,5 +148,37 @@ class ViolationController extends Controller
         }
 
         return [$contractId, $customerId];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    private function normalizePhotos(array $data): array
+    {
+        $paths = [];
+        if (isset($data['photo_paths']) && is_array($data['photo_paths'])) {
+            foreach ($data['photo_paths'] as $p) {
+                if (is_string($p) && trim($p) !== '') {
+                    $paths[] = trim($p);
+                }
+            }
+        }
+        if ($paths === [] && isset($data['photo_path']) && is_string($data['photo_path']) && trim($data['photo_path']) !== '') {
+            $paths[] = trim($data['photo_path']);
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serialize(Violation $v): array
+    {
+        $arr = $v->toArray();
+        $arr['photo_paths'] = $v->resolvedPhotoPaths();
+
+        return $arr;
     }
 }
