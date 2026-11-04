@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  PageHeader, FilterBar, Button, DataTable, StatusPill, useToast, PhoneActions, IconCheck, type DataColumn,
+  PageHeader, FilterBar, Button, DataTable, useToast, IconCheck, IconClipboard, type DataColumn,
 } from '@/shared/ui'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import './pages.css'
+import './ViolationInquiriesPage.css'
 
 type InquiryRow = {
   vehicle_id: number
@@ -32,6 +33,42 @@ type Meta = {
 
 const Tabs = ['pending', 'done_today', 'rented_today', 'all'] as const
 
+function CopyableValue({
+  value,
+  label,
+  dir,
+  onCopy,
+}: {
+  value?: string | null
+  label: string
+  dir?: 'ltr' | 'rtl'
+  onCopy: (text: string, label: string) => void
+}) {
+  const text = (value || '').trim()
+  const empty = text === ''
+  return (
+    <span className="viq-copy">
+      <span className="viq-copy__text" dir={dir}>
+        {empty ? '—' : text}
+      </span>
+      {!empty ? (
+        <button
+          type="button"
+          className="rpm-icon-btn viq-copy__btn"
+          aria-label={`نسخ ${label}`}
+          title={`نسخ ${label}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onCopy(text, label)
+          }}
+        >
+          <IconClipboard size={14} />
+        </button>
+      ) : null}
+    </span>
+  )
+}
+
 export function ViolationInquiriesPage() {
   const toast = useToast()
   const [rows, setRows] = useState<InquiryRow[]>([])
@@ -49,11 +86,7 @@ export function ViolationInquiriesPage() {
         attention: (meta?.pending ?? 0) > 0 ? ('warning' as const) : null,
         attentionLabel: `${meta?.pending ?? 0} بانتظار الاستعلام اليوم`,
       },
-      {
-        id: 'done_today',
-        label: 'تم الاستعلام اليوم',
-        attention: null,
-      },
+      { id: 'done_today', label: 'تم الاستعلام اليوم', attention: null },
       {
         id: 'rented_today',
         label: 'مؤجرة اليوم',
@@ -87,10 +120,17 @@ export function ViolationInquiriesPage() {
     const q = search.trim()
     if (!q) return rows
     return rows.filter((r) => {
-      const hay = `${r.plate} ${r.brand ?? ''} ${r.model ?? ''} ${r.category ?? ''} ${r.owner_name ?? ''} ${r.owner_phone ?? ''} ${r.owner_national_id ?? ''}`
+      const hay = `${r.plate} ${r.category ?? ''} ${r.owner_name ?? ''} ${r.owner_phone ?? ''} ${r.owner_national_id ?? ''}`
       return hay.includes(q)
     })
   }, [rows, search])
+
+  function copyValue(text: string, label: string) {
+    void navigator.clipboard?.writeText(text).then(
+      () => toast.success(`تم نسخ ${label}.`),
+      () => toast.error('تعذّر النسخ.'),
+    )
+  }
 
   async function markDone(row: InquiryRow) {
     if (row.inquired_today) return
@@ -109,22 +149,22 @@ export function ViolationInquiriesPage() {
     }
   }
 
+  // الترتيب الملزم: نوع · رقم · قومي · اسم المالك · موبايل · تم الاستعلام
   const columns: DataColumn<InquiryRow>[] = [
     {
       id: 'category',
       header: 'نوع العربية',
-      cell: (r) => r.category || '—',
+      cell: (r): ReactNode => (
+        <CopyableValue value={r.category} label="نوع العربية" onCopy={copyValue} />
+      ),
       sortValue: (r) => r.category,
       mobile: 'badge',
     },
     {
       id: 'plate',
       header: 'رقم العربية',
-      cell: (r) => (
-        <>
-          <strong className="rpm-table__primary">{r.plate}</strong>
-          <span className="rpm-table__sub">{[r.brand, r.model].filter(Boolean).join(' ')}</span>
-        </>
+      cell: (r): ReactNode => (
+        <CopyableValue value={r.plate} label="رقم العربية" onCopy={copyValue} />
       ),
       sortValue: (r) => r.plate,
       mobile: 'title',
@@ -132,49 +172,34 @@ export function ViolationInquiriesPage() {
     {
       id: 'national_id',
       header: 'الرقم القومي',
-      cell: (r) => r.owner_national_id || '—',
+      cell: (r): ReactNode => (
+        <CopyableValue value={r.owner_national_id} label="الرقم القومي" dir="ltr" onCopy={copyValue} />
+      ),
       sortValue: (r) => r.owner_national_id,
+      mobile: 'field',
     },
     {
       id: 'owner',
       header: 'اسم المالك',
-      cell: (r) => r.owner_name || '—',
+      cell: (r): ReactNode => (
+        <CopyableValue value={r.owner_name} label="اسم المالك" onCopy={copyValue} />
+      ),
       sortValue: (r) => r.owner_name,
       mobile: 'subtitle',
     },
     {
       id: 'phone',
-      header: 'موبايل المالك',
-      cell: (r) => (
-        r.owner_phone
-          ? (
-            <span className="rpm-inline-stack">
-              <span dir="ltr">{r.owner_phone}</span>
-              <PhoneActions phone={r.owner_phone} name={r.owner_name || undefined} />
-            </span>
-          )
-          : '—'
+      header: 'رقم موبايل المالك',
+      cell: (r): ReactNode => (
+        <CopyableValue value={r.owner_phone} label="موبايل المالك" dir="ltr" onCopy={copyValue} />
       ),
       sortValue: (r) => r.owner_phone,
-    },
-    {
-      id: 'flags',
-      header: 'الحالة',
-      cell: (r) => (
-        <span className="rpm-inline-stack">
-          {r.inquired_today
-            ? <StatusPill status="completed" label={r.inquired_by_name ? `تم · ${r.inquired_by_name}` : 'تم اليوم'} />
-            : <StatusPill status="pending" label="بانتظار الاستعلام" />}
-          {r.rented_today ? <StatusPill status="active" label="مؤجرة اليوم" /> : null}
-        </span>
-      ),
-      sortValue: (r) => (r.inquired_today ? 1 : 0),
       mobile: 'field',
     },
     {
       id: 'mark',
       header: 'الاستعلام',
-      cell: (r) => (
+      cell: (r): ReactNode => (
         <Button
           size="sm"
           variant={r.inquired_today ? 'secondary' : undefined}
@@ -182,7 +207,7 @@ export function ViolationInquiriesPage() {
           loading={markingId === r.vehicle_id}
           onClick={() => void markDone(r)}
         >
-          تم الاستعلام
+          {r.inquired_today ? (r.inquired_by_name ? `تم · ${r.inquired_by_name}` : 'تم الاستعلام') : 'تم الاستعلام'}
         </Button>
       ),
       mobile: 'field',
@@ -191,7 +216,7 @@ export function ViolationInquiriesPage() {
   ]
 
   return (
-    <div className="rpm-stack">
+    <div className="rpm-stack viq-page">
       <PageHeader
         title="استعلامات عن المخالفات"
         subtitle={`متابعة يومية للوحات — اليوم ${meta?.date || '…'} · يُعاد الاستعلام كل يوم`}
@@ -221,7 +246,7 @@ export function ViolationInquiriesPage() {
               onSelect: () => void markDone(r),
             }]}
         emptyTitle="لا عربيات في هذا الفلتر"
-        emptyDescription="غيّر الفلتر أو أضف عربيات نشطة في الأسطول."
+        emptyDescription="غيّر الفلتر أو اربط العربيات بمالك لإظهار القومي والموبايل."
       />
     </div>
   )
