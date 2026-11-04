@@ -131,12 +131,26 @@ class VehicleController extends Controller
                         ->where('planned_ends_at', '>=', $from)
                         ->where('planned_ends_at', '<=', $until);
                 });
+            } elseif ($status === 'license_expiring') {
+                $within = max(0, (int) $request->integer('within_days', 30));
+                $until = now()->addDays($within)->toDateString();
+                $q->whereHas('documents', function ($d) use ($until) {
+                    $this->constrainLicenseDocuments($d)
+                        ->whereNotNull('expires_on')
+                        ->whereDate('expires_on', '<=', $until);
+                });
             }
         }
 
-        $q->with(['owner:id,full_name,phone', 'contracts' => function ($c) {
-            $c->where('status', 'active')->latest('planned_ends_at');
-        }]);
+        $q->with([
+            'owner:id,full_name,phone',
+            'contracts' => function ($c) {
+                $c->where('status', 'active')->latest('planned_ends_at');
+            },
+            'documents' => function ($d) {
+                $this->constrainLicenseDocuments($d)->orderByDesc('id');
+            },
+        ]);
         $rows = $q->paginate((int) $request->integer('per_page', 50));
 
         $data = collect($rows->items())->map(function (Vehicle $v) {
@@ -480,9 +494,49 @@ class VehicleController extends Controller
             'documents' => $v->relationLoaded('documents') ? $v->documents : null,
             'notes' => $v->notes,
             'active_contract_ends_at' => $this->activeContractEndsAt($v),
+            'license_expires_on' => $this->licenseExpiresOn($v),
             'created_at' => $v->created_at?->toIso8601String(),
             'updated_at' => $v->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\VehicleDocument>|\Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\VehicleDocument, \App\Models\Vehicle>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\VehicleDocument>|\Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\VehicleDocument, \App\Models\Vehicle>
+     */
+    private function constrainLicenseDocuments($query)
+    {
+        return $query->where(function ($qq) {
+            $qq->where('type', 'رخصة تسيير')
+                ->orWhere('type', 'like', '%رخص%')
+                ->orWhere('type', 'like', '%license%');
+        });
+    }
+
+    private function licenseExpiresOn(Vehicle $v): ?string
+    {
+        if ($v->relationLoaded('documents')) {
+            $license = $v->documents->first(function ($doc) {
+                $type = (string) ($doc->type ?? '');
+
+                return $type === 'رخصة تسيير'
+                    || str_contains($type, 'رخص')
+                    || str_contains(mb_strtolower($type), 'license');
+            });
+
+            return $license?->expires_on?->toDateString();
+        }
+
+        $license = $v->documents()
+            ->where(function ($qq) {
+                $qq->where('type', 'رخصة تسيير')
+                    ->orWhere('type', 'like', '%رخص%')
+                    ->orWhere('type', 'like', '%license%');
+            })
+            ->orderByDesc('id')
+            ->first();
+
+        return $license?->expires_on?->toDateString();
     }
 
     private function activeContractEndsAt(Vehicle $v): ?string
@@ -504,13 +558,30 @@ class VehicleController extends Controller
     private function summary(): array
     {
         $all = Vehicle::query()->where('is_active', true)->get();
-        $counts = ['total' => $all->count(), 'available' => 0, 'rented' => 0, 'reserved' => 0, 'maintenance' => 0];
+        $counts = [
+            'total' => $all->count(),
+            'available' => 0,
+            'rented' => 0,
+            'reserved' => 0,
+            'maintenance' => 0,
+            'license_expiring' => 0,
+        ];
         foreach ($all as $v) {
             $status = $this->present($v)['status'];
             if (isset($counts[$status])) {
                 $counts[$status]++;
             }
         }
+
+        $until = now()->addDays(30)->toDateString();
+        $counts['license_expiring'] = Vehicle::query()
+            ->where('is_active', true)
+            ->whereHas('documents', function ($d) use ($until) {
+                $this->constrainLicenseDocuments($d)
+                    ->whereNotNull('expires_on')
+                    ->whereDate('expires_on', '<=', $until);
+            })
+            ->count();
 
         return $counts;
     }

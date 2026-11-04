@@ -194,12 +194,12 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | وصف |
 |--------|------|-----|
-| GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&per_page=` |
+| GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&within_days=&per_page=` · `status=license_expiring` لرخص تسيير تنتهي خلال `within_days` (افتراضي ٣٠) وتشمل المنتهية · الحقل `license_expires_on` · `summary.license_expiring` لعدّ ٣٠ يوماً |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
 | POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية من نموذج العربية |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
-| PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) |
+| PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) · عند تغيير رخصة التسيير (تاريخ/صورة) تُؤرشف السابقة تلقائياً ثم تُكتب الجديدة |
 | DELETE | `/vehicles/{vehicle}` | أرشفة ناعمة (apiResource) |
 | POST | `/vehicles/{vehicle}/documents` | مستند |
 | PUT | `/vehicles/{vehicle}/documents/{id}` | تحديث؛ رخصة تسيير مع `archive_previous` تؤرشف السجل القديم |

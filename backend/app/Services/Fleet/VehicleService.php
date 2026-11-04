@@ -152,15 +152,34 @@ class VehicleService
 
         $payload = [
             'type' => 'رخصة تسيير',
-            'file_path' => $license['file_path'] ?? $existing?->file_path ?? 'manual/رخصة تسيير',
-            'file_path_back' => $license['file_path_back'] ?? $existing?->file_path_back,
-            'issued_on' => $license['issued_on'] ?? $existing?->issued_on,
-            'expires_on' => $license['expires_on'] ?? null,
-            'notes' => $license['notes'] ?? $existing?->notes,
+            'file_path' => array_key_exists('file_path', $license) && filled($license['file_path'])
+                ? (string) $license['file_path']
+                : ($existing?->file_path ?? 'manual/رخصة تسيير'),
+            'file_path_back' => array_key_exists('file_path_back', $license)
+                ? ($license['file_path_back'] ?: null)
+                : $existing?->file_path_back,
+            'issued_on' => array_key_exists('issued_on', $license)
+                ? ($license['issued_on'] ?: null)
+                : $existing?->issued_on?->toDateString(),
+            'expires_on' => array_key_exists('expires_on', $license)
+                ? ($license['expires_on'] ?: null)
+                : $existing?->expires_on?->toDateString(),
+            'notes' => array_key_exists('notes', $license)
+                ? ($license['notes'] ?: null)
+                : $existing?->notes,
         ];
 
         if ($existing) {
-            $existing->update($payload);
+            $materialChange = (string) ($existing->expires_on?->toDateString() ?? '') !== (string) ($payload['expires_on'] ?? '')
+                || (string) ($existing->issued_on?->toDateString() ?? '') !== (string) ($payload['issued_on'] ?? '')
+                || (string) ($existing->file_path ?? '') !== (string) ($payload['file_path'] ?? '')
+                || (string) ($existing->file_path_back ?? '') !== (string) ($payload['file_path_back'] ?? '');
+
+            if ($materialChange) {
+                $this->renewLicense($vehicle, $existing, $payload, auth()->id());
+            } else {
+                $existing->update(['notes' => $payload['notes']]);
+            }
         } else {
             $vehicle->documents()->create($payload);
         }

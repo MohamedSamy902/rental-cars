@@ -12,8 +12,10 @@ import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './pages.css'
 import './VehiclesPage.css'
 
-const VEHICLE_TABS = ['all', 'available', 'rented', 'reserved', 'maintenance', 'expiring'] as const
+const VEHICLE_TABS = ['all', 'available', 'rented', 'reserved', 'maintenance', 'expiring', 'license_expiring'] as const
 const EXPIRING_PRESETS = [1, 2, 3, 7] as const
+const LICENSE_EXPIRING_PRESETS = [7, 14, 30] as const
+const LICENSE_EXPIRING_DEFAULT_DAYS = 30
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
 
@@ -39,6 +41,7 @@ type Vehicle = {
   owner_since?: string | null
   owner?: OwnerOption | null
   active_contract_ends_at?: string | null
+  license_expires_on?: string | null
   accessories?: Array<{ id?: number; name?: string | null }> | null
   purchase_value_estimate?: number | null
   color?: string | null
@@ -63,11 +66,15 @@ export function VehiclesPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Vehicle[]>([])
-  const [summary, setSummary] = useState({ total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0 })
+  const [summary, setSummary] = useState({
+    total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0, license_expiring: 0,
+  })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: VEHICLE_TABS, defaultValue: 'all' })
   const [withinDays, setWithinDays] = useState(2)
+  const [licenseWithinDays, setLicenseWithinDays] = useState(LICENSE_EXPIRING_DEFAULT_DAYS)
   const [customDays, setCustomDays] = useState('')
+  const [licenseCustomDays, setLicenseCustomDays] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
@@ -97,15 +104,26 @@ export function VehiclesPage() {
       },
       {
         id: 'expiring',
-        label: 'قاربت على الانتهاء',
+        label: 'تأجير قارب الانتهاء',
         attention: 'warning' as const,
         attentionLabel: `خلال ${withinDays} يوم`,
       },
+      {
+        id: 'license_expiring',
+        label: 'رخص قاربت الانتهاء',
+        attention: summary.license_expiring > 0 ? ('warning' as const) : null,
+        attentionLabel: `${summary.license_expiring} رخصة خلال ${LICENSE_EXPIRING_DEFAULT_DAYS} يوماً أو أقل`,
+      },
     ],
-    [summary.rented, summary.reserved, summary.maintenance, withinDays],
+    [summary.rented, summary.reserved, summary.maintenance, summary.license_expiring, withinDays],
   )
 
-  async function load(nextSearch = search, nextChip = chip, days = withinDays) {
+  async function load(
+    nextSearch = search,
+    nextChip = chip,
+    days = withinDays,
+    licenseDays = licenseWithinDays,
+  ) {
     setLoading(true)
     setError('')
     try {
@@ -113,9 +131,18 @@ export function VehiclesPage() {
       if (nextSearch.trim()) qs.set('search', nextSearch.trim())
       if (nextChip !== 'all') qs.set('status', nextChip)
       if (nextChip === 'expiring') qs.set('within_days', String(days))
+      if (nextChip === 'license_expiring') qs.set('within_days', String(licenseDays))
       const res = await api<{ data: Vehicle[]; summary: typeof summary }>(`/vehicles?${qs}`)
       setRows(res.data)
-      setSummary(res.summary)
+      const s = res.summary
+      setSummary({
+        total: s.total ?? 0,
+        available: s.available ?? 0,
+        rented: s.rented ?? 0,
+        reserved: s.reserved ?? 0,
+        maintenance: s.maintenance ?? 0,
+        license_expiring: s.license_expiring ?? 0,
+      })
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -126,7 +153,7 @@ export function VehiclesPage() {
   useEffect(() => {
     const t = window.setTimeout(() => load(), 250)
     return () => window.clearTimeout(t)
-  }, [search, chip, withinDays])
+  }, [search, chip, withinDays, licenseWithinDays])
 
   const columns: DataColumn<Vehicle>[] = [
     {
@@ -165,9 +192,12 @@ export function VehiclesPage() {
           {chip === 'expiring' && v.active_contract_ends_at ? (
             <span className="rpm-table__sub">ينتهي {formatDate(v.active_contract_ends_at)}</span>
           ) : null}
+          {chip === 'license_expiring' && v.license_expires_on ? (
+            <span className="rpm-table__sub">الرخصة {formatDate(v.license_expires_on)}</span>
+          ) : null}
         </div>
       ),
-      sortValue: (v) => v.active_contract_ends_at || v.status,
+      sortValue: (v) => v.license_expires_on || v.active_contract_ends_at || v.status,
       mobile: 'badge',
     },
     {
@@ -233,6 +263,15 @@ export function VehiclesPage() {
       return
     }
     setWithinDays(Math.round(n))
+  }
+
+  function applyLicenseCustomDays() {
+    const n = Number(licenseCustomDays)
+    if (!Number.isFinite(n) || n < 0 || n > 90) {
+      toast.error('أدخل عدد أيام بين 0 و 90.')
+      return
+    }
+    setLicenseWithinDays(Math.round(n))
   }
 
   return (
@@ -301,6 +340,42 @@ export function VehiclesPage() {
               onBlur={() => { if (customDays !== '') applyCustomDays() }}
               onKeyDown={(e) => { if (e.key === 'Enter') applyCustomDays() }}
               aria-label="عدد الأيام المخصص"
+            />
+            <span className="vh-expiring-bar__unit">يوم</span>
+          </label>
+        </div>
+      ) : null}
+
+      {chip === 'license_expiring' ? (
+        <div className="vh-expiring-bar" role="group" aria-label="نافذة قرب انتهاء رخصة التسيير">
+          <span className="vh-expiring-bar__label">خلال:</span>
+          <div className="vh-expiring-bar__pills">
+            {LICENSE_EXPIRING_PRESETS.map((d) => (
+              <Button
+                key={d}
+                type="button"
+                size="sm"
+                variant={licenseWithinDays === d && licenseCustomDays === '' ? 'accent' : 'secondary'}
+                onClick={() => { setLicenseWithinDays(d); setLicenseCustomDays('') }}
+              >
+                {d} يوماً
+              </Button>
+            ))}
+          </div>
+          <span className="vh-expiring-bar__sep" aria-hidden />
+          <label className="vh-expiring-bar__custom">
+            <span className="vh-expiring-bar__custom-label">مخصص:</span>
+            <input
+              className="vh-expiring-bar__input"
+              type="number"
+              min={0}
+              max={90}
+              value={licenseCustomDays}
+              placeholder={String(licenseWithinDays)}
+              onChange={(e) => setLicenseCustomDays(e.target.value)}
+              onBlur={() => { if (licenseCustomDays !== '') applyLicenseCustomDays() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyLicenseCustomDays() }}
+              aria-label="عدد أيام قرب انتهاء الرخصة"
             />
             <span className="vh-expiring-bar__unit">يوم</span>
           </label>

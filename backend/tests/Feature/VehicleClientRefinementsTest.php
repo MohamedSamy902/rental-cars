@@ -76,6 +76,111 @@ class VehicleClientRefinementsTest extends TestCase
         $this->assertTrue($names->contains('لاند روفر'));
     }
 
+    public function test_license_expiring_filter_lists_vehicles_within_window(): void
+    {
+        $soon = Vehicle::query()->create([
+            'code' => 'VEH-LIC-1',
+            'plate' => 'أ ب 1111',
+            'brand' => 'تويوتا',
+            'model' => 'يارس',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 700,
+            'default_deposit' => 1500,
+            'is_active' => true,
+        ]);
+        $later = Vehicle::query()->create([
+            'code' => 'VEH-LIC-2',
+            'plate' => 'أ ب 2222',
+            'brand' => 'هيونداي',
+            'model' => 'أكسنت',
+            'year' => 2021,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 2000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 650,
+            'default_deposit' => 1500,
+            'is_active' => true,
+        ]);
+
+        VehicleDocument::query()->create([
+            'vehicle_id' => $soon->id,
+            'type' => 'رخصة تسيير',
+            'file_path' => 'manual/soon',
+            'expires_on' => now()->addDays(20)->toDateString(),
+        ]);
+        VehicleDocument::query()->create([
+            'vehicle_id' => $later->id,
+            'type' => 'رخصة تسيير',
+            'file_path' => 'manual/later',
+            'expires_on' => now()->addDays(60)->toDateString(),
+        ]);
+
+        $res = $this->getJson('/api/vehicles?status=license_expiring&within_days=30')->assertOk();
+        $ids = collect($res->json('data'))->pluck('id')->all();
+        $this->assertContains($soon->id, $ids);
+        $this->assertNotContains($later->id, $ids);
+        $this->assertSame(
+            now()->addDays(20)->toDateString(),
+            collect($res->json('data'))->firstWhere('id', $soon->id)['license_expires_on'] ?? null,
+        );
+        $this->assertGreaterThanOrEqual(1, (int) $res->json('summary.license_expiring'));
+    }
+
+    public function test_vehicle_update_license_archives_previous_row(): void
+    {
+        $vehicle = Vehicle::query()->create([
+            'code' => 'VEH-0098',
+            'plate' => 'س ص 7787',
+            'brand' => 'كيا',
+            'model' => 'ريو',
+            'year' => 2020,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 8000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 600,
+            'default_deposit' => 1200,
+            'is_active' => true,
+        ]);
+
+        VehicleDocument::query()->create([
+            'vehicle_id' => $vehicle->id,
+            'type' => 'رخصة تسيير',
+            'file_path' => 'manual/license-old-edit',
+            'issued_on' => '2024-02-01',
+            'expires_on' => '2025-02-01',
+            'notes' => 'قديمة',
+        ]);
+
+        $this->putJson("/api/vehicles/{$vehicle->id}", [
+            'daily_rate' => 620,
+            'license' => [
+                'has_license' => true,
+                'issued_on' => '2026-02-01',
+                'expires_on' => '2027-02-01',
+                'file_path' => '/media/99/file',
+                'notes' => 'مجدّدة من التعديل',
+            ],
+        ])->assertOk();
+
+        $this->assertTrue(
+            VehicleDocumentHistory::query()
+                ->where('vehicle_id', $vehicle->id)
+                ->whereDate('expires_on', '2025-02-01')
+                ->where('file_path', 'manual/license-old-edit')
+                ->exists()
+        );
+        $active = VehicleDocument::query()->where('vehicle_id', $vehicle->id)->first();
+        $this->assertSame('2027-02-01', $active?->expires_on?->toDateString());
+        $this->assertSame('/media/99/file', $active?->file_path);
+        $this->assertSame('مجدّدة من التعديل', $active?->notes);
+    }
+
     public function test_license_update_archives_previous(): void
     {
         $vehicle = Vehicle::query()->create([

@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { BrandSelectField } from '@/shared/forms/BrandSelectField'
 import {
   Button, Sheet, TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
-  PlateField, splitPlate, useToast,
+  MediaUpload, PlateField, splitPlate, useToast,
 } from '@/shared/ui'
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
@@ -83,6 +83,8 @@ type FormState = {
   license_expires_on: string
   license_issued_on: string
   license_status: 'none' | 'active' | 'expired'
+  license_file_path: string
+  license_file_path_back: string
 }
 
 function emptyForm(): FormState {
@@ -121,6 +123,8 @@ function emptyForm(): FormState {
     license_expires_on: '',
     license_issued_on: '',
     license_status: 'none',
+    license_file_path: '',
+    license_file_path_back: '',
   }
 }
 
@@ -188,7 +192,15 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
     setSelectedAddons([])
     const next = mode === 'edit' ? fromInitial(initial) : emptyForm()
     if (mode === 'edit' && initial) {
-      const docs = (initial as VehicleFormInitial & { documents?: Array<{ type?: string; expires_on?: string | null; issued_on?: string | null }> }).documents || []
+      const docs = (initial as VehicleFormInitial & {
+        documents?: Array<{
+          type?: string
+          expires_on?: string | null
+          issued_on?: string | null
+          file_path?: string | null
+          file_path_back?: string | null
+        }>
+      }).documents || []
       const lic = docs.find((d) => /رخص|license/i.test(d.type || ''))
       if (lic) {
         const exp = lic.expires_on ? String(lic.expires_on).slice(0, 10) : ''
@@ -197,6 +209,10 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         next.license_expires_on = exp
         next.license_issued_on = lic.issued_on ? String(lic.issued_on).slice(0, 10) : ''
         next.license_status = expired ? 'expired' : 'active'
+        next.license_file_path = lic.file_path && !String(lic.file_path).startsWith('manual/')
+          ? String(lic.file_path)
+          : ''
+        next.license_file_path_back = lic.file_path_back ? String(lic.file_path_back) : ''
       }
     }
     setForm(next)
@@ -271,6 +287,8 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         has_license: form.has_license,
         expires_on: form.has_license && form.license_expires_on ? form.license_expires_on : null,
         issued_on: form.has_license && form.license_issued_on ? form.license_issued_on : null,
+        file_path: form.has_license && form.license_file_path ? form.license_file_path : null,
+        file_path_back: form.has_license && form.license_file_path_back ? form.license_file_path_back : null,
         notes: form.has_license
           ? (form.license_status === 'expired' ? 'رخصة منتهية' : (form.license_status === 'active' ? 'رخصة سارية' : null))
           : 'بدون رخصة تسيير',
@@ -487,6 +505,29 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
                 }}
                 hint="يُسمح برخصة منتهية — يُحدَّث الحالة تلقائياً"
               />
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gap: '0.75rem', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}>
+                <MediaUpload
+                  label="صورة الرخصة (وش)"
+                  value={form.license_file_path || null}
+                  collection="vehicle_docs"
+                  purpose="document"
+                  accept="image"
+                  attachableType={vehicleId ? 'vehicle' : undefined}
+                  attachableId={vehicleId}
+                  onChange={(path) => setForm((f) => ({ ...f, license_file_path: path || '' }))}
+                  hint={mode === 'edit' ? 'عند رفع صورة جديدة تُحفظ الرخصة السابقة في السجل التاريخي' : undefined}
+                />
+                <MediaUpload
+                  label="صورة الرخصة (ضهر)"
+                  value={form.license_file_path_back || null}
+                  collection="vehicle_docs"
+                  purpose="document"
+                  accept="image"
+                  attachableType={vehicleId ? 'vehicle' : undefined}
+                  attachableId={vehicleId}
+                  onChange={(path) => setForm((f) => ({ ...f, license_file_path_back: path || '' }))}
+                />
+              </div>
             </div>
           ) : (
             <p className="muted" style={{ marginBlockStart: '0.35rem' }}>يمكن إضافة العربية بدون رخصة تسيير وتسجيلها لاحقاً من ملف العربية.</p>
