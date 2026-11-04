@@ -13,7 +13,6 @@ type Violation = {
   amount: number
   occurred_at: string
   status: string
-  location?: string
   photo_path?: string | null
   photo_paths?: string[] | null
   vehicle_id?: number
@@ -38,6 +37,14 @@ type ContractOption = {
   vehicle_id?: number
 }
 
+function todayDateOnly(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function contractLabel(c: ContractOption): string {
   const raw = (c.number || c.code || '').trim()
   const no = raw || `CNT-${String(c.id).padStart(5, '0')}`
@@ -55,7 +62,7 @@ const statusLabel: Record<string, string> = {
 
 const emptyForm = () => ({
   contract_id: '',
-  occurred_at: '',
+  occurred_at: todayDateOnly(),
   amount: '',
   photo_paths: ['', ''] as string[],
   status: 'new',
@@ -162,7 +169,10 @@ export function ViolationsPage() {
     const list = (row.photo_paths && row.photo_paths.length > 0)
       ? row.photo_paths
       : (row.photo_path ? [row.photo_path] : [])
-    return [...list, ''].slice(0, Math.max(2, list.length + (list.length < 5 ? 1 : 0)))
+    const next = [...list]
+    if (next.length < 5 && (next.length === 0 || next.every(Boolean))) next.push('')
+    while (next.length < 2) next.push('')
+    return next.slice(0, 5)
   }
 
   async function openCreate() {
@@ -177,7 +187,7 @@ export function ViolationsPage() {
     setEditing(row)
     setForm({
       contract_id: row.contract_id || row.contract?.id ? String(row.contract_id || row.contract?.id) : '',
-      occurred_at: (row.occurred_at || '').slice(0, 10),
+      occurred_at: (row.occurred_at || '').slice(0, 10) || todayDateOnly(),
       amount: String(row.amount ?? ''),
       photo_paths: photosFromRow(row),
       status: row.status || 'new',
@@ -343,7 +353,7 @@ export function ViolationsPage() {
               error={index === 0 ? (fieldErrors.photo_path || fieldErrors.photo_paths || fieldErrors['photo_paths.0']) : undefined}
               value={path || null}
               onChange={(p) => setPhotoAt(index, p)}
-              hint={index === 0 ? 'يمكن رفع أكثر من صورة' : undefined}
+              hint={index === 0 ? 'يمكن رفع أكثر من صورة (حتى 5)' : undefined}
             />
           ))}
           {editing ? (
