@@ -42,6 +42,7 @@ const railNav: NavItem[] = [
   { to: '/expenses', label: 'المصروفات', icon: <IconReceipt />, permission: 'expenses.view' },
   { to: '/owners', label: 'ملاك العربيات', icon: <IconKey />, permission: 'owners.view' },
   { to: '/violations', label: 'المخالفات', icon: <IconAlert />, permission: 'violations.view' },
+  { to: '/violation-inquiries', label: 'استعلامات المخالفات', icon: <IconSearch />, permission: 'violations.view' },
   { to: '/customers', label: 'العملاء', icon: <IconUsers />, permission: 'customers.view' },
   { to: '/department-notice', label: 'إخطار القسم', icon: <IconFileText />, feature: 'department_notice', permission: 'department_notice.print' },
   { to: '/accounts', label: 'الحسابات', icon: <IconLandmark />, permission: 'accounting.view' },

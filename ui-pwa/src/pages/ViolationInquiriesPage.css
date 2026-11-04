@@ -1,0 +1,31 @@
+.viq-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.viq-copy__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.viq-copy__btn {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--text-muted);
+}
+
+.viq-copy__btn:hover {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.viq-page .rpm-dt__table td {
+  vertical-align: middle;
+}
