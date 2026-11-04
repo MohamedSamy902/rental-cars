@@ -519,6 +519,7 @@ class MegaSeeder extends Seeder
                 'status' => $statuses[$n % count($statuses)],
                 'confirmed_by' => $n % 3 === 0 ? $accountsId : null,
                 'confirmed_at' => $n % 3 === 0 ? now()->subDays($n - 1) : null,
+                'created_by' => $accountsId,
                 'notes' => 'مخالفة ميجا #'.$n,
             ]);
         }

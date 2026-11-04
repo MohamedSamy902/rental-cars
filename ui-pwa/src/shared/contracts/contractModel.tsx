@@ -75,7 +75,17 @@ export type Contract = {
   documents?: ContractDoc[]
   related?: RelatedContract[]
   timeline?: TimelineItem[]
-  ledger?: { contract_total: number; paid: number; balance: number; deposit_held: number }
+  open_violations?: Array<{
+    id: number
+    amount: number
+    occurred_at?: string | null
+    status: string
+    photo_paths?: string[]
+    created_by_name?: string | null
+  }>
+  open_violations_total?: number
+  open_violations_count?: number
+  ledger?: { contract_total: number; paid: number; balance: number; deposit_held: number; violations_due?: number }
   progress?: {
     status: string
     tone: 'normal' | 'warning' | 'danger' | 'muted'
