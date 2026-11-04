@@ -4,7 +4,7 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import { Button, TextAreaField, TextField, useToast } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
 
-type TemplateType = 'contract' | 'handover_receipt'
+type TemplateType = 'contract' | 'handover_receipt' | 'custody_agreement'
 
 type Placeholder = {
   key: string
@@ -27,26 +27,42 @@ type TemplateRow = {
 const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
   contract: {
     title: 'قالب العقد الأساسي',
-    hint: 'يُستخدم عند طباعة عقد التأجير. يدعم HTML أو Markdown أو رفع ملف Word (.docx).',
+    hint: 'يُستخدم عند طباعة عقد التأجير للعميل. يدعم HTML أو Markdown أو رفع ملف Word (.docx).',
   },
   handover_receipt: {
     title: 'قالب إيصال الاستلام والتأمين',
     hint: 'يُستخدم عند طباعة إيصال الاستلام والتأمين.',
   },
+  custody_agreement: {
+    title: 'قالب عقد الاعتماد',
+    hint: 'عقد بين المركز ومالك العربية الأساسي عند اعتماد السيارة للتأجير. تعديل القالب لا يغيّر النسخ الصادرة سابقاً.',
+  },
+}
+
+const ALL_TYPES: TemplateType[] = ['contract', 'handover_receipt', 'custody_agreement']
+
+function emptyDrafts(): Record<TemplateType, { title: string; content: string }> {
+  return {
+    contract: { title: TYPE_META.contract.title, content: '' },
+    handover_receipt: { title: TYPE_META.handover_receipt.title, content: '' },
+    custody_agreement: { title: TYPE_META.custody_agreement.title, content: '' },
+  }
 }
 
 function shellPreview(title: string, body: string) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${title}</title>
 <style>
-  body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a}
+  body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a;line-height:1.7}
   h1{margin:0 0 4px;font-size:22px} h2{margin:20px 0 8px;font-size:16px}
   .muted{color:#64748b} table{width:100%;border-collapse:collapse;margin-top:12px}
   td,th{border:1px solid #cbd5e1;padding:8px;text-align:start} th{background:#f8fafc;width:32%}
   .foot{margin-top:24px;color:#64748b;font-size:12px}
   .terms{margin-top:20px;white-space:pre-wrap;font-size:13px;line-height:1.7}
+  .terms-list{margin:12px 0;padding-inline-start:1.25rem;font-size:13px;line-height:1.75}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;color:#0f766e;font-size:12px}
   .print-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
   .print-logo{width:96px;height:auto;object-fit:contain}
+  @media print{body{padding:0}}
 </style></head><body>${body}</body></html>`
 }
 
@@ -57,13 +73,11 @@ export function DocumentTemplatesPanel() {
   const [loading, setLoading] = useState(true)
   const [placeholders, setPlaceholders] = useState<Placeholder[]>([])
   const [active, setActive] = useState<Partial<Record<TemplateType, TemplateRow>>>({})
-  const [drafts, setDrafts] = useState<Record<TemplateType, { title: string; content: string }>>({
-    contract: { title: '', content: '' },
-    handover_receipt: { title: '', content: '' },
-  })
+  const [drafts, setDrafts] = useState<Record<TemplateType, { title: string; content: string }>>(emptyDrafts)
   const [files, setFiles] = useState<Partial<Record<TemplateType, File | null>>>({})
   const [saving, setSaving] = useState<TemplateType | null>(null)
   const [previewing, setPreviewing] = useState<TemplateType | null>(null)
+  const [tokenTarget, setTokenTarget] = useState<TemplateType>('custody_agreement')
 
   useEffect(() => {
     let cancelled = false
@@ -73,12 +87,9 @@ export function DocumentTemplatesPanel() {
         if (cancelled) return
         setPlaceholders(res.placeholders || [])
         const nextActive: Partial<Record<TemplateType, TemplateRow>> = {}
-        const nextDrafts: Record<TemplateType, { title: string; content: string }> = {
-          contract: { title: TYPE_META.contract.title, content: '' },
-          handover_receipt: { title: TYPE_META.handover_receipt.title, content: '' },
-        }
+        const nextDrafts = emptyDrafts()
         for (const row of res.data || []) {
-          if (row.type !== 'contract' && row.type !== 'handover_receipt') continue
+          if (!ALL_TYPES.includes(row.type)) continue
           nextActive[row.type] = row
           nextDrafts[row.type] = { title: row.title, content: row.content }
         }
@@ -139,9 +150,6 @@ export function DocumentTemplatesPanel() {
   async function preview(type: TemplateType) {
     setPreviewing(type)
     try {
-      // Persist draft content temporarily via preview endpoint sample vars (does not publish).
-      // If draft differs from active, send override variables only — preview uses active DB template.
-      // So we first save? No — for unsaved draft preview, render locally with sample placeholders.
       const content = drafts[type].content
       const sampleMap: Record<string, string> = {}
       for (const p of placeholders) {
@@ -154,7 +162,6 @@ export function DocumentTemplatesPanel() {
       })
       printHtmlDocument(shellPreview(TYPE_META[type].title, rendered))
 
-      // Also hit server preview for active published version (optional confirmation).
       await api('/document-templates/preview', {
         method: 'POST',
         json: { type },
@@ -184,12 +191,25 @@ export function DocumentTemplatesPanel() {
     <div className="rpm-stack" style={{ gap: '1rem' }}>
       <p className="muted" style={{ margin: 0 }}>
         خصّص قوالب الطباعة بعناصر ديناميكية مثل{' '}
-        <code>{'{{اسم_العميل}}'}</code> و<code>{'{{رقم_اللوحة}}'}</code>. الحفظ ينشر إصداراً جديداً ويصبح فوراً
-        القالب النشط لكل المستخدمين عند الطباعة.
+        <code>{'{{اسم_المالك}}'}</code> و<code>{'{{اسم_المركز}}'}</code> و<code>{'{{رقم_اللوحة}}'}</code>. الحفظ ينشر
+        إصداراً جديداً ويصبح فوراً القالب النشط. النسخ الصادرة من عقد الاعتماد تبقى ثابتة ولا تتأثر بتعديل القالب.
       </p>
 
       <div className="rpm-panel" style={{ padding: '0.85rem 1rem' }}>
         <strong style={{ display: 'block', marginBlockEnd: '0.55rem' }}>المتغيرات المتاحة</strong>
+        <p className="muted" style={{ margin: '0 0 0.55rem', fontSize: '0.82rem' }}>
+          الإدراج في:{' '}
+          <select
+            value={tokenTarget}
+            onChange={(e) => setTokenTarget(e.target.value as TemplateType)}
+            disabled={!canEdit}
+            style={{ marginInlineStart: '0.35rem' }}
+          >
+            {ALL_TYPES.map((t) => (
+              <option key={t} value={t}>{TYPE_META[t].title}</option>
+            ))}
+          </select>
+        </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
           {placeholders.map((p) => (
             <button
@@ -197,7 +217,7 @@ export function DocumentTemplatesPanel() {
               type="button"
               className="rpm-chip"
               title={`${p.label} · مثال: ${p.sample}`}
-              onClick={() => insertToken('contract', p.aliases[0] || p.key)}
+              onClick={() => insertToken(tokenTarget, p.aliases[0] || p.key)}
               disabled={!canEdit}
               style={{
                 border: '1px solid var(--border)',
@@ -214,7 +234,7 @@ export function DocumentTemplatesPanel() {
         </div>
       </div>
 
-      {(['contract', 'handover_receipt'] as TemplateType[]).map((type) => {
+      {ALL_TYPES.map((type) => {
         const meta = TYPE_META[type]
         const row = active[type]
         return (

@@ -35,6 +35,19 @@ class DocumentTemplateService
             ['key' => 'customer_phone', 'aliases' => ['هاتف_العميل', 'رقم_الهاتف'], 'label' => 'هاتف العميل', 'sample' => '01000000000'],
             ['key' => 'vehicle_plate', 'aliases' => ['رقم_اللوحة'], 'label' => 'رقم اللوحة', 'sample' => 'أ ب ج 1234'],
             ['key' => 'vehicle_name', 'aliases' => ['اسم_العربية', 'العربية'], 'label' => 'الماركة والموديل', 'sample' => 'هيونداي إلنترا'],
+            ['key' => 'vehicle_brand', 'aliases' => ['ماركة_العربية'], 'label' => 'ماركة العربية', 'sample' => 'هيونداي'],
+            ['key' => 'vehicle_model', 'aliases' => ['موديل_العربية'], 'label' => 'موديل العربية', 'sample' => 'إلنترا'],
+            ['key' => 'vehicle_year', 'aliases' => ['سنة_العربية'], 'label' => 'سنة الصنع', 'sample' => '2024'],
+            ['key' => 'vehicle_color', 'aliases' => ['لون_العربية'], 'label' => 'لون العربية', 'sample' => 'أبيض'],
+            ['key' => 'vehicle_chassis', 'aliases' => ['رقم_الشاسيه'], 'label' => 'رقم الشاسيه', 'sample' => 'CHS-001'],
+            ['key' => 'vehicle_engine', 'aliases' => ['رقم_الموتور'], 'label' => 'رقم الموتور', 'sample' => 'ENG-001'],
+            ['key' => 'owner_name', 'aliases' => ['اسم_المالك', 'اسم_المؤجر'], 'label' => 'اسم مالك العربية (الطرف الأول)', 'sample' => 'أحمد محمود'],
+            ['key' => 'owner_phone', 'aliases' => ['هاتف_المالك'], 'label' => 'هاتف المالك', 'sample' => '01012345678'],
+            ['key' => 'owner_national_id', 'aliases' => ['رقم_قومي_المالك'], 'label' => 'الرقم القومي للمالك', 'sample' => '29001011234567'],
+            ['key' => 'owner_notes', 'aliases' => ['ملاحظات_المالك'], 'label' => 'ملاحظات المالك', 'sample' => ''],
+            ['key' => 'agreement_number', 'aliases' => ['رقم_عقد_الاعتماد'], 'label' => 'رقم عقد الاعتماد', 'sample' => 'CAD-2026-0001'],
+            ['key' => 'monthly_amount', 'aliases' => ['القيمة_الشهرية', 'إيجار_المالك'], 'label' => 'القيمة الإيجارية الشهرية للمالك', 'sample' => '8000'],
+            ['key' => 'issued_on', 'aliases' => ['تاريخ_الإصدار'], 'label' => 'تاريخ إصدار عقد الاعتماد', 'sample' => '2026-11-04'],
             ['key' => 'start_date', 'aliases' => ['تاريخ_البداية'], 'label' => 'تاريخ البداية', 'sample' => '2026-11-01'],
             ['key' => 'end_date', 'aliases' => ['تاريخ_النهاية', 'النهاية_المخططة'], 'label' => 'تاريخ النهاية المخططة', 'sample' => '2026-11-05'],
             ['key' => 'actual_end_date', 'aliases' => ['تاريخ_الاستلام_الفعلي'], 'label' => 'تاريخ الاستلام الفعلي', 'sample' => '2026-11-05'],
@@ -75,6 +88,10 @@ class DocumentTemplateService
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => [
                 'title' => 'قالب إيصال الاستلام والتأمين',
                 'content' => $this->defaultHandoverHtml(),
+            ],
+            DocumentTemplate::TYPE_CUSTODY_AGREEMENT => [
+                'title' => 'قالب عقد الاعتماد',
+                'content' => $this->defaultCustodyAgreementHtml(),
             ],
         ] as $type => $meta) {
             $exists = DocumentTemplate::query()->where('type', $type)->where('is_active', true)->exists();
@@ -435,6 +452,7 @@ class DocumentTemplateService
         return match ($type) {
             DocumentTemplate::TYPE_CONTRACT => 'قالب العقد الأساسي',
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب إيصال الاستلام والتأمين',
+            DocumentTemplate::TYPE_CUSTODY_AGREEMENT => 'قالب عقد الاعتماد',
             default => 'قالب مستند',
         };
     }
@@ -499,6 +517,68 @@ HTML;
 <table>
   <tr><th>عداد العودة</th><td>{{odometer_in}}</td></tr>
   <tr><th>وقت الاستلام</th><td>{{return_at}}</td></tr>
+</table>
+<p class="foot">{{print_footer}}</p>
+HTML;
+    }
+
+    private function defaultCustodyAgreementHtml(): string
+    {
+        return <<<'HTML'
+<header class="print-head">
+  <img class="print-logo" src="{{logo_src}}" alt="شعار الشركة" />
+  <div>
+    <h1>{{company_name}}</h1>
+    <p class="muted">{{company_phone}} · {{company_address}}</p>
+    <p class="muted">سجل تجاري {{company_cr}} · بطاقة ضريبية {{company_tax}}</p>
+  </div>
+</header>
+<h2 style="text-align:center">عقد اعتماد · رقم {{agreement_number}}</h2>
+<p class="muted" style="text-align:center">إصدار القالب {{template_version}} · حُرّر في {{issued_on}}</p>
+<p>إنه في يوم الموافق {{issued_on}} حُرّر هذا العقد فيما بين كل من:</p>
+<h2>أولاً: الطرف الأول (المؤجر / مالك العربية)</h2>
+<table>
+  <tr><th>الاسم</th><td>{{owner_name}}</td></tr>
+  <tr><th>الهاتف</th><td dir="ltr">{{owner_phone}}</td></tr>
+  <tr><th>الرقم القومي</th><td dir="ltr">{{owner_national_id}}</td></tr>
+</table>
+<h2>ثانياً: الطرف الثاني (المستأجر / المركز)</h2>
+<table>
+  <tr><th>اسم المركز</th><td>{{company_name}}</td></tr>
+  <tr><th>الهاتف</th><td dir="ltr">{{company_phone}}</td></tr>
+  <tr><th>العنوان</th><td>{{company_address}}</td></tr>
+  <tr><th>السجل التجاري</th><td>{{company_cr}}</td></tr>
+  <tr><th>البطاقة الضريبية</th><td>{{company_tax}}</td></tr>
+</table>
+<p>وبعد أن أقر الطرفان بأهليتهما الكاملة للتصرفات القانونية والتعاقد، اتفقا وتراضيا على الآتي:</p>
+<h2>تمهيد</h2>
+<p>يمتلك الطرف الأول السيارة رقم اللوحة ({{vehicle_plate}}) ماركة/ {{vehicle_brand}} موديل/ {{vehicle_model}} سنة/ {{vehicle_year}} لون/ {{vehicle_color}} رقم الشاسيه/ {{vehicle_chassis}} رقم الموتور/ {{vehicle_engine}}. وحيث يرغب الطرف الأول في اعتماد السيارة لدى الطرف الثاني بصفته مركزاً لتأجير السيارات لتمكينه من تأجيرها للغير خلال مدة هذا العقد، لذلك اتفق الطرفان على ما يلي:</p>
+<ol class="terms-list">
+  <li>التمهيد السابق جزء لا يتجزأ من العقد ويُعتبر مكملاً له.</li>
+  <li>اعتمد الطرف الثاني من الطرف الأول السيارة محل التمهيد السابق لاستغلالها في نشاط التأجير وفق أنظمة المركز.</li>
+  <li>مدة هذا العقد تبدأ من تاريخ {{start_date}} إلى تاريخ {{end_date}}.</li>
+  <li>القيمة الإيجارية الشهرية المستحقة للمالك مبلغ وقدره ({{monthly_amount}}) جنيهاً لا غير، تُدفع أول كل شهر من المستأجر (المركز) إلى المؤجر أو وكيله بموجب إيصال أو مخالصة أو إيداع بنكي يُعد الدليل الوحيد على السداد.</li>
+  <li>يقر الطرف الثاني بأنه تسلم السيارة موضع هذا العقد بحالة جيدة وبكامل كمالياتها، وأصبح مسؤولاً عنها مسؤولية قانونية كاملة وعن أي حوادث أو مخالفات قد تنجم عنها خلال مدة الاعتماد.</li>
+  <li>يلتزم المستأجر بإصلاح أي تلفيات قد تحدث للسيارة دون توقف عن دفع القيمة الإيجارية للمؤجر طوال مدة الإصلاح، وعلى المؤجر تقديم وثيقة التأمين ويتحمل المستأجر فرق ومصاريف الإصلاح، كما يلتزم المستأجر بالصيانة الدورية والعادية في مواعيدها والمحافظة عليها.</li>
+  <li>يحق للطرف الأول أو وكيله الاطمئنان على السيارة ومشاهدتها كل 3 شهور، وعلى الطرف الثاني تمكينه من ذلك دون اعتراض.</li>
+  <li>يلتزم الطرف الثاني بتسليم السيارة للطرف الأول أو وكيله بحالتها التي كانت وقت التعاقد عند انتهاء مدة العقد، ولا يمتد هذا العقد أو يُجدَّد إلا بموافقة كتابية من المؤجر أو وكيله.</li>
+  <li>يلتزم الطرفان بتنفيذ كافة بنود هذا العقد. وفي حالة مخالفة أي بند يلتزم الطرف المخالف بدفع مبلغ (50000) جنيهاً فقط لا غير كشرط جزائي للطرف الآخر، ويكون العقد مفسوخاً تلقائياً.</li>
+  <li>في حالة التأخر في الدفعة الإيجارية الشهرية عن ثلاثين يوماً يُعتبر العقد مفسوخاً ويحق للطرف الأول سحب السيارة مع استيفاء القيمة الإيجارية كاملة بالإضافة إلى الشرط الجزائي (50000) جنيهاً.</li>
+  <li>تختص المحكمة المختصة بأي نزاع ينشأ عن هذا العقد، ويقر الطرفان بأن العنوان المدون بالعقد هو موطن المراسلات الرسمية بينهما.</li>
+  <li>يلتزم الطرف الأول بتسهيل إجراءات تجديد الترخيص عند انتهائه أو سحبه لأي سبب، وبتسليم صورة من وثيقة التأمين والمستندات اللازمة، مع تحمل المستأجر نسبة التحمل التأميني وفروق التصليح.</li>
+  <li>يتعهد الطرف الثاني بأن خط سير السيارة داخل جمهورية مصر العربية فقط، وأن السيارة خالية مما يخالف القانون.</li>
+  <li>تحرر هذا العقد من نسختين بيد كل طرف نسخة للعمل بها عند اللزوم. ومن تاريخ وساعة التعاقد يكون الطرف الثاني مسؤولاً مسؤولية كاملة عن السيارة حتى نهاية المدة المتعاقد عليها.</li>
+</ol>
+<div class="terms">{{contract_terms}}</div>
+<table style="margin-top:32px">
+  <tr>
+    <th style="width:50%;text-align:center">توقيع الطرف الأول (المؤجر)</th>
+    <th style="width:50%;text-align:center">توقيع الطرف الثاني (المركز)</th>
+  </tr>
+  <tr>
+    <td style="height:72px;text-align:center">{{owner_name}}</td>
+    <td style="height:72px;text-align:center">{{company_name}}</td>
+  </tr>
 </table>
 <p class="foot">{{print_footer}}</p>
 HTML;

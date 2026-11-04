@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAuth } from '@/shared/auth/AuthContext'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -20,7 +21,7 @@ import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { printContractDocument } from '@/shared/contracts/printContract'
 import type { Contract } from '@/shared/contracts/contractModel'
-import { printDomSubtree } from '@/utils/printHtml'
+import { printDomSubtree, printHtmlDocument } from '@/utils/printHtml'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
@@ -95,6 +96,35 @@ type Vehicle = {
 
 type ChartPoint = { month: string; amount: number; count?: number }
 type StatusSlice = { status: string; label: string; count: number }
+
+type CustodyAgreement = {
+  id: number
+  number: string
+  starts_on: string
+  ends_on: string
+  monthly_amount: number
+  template_version: number
+  issued_at?: string | null
+  issuer_name?: string | null
+  immutable?: boolean
+  rendered_html?: string
+}
+
+function custodyPrintShell(title: string, body: string) {
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${title.replace(/[<>&]/g, '')}</title>
+<style>
+  body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a;line-height:1.7}
+  h1{margin:0 0 4px;font-size:22px} h2{margin:20px 0 8px;font-size:16px}
+  .muted{color:#64748b} table{width:100%;border-collapse:collapse;margin-top:12px}
+  td,th{border:1px solid #cbd5e1;padding:8px;text-align:start} th{background:#f8fafc;width:32%}
+  .foot{margin-top:24px;color:#64748b;font-size:12px}
+  .terms{margin-top:20px;white-space:pre-wrap;font-size:13px;line-height:1.7}
+  .terms-list{margin:12px 0;padding-inline-start:1.25rem;font-size:13px;line-height:1.75}
+  .print-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
+  .print-logo{width:96px;height:auto;object-fit:contain}
+  @media print{body{padding:0}}
+</style></head><body>${body}</body></html>`
+}
 
 type Dossier = {
   vehicle: Vehicle
@@ -260,8 +290,10 @@ export function VehicleDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const { can } = useAuth()
   const { openNewContract } = useNewContract()
   const vehicleId = Number(id)
+  const canUpdateVehicle = can('vehicles.update')
 
   const [dossier, setDossier] = useState<Dossier | null>(null)
   const [loading, setLoading] = useState(true)
@@ -269,6 +301,10 @@ export function VehicleDetailPage() {
   const [tab, setTab] = useQueryTab<TabId>({ allowed: VEHICLE_DETAIL_TABS, defaultValue: 'overview' })
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [custodyAgreements, setCustodyAgreements] = useState<CustodyAgreement[]>([])
+  const [custodyLoading, setCustodyLoading] = useState(false)
+  const [custodyIssuing, setCustodyIssuing] = useState(false)
+  const [custodyPrintingId, setCustodyPrintingId] = useState<number | null>(null)
   const [docForm, setDocForm] = useState({ type: 'رخصة تسيير', document_number: '', expires_on: '', issued_on: '', notes: '', file_path: '', file_path_back: '' })
   const [docEdit, setDocEdit] = useState<Document | null>(null)
   const [docHistory, setDocHistory] = useState<Array<{ id: number; type: string; document_number?: string | null; issued_on?: string | null; expires_on?: string | null; archived_at?: string }>>([])
@@ -361,6 +397,73 @@ export function VehicleDetailPage() {
   )
 
 
+  async function loadCustodyAgreements(vid = vehicleId) {
+    if (!Number.isFinite(vid) || vid <= 0) return
+    setCustodyLoading(true)
+    try {
+      const res = await api<{ data: CustodyAgreement[] }>(`/vehicles/${vid}/custody-agreements`)
+      setCustodyAgreements(res.data || [])
+    } catch {
+      setCustodyAgreements([])
+    } finally {
+      setCustodyLoading(false)
+    }
+  }
+
+  async function issueCustodyAgreement() {
+    if (!dossier?.vehicle.owner) {
+      toast.error('اربط العربية بمالك خارجي أولاً.')
+      return
+    }
+    if (!dossier.vehicle.owner_agreement_starts_on || !dossier.vehicle.owner_agreement_ends_on) {
+      toast.error('حدّد بداية ونهاية عقد الاعتماد في بيانات العربية أولاً.')
+      return
+    }
+    setCustodyIssuing(true)
+    try {
+      const res = await api<{ data: CustodyAgreement; message?: string }>(
+        `/vehicles/${dossier.vehicle.id}/custody-agreements`,
+        {
+          method: 'POST',
+          json: {
+            number: dossier.vehicle.owner_agreement_number || undefined,
+            starts_on: dossier.vehicle.owner_agreement_starts_on.slice(0, 10),
+            ends_on: dossier.vehicle.owner_agreement_ends_on.slice(0, 10),
+            monthly_amount: Number(dossier.vehicle.owner_monthly_amount || 0),
+          },
+        },
+      )
+      toast.success(res.message || 'تم إصدار عقد الاعتماد.')
+      await loadCustodyAgreements(dossier.vehicle.id)
+      if (res.data?.rendered_html) {
+        printHtmlDocument(custodyPrintShell(`عقد اعتماد · ${res.data.number}`, res.data.rendered_html))
+      }
+    } catch (e) {
+      toast.error((e as ApiError).message || 'تعذّر إصدار عقد الاعتماد.')
+    } finally {
+      setCustodyIssuing(false)
+    }
+  }
+
+  async function printCustodyAgreement(row: CustodyAgreement) {
+    setCustodyPrintingId(row.id)
+    try {
+      const res = await api<{ data: { html: string; title?: string; number?: string } }>(
+        `/vehicles/${vehicleId}/custody-agreements/${row.id}/print`,
+      )
+      const html = res.data?.html || row.rendered_html || ''
+      if (!html) {
+        toast.error('لا يوجد محتوى مطبوع لهذه النسخة.')
+        return
+      }
+      printHtmlDocument(custodyPrintShell(res.data?.title || `عقد اعتماد · ${row.number}`, html))
+    } catch (e) {
+      toast.error((e as ApiError).message || 'تعذّر طباعة عقد الاعتماد.')
+    } finally {
+      setCustodyPrintingId(null)
+    }
+  }
+
   async function load() {
     if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
       setError('معرّف العربية غير صالح.')
@@ -372,6 +475,7 @@ export function VehicleDetailPage() {
     try {
       const res = await api<{ data: Dossier }>(`/vehicles/${vehicleId}/dossier`)
       setDossier(res.data)
+      void loadCustodyAgreements(vehicleId)
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -1145,15 +1249,71 @@ export function VehicleDetailPage() {
             </div>
           </div>
           <div className="vd-facts" style={{ marginBlockStart: '0.75rem' }}>
-            <Fact label="رقم عقد المالك" value={v.owner_agreement_number || '—'} />
+            <Fact label="رقم عقد الاعتماد" value={v.owner_agreement_number || '—'} />
             <Fact label="بداية العقد" value={shortDate(v.owner_agreement_starts_on)} />
             <Fact label="نهاية العقد" value={shortDate(v.owner_agreement_ends_on)} />
             <Fact label="تفاصيل العقد" value={v.owner_agreement_notes || '—'} wide />
           </div>
-          <Link className="vd-no-print rpm-link-btn" to={v.owner ? `/owners/${v.owner.id}` : '/owners'}>{v.owner ? 'ملف المالك' : 'صفحة الملاك'}</Link>
+          <div className="vd-no-print" style={{ marginBlockStart: '0.85rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+            <Link className="rpm-link-btn" to={`/owners/${v.owner.id}`}>ملف المالك</Link>
+            {canUpdateVehicle ? (
+              <Button size="sm" loading={custodyIssuing} onClick={() => void issueCustodyAgreement()}>
+                إصدار عقد اعتماد وطباعة
+              </Button>
+            ) : null}
+          </div>
+          <div style={{ marginBlockStart: '1rem' }}>
+            <h3 style={{ margin: '0 0 0.35rem' }}>نسخ عقد الاعتماد الصادرة</h3>
+            <p className="muted" style={{ margin: '0 0 0.55rem', fontSize: '0.82rem' }}>
+              تُملأ تلقائياً ببيانات المركز والمالك والعربية. النسخة الصادرة ثابتة ولا تتأثر بتعديل القالب لاحقاً — وهذا مستقل عن عقود تأجير العملاء.
+            </p>
+            {custodyLoading ? (
+              <p className="muted">جاري تحميل العقود…</p>
+            ) : custodyAgreements.length === 0 ? (
+              <Empty>لا توجد نسخ صادرة بعد. أصدر عقد اعتماد بعد ضبط مدة البداية والنهاية.</Empty>
+            ) : (
+              <div className="rpm-table-wrap">
+                <table className="rpm-table rpm-table--compact rpm-table--stack">
+                  <thead>
+                    <tr>
+                      <th>الرقم</th>
+                      <th>المدة</th>
+                      <th>الشهري</th>
+                      <th>الإصدار</th>
+                      <th className="vd-no-print">طباعة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {custodyAgreements.map((row) => (
+                      <tr key={row.id}>
+                        <td data-label="الرقم">{row.number}</td>
+                        <td data-label="المدة">{shortDate(row.starts_on)} → {shortDate(row.ends_on)}</td>
+                        <td data-label="الشهري">{formatMoney(row.monthly_amount || 0)}</td>
+                        <td data-label="الإصدار">
+                          قالب v{row.template_version}
+                          {row.issued_at ? ` · ${shortDate(row.issued_at)}` : ''}
+                          {row.issuer_name ? ` · ${row.issuer_name}` : ''}
+                        </td>
+                        <td data-label="طباعة" className="vd-no-print">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            loading={custodyPrintingId === row.id}
+                            onClick={() => void printCustodyAgreement(row)}
+                          >
+                            طباعة
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
-        <Empty>هذه العربية ملك المركز — لا يوجد مالك خارجي مرتبط.</Empty>
+        <Empty>هذه العربية ملك المركز — لا يوجد مالك خارجي مرتبط. عقد الاعتماد للمالك الخارجي فقط.</Empty>
       )}
       {(dossier.owner_dues.length > 0 || dossier.owner_payouts.length > 0) ? (
         <div className="vd-split">
