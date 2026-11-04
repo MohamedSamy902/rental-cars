@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney, toApiDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, SelectField, TextField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck, IconEdit,
+  PageHeader, FilterBar, Button, Sheet, Fab, SelectField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck, IconEdit,
   MediaUpload, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -13,8 +13,8 @@ type Violation = {
   amount: number
   occurred_at: string
   status: string
-  location?: string
   photo_path?: string | null
+  photo_paths?: string[] | null
   vehicle_id?: number
   contract_id?: number | null
   vehicle?: { id?: number; brand: string; model: string; plate: string }
@@ -35,6 +35,14 @@ type ContractOption = {
   vehicle_id?: number
 }
 
+function todayDateOnly(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function contractLabel(c: ContractOption): string {
   const raw = (c.number || c.code || '').trim()
   const no = raw || `CNT-${String(c.id).padStart(5, '0')}`
@@ -53,10 +61,9 @@ const statusLabel: Record<string, string> = {
 const emptyForm = () => ({
   vehicle_id: '',
   contract_id: '',
-  occurred_at: '',
+  occurred_at: todayDateOnly(),
   amount: '',
-  location: '',
-  photo_path: '',
+  photo_paths: ['', ''] as string[],
   status: 'new',
 })
 
@@ -99,7 +106,7 @@ export function ViolationsPage() {
       if (chip === 'open' && ['paid', 'confirmed'].includes(r.status)) return false
       if (chip === 'done' && !['paid', 'confirmed'].includes(r.status)) return false
       if (!q) return true
-      const hay = `${r.vehicle?.plate ?? ''} ${r.vehicle?.brand ?? ''} ${r.customer?.full_name ?? ''} ${r.contract?.code ?? ''} ${r.location ?? ''}`
+      const hay = `${r.vehicle?.plate ?? ''} ${r.vehicle?.brand ?? ''} ${r.customer?.full_name ?? ''} ${r.contract?.code ?? ''} ${r.contract?.number ?? ''}`
       return hay.includes(q)
     })
   }, [rows, chip, search])
@@ -138,7 +145,6 @@ export function ViolationsPage() {
     },
     { id: 'customer', header: 'العميل', cell: (r) => r.customer?.full_name || 'بلا ربط بعد', sortValue: (r) => r.customer?.full_name, mobile: 'subtitle' },
     { id: 'date', header: 'تاريخ المخالفة', cell: (r) => formatDate(r.occurred_at), sortValue: (r) => r.occurred_at },
-    { id: 'location', header: 'المكان', cell: (r) => r.location || '—', sortValue: (r) => r.location },
     { id: 'amount', header: 'المبلغ', cell: (r) => formatMoney(r.amount), sortValue: (r) => Number(r.amount) },
     {
       id: 'status',
@@ -170,6 +176,27 @@ export function ViolationsPage() {
     setContracts(c.data)
   }
 
+  function photosFromRow(row: Violation): string[] {
+    const list = (row.photo_paths && row.photo_paths.length > 0)
+      ? row.photo_paths
+      : (row.photo_path ? [row.photo_path] : [])
+    const next = [...list]
+    if (next.length < 5 && (next.length === 0 || next.every(Boolean))) next.push('')
+    while (next.length < 2) next.push('')
+    return next.slice(0, 5)
+  }
+
+  function setPhotoAt(index: number, path: string | null) {
+    setForm((prev) => {
+      const next = [...prev.photo_paths]
+      next[index] = path || ''
+      const cleaned = next.filter((p, i) => p || i < 2)
+      if (cleaned.filter(Boolean).length < 5 && cleaned.every(Boolean)) cleaned.push('')
+      while (cleaned.length < 2) cleaned.push('')
+      return { ...prev, photo_paths: cleaned.slice(0, 5) }
+    })
+  }
+
   async function openCreate() {
     setEditing(null)
     setForm(emptyForm())
@@ -183,10 +210,9 @@ export function ViolationsPage() {
     setForm({
       vehicle_id: String(row.vehicle_id || row.vehicle?.id || ''),
       contract_id: row.contract_id || row.contract?.id ? String(row.contract_id || row.contract?.id) : '',
-      occurred_at: (row.occurred_at || '').slice(0, 10),
+      occurred_at: (row.occurred_at || '').slice(0, 10) || todayDateOnly(),
       amount: String(row.amount ?? ''),
-      location: row.location || '',
-      photo_path: row.photo_path || '',
+      photo_paths: photosFromRow(row),
       status: row.status || 'new',
     })
     setFieldErrors({})
@@ -198,13 +224,14 @@ export function ViolationsPage() {
     setFieldErrors({})
     setSaving(true)
     try {
+      const photo_paths = form.photo_paths.map((p) => p.trim()).filter(Boolean)
       const payload = {
         vehicle_id: Number(form.vehicle_id),
         contract_id: form.contract_id ? Number(form.contract_id) : null,
         occurred_at: toApiDateTime(form.occurred_at) || form.occurred_at,
         amount: Number(form.amount),
-        location: form.location || undefined,
-        photo_path: form.photo_path || undefined,
+        photo_path: photo_paths[0] || undefined,
+        photo_paths,
         ...(editing ? { status: form.status } : {}),
       }
       if (editing) {
@@ -325,7 +352,6 @@ export function ViolationsPage() {
             <p className="muted" style={{ margin: 0 }}>العميل المسؤول: {selectedContract.customer.full_name}</p>
           ) : null}
           <MoneyField label="المبلغ (للمتابعة)" required error={fieldErrors.amount} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-          <TextField label="المكان" error={fieldErrors.location} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           {editing ? (
             <SelectField
               label="الحالة"
@@ -340,15 +366,19 @@ export function ViolationsPage() {
               onChange={(e) => setForm({ ...form, status: e.target.value })}
             />
           ) : null}
-          <MediaUpload
-            label="صورة المخالفة"
-            accept="both"
-            collection="violations"
-            purpose="ticket"
-            error={fieldErrors.photo_path}
-            value={form.photo_path || null}
-            onChange={(path) => setForm({ ...form, photo_path: path || '' })}
-          />
+          {form.photo_paths.map((path, index) => (
+            <MediaUpload
+              key={`photo-${index}`}
+              label={index === 0 ? 'صور المخالفة' : `صورة إضافية ${index + 1}`}
+              accept="both"
+              collection="violations"
+              purpose="ticket"
+              error={index === 0 ? (fieldErrors.photo_path || fieldErrors.photo_paths || fieldErrors['photo_paths.0']) : undefined}
+              value={path || null}
+              onChange={(p) => setPhotoAt(index, p)}
+              hint={index === 0 ? 'يمكن رفع أكثر من صورة (حتى 5)' : undefined}
+            />
+          ))}
         </div>
       </Sheet>
     </div>

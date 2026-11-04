@@ -44,6 +44,8 @@ class UpdateViolationRequest extends FormRequest
             'amount' => ['sometimes', 'required', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
             'photo_path' => ['nullable', 'string', 'max:500'],
+            'photo_paths' => ['nullable', 'array', 'max:5'],
+            'photo_paths.*' => ['string', 'max:500'],
             'contract_id' => [
                 'nullable',
                 Rule::exists('contracts', 'id')->whereNull('deleted_at'),
@@ -67,6 +69,7 @@ class UpdateViolationRequest extends FormRequest
             'contract_id' => 'العقد',
             'status' => 'الحالة',
             'photo_path' => 'المرفق',
+            'photo_paths' => 'صور المخالفة',
         ];
     }
 
