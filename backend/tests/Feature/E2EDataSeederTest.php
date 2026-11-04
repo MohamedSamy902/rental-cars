@@ -16,7 +16,6 @@ use App\Models\SalaryAdvance;
 use App\Models\Vehicle;
 use App\Models\VehicleDocument;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
 use App\Services\Operations\AuditNarrator;
@@ -52,7 +51,6 @@ class E2EDataSeederTest extends TestCase
 
         $this->assertTrue(Violation::query()->exists());
         $this->assertTrue(Expense::query()->exists());
-        $this->assertTrue(WaitlistRequest::query()->exists());
         $this->assertTrue(OwnerMonthDue::query()->exists());
         $this->assertTrue(VehicleDocument::query()->exists());
         $this->assertTrue(InventoryItem::query()->where('code', 'CLT-GRN')->exists());

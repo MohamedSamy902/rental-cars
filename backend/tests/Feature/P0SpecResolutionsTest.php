@@ -42,7 +42,7 @@ class P0SpecResolutionsTest extends TestCase
         TenantSetting::query()->create([
             'center_name' => 'اختبار',
             'feature_flags' => [
-                'showroom' => true, 'petty_cash' => true, 'waitlist' => true, 'inventory' => true,
+                'showroom' => true, 'petty_cash' => true, 'inventory' => true,
                 'department_notice' => true, 'chat' => true, 'evaluations' => true, 'hr' => true,
             ],
             'operational' => [

@@ -168,7 +168,6 @@ class NotificationDispatchService
             'employee' => $linkId ? '/employees/'.$linkId : '/hr',
             'violation' => '/violations',
             'inventory' => '/inventory',
-            'waitlist' => '/waitlist',
             'maintenance' => '/maintenance',
             'expense' => '/expenses',
             default => '/notifications',

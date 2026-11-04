@@ -80,24 +80,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('waitlist_requests', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('customer_id')->constrained();
-            $table->string('category');
-            $table->foreignId('preferred_vehicle_id')->nullable()->constrained('vehicles')->nullOnDelete();
-            $table->date('desired_start')->nullable();
-            $table->date('desired_end')->nullable();
-            $table->unsignedInteger('priority')->default(0);
-            $table->string('status')->default('waiting');
-            $table->timestamp('notified_at')->nullable();
-            $table->timestamp('expires_at')->nullable();
-            $table->foreignId('resulting_contract_id')->nullable()->constrained('contracts')->nullOnDelete();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->text('notes')->nullable();
-            $table->timestamps();
-            $table->softDeletes();
-        });
-
         Schema::create('inspections', function (Blueprint $table) {
             $table->id();
             $table->foreignId('contract_id')->constrained()->cascadeOnDelete();
@@ -351,7 +333,7 @@ return new class extends Migration
             'audit_logs', 'notifications', 'month_locks', 'journal_lines', 'journal_entries', 'accounts',
             'petty_cash_movements', 'petty_cash_accounts', 'employees', 'work_order_lines', 'work_orders',
             'inventory_batches', 'inventory_items', 'violations', 'payments', 'deposit_deductions', 'deposits',
-            'inspection_damages', 'inspections', 'waitlist_requests', 'vehicle_documents', 'vehicle_accessories',
+            'inspection_damages', 'inspections', 'vehicle_documents', 'vehicle_accessories',
             'branches', 'tenant_settings', 'permission_role', 'permissions', 'roles',
         ];
         foreach ($tables as $table) {

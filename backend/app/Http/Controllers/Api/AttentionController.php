@@ -10,7 +10,6 @@ use App\Models\InventoryItem;
 use App\Models\Notification;
 use App\Models\PayrollRun;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -76,10 +75,6 @@ class AttentionController extends Controller
 
         $blacklistedCustomers = Customer::query()->where('status', 'blacklist')->count();
 
-        $waitingRequests = Schema::hasTable('waitlist_requests')
-            ? WaitlistRequest::query()->where('status', 'waiting')->count()
-            : 0;
-
         $ownersUnpaid = $this->ownersWithUnpaidBalance();
 
         return response()->json([
@@ -96,7 +91,6 @@ class AttentionController extends Controller
                 'pending_hr_acks' => $pendingHrAcks,
                 'draft_payroll_runs' => $draftPayroll,
                 'blacklisted_customers' => $blacklistedCustomers,
-                'waiting_requests' => $waitingRequests,
                 'owners_unpaid' => $ownersUnpaid,
             ],
         ]);

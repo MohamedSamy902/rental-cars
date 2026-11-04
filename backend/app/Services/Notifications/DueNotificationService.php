@@ -19,7 +19,6 @@ use App\Models\VehicleConsumableState;
 use App\Models\VehicleDocument;
 use App\Models\VehicleTire;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Services\Contracts\ContractPricingService;
 use Carbon\Carbon;
@@ -102,7 +101,6 @@ class DueNotificationService
             $this->maintenanceAlerts($scanned),
             $this->consumableAlerts($scanned),
             $this->tireAndBatteryAlerts($scanned),
-            $this->waitlistAlerts($scanned),
             $this->assignmentAlerts($scanned),
             $this->evaluationAlerts($scanned),
         );
@@ -197,16 +195,6 @@ class DueNotificationService
 
         $reminder->last_sent_at = now();
         $reminder->save();
-
-        if ($alert->ruleKey === 'waitlist_available') {
-            WaitlistRequest::query()
-                ->whereKey($alert->subjectId)
-                ->where('status', 'waiting')
-                ->update([
-                    'status' => 'notified',
-                    'notified_at' => now(),
-                ]);
-        }
 
         return $sent;
     }
@@ -839,88 +827,6 @@ class DueNotificationService
         }
 
         return $alerts;
-    }
-
-    /**
-     * @param  list<string>  $scanned
-     * @return list<DueAlert>
-     */
-    private function waitlistAlerts(array &$scanned): array
-    {
-        if (! Schema::hasTable('waitlist_requests') || ! Schema::hasTable('vehicles')) {
-            return [];
-        }
-
-        $this->mark($scanned, 'waitlist_available');
-
-        $requests = WaitlistRequest::query()
-            ->with('customer:id,full_name')
-            ->whereIn('status', ['waiting', 'notified'])
-            ->whereNull('resulting_contract_id')
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->get();
-
-        $alerts = [];
-        foreach ($requests as $request) {
-            $match = $this->availableVehicle($request);
-            if (! $match) {
-                continue;
-            }
-            $who = $request->customer?->full_name ?: 'عميل';
-            $alerts[] = new DueAlert(
-                ruleKey: 'waitlist_available',
-                subjectType: 'waitlist_request',
-                subjectId: (int) $request->id,
-                title: "سيارة متاحة لطلب انتظار: {$who}",
-                body: "{$match->plate} ({$match->category}) متاحة للفترة المطلوبة. لا يُنشأ عقد تلقائياً.",
-                linkType: 'waitlist',
-                linkId: (int) $request->id,
-                permissions: ['waitlist.view'],
-            );
-        }
-
-        return $alerts;
-    }
-
-    private function availableVehicle(WaitlistRequest $request): ?Vehicle
-    {
-        $from = $request->desired_start ? Carbon::parse($request->desired_start)->startOfDay() : now()->copy()->startOfDay();
-        $to = $request->desired_end ? Carbon::parse($request->desired_end)->endOfDay() : $from->copy()->endOfDay();
-
-        $candidates = Vehicle::query()
-            ->where('is_active', true)
-            ->when($request->preferred_vehicle_id, fn ($query) => $query->whereKey($request->preferred_vehicle_id))
-            ->when(! $request->preferred_vehicle_id && $request->category, fn ($query) => $query->where('category', $request->category))
-            ->get();
-
-        if ($candidates->isEmpty()) {
-            return null;
-        }
-
-        $blocked = Contract::query()
-            ->whereIn('vehicle_id', $candidates->pluck('id'))
-            ->whereIn('status', ['pending', 'approved', 'active'])
-            ->where('starts_at', '<', $to)
-            ->where('planned_ends_at', '>', $from)
-            ->pluck('vehicle_id');
-
-        $maintenance = Schema::hasTable('work_orders')
-            ? WorkOrder::query()
-                ->whereIn('vehicle_id', $candidates->pluck('id'))
-                ->where('puts_in_maintenance', true)
-                ->whereIn('status', ['open', 'in_progress'])
-                ->pluck('vehicle_id')
-            : collect();
-
-        return $candidates->first(function (Vehicle $vehicle) use ($blocked, $maintenance) {
-            if (in_array($vehicle->manual_status, ['maintenance', 'out_of_service', 'sold'], true)) {
-                return false;
-            }
-
-            return ! $blocked->contains($vehicle->id) && ! $maintenance->contains($vehicle->id);
-        });
     }
 
     /**
