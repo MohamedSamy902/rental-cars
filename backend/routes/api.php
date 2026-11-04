@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\VehicleAssetController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\ViolationController;
+use App\Http\Controllers\Api\ViolationInquiryController;
 use App\Http\Controllers\Api\WorkOrderController;
 use App\Models\Notification;
 use App\Models\TenantSetting;
@@ -240,6 +241,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/violations', [ViolationController::class, 'store'])->middleware('permission:violations.create');
     Route::put('/violations/{violation}', [ViolationController::class, 'update'])->middleware('permission:violations.update');
     Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment'])->middleware('permission:violations.update');
+
+    Route::get('/violation-inquiries', [ViolationInquiryController::class, 'index'])->middleware('permission:violations.view');
+    Route::post('/violation-inquiries/{vehicle}/mark', [ViolationInquiryController::class, 'mark'])->middleware('permission:violations.update');
 
     Route::middleware(['feature:waitlist', 'permission:waitlist.view'])->get('/waitlist', function (WaitlistService $service) {
         return response()->json(['data' => $service->list()]);

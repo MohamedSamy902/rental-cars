@@ -33,6 +33,7 @@ const ITEMS: Item[] = [
   { to: '/inventory', label: 'المخزون', group: 'الأسطول', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
   { to: '/petty-cash', label: 'العهدة النقدية', group: 'الأسطول', icon: <IconWallet />, feature: 'petty_cash', permission: 'petty_cash.view' },
   { to: '/violations', label: 'المخالفات', group: 'الأسطول', icon: <IconAlert />, permission: 'violations.view' },
+  { to: '/violation-inquiries', label: 'استعلامات المخالفات', group: 'الأسطول', icon: <IconSearch />, permission: 'violations.view' },
   { to: '/customers', label: 'العملاء', group: 'المالية', icon: <IconUsers />, permission: 'customers.view' },
   { to: '/accounts', label: 'الحسابات', group: 'المالية', icon: <IconLandmark />, permission: 'accounting.view' },
   { to: '/reports', label: 'التقارير', group: 'المالية', icon: <IconChart />, permission: 'reports.view' },
