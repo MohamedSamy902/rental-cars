@@ -201,36 +201,4 @@ class ViolationController extends Controller
 
         return $arr;
     }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return list<string>
-     */
-    private function normalizePhotos(array $data): array
-    {
-        $paths = [];
-        if (isset($data['photo_paths']) && is_array($data['photo_paths'])) {
-            foreach ($data['photo_paths'] as $p) {
-                if (is_string($p) && trim($p) !== '') {
-                    $paths[] = trim($p);
-                }
-            }
-        }
-        if ($paths === [] && isset($data['photo_path']) && is_string($data['photo_path']) && trim($data['photo_path']) !== '') {
-            $paths[] = trim($data['photo_path']);
-        }
-
-        return array_values(array_unique($paths));
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function serialize(Violation $v): array
-    {
-        $arr = $v->toArray();
-        $arr['photo_paths'] = $v->resolvedPhotoPaths();
-
-        return $arr;
-    }
 }

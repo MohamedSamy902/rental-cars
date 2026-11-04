@@ -235,7 +235,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 **POST /vehicles — حقول أساسية**
 `plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit`  
 الكود: يُولَّد تلقائياً إن لم يُرسل.  
-اختياري: `chassis_number`, `engine_number`, `rental_priority`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_agreement_number`, `owner_agreement_notes`, `owner_inline{full_name,phone,…}`, `addon_ids[]`
+اختياري: `chassis_number`, `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_agreement_number`, `owner_agreement_notes`, `owner_inline{full_name,phone,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}`  
+**ملغى:** `rental_priority` · قائمة الانتظار · `fuel_level` في الفحص.
 
 **POST documents**
 ```json
@@ -334,7 +335,6 @@ Query شائع: `?per_page=50&page=1&search=...`
 ```json
 {
   "odometer_out": 18200,
-  "fuel_level": 70,
   "notes": null,
   "signature_data": "data:image/png;base64,...",
   "accessories": [
@@ -345,7 +345,7 @@ Query شائع: `?per_page=50&page=1&search=...`
   ]
 }
 ```
-التوقيع إلزامي افتراضياً (`operational.require_handover_signature`).
+التوقيع إلزامي افتراضياً (`operational.require_handover_signature`). بلا `fuel_level`.
 
 ### POST …/return
 ```json
@@ -353,7 +353,6 @@ Query شائع: `?per_page=50&page=1&search=...`
   "odometer_in": 18600,
   "returned_at": null,
   "damage_fee": 100,
-  "fuel_level": 40,
   "notes": null,
   "signature_data": "...",
   "accessories": [],
@@ -675,7 +674,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | فحص/توقيع | handover/return | Bookings sheet |
 | وديعة | `/contracts/.../deposit*` | Bookings |
 | عملاء/سوداء | `/customers` | `/customers` |
-| مخالفات | `/violations` | `/violations` |
+| مخالفات | `/violations` · `/violation-inquiries` | `/violations` · `/violation-inquiries` |
 | صيانة | `/work-orders` | `/maintenance` |
 | مخزون | `/inventory*` | `/inventory` |
 | عهدة | `/petty-cash*` | `/petty-cash` |
