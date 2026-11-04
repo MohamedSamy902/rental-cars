@@ -100,6 +100,7 @@ class DueNotificationService
             $this->lowStockAlerts($scanned),
             $this->documentAlerts($scanned),
             $this->trackerSimRechargeAlerts($scanned),
+            $this->ownerAgreementAlerts($scanned),
             $this->maintenanceAlerts($scanned),
             $this->consumableAlerts($scanned),
             $this->tireAndBatteryAlerts($scanned),
@@ -628,6 +629,60 @@ class DueNotificationService
                 linkType: 'vehicle',
                 linkId: (int) $vehicle->id,
                 permissions: ['vehicles.view'],
+            );
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * عقد تأجير العربية من المالك: تنبيه يومي بدءاً من قبل شهر من نهاية العقد.
+     *
+     * @param  list<string>  $scanned
+     * @return list<DueAlert>
+     */
+    private function ownerAgreementAlerts(array &$scanned): array
+    {
+        if (! Schema::hasTable('vehicles') || ! Schema::hasColumn('vehicles', 'owner_agreement_ends_on')) {
+            return [];
+        }
+
+        $this->mark($scanned, 'owner_agreement_end');
+        $leadDays = 30;
+        $deadline = now()->copy()->startOfDay()->addDays($leadDays)->toDateString();
+        $alerts = [];
+
+        $vehicles = Vehicle::query()
+            ->with('owner:id,full_name,phone')
+            ->where('is_active', true)
+            ->whereNotNull('owner_agreement_ends_on')
+            ->whereDate('owner_agreement_ends_on', '<=', $deadline)
+            ->get([
+                'id', 'plate', 'code', 'owner_id',
+                'owner_agreement_starts_on', 'owner_agreement_ends_on',
+                'owner_agreement_number', 'owner_agreement_notes',
+            ]);
+
+        foreach ($vehicles as $vehicle) {
+            $plate = $vehicle->plate ?: ($vehicle->code ?: 'عربية');
+            $ownerName = $vehicle->owner?->full_name ?: 'مالك';
+            $ends = $vehicle->owner_agreement_ends_on?->toDateString();
+            $starts = $vehicle->owner_agreement_starts_on?->toDateString();
+            $number = $vehicle->owner_agreement_number ? " · عقد {$vehicle->owner_agreement_number}" : '';
+            $range = $starts ? "من {$starts} إلى {$ends}" : "ينتهي {$ends}";
+            $notes = $vehicle->owner_agreement_notes
+                ? ' · '.mb_substr(trim((string) $vehicle->owner_agreement_notes), 0, 120)
+                : '';
+
+            $alerts[] = new DueAlert(
+                ruleKey: 'owner_agreement_end',
+                subjectType: 'vehicle',
+                subjectId: (int) $vehicle->id,
+                title: "عقد مالك يقترب من الانتهاء: {$plate}",
+                body: "المالك {$ownerName}{$number} · {$range}{$notes}.",
+                linkType: 'vehicle',
+                linkId: (int) $vehicle->id,
+                permissions: ['vehicles.view', 'owners.view'],
             );
         }
 

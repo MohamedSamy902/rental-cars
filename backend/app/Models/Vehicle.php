@@ -19,6 +19,8 @@ class Vehicle extends Model
         'tracker_sim_last_recharged_on', 'tracker_sim_next_recharge_on', 'tracker_sim_recharge_cycle_days',
         'notes', 'is_active', 'manual_status', 'branch_id',
         'owner_id', 'owner_monthly_amount', 'owner_since',
+        'owner_agreement_starts_on', 'owner_agreement_ends_on',
+        'owner_agreement_number', 'owner_agreement_notes',
     ];
 
     protected function casts(): array
@@ -31,6 +33,8 @@ class Vehicle extends Model
             'default_deposit' => 'integer',
             'owner_monthly_amount' => 'integer',
             'owner_since' => 'date',
+            'owner_agreement_starts_on' => 'date',
+            'owner_agreement_ends_on' => 'date',
             'tracker_sim_last_recharged_on' => 'date',
             'tracker_sim_next_recharge_on' => 'date',
             'tracker_sim_recharge_cycle_days' => 'integer',

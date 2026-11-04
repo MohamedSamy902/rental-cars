@@ -12,12 +12,17 @@ import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './pages.css'
 import './VehiclesPage.css'
 
-const VEHICLE_TABS = ['all', 'available', 'rented', 'reserved', 'maintenance', 'expiring', 'license_expiring', 'sim_recharge'] as const
+const VEHICLE_TABS = [
+  'all', 'available', 'rented', 'reserved', 'maintenance',
+  'expiring', 'license_expiring', 'sim_recharge', 'owner_agreement_expiring',
+] as const
 const EXPIRING_PRESETS = [1, 2, 3, 7] as const
 const LICENSE_EXPIRING_PRESETS = [7, 14, 30] as const
 const LICENSE_EXPIRING_DEFAULT_DAYS = 30
 const SIM_RECHARGE_PRESETS = [3, 7, 14, 30] as const
 const SIM_RECHARGE_DEFAULT_DAYS = 14
+const OWNER_AGREEMENT_PRESETS = [7, 14, 30] as const
+const OWNER_AGREEMENT_DEFAULT_DAYS = 30
 
 function addDaysIso(base: string, days: number): string {
   const d = new Date(`${base}T12:00:00`)
@@ -54,6 +59,10 @@ type Vehicle = {
   owner_id?: number | null
   owner_monthly_amount?: number | null
   owner_since?: string | null
+  owner_agreement_starts_on?: string | null
+  owner_agreement_ends_on?: string | null
+  owner_agreement_number?: string | null
+  owner_agreement_notes?: string | null
   owner?: OwnerOption | null
   active_contract_ends_at?: string | null
   license_expires_on?: string | null
@@ -82,16 +91,19 @@ export function VehiclesPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<Vehicle[]>([])
   const [summary, setSummary] = useState({
-    total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0, license_expiring: 0, sim_recharge: 0,
+    total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0,
+    license_expiring: 0, sim_recharge: 0, owner_agreement_expiring: 0,
   })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: VEHICLE_TABS, defaultValue: 'all' })
   const [withinDays, setWithinDays] = useState(2)
   const [licenseWithinDays, setLicenseWithinDays] = useState(LICENSE_EXPIRING_DEFAULT_DAYS)
   const [simWithinDays, setSimWithinDays] = useState(SIM_RECHARGE_DEFAULT_DAYS)
+  const [agreementWithinDays, setAgreementWithinDays] = useState(OWNER_AGREEMENT_DEFAULT_DAYS)
   const [customDays, setCustomDays] = useState('')
   const [licenseCustomDays, setLicenseCustomDays] = useState('')
   const [simCustomDays, setSimCustomDays] = useState('')
+  const [agreementCustomDays, setAgreementCustomDays] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
@@ -137,8 +149,17 @@ export function VehiclesPage() {
         attention: summary.sim_recharge > 0 ? ('warning' as const) : null,
         attentionLabel: `${summary.sim_recharge} شريحة خلال ${SIM_RECHARGE_DEFAULT_DAYS} يوماً أو أقل`,
       },
+      {
+        id: 'owner_agreement_expiring',
+        label: 'عقود ملاك قاربت الانتهاء',
+        attention: summary.owner_agreement_expiring > 0 ? ('warning' as const) : null,
+        attentionLabel: `${summary.owner_agreement_expiring} عقد خلال ${OWNER_AGREEMENT_DEFAULT_DAYS} يوماً أو أقل`,
+      },
     ],
-    [summary.rented, summary.reserved, summary.maintenance, summary.license_expiring, summary.sim_recharge, withinDays],
+    [
+      summary.rented, summary.reserved, summary.maintenance,
+      summary.license_expiring, summary.sim_recharge, summary.owner_agreement_expiring, withinDays,
+    ],
   )
 
   async function load(
@@ -147,6 +168,7 @@ export function VehiclesPage() {
     days = withinDays,
     licenseDays = licenseWithinDays,
     simDays = simWithinDays,
+    agreementDays = agreementWithinDays,
   ) {
     setLoading(true)
     setError('')
@@ -157,6 +179,7 @@ export function VehiclesPage() {
       if (nextChip === 'expiring') qs.set('within_days', String(days))
       if (nextChip === 'license_expiring') qs.set('within_days', String(licenseDays))
       if (nextChip === 'sim_recharge') qs.set('within_days', String(simDays))
+      if (nextChip === 'owner_agreement_expiring') qs.set('within_days', String(agreementDays))
       const res = await api<{ data: Vehicle[]; summary: typeof summary }>(`/vehicles?${qs}`)
       setRows(res.data)
       const s = res.summary
@@ -168,6 +191,7 @@ export function VehiclesPage() {
         maintenance: s.maintenance ?? 0,
         license_expiring: s.license_expiring ?? 0,
         sim_recharge: s.sim_recharge ?? 0,
+        owner_agreement_expiring: s.owner_agreement_expiring ?? 0,
       })
     } catch (e) {
       setError((e as ApiError).message)
@@ -179,9 +203,57 @@ export function VehiclesPage() {
   useEffect(() => {
     const t = window.setTimeout(() => load(), 250)
     return () => window.clearTimeout(t)
-  }, [search, chip, withinDays, licenseWithinDays, simWithinDays])
+  }, [search, chip, withinDays, licenseWithinDays, simWithinDays, agreementWithinDays])
 
   const columns: DataColumn<Vehicle>[] = useMemo(() => {
+    if (chip === 'owner_agreement_expiring') {
+      return [
+        {
+          id: 'plate',
+          header: 'رقم العربية',
+          cell: (v) => (
+            <>
+              <strong className="rpm-table__primary tabular-nums">{v.plate}</strong>
+              <span className="rpm-table__sub">{v.brand} {v.model}</span>
+            </>
+          ),
+          sortValue: (v) => v.plate,
+          mobile: 'title',
+        },
+        {
+          id: 'owner',
+          header: 'المالك',
+          cell: (v) => v.owner?.full_name || '—',
+          sortValue: (v) => v.owner?.full_name || '',
+        },
+        {
+          id: 'agreement_number',
+          header: 'رقم العقد',
+          cell: (v) => v.owner_agreement_number || '—',
+          sortValue: (v) => v.owner_agreement_number || '',
+          mobile: 'hidden',
+        },
+        {
+          id: 'agreement_start',
+          header: 'البداية',
+          cell: (v) => (v.owner_agreement_starts_on ? formatDate(v.owner_agreement_starts_on) : '—'),
+          sortValue: (v) => v.owner_agreement_starts_on || '',
+        },
+        {
+          id: 'agreement_end',
+          header: 'النهاية',
+          cell: (v) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+              <strong>{v.owner_agreement_ends_on ? formatDate(v.owner_agreement_ends_on) : '—'}</strong>
+              {v.owner_agreement_notes ? <span className="rpm-table__sub">{v.owner_agreement_notes}</span> : null}
+            </div>
+          ),
+          sortValue: (v) => v.owner_agreement_ends_on || '',
+          mobile: 'badge',
+        },
+      ]
+    }
+
     if (chip === 'sim_recharge') {
       return [
         {
@@ -409,6 +481,15 @@ export function VehiclesPage() {
     setSimWithinDays(Math.round(n))
   }
 
+  function applyAgreementCustomDays() {
+    const n = Number(agreementCustomDays)
+    if (!Number.isFinite(n) || n < 0 || n > 120) {
+      toast.error('أدخل عدد أيام بين 0 و 120.')
+      return
+    }
+    setAgreementWithinDays(Math.round(n))
+  }
+
   return (
     <div className="rpm-stack">
       <PageHeader
@@ -547,6 +628,42 @@ export function VehiclesPage() {
               onBlur={() => { if (simCustomDays !== '') applySimCustomDays() }}
               onKeyDown={(e) => { if (e.key === 'Enter') applySimCustomDays() }}
               aria-label="عدد أيام قرب شحن الشريحة"
+            />
+            <span className="vh-expiring-bar__unit">يوم</span>
+          </label>
+        </div>
+      ) : null}
+
+      {chip === 'owner_agreement_expiring' ? (
+        <div className="vh-expiring-bar" role="group" aria-label="نافذة قرب انتهاء عقد المالك">
+          <span className="vh-expiring-bar__label">خلال:</span>
+          <div className="vh-expiring-bar__pills">
+            {OWNER_AGREEMENT_PRESETS.map((d) => (
+              <Button
+                key={d}
+                type="button"
+                size="sm"
+                variant={agreementWithinDays === d && agreementCustomDays === '' ? 'accent' : 'secondary'}
+                onClick={() => { setAgreementWithinDays(d); setAgreementCustomDays('') }}
+              >
+                {d} يوماً
+              </Button>
+            ))}
+          </div>
+          <span className="vh-expiring-bar__sep" aria-hidden />
+          <label className="vh-expiring-bar__custom">
+            <span className="vh-expiring-bar__custom-label">مخصص:</span>
+            <input
+              className="vh-expiring-bar__input"
+              type="number"
+              min={0}
+              max={120}
+              value={agreementCustomDays}
+              placeholder={String(agreementWithinDays)}
+              onChange={(e) => setAgreementCustomDays(e.target.value)}
+              onBlur={() => { if (agreementCustomDays !== '') applyAgreementCustomDays() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyAgreementCustomDays() }}
+              aria-label="عدد أيام قرب انتهاء عقد المالك"
             />
             <span className="vh-expiring-bar__unit">يوم</span>
           </label>
