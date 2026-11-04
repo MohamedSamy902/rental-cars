@@ -88,6 +88,9 @@ cd ui-pwa && npm run lint && npm run build
 
 ## ٣) الرفع على cPanel — خطوة بخطوة بدقة
 
+> **تفعيل CI/CD بالكامل (أسرار GitHub + أول لايف):**  
+> [`docs/تفعيل-CI-CD-cPanel.md`](docs/تفعيل-CI-CD-cPanel.md)
+
 ### ٣٫١ ما سترفعه
 
 | على الاستضافة | المحتوى |
@@ -95,7 +98,7 @@ cd ui-pwa && npm run lint && npm run build
 | `/home/USER/rpm/` | تطبيق Laravel كاملاً (`app`, `vendor`, `artisan`, `.env`, …) **خارج** الويب |
 | `/home/USER/public_html/` | واجهة SPA + `index.php` + `.htaccess` (نقطة الدخول العامة) |
 
- Domains: دومين واحد يكفي — `/api/*` يذهب لـ Laravel وباقي المسارات للواجهة.
+دومين واحد يكفي — `/api/*` يذهب لـ Laravel وباقي المسارات للواجهة. **لا Node على cPanel.**
 
 ### ٣٫٢ تجهيز الحزمة من جهازك أو من CI
 
@@ -106,7 +109,7 @@ bash scripts/build-production.sh
 
 ينتج:
 - `dist/cpanel/` → ارفعه إلى `public_html/`
-- `dist/cpanel-app/` → ارفعه إلى `~/rpm/`
+- `dist/cpanel-app/` → ارفعه إلى `~/rpm/` (يشمل `vendor` إنتاجي + `cpanel-post-deploy.sh`)
 - `dist/README-DEPLOY.txt` → ملخص سريع
 
 أو من GitHub Actions: Workflow **CI** على `main` يرفع Artifact باسم `rpm-cpanel-bundle`.
@@ -165,17 +168,14 @@ LOG_CHANNEL=stack
 LOG_LEVEL=error
 ```
 
-ثم:
+ثم من Terminal في cPanel:
 
 ```bash
 cd ~/rpm
-php artisan key:generate --force
-php artisan migrate --force
-php artisan db:seed --force          # أول تثبيت فقط (مستخدم تجريبي + بيانات عرض)
-php artisan config:cache
-php artisan route:cache
-chmod -R 775 storage bootstrap/cache
+RPM_RUN_SEED=yes bash cpanel-post-deploy.sh --first
 ```
+
+(أو يدوياً: `key:generate` · `migrate --force` · `db:seed --force` · `config:cache` · `route:cache` · `chmod -R 775 storage bootstrap/cache`)
 
 دخول أولي بعد الـ seed: `admin@rpm.local` / `password` — **غيّر كلمة المرور فوراً** من شاشة الموظفين.
 
@@ -201,21 +201,23 @@ chmod -R 775 storage bootstrap/cache
 
 ### ٣٫٨ تحديث لاحق (بدون مسح البيانات)
 
-1. ابنِ حزمة جديدة `build-production.sh`  
+1. ابنِ حزمة جديدة `build-production.sh` أو شغّل **Deploy · cPanel**  
 2. ارفع الكود الجديد فوق `~/rpm` **بدون** استبدال `.env` ولا `storage/app`  
 3. ارفع أصول `public_html` الجديدة  
-4. نفّذ: `php artisan migrate --force && php artisan config:cache && php artisan route:cache`
+4. نفّذ: `cd ~/rpm && bash cpanel-post-deploy.sh`
 
 ---
 
 ## ٤) CI / CD (GitHub Actions)
 
+الدليل الكامل للتفعيل: **[`docs/تفعيل-CI-CD-cPanel.md`](docs/تفعيل-CI-CD-cPanel.md)**
+
 | Workflow | الملف | ماذا يفعل |
 |----------|--------|-----------|
-| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | على كل PR وpush لـ `main`: PHPUnit + Lint + Build · وعلى `main` يصدر Artifact للحزمة |
-| **Deploy · cPanel** | [`.github/workflows/deploy-cpanel.yml`](.github/workflows/deploy-cpanel.yml) | نشر FTP يدوي (`workflow_dispatch` مع كتابة `deploy`) — جاهز للتلقائي لاحقاً |
+| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | على كل PR وpush لـ `main`: PHPUnit + Lint + Build · وعلى `main` يصدر Artifact (`cpanel` + `cpanel-app`) |
+| **Deploy · cPanel** | [`.github/workflows/deploy-cpanel.yml`](.github/workflows/deploy-cpanel.yml) | بناء ثم FTP لـ `public_html` و`~/rpm` · يدوي بـ `confirm=deploy` · SSH اختياري لـ migrate |
 
-### أسرار النشر (Settings → Secrets → Actions)
+### أسرار النشر الأساسية
 
 | السر | مثال |
 |------|------|
@@ -223,11 +225,10 @@ chmod -R 775 storage bootstrap/cache
 | `CPANEL_FTP_USER` | مستخدم FTP |
 | `CPANEL_FTP_PASSWORD` | كلمة مرور FTP |
 | `CPANEL_FTP_REMOTE_DIR` | `/public_html/` |
+| `CPANEL_FTP_APP_DIR` | `/rpm/` |
 | `CPANEL_FTP_PORT` | `21` (اختياري) |
 
-> الـ Deploy يرفع محتويات الحزمة المبنية. مسار Laravel خارج `public_html` يُفضَّل رفعه مرة أولى يدوياً أو عبر FTP منفصل لنفس السبب الأمني.
-
-لفتح النشر التلقائي عند كل push على `main`: ألغِ تعليق قسم `push:` داخل `deploy-cpanel.yml`.
+النشر التلقائي على كل push لـ `main`: ألغِ تعليق `push:` داخل `deploy-cpanel.yml` بعد نجاح أول نشر يدوي.
 
 ---
 
@@ -239,11 +240,13 @@ rental-cars/
 ├── ui-pwa/                  React PWA
 ├── docs/                    مواصفات ومراجعات
 ├── scripts/
-│   ├── dev.sh               تشغيل محلي
-│   ├── build-production.sh  حزمة cPanel
+│   ├── dev.sh                 تشغيل محلي
+│   ├── build-production.sh    حزمة cPanel (+ vendor)
+│   ├── cpanel-post-deploy.sh  migrate/cache على السيرفر
 │   ├── cpanel.htaccess
 │   └── cpanel-index.php
-└── .github/workflows/       CI + Deploy
+├── docs/تفعيل-CI-CD-cPanel.md  تفعيل GitHub → cPanel
+└── .github/workflows/         CI + Deploy
 ```
 
 ---
