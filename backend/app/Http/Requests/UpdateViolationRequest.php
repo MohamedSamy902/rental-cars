@@ -36,7 +36,7 @@ class UpdateViolationRequest extends FormRequest
         return [
             'vehicle_id' => [
                 'sometimes',
-                'required',
+                'nullable',
                 Rule::exists('vehicles', 'id')->whereNull('deleted_at'),
             ],
             'occurred_at' => ['sometimes', 'required', 'date'],
@@ -44,8 +44,11 @@ class UpdateViolationRequest extends FormRequest
             'amount' => ['sometimes', 'required', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
             'photo_path' => ['nullable', 'string', 'max:500'],
+            'photo_paths' => ['nullable', 'array', 'max:5'],
+            'photo_paths.*' => ['string', 'max:500'],
             'contract_id' => [
-                'nullable',
+                'sometimes',
+                'required',
                 Rule::exists('contracts', 'id')->whereNull('deleted_at'),
             ],
             'status' => ['nullable', Rule::in(['new', 'assigned', 'confirmed', 'paid'])],
@@ -64,9 +67,10 @@ class UpdateViolationRequest extends FormRequest
             'location' => 'الموقع',
             'amount' => 'المبلغ',
             'notes' => 'الملاحظات',
-            'contract_id' => 'العقد',
+            'contract_id' => 'الحجز',
             'status' => 'الحالة',
             'photo_path' => 'المرفق',
+            'photo_paths' => 'صور المخالفة',
         ];
     }
 
@@ -76,14 +80,14 @@ class UpdateViolationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'vehicle_id.required' => 'العربية مطلوبة.',
             'vehicle_id.exists' => 'العربية المحدّدة غير صالحة.',
             'occurred_at.required' => 'تاريخ المخالفة مطلوب.',
             'occurred_at.date' => 'تاريخ المخالفة غير صالح.',
             'amount.required' => 'المبلغ مطلوب.',
             'amount.integer' => 'يجب أن يكون المبلغ عدداً صحيحاً.',
             'amount.min' => 'لا يجوز أن يكون المبلغ سالباً.',
-            'contract_id.exists' => 'العقد المحدّد غير صالح.',
+            'contract_id.required' => 'الحجز مطلوب.',
+            'contract_id.exists' => 'الحجز المحدّد غير صالح.',
             'status.in' => 'حالة المخالفة غير صالحة.',
         ];
     }

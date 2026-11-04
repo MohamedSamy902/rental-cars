@@ -63,4 +63,9 @@ class Contract extends Model
     {
         return $this->hasMany(ContractVehicleSwap::class);
     }
+
+    public function violations(): HasMany
+    {
+        return $this->hasMany(Violation::class);
+    }
 }

@@ -124,23 +124,46 @@ class EntityEditCapabilityTest extends TestCase
             'is_active' => true,
         ]);
 
-        $created = $this->postJson('/api/violations', [
+        $customer = \App\Models\Customer::query()->create([
+            'full_name' => 'عميل تعديل مخالفة',
+            'phone' => '01005554433',
+            'birth_date' => '1991-01-01',
+            'license_number' => 'LIC-8801',
+            'license_expires_on' => now()->addYears(2)->toDateString(),
+            'status' => 'active',
+        ]);
+
+        $contract = \App\Models\Contract::query()->create([
+            'number' => 'CNT-8801',
+            'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
+            'status' => 'active',
+            'starts_at' => now()->subDay(),
+            'planned_ends_at' => now()->addDays(3),
+            'approved_days' => 4,
+            'frozen_daily_rate' => 600,
+            'frozen_agreed_deposit' => 1000,
+            'frozen_daily_km_allowance' => 200,
+            'frozen_excess_km_rate' => 5,
+        ]);
+
+        $created = $this->postJson('/api/violations', [
+            'contract_id' => $contract->id,
             'occurred_at' => now()->toDateString(),
             'amount' => 150,
             'location' => 'المعادي',
-        ])->assertCreated();
+        ])->assertCreated()
+            ->assertJsonPath('data.created_by', auth()->id());
 
         $id = (int) $created->json('data.id');
 
         $this->putJson("/api/violations/{$id}", [
-            'vehicle_id' => $vehicle->id,
+            'contract_id' => $contract->id,
             'occurred_at' => now()->toDateString(),
             'amount' => 275,
             'location' => 'مدينة نصر',
             'status' => 'assigned',
             'photo_path' => null,
-            'contract_id' => null,
         ])->assertOk()
             ->assertJsonPath('data.amount', 275)
             ->assertJsonPath('data.location', 'مدينة نصر')
@@ -151,6 +174,7 @@ class EntityEditCapabilityTest extends TestCase
             'amount' => 275,
             'location' => 'مدينة نصر',
             'status' => 'assigned',
+            'contract_id' => $contract->id,
         ]);
         $this->assertInstanceOf(Violation::class, Violation::query()->find($id));
     }

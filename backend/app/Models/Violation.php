@@ -11,8 +11,8 @@ class Violation extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'vehicle_id', 'occurred_at', 'location', 'amount', 'photo_path', 'contract_id',
-        'customer_id', 'status', 'collection_note', 'confirmed_by', 'confirmed_at', 'notes',
+        'vehicle_id', 'occurred_at', 'location', 'amount', 'photo_path', 'photo_paths', 'contract_id',
+        'customer_id', 'status', 'collection_note', 'confirmed_by', 'confirmed_at', 'notes', 'created_by',
     ];
 
     protected function casts(): array
@@ -20,6 +20,7 @@ class Violation extends Model
         return [
             'occurred_at' => 'datetime',
             'confirmed_at' => 'datetime',
+            'photo_paths' => 'array',
         ];
     }
 
@@ -36,5 +37,37 @@ class Violation extends Model
     public function contract(): BelongsTo
     {
         return $this->belongsTo(Contract::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function confirmedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function resolvedPhotoPaths(): array
+    {
+        $paths = array_values(array_filter(array_map(
+            static fn ($p) => is_string($p) ? trim($p) : '',
+            is_array($this->photo_paths) ? $this->photo_paths : [],
+        )));
+
+        if ($paths === [] && is_string($this->photo_path) && trim($this->photo_path) !== '') {
+            return [trim($this->photo_path)];
+        }
+
+        return $paths;
+    }
+
+    public function scopeOpen($query)
+    {
+        return $query->whereNotIn('status', ['confirmed', 'paid']);
     }
 }

@@ -32,6 +32,23 @@ export function useContractLifecycle(onMutated?: () => void) {
       const v = await api<{ data: VehicleOption[] }>('/vehicles?per_page=100')
       setVehicles(v.data)
     }
+    if (kind === 'return' && (contract.open_violations === undefined || contract.open_violations_total === undefined)) {
+      try {
+        const dossier = await api<{ data: Contract }>(`/contracts/${contract.id}`)
+        setSelected({
+          ...contract,
+          open_violations: dossier.data.open_violations ?? [],
+          open_violations_total: dossier.data.open_violations_total
+            ?? dossier.data.ledger?.violations_due
+            ?? 0,
+          open_violations_count: dossier.data.open_violations?.length
+            ?? contract.open_violations_count
+            ?? 0,
+        })
+      } catch {
+        /* الشيت يعمل بإجمالي القائمة إن وُجد */
+      }
+    }
   }
 
   function closeAction() {
