@@ -101,9 +101,33 @@ Query شائع: `?per_page=50&page=1&search=...`
     "open_violations": 0, "low_stock": 0
   },
   "tasks": [{ "id": 1, "title": "...", "subtitle": "...", "status": "active", "at": "..." }],
+  "important_tasks": [
+    {
+      "id": "contract_pending:12",
+      "rule": "contract_pending",
+      "severity": "critical",
+      "title": "اعتماد حجز معلّق · C-12",
+      "subtitle": "عميل · ماركة موديل · لوحة",
+      "href": "/contracts/12",
+      "due_on": "2026-11-05"
+    }
+  ],
+  "fleet_prep": { "horizon_days": 5, "days": [], "totals": {} },
   "unread_notifications": 1
 }
 ```
+
+`important_tasks` قائمة مهام تشغيلية للوحة اليوم (حد أقصى ٢٠)، مرتّبة بالحرج ثم التاريخ، ومفلترة بصلاحيات المستخدم الحالي:
+
+| `rule` | صلاحية | متى يظهر |
+|--------|--------|----------|
+| `contract_overdue` / `contract_pending` / `contract_pickup` / `contract_return` | `contracts.view` | استلام متأخر · حجز معلّق · تسليم/استلام اليوم |
+| `work_order_open` / `maintenance_due` | `maintenance.view` أو `vehicles.view` | أمر شغل مفتوح · صيانة مستحقة خلال ٧ أيام |
+| `license_expiring` | `vehicles.view` | رخصة تسيير ≤ ٣٠ يوماً |
+| `sim_recharge` | `vehicles.view` | شحن شريحة تتبع ≤ ١٤ يوماً |
+| `owner_agreement_end` | `vehicles.view` أو `owners.view` | عقد مالك ≤ ٣٠ يوماً |
+| `violation_open` | `violations.view` | مخالفة غير مدفوعة/مؤكّدة |
+| `low_stock` | `inventory.view` | صنف تحت حد التنبيه |
 
 ---
 
