@@ -91,6 +91,21 @@ jobs:
           cache: npm
           cache-dependency-path: ui-pwa/package-lock.json
 
+      - name: Setup PHP 8.3 (للـ vendor الإنتاجي في الحزمة)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, fileinfo, tokenizer, xml, curl
+          coverage: none
+          tools: composer
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-prod-${{ runner.os }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-prod-${{ runner.os }}-
+
       - name: Build production package
         run: bash scripts/build-production.sh
 
@@ -98,5 +113,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rpm-cpanel-bundle
-          path: dist/cpanel
+          path: |
+            dist/cpanel
+            dist/cpanel-app
+            dist/README-DEPLOY.txt
           retention-days: 14
