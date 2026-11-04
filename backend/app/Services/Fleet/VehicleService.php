@@ -94,9 +94,21 @@ class VehicleService
             if (array_key_exists('owner_id', $data) && empty($data['owner_id'])) {
                 $data['owner_id'] = null;
                 $data['owner_monthly_amount'] = null;
+                $data['owner_agreement_starts_on'] = null;
+                $data['owner_agreement_ends_on'] = null;
+                $data['owner_agreement_number'] = null;
+                $data['owner_agreement_notes'] = null;
             }
             if (! empty($data['owner_id']) && empty($data['owner_since']) && ! $vehicle->owner_since) {
                 $data['owner_since'] = now()->toDateString();
+            }
+            if (! empty($data['owner_id'])
+                && empty($data['owner_agreement_starts_on'] ?? null)
+                && ! empty($data['owner_agreement_ends_on'] ?? null)
+                && ! $vehicle->owner_agreement_starts_on) {
+                $data['owner_agreement_starts_on'] = $data['owner_since']
+                    ?? $vehicle->owner_since?->toDateString()
+                    ?? now()->toDateString();
             }
 
             // Internal code stays system-owned after create.

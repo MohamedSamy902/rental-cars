@@ -76,6 +76,60 @@ class VehicleClientRefinementsTest extends TestCase
         $this->assertTrue($names->contains('لاند روفر'));
     }
 
+    public function test_owner_agreement_expiring_filter_and_fields(): void
+    {
+        $owner = \App\Models\VehicleOwner::query()->create([
+            'full_name' => 'مالك العقد',
+            'phone' => '01001112223',
+            'is_active' => true,
+        ]);
+        $due = Vehicle::query()->create([
+            'code' => 'VEH-OWN-1',
+            'plate' => 'م ل 1001',
+            'brand' => 'كيا',
+            'model' => 'سبورتاج',
+            'year' => 2023,
+            'category' => 'SUV',
+            'fuel_type' => 'بنزين',
+            'odometer' => 5000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 1200,
+            'default_deposit' => 3000,
+            'is_active' => true,
+            'owner_id' => $owner->id,
+            'owner_monthly_amount' => 8000,
+            'owner_agreement_starts_on' => now()->subYear()->toDateString(),
+            'owner_agreement_ends_on' => now()->addDays(20)->toDateString(),
+            'owner_agreement_number' => 'OWN-2025-01',
+            'owner_agreement_notes' => 'عقد سنوي قابل للتجديد',
+        ]);
+        $later = Vehicle::query()->create([
+            'code' => 'VEH-OWN-2',
+            'plate' => 'م ل 1002',
+            'brand' => 'تويوتا',
+            'model' => 'كورولا',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 3000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 800,
+            'default_deposit' => 2000,
+            'is_active' => true,
+            'owner_id' => $owner->id,
+            'owner_agreement_ends_on' => now()->addDays(90)->toDateString(),
+        ]);
+
+        $res = $this->getJson('/api/vehicles?status=owner_agreement_expiring&within_days=30')->assertOk();
+        $ids = collect($res->json('data'))->pluck('id')->all();
+        $this->assertContains($due->id, $ids);
+        $this->assertNotContains($later->id, $ids);
+        $row = collect($res->json('data'))->firstWhere('id', $due->id);
+        $this->assertSame('OWN-2025-01', $row['owner_agreement_number'] ?? null);
+        $this->assertSame(now()->addDays(20)->toDateString(), $row['owner_agreement_ends_on'] ?? null);
+        $this->assertGreaterThanOrEqual(1, (int) $res->json('summary.owner_agreement_expiring'));
+    }
+
     public function test_sim_recharge_filter_and_fields(): void
     {
         $due = Vehicle::query()->create([

@@ -95,6 +95,10 @@ class StoreVehicleRequest extends FormRequest
             'owner_id' => ['nullable', 'integer', 'exists:vehicle_owners,id'],
             'owner_monthly_amount' => ['nullable', 'integer', 'min:0'],
             'owner_since' => ['nullable', 'date'],
+            'owner_agreement_starts_on' => ['nullable', 'date'],
+            'owner_agreement_ends_on' => ['nullable', 'date', 'after_or_equal:owner_agreement_starts_on'],
+            'owner_agreement_number' => ['nullable', 'string', 'max:100'],
+            'owner_agreement_notes' => ['nullable', 'string', 'max:2000'],
             'owner_inline' => ['nullable', 'array'],
             'owner_inline.full_name' => ['required_with:owner_inline', 'string', 'max:150'],
             'owner_inline.phone' => ['nullable', 'string', 'max:30'],
@@ -132,6 +136,10 @@ class StoreVehicleRequest extends FormRequest
             'owner_id' => 'المالك',
             'owner_monthly_amount' => 'المبلغ الشهري للمالك',
             'owner_since' => 'تاريخ بدء الملكية',
+            'owner_agreement_starts_on' => 'بداية عقد المالك',
+            'owner_agreement_ends_on' => 'نهاية عقد المالك',
+            'owner_agreement_number' => 'رقم عقد المالك',
+            'owner_agreement_notes' => 'تفاصيل عقد المالك',
             'notes' => 'الملاحظات',
         ];
     }

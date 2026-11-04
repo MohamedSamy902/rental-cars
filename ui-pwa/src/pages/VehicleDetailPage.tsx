@@ -76,6 +76,10 @@ type Vehicle = {
   tracker_sim_last_recharged_on?: string | null
   tracker_sim_next_recharge_on?: string | null
   tracker_sim_recharge_cycle_days?: number | null
+  owner_agreement_starts_on?: string | null
+  owner_agreement_ends_on?: string | null
+  owner_agreement_number?: string | null
+  owner_agreement_notes?: string | null
   notes?: string | null
   is_active?: boolean
   owner_id?: number | null
@@ -1129,6 +1133,12 @@ export function VehicleDetailPage() {
               )}
               <span>شهري {formatMoney(v.owner_monthly_amount || 0)} · ربط منذ {v.owner_since || '—'}</span>
             </div>
+          </div>
+          <div className="vd-facts" style={{ marginBlockStart: '0.75rem' }}>
+            <Fact label="رقم عقد المالك" value={v.owner_agreement_number || '—'} />
+            <Fact label="بداية العقد" value={shortDate(v.owner_agreement_starts_on)} />
+            <Fact label="نهاية العقد" value={shortDate(v.owner_agreement_ends_on)} />
+            <Fact label="تفاصيل العقد" value={v.owner_agreement_notes || '—'} wide />
           </div>
           <Link className="vd-no-print rpm-link-btn" to={v.owner ? `/owners/${v.owner.id}` : '/owners'}>{v.owner ? 'ملف المالك' : 'صفحة الملاك'}</Link>
         </div>

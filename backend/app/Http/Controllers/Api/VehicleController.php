@@ -144,6 +144,11 @@ class VehicleController extends Controller
                 $until = now()->addDays($within)->toDateString();
                 $q->whereNotNull('tracker_sim_next_recharge_on')
                     ->whereDate('tracker_sim_next_recharge_on', '<=', $until);
+            } elseif ($status === 'owner_agreement_expiring') {
+                $within = max(0, (int) $request->integer('within_days', 30));
+                $until = now()->addDays($within)->toDateString();
+                $q->whereNotNull('owner_agreement_ends_on')
+                    ->whereDate('owner_agreement_ends_on', '<=', $until);
             }
         }
 
@@ -495,6 +500,10 @@ class VehicleController extends Controller
             'owner_id' => $v->owner_id !== null ? (int) $v->owner_id : null,
             'owner_monthly_amount' => $v->owner_monthly_amount !== null ? (int) $v->owner_monthly_amount : null,
             'owner_since' => $v->owner_since?->toDateString(),
+            'owner_agreement_starts_on' => $v->owner_agreement_starts_on?->toDateString(),
+            'owner_agreement_ends_on' => $v->owner_agreement_ends_on?->toDateString(),
+            'owner_agreement_number' => $v->owner_agreement_number,
+            'owner_agreement_notes' => $v->owner_agreement_notes,
             'owner' => $v->relationLoaded('owner') && $v->owner ? [
                 'id' => $v->owner->id,
                 'full_name' => $v->owner->full_name,
@@ -576,10 +585,11 @@ class VehicleController extends Controller
             'maintenance' => 0,
             'license_expiring' => 0,
             'sim_recharge' => 0,
+            'owner_agreement_expiring' => 0,
         ];
         foreach ($all as $v) {
             $status = $this->present($v)['status'];
-            if (isset($counts[$status]) && ! in_array($status, ['license_expiring', 'sim_recharge'], true)) {
+            if (isset($counts[$status]) && ! in_array($status, ['license_expiring', 'sim_recharge', 'owner_agreement_expiring'], true)) {
                 $counts[$status]++;
             }
         }
@@ -599,6 +609,13 @@ class VehicleController extends Controller
             ->where('is_active', true)
             ->whereNotNull('tracker_sim_next_recharge_on')
             ->whereDate('tracker_sim_next_recharge_on', '<=', $simUntil)
+            ->count();
+
+        $agreementUntil = now()->addDays(30)->toDateString();
+        $counts['owner_agreement_expiring'] = Vehicle::query()
+            ->where('is_active', true)
+            ->whereNotNull('owner_agreement_ends_on')
+            ->whereDate('owner_agreement_ends_on', '<=', $agreementUntil)
             ->count();
 
         return $counts;
