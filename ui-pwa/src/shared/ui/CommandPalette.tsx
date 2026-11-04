@@ -4,9 +4,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
-  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart, IconChat,
-  IconClipboard, IconClose, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
-  IconQueue, IconReceipt, IconSearch, IconSettings, IconStore, IconUserCog, IconUsers,
+  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart,
+  IconClipboard, IconClose, IconEdit, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
+  IconReceipt, IconSearch, IconSettings, IconStore, IconUserCog, IconUsers,
   IconWallet, IconWrench,
 } from './Icons'
 import { useIsMobile, useSheetDrag } from './useSheetDrag'
@@ -23,16 +23,16 @@ type Item = {
 
 const ITEMS: Item[] = [
   { to: '/', label: 'لوحة اليوم', group: 'التشغيل', icon: <IconHome /> },
-  { to: '/vehicles', label: 'المركبات', group: 'التشغيل', icon: <IconCar />, permission: 'vehicles.view' },
+  { to: '/vehicles', label: 'العربيات', group: 'التشغيل', icon: <IconCar />, permission: 'vehicles.view' },
   { to: '/bookings', label: 'العقود والحجوزات', group: 'التشغيل', icon: <IconClipboard />, permission: 'contracts.view' },
   { to: '/calendar', label: 'التقويم', group: 'التشغيل', icon: <IconCalendar />, permission: 'contracts.view' },
-  { to: '/waitlist', label: 'قائمة الانتظار', group: 'التشغيل', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
   { to: '/showroom', label: 'وضع عرض المعرض', group: 'التشغيل', icon: <IconStore />, feature: 'showroom', permission: 'showroom.run' },
   { to: '/department-notice', label: 'إخطار القسم', group: 'التشغيل', icon: <IconFileText />, feature: 'department_notice', permission: 'department_notice.print' },
-  { to: '/maintenance', label: 'أوامر الشغل', group: 'الأسطول', icon: <IconWrench />, permission: 'maintenance.view' },
+  { to: '/maintenance', label: 'الصيانة', group: 'الأسطول', icon: <IconWrench />, permission: 'maintenance.view' },
   { to: '/inventory', label: 'المخزون', group: 'الأسطول', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
   { to: '/petty-cash', label: 'العهدة النقدية', group: 'الأسطول', icon: <IconWallet />, feature: 'petty_cash', permission: 'petty_cash.view' },
   { to: '/violations', label: 'المخالفات', group: 'الأسطول', icon: <IconAlert />, permission: 'violations.view' },
+  { to: '/violation-inquiries', label: 'استعلامات المخالفات', group: 'الأسطول', icon: <IconSearch />, permission: 'violations.view' },
   { to: '/customers', label: 'العملاء', group: 'المالية', icon: <IconUsers />, permission: 'customers.view' },
   { to: '/accounts', label: 'الحسابات', group: 'المالية', icon: <IconLandmark />, permission: 'accounting.view' },
   { to: '/reports', label: 'التقارير', group: 'المالية', icon: <IconChart />, permission: 'reports.view' },
@@ -42,8 +42,9 @@ const ITEMS: Item[] = [
   { to: '/audit-logs', label: 'سجل التعديلات', group: 'النظام', icon: <IconHistory />, permission: 'audit.view' },
   { to: '/notifications', label: 'الإشعارات', group: 'النظام', icon: <IconBell />, permission: 'notifications.view' },
   { to: '/hr', label: 'الموارد البشرية', group: 'النظام', icon: <IconBriefcase />, feature: 'hr', permission: 'hr.view' },
-  { to: '/chat', label: 'محادثة التشغيل', group: 'النظام', icon: <IconChat />, feature: 'chat' },
   { to: '/settings', label: 'الإعدادات', group: 'النظام', icon: <IconSettings />, permission: 'settings.view' },
+  // Unrestricted for any authenticated user (no permission key).
+  { to: '/profile', label: 'حسابي الشخصي', group: 'النظام', icon: <IconEdit /> },
 ]
 
 type Props = { open: boolean; onClose: () => void }

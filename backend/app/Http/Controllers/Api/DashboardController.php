@@ -11,13 +11,25 @@ use App\Models\TenantSetting;
 use App\Models\Vehicle;
 use App\Models\Violation;
 use App\Models\WorkOrder;
+use App\Services\Accounting\ProfitabilityService;
+use App\Services\Contracts\RentalProgressService;
+use App\Services\Dashboard\HomeImportantTasksService;
+use App\Services\Fleet\FleetDailyPrepService;
+use App\Services\Fleet\OccupancyService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function __construct(private readonly VehicleAvailabilityService $availability) {}
+    public function __construct(
+        private readonly VehicleAvailabilityService $availability,
+        private readonly OccupancyService $occupancy,
+        private readonly ProfitabilityService $profitability,
+        private readonly RentalProgressService $progress,
+        private readonly FleetDailyPrepService $dailyPrep,
+        private readonly HomeImportantTasksService $importantTasks,
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
@@ -37,12 +49,18 @@ class DashboardController extends Controller
             'maintenance' => 0,
             'out_of_service' => 0,
         ];
+        $blockingWo = WorkOrder::query()
+            ->where('puts_in_maintenance', true)
+            ->whereIn('status', ['open', 'in_progress'])
+            ->pluck('vehicle_id')
+            ->flip();
+
         foreach ($vehicles as $v) {
             $status = $this->availability->statusOnDate([
                 'manual_status' => $v->manual_status,
                 'has_active_handover' => $activeIds->has($v->id),
                 'has_approved_covering_date' => $reservedIds->has($v->id),
-                'open_work_order_blocks' => $v->manual_status === 'maintenance',
+                'open_work_order_blocks' => $v->manual_status === 'maintenance' || $blockingWo->has($v->id),
             ]);
             if (isset($statusCounts[$status])) {
                 $statusCounts[$status]++;
@@ -90,11 +108,15 @@ class DashboardController extends Controller
 
         $center = TenantSetting::query()->value('center_name') ?: 'مركز التأجير';
 
+        $occupancyPct = $this->occupancy->percent(now()->startOfMonth(), now());
+
         return response()->json([
             'center_name' => $center,
-            'occupancy_pct' => $vehicles->count() ? (int) round(($statusCounts['rented'] / $vehicles->count()) * 100) : 0,
+            'occupancy_pct' => (int) round($occupancyPct),
+            'occupancy_pct_precise' => $occupancyPct,
             'fleet_total' => $vehicles->count(),
             'fleet_status' => $statusCounts,
+            'profitability_compare' => $this->profitability->monthOverMonth(),
             'kpis' => [
                 'available' => $statusCounts['available'],
                 'rented' => $statusCounts['rented'],
@@ -111,11 +133,22 @@ class DashboardController extends Controller
                     ->count(),
             ],
             'tasks' => $tasks,
+            'important_tasks' => $request->user()
+                ? $this->importantTasks->forUser($request->user())
+                : [],
+            'fleet_prep' => $this->dailyPrep->summarize(now(), 5),
             'recent_contracts' => Contract::query()
                 ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
                 ->latest('id')
                 ->limit(5)
-                ->get(),
+                ->get()
+                ->map(function (Contract $c) {
+                    $arr = $c->toArray();
+                    $arr['progress'] = $this->progress->forContract($c);
+
+                    return $arr;
+                })
+                ->values(),
         ]);
     }
 }

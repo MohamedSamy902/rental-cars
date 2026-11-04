@@ -59,7 +59,7 @@ export async function enableWebPush(): Promise<{ ok: true } | { ok: false; messa
     json: {
       endpoint: json.endpoint,
       keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
-      contentEncoding: 'aesgcm',
+      contentEncoding: 'aes128gcm',
     },
   })
 

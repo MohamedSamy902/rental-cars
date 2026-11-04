@@ -4,23 +4,30 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
-use App\Models\TenantSetting;
-use App\Models\Vehicle;
-use App\Models\VehicleAccessory;
-use App\Models\VehicleDocument;
-use App\Services\Fleet\VehicleAvailabilityService;
 use App\Models\PrintSnapshot;
+use App\Models\TenantSetting;
+use App\Models\User;
+use App\Models\Vehicle;
+use App\Models\VehicleDocumentHistory;
+use App\Models\WorkOrder;
+use App\Services\Fleet\VehicleAvailabilityService;
+use App\Services\Fleet\VehicleService;
+use App\Services\Operations\PettyCashLedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class OperationsController extends Controller
 {
-    public function __construct(private readonly VehicleAvailabilityService $availability) {}
+    public function __construct(
+        private readonly VehicleAvailabilityService $availability,
+        private readonly PettyCashLedgerService $pettyCashLedger,
+    ) {}
 
     public function showroom(): JsonResponse
     {
@@ -28,22 +35,36 @@ class OperationsController extends Controller
         $flags = $settings?->feature_flags ?? [];
         abort_unless(($flags['showroom'] ?? true) === true, 403, 'وضع المعرض غير مفعّل.');
 
-        $activeIds = \App\Models\Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip();
-        $reservedIds = \App\Models\Contract::query()
+        $activeIds = Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip();
+        $reservedIds = Contract::query()
             ->where('status', 'approved')
             ->where('starts_at', '<=', now())
             ->where('planned_ends_at', '>=', now())
             ->pluck('vehicle_id')
             ->flip();
 
-        $rows = Vehicle::query()->where('is_active', true)->orderByDesc('rental_priority')->get()
+        $rows = Vehicle::query()->where('is_active', true)->orderBy('brand')->orderBy('model')->get()
             ->map(function (Vehicle $v) use ($activeIds, $reservedIds) {
                 $status = $this->availability->statusOnDate([
                     'manual_status' => $v->manual_status,
                     'has_active_handover' => $activeIds->has($v->id),
                     'has_approved_covering_date' => $reservedIds->has($v->id),
-                    'open_work_order_blocks' => $v->manual_status === 'maintenance',
+                    'open_work_order_blocks' => $v->manual_status === 'maintenance'
+                        || WorkOrder::query()
+                            ->where('vehicle_id', $v->id)
+                            ->where('puts_in_maintenance', true)
+                            ->whereIn('status', ['open', 'in_progress'])
+                            ->exists(),
                 ]);
+
+                $returning = null;
+                if ($status !== 'available') {
+                    $returning = Contract::query()
+                        ->where('vehicle_id', $v->id)
+                        ->whereIn('status', ['active', 'approved'])
+                        ->orderBy('planned_ends_at')
+                        ->value('planned_ends_at');
+                }
 
                 return [
                     'id' => $v->id,
@@ -52,11 +73,19 @@ class OperationsController extends Controller
                     'year' => $v->year,
                     'category' => $v->category,
                     'fuel_type' => $v->fuel_type,
+                    'transmission' => $v->transmission,
+                    'color' => $v->color,
+                    'seats' => $v->seats,
+                    'plate' => $v->plate,
+                    'daily_rate' => (int) $v->daily_rate,
+                    'weekly_rate' => (int) round(((int) $v->daily_rate) * 7 * 0.9),
+                    'monthly_rate' => (int) round(((int) $v->daily_rate) * 30 * 0.75),
+                    'default_deposit' => (int) $v->default_deposit,
                     'status' => $status,
                     'available' => $status === 'available',
+                    'returning_on' => $returning?->toDateString(),
                 ];
             })
-            ->filter(fn ($row) => $row['available'])
             ->values();
 
         return response()->json([
@@ -92,8 +121,8 @@ class OperationsController extends Controller
         }
 
         $rows = $q->limit(200)->get([
-            'id', 'full_name', 'phone', 'national_id', 'national_id_image_path',
-            'license_number', 'license_expires_on', 'license_image_path', 'birth_date', 'status',
+            'id', 'full_name', 'phone', 'national_id', 'national_id_image_path', 'national_id_back_path',
+            'license_number', 'license_expires_on', 'license_image_path', 'license_back_path', 'birth_date', 'status',
         ]);
 
         return response()->json([
@@ -110,11 +139,30 @@ class OperationsController extends Controller
     {
         $data = $request->validate([
             'center_name' => ['sometimes', 'string', 'max:200'],
-            'print_footer' => ['nullable', 'string', 'max:300'],
+            'print_footer' => ['nullable', 'string', 'max:2000'],
+            'logo_path' => ['nullable', 'string', 'max:500'],
+            'print_phone' => ['nullable', 'string', 'max:50'],
+            'print_address' => ['nullable', 'string', 'max:500'],
+            'print_commercial_register' => ['nullable', 'string', 'max:120'],
+            'print_tax_info' => ['nullable', 'string', 'max:200'],
+            'contract_terms' => ['nullable', 'string', 'max:20000'],
             'operational' => ['nullable', 'array'],
         ]);
 
         $settings = TenantSetting::query()->firstOrCreate([]);
+
+        $ops = is_array($settings->operational) ? $settings->operational : [];
+        if (array_key_exists('operational', $data) && is_array($data['operational'])) {
+            $ops = array_merge($ops, $data['operational']);
+        }
+        foreach (['print_phone', 'print_address', 'print_commercial_register', 'print_tax_info', 'contract_terms'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $ops[$key] = $data[$key];
+                unset($data[$key]);
+            }
+        }
+        $data['operational'] = $ops;
+
         $settings->fill($data)->save();
 
         return response()->json(['data' => $settings->fresh(), 'message' => 'تم حفظ إعدادات التشغيل.']);
@@ -182,14 +230,119 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function auditLogs(Request $request): JsonResponse
+    public function auditLogs(Request $request, \App\Services\Operations\AuditNarrator $narrator): JsonResponse
     {
-        $rows = AuditLog::query()
-            ->latest('id')
-            ->limit((int) $request->input('limit', 50))
-            ->get();
+        $validated = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'action' => ['nullable', 'string', 'max:80'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
 
-        return response()->json(['data' => $rows]);
+        $limit = (int) ($validated['limit'] ?? 50);
+
+        $query = AuditLog::query()->with([
+            'user:id,name,role_id,employee_id',
+            'user.role:id,name,label',
+            'user.employee:id,job_title',
+        ]);
+
+        if (! empty($validated['user_id'])) {
+            $query->where('user_id', (int) $validated['user_id']);
+        }
+        if (! empty($validated['action'])) {
+            $query->where('action', $validated['action']);
+        }
+        if (! empty($validated['date_from'])) {
+            $query->whereDate('created_at', '>=', $validated['date_from']);
+        }
+        if (! empty($validated['date_to'])) {
+            $query->whereDate('created_at', '<=', $validated['date_to']);
+        }
+
+        $rows = $query->latest('id')->limit($limit)->get();
+
+        $data = $rows->map(function (AuditLog $log) use ($narrator) {
+            $user = $log->user;
+            $userName = $user?->name;
+            $roleTitle = $user ? $narrator->resolveRoleTitle($user) : null;
+
+            return [
+                'id' => $log->id,
+                'action' => $log->action,
+                'summary' => $narrator->summarizeForUser($log, $user),
+                'record_type' => $log->record_type,
+                'record_id' => $log->record_id,
+                'user_id' => $log->user_id,
+                'user_name' => $userName,
+                'user_role_title' => $roleTitle,
+                'user_phrase' => $narrator->actorPhrase($userName, $roleTitle),
+                'before' => $log->before,
+                'after' => $log->after,
+                'created_at' => $log->created_at?->toIso8601String(),
+            ];
+        })->values();
+
+        $labels = $narrator->actionLabels();
+        $seenActions = AuditLog::query()
+            ->select('action')
+            ->distinct()
+            ->orderBy('action')
+            ->pluck('action');
+
+        $actions = $seenActions
+            ->map(fn (string $key) => [
+                'value' => $key,
+                'label' => $labels[$key] ?? $key,
+            ])
+            ->values()
+            ->all();
+
+        // Prefer known catalog order, then any unseen keys that appeared in the DB.
+        $catalog = collect($labels)
+            ->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])
+            ->values();
+        $extra = collect($actions)->reject(
+            fn (array $row) => $catalog->contains(fn (array $c) => $c['value'] === $row['value'])
+        );
+        $actionOptions = $catalog->concat($extra)->values()->all();
+
+        $users = User::query()
+            ->with(['role:id,name,label', 'employee:id,job_title'])
+            ->where(function ($q) {
+                $q->where('is_active', true)
+                    ->orWhereIn('id', AuditLog::query()->whereNotNull('user_id')->distinct()->select('user_id'));
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'role_id', 'employee_id'])
+            ->map(function (User $u) use ($narrator) {
+                $title = $narrator->resolveRoleTitle($u);
+
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'role_title' => $title,
+                    'label' => $title ? "{$title} — {$u->name}" : $u->name,
+                ];
+            })
+            ->values()
+            ->all();
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'users' => $users,
+                'actions' => $actionOptions,
+                'filters' => [
+                    'user_id' => $validated['user_id'] ?? null,
+                    'action' => $validated['action'] ?? null,
+                    'date_from' => $validated['date_from'] ?? null,
+                    'date_to' => $validated['date_to'] ?? null,
+                    'limit' => $limit,
+                ],
+            ],
+        ]);
     }
 
     public function pettyCashIndex(): JsonResponse
@@ -199,30 +352,91 @@ class OperationsController extends Controller
         return response()->json(['data' => $rows]);
     }
 
+    public function pettyCashShow(PettyCashAccount $account): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->pettyCashLedger->dossier($account),
+        ]);
+    }
+
     public function pettyCashStore(Request $request): JsonResponse
     {
         $data = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
-            'limit_amount' => ['required', 'integer', 'min:0'],
+            'limit_amount' => ['nullable', 'integer', 'min:0'],
             'balance' => ['nullable', 'integer', 'min:0'],
-        ], [], ['employee_id' => 'الموظف', 'limit_amount' => 'حد العهدة']);
+            'topup_amount' => ['nullable', 'integer', 'min:0'],
+        ], [], [
+            'employee_id' => 'الموظف',
+            'limit_amount' => 'حد العهدة',
+            'balance' => 'المبلغ',
+            'topup_amount' => 'مبلغ التغذية',
+        ]);
 
-        $row = PettyCashAccount::query()->updateOrCreate(
-            ['employee_id' => $data['employee_id']],
-            [
-                'limit_amount' => $data['limit_amount'],
-                'balance' => $data['balance'] ?? $data['limit_amount'],
+        $row = DB::transaction(function () use ($data, $request) {
+            $existing = PettyCashAccount::query()
+                ->where('employee_id', $data['employee_id'])
+                ->lockForUpdate()
+                ->first();
+
+            $topup = (int) ($data['topup_amount'] ?? $data['balance'] ?? 0);
+            if ($topup < 0) {
+                $topup = 0;
+            }
+
+            if ($existing) {
+                // Cumulative top-up — never overwrite the live balance.
+                $newBalance = (int) $existing->balance + $topup;
+                $existing->update([
+                    'limit_amount' => array_key_exists('limit_amount', $data)
+                        ? (int) ($data['limit_amount'] ?? 0)
+                        : (int) $existing->limit_amount,
+                    'balance' => $newBalance,
+                    'is_active' => true,
+                ]);
+
+                if ($topup > 0) {
+                    PettyCashMovement::query()->create([
+                        'petty_cash_account_id' => $existing->id,
+                        'type' => 'topup',
+                        'amount' => $topup,
+                        'moved_on' => now()->toDateString(),
+                        'performed_by' => $request->user()?->id,
+                        'notes' => 'تغذية عهدة',
+                    ]);
+                }
+
+                return $existing->fresh('employee');
+            }
+
+            $created = PettyCashAccount::query()->create([
+                'employee_id' => $data['employee_id'],
+                'limit_amount' => (int) ($data['limit_amount'] ?? 0),
+                'balance' => $topup,
                 'is_active' => true,
-            ],
-        );
+            ]);
 
-        return response()->json(['data' => $row->load('employee'), 'message' => 'تم حفظ العهدة.'], 201);
+            if ($topup > 0) {
+                PettyCashMovement::query()->create([
+                    'petty_cash_account_id' => $created->id,
+                    'type' => 'topup',
+                    'amount' => $topup,
+                    'moved_on' => now()->toDateString(),
+                    'performed_by' => $request->user()?->id,
+                    'notes' => 'تغذية عهدة',
+                ]);
+            }
+
+            return $created->load('employee');
+        });
+
+        return response()->json(['data' => $row, 'message' => 'تم حفظ العهدة.'], 201);
     }
 
     public function pettyCashMove(Request $request, PettyCashAccount $account): JsonResponse
     {
         $data = $request->validate([
-            'type' => ['required', 'in:topup,spend,adjust'],
+            'type' => ['required', 'in:topup,spend,adjust,return'],
             'amount' => ['required', 'integer', 'min:1'],
             'notes' => ['nullable', 'string'],
         ], [], ['type' => 'نوع الحركة', 'amount' => 'المبلغ']);
@@ -232,7 +446,7 @@ class OperationsController extends Controller
             $balance = (int) $account->balance;
             if ($data['type'] === 'topup') {
                 $balance += $amount;
-            } elseif ($data['type'] === 'spend') {
+            } elseif ($data['type'] === 'spend' || $data['type'] === 'return') {
                 if ($amount > $balance) {
                     abort(422, 'رصيد العهدة غير كافٍ.');
                 }
@@ -260,15 +474,24 @@ class OperationsController extends Controller
     {
         $data = $request->validate([
             'type' => ['required', 'string', 'max:100'],
+            'document_number' => ['nullable', 'string', 'max:80'],
             'file_path' => ['nullable', 'string', 'max:500'],
+            'file_path_back' => ['nullable', 'string', 'max:500'],
             'issued_on' => ['nullable', 'date'],
             'expires_on' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
-        ], [], ['type' => 'نوع المستند']);
+        ], [], [
+            'type' => 'نوع المستند',
+            'document_number' => 'رقم المستند',
+            'file_path' => 'وجه المستند',
+            'file_path_back' => 'ظهر المستند',
+        ]);
 
         $doc = $vehicle->documents()->create([
             'type' => $data['type'],
+            'document_number' => $data['document_number'] ?? null,
             'file_path' => $data['file_path'] ?? 'manual/'.$data['type'],
+            'file_path_back' => $data['file_path_back'] ?? null,
             'issued_on' => $data['issued_on'] ?? null,
             'expires_on' => $data['expires_on'] ?? null,
             'notes' => $data['notes'] ?? null,
@@ -330,15 +553,50 @@ class OperationsController extends Controller
         $row = $vehicle->documents()->whereKey($document)->firstOrFail();
         $data = $request->validate([
             'type' => ['sometimes', 'string', 'max:100'],
+            'document_number' => ['nullable', 'string', 'max:80'],
             'file_path' => ['nullable', 'string', 'max:500'],
+            'file_path_back' => ['nullable', 'string', 'max:500'],
             'issued_on' => ['nullable', 'date'],
             'expires_on' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
-        ], [], ['type' => 'نوع المستند']);
+            'archive_previous' => ['nullable', 'boolean'],
+        ], [], [
+            'type' => 'نوع المستند',
+            'document_number' => 'رقم المستند',
+            'file_path' => 'وجه المستند',
+            'file_path_back' => 'ظهر المستند',
+        ]);
 
+        $type = strtolower((string) ($data['type'] ?? $row->type));
+        $isLicense = str_contains($type, 'license') || str_contains($type, 'رخص');
+        $shouldArchive = $isLicense || ! empty($data['archive_previous']);
+
+        if ($shouldArchive) {
+            unset($data['archive_previous']);
+            $row = app(VehicleService::class)
+                ->renewLicense($vehicle, $row, $data, $request->user()?->id);
+
+            return response()->json([
+                'data' => $row,
+                'message' => 'تم تحديث الرخصة مع حفظ السجل السابق.',
+            ]);
+        }
+
+        unset($data['archive_previous']);
         $row->update($data);
 
         return response()->json(['data' => $row->fresh(), 'message' => 'تم تحديث المستند.']);
+    }
+
+    public function vehicleDocumentHistory(Vehicle $vehicle): JsonResponse
+    {
+        $rows = VehicleDocumentHistory::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->latest('archived_at')
+            ->limit(100)
+            ->get();
+
+        return response()->json(['data' => $rows]);
     }
 
     public function destroyVehicleDocument(Vehicle $vehicle, int $document): JsonResponse

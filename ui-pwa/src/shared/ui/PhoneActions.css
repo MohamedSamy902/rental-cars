@@ -1,0 +1,96 @@
+.rpm-phone-actions {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.rpm-phone-actions--empty {
+  color: var(--rpm-muted, #64748b);
+}
+
+.rpm-phone-actions__call,
+.rpm-phone-actions__wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-block: 0.2rem;
+  padding-inline: 0.45rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.rpm-phone-actions__call {
+  min-inline-size: 0;
+  /* Hug content — do not grow and shove WhatsApp under the FAB */
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: #0f766e;
+  background: color-mix(in srgb, #0d9488 12%, transparent);
+  border: 1px solid color-mix(in srgb, #0d9488 28%, transparent);
+}
+
+.rpm-phone-actions__wa {
+  flex: 0 0 auto;
+  color: #166534;
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+  border: 1px solid color-mix(in srgb, #16a34a 28%, transparent);
+}
+
+.rpm-phone-actions__call:hover,
+.rpm-phone-actions__wa:hover {
+  transform: translateY(-1px);
+}
+
+.rpm-phone-actions__call:focus-visible,
+.rpm-phone-actions__wa:focus-visible {
+  outline: 2px solid #0d9488;
+  outline-offset: 2px;
+}
+
+.rpm-phone-actions__number {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rpm-phone-actions--compact .rpm-phone-actions__call,
+.rpm-phone-actions--compact .rpm-phone-actions__wa {
+  padding-block: 0.28rem;
+  padding-inline: 0.45rem;
+  font-size: 0.75rem;
+}
+
+.rpm-phone-actions--compact .rpm-phone-actions__wa {
+  inline-size: 2rem;
+  block-size: 2rem;
+  padding: 0;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  .rpm-phone-actions {
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .rpm-phone-actions__call,
+  .rpm-phone-actions__wa {
+    padding-block: 0.28rem;
+    padding-inline: 0.4rem;
+    font-size: 0.74rem;
+  }
+}

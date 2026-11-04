@@ -159,11 +159,23 @@
   color: var(--danger-ink);
 }
 
-/* Remember + forgot */
+.auth-alert {
+  padding-block: 0.75rem;
+  padding-inline: 0.875rem;
+  border-radius: var(--radius-md, 0.75rem);
+  border: 1px solid color-mix(in srgb, var(--danger-ink) 28%, transparent);
+  background: color-mix(in srgb, var(--danger-ink) 10%, var(--surface));
+  color: var(--danger-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* Remember */
 .auth-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem;
   flex-wrap: wrap;
 }

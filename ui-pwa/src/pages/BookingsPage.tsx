@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
+import { useAuth } from '@/shared/auth/AuthContext'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
-  useToast, ErrorState, IconClipboard, IconAlert, IconCheck, IconKey,
+  useToast, ErrorState, IconClipboard, IconAlert, IconCheck, IconKey, PhoneActions,
   type DataColumn,
 } from '@/shared/ui'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -14,17 +16,22 @@ import {
 } from '@/shared/contracts/contractModel'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
-import { printContract } from '@/shared/contracts/printContract'
+import { printContractDocument } from '@/shared/contracts/printContract'
 import './pages.css'
+
+const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed'] as const
 
 export function BookingsPage() {
   const toast = useToast()
   const navigate = useNavigate()
+  const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Contract[]>([])
-  const [summary, setSummary] = useState({ total: 0, pending: 0, approved: 0, active: 0, completed: 0 })
+  const [summary, setSummary] = useState({
+    total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0, handover_today: 0,
+  })
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: BookingsPageTabs, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { openNewContract, createdVersion } = useNewContract()
@@ -35,10 +42,22 @@ export function BookingsPage() {
     () => [
       { id: 'all', label: 'الكل' },
       {
+        id: 'handover_today',
+        label: 'تسليم العربية',
+        attention: summary.handover_today > 0 ? ('warning' as const) : null,
+        attentionLabel: 'تسليمات اليوم',
+      },
+      {
+        id: 'upcoming',
+        label: 'الحجوزات القادمة',
+        attention: summary.upcoming > 0 ? ('warning' as const) : null,
+        attentionLabel: 'حجوزات مستقبلية',
+      },
+      {
         id: 'pending',
         label: 'معلّق',
         attention: summary.pending > 0 ? ('warning' as const) : null,
-        attentionLabel: `${summary.pending} عقد بانتظار الاعتماد`,
+        attentionLabel: 'اعتماد معلّق',
       },
       {
         id: 'approved',
@@ -49,12 +68,17 @@ export function BookingsPage() {
       {
         id: 'active',
         label: 'نشط',
-        attention: attention.overdue_returns > 0 ? ('critical' as const) : null,
-        attentionLabel: `${attention.overdue_returns} عقد متأخر عن الاستلام`,
+        attention:
+          attention.overdue_returns > 0
+            ? ('critical' as const)
+            : attention.returning_today > 0
+              ? ('warning' as const)
+              : null,
+        attentionLabel: attention.overdue_returns > 0 ? 'عقود متأخرة' : 'استلامات اليوم',
       },
       { id: 'completed', label: 'مكتمل' },
     ],
-    [summary.pending, attention.pickups_today, attention.overdue_returns],
+    [summary.pending, summary.upcoming, summary.handover_today, attention.pickups_today, attention.overdue_returns, attention.returning_today],
   )
 
   async function load() {
@@ -63,10 +87,22 @@ export function BookingsPage() {
     try {
       const qs = new URLSearchParams()
       if (search.trim()) qs.set('search', search.trim())
-      if (chip !== 'all') qs.set('status', chip)
+      if (chip === 'upcoming' || chip === 'handover_today') {
+        qs.set('tab', chip)
+      } else if (chip !== 'all') {
+        qs.set('status', chip)
+      }
       const res = await api<{ data: Contract[]; summary: typeof summary }>(`/contracts?${qs}`)
       setRows(res.data)
-      setSummary(res.summary)
+      setSummary({
+        total: res.summary.total ?? 0,
+        pending: res.summary.pending ?? 0,
+        approved: res.summary.approved ?? 0,
+        active: res.summary.active ?? 0,
+        completed: res.summary.completed ?? 0,
+        upcoming: res.summary.upcoming ?? 0,
+        handover_today: res.summary.handover_today ?? 0,
+      })
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -99,13 +135,22 @@ export function BookingsPage() {
     {
       id: 'customer',
       header: 'العميل',
-      cell: (b) => <strong className="rpm-table__primary">{b.customer?.full_name || '—'}</strong>,
+      cell: (b) => (
+        <div>
+          <strong className="rpm-table__primary">{b.customer?.full_name || '—'}</strong>
+          {b.customer?.phone ? (
+            <div className="rpm-table__sub">
+              <PhoneActions phone={b.customer.phone} name={b.customer.full_name} compact />
+            </div>
+          ) : null}
+        </div>
+      ),
       sortValue: (b) => b.customer?.full_name,
       mobile: 'subtitle',
     },
     {
       id: 'vehicle',
-      header: 'المركبة',
+      header: 'العربية',
       cell: (b) =>
         b.vehicle ? (
           <>
@@ -121,8 +166,8 @@ export function BookingsPage() {
       header: 'الفترة',
       cell: (b) => (
         <>
-          <span className="rpm-table__primary">{formatDateTime(b.starts_at)}</span>
-          <span className="rpm-table__sub">حتى {formatDateTime(b.planned_ends_at)}</span>
+          <span className="rpm-table__primary">{formatDate(b.starts_at)}</span>
+          <span className="rpm-table__sub">حتى {formatDate(b.planned_ends_at)}</span>
         </>
       ),
       sortValue: (b) => b.starts_at,
@@ -137,8 +182,8 @@ export function BookingsPage() {
     {
       id: 'deposit',
       header: 'التأمين',
-      cell: (b) => <DepositBadge deposit={b.deposit} />,
-      sortValue: (b) => b.deposit?.status ?? '',
+      cell: (b) => <DepositBadge deposit={b.deposit} agreedAmount={b.frozen_agreed_deposit} />,
+      sortValue: (b) => b.deposit?.original_amount ?? b.frozen_agreed_deposit ?? 0,
     },
     {
       id: 'status',
@@ -160,11 +205,11 @@ export function BookingsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العقود والحجوزات"
-        subtitle="تمديد = عقد جديد · تبديل عطل = نفس العقد · رصيد دائن عند الإنهاء المبكر"
-        action={<Button onClick={() => openNewContract()}>إضافة حجز</Button>}
+        subtitle="تمديد = عقد جديد · تبديل عطل = عقد جديد · بلا رصيد دائن"
+        action={<Button onClick={() => openNewContract()}>عقد جديد</Button>}
         mobileFab
       />
-      <Fab label="إضافة حجز" onClick={() => openNewContract()} />
+      <Fab label="عقد جديد" onClick={() => openNewContract()} />
 
       <MetricCardGrid
         label="ملخص العقود"
@@ -194,7 +239,8 @@ export function BookingsPage() {
               view: () => navigate(`/contracts/${b.id}`),
               approve: () => void life.approve(b.id),
               openAction: (kind) => void life.openAction(kind, b),
-              print: () => void printContract(b.id, toast.error),
+              print: (kind = 'contract') => void printContractDocument(b.id, kind, toast.error),
+              can,
             })
           }
           emptyTitle="لا توجد عقود مطابقة"

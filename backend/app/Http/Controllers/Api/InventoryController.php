@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\InventoryItem;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class InventoryController extends Controller
     public function storeItem(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'unique:inventory_items,code'],
+            'code' => ['nullable', 'string', 'max:50', 'unique:inventory_items,code'],
             'name' => ['required', 'string'],
             'category' => ['required', 'string'],
             'unit' => ['required', 'string'],
@@ -34,9 +35,37 @@ class InventoryController extends Controller
             'reorder_level' => 'حد التنبيه',
         ]);
 
+        if (array_key_exists('code', $data) && ($data['code'] === null || $data['code'] === '')) {
+            unset($data['code']);
+        }
+
         $item = $this->inventory->storeItem($data);
 
         return response()->json(['data' => $item, 'message' => 'تم إضافة الصنف.'], 201);
+    }
+
+    public function updateItem(Request $request, InventoryItem $item): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string'],
+            'category' => ['required', 'string'],
+            'unit' => ['required', 'string'],
+            'reorder_level' => ['required', 'integer', 'min:0'],
+            'location' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+        ], [], [
+            'name' => 'الاسم',
+            'category' => 'التصنيف',
+            'unit' => 'وحدة القياس',
+            'reorder_level' => 'حد التنبيه',
+        ]);
+
+        // Codes are system-owned and never editable after creation.
+        unset($data['code']);
+
+        $item = $this->inventory->updateItem($item, $data);
+
+        return response()->json(['data' => $item, 'message' => 'تم تحديث الصنف.']);
     }
 
     public function receiveBatch(Request $request): JsonResponse

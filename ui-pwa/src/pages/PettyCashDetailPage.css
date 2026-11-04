@@ -1,0 +1,101 @@
+.pcd-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent, #0f766e) 10%, var(--surface)),
+      var(--surface)
+    );
+}
+
+.pcd-identity h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.35rem;
+}
+
+.pcd-identity__role {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.pcd-ledger .rpm-panel__head {
+  margin-block-end: 0.75rem;
+}
+
+.pcd-ledger-main {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.pcd-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding-inline: 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: var(--surface-2, var(--surface));
+}
+
+.pcd-badge--topup {
+  color: #0f766e;
+  border-color: color-mix(in srgb, #0f766e 35%, var(--border));
+  background: color-mix(in srgb, #0f766e 12%, transparent);
+}
+
+.pcd-badge--expense {
+  color: #b45309;
+  border-color: color-mix(in srgb, #b45309 35%, var(--border));
+  background: color-mix(in srgb, #b45309 12%, transparent);
+}
+
+.pcd-badge--maintenance {
+  color: #1d4ed8;
+  border-color: color-mix(in srgb, #1d4ed8 35%, var(--border));
+  background: color-mix(in srgb, #1d4ed8 12%, transparent);
+}
+
+.pcd-badge--settlement {
+  color: #6d28d9;
+  border-color: color-mix(in srgb, #6d28d9 35%, var(--border));
+  background: color-mix(in srgb, #6d28d9 12%, transparent);
+}
+
+.pcd-amt--in {
+  color: #0f766e;
+}
+
+.pcd-amt--out {
+  color: #b45309;
+}
+
+.pcd-links {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.pcd-link {
+  color: var(--accent, #0f766e);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.pcd-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .pcd-identity {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

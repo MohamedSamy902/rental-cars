@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Contract;
+use App\Models\Customer;
+use App\Models\EmployeeAssignment;
 use App\Models\InventoryItem;
 use App\Models\Notification;
+use App\Models\PayrollRun;
 use App\Models\Violation;
 use App\Models\WorkOrder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * عدّادات انتباه خفيفة للقائمة والتبويبات — بدون حمولة لوحة اليوم الكاملة.
@@ -62,6 +67,16 @@ class AttentionController extends Controller
             ->whereNull('read_at')
             ->count();
 
+        $pendingHrAcks = Schema::hasTable('employee_assignments')
+            ? EmployeeAssignment::query()->where('status', 'pending_ack')->count()
+            : 0;
+
+        $draftPayroll = PayrollRun::query()->where('status', 'draft')->count();
+
+        $blacklistedCustomers = Customer::query()->where('status', 'blacklist')->count();
+
+        $ownersUnpaid = $this->ownersWithUnpaidBalance();
+
         return response()->json([
             'data' => [
                 'overdue_returns' => $overdueReturns,
@@ -73,7 +88,29 @@ class AttentionController extends Controller
                 'open_violations' => $openViolations,
                 'low_stock' => $lowStock,
                 'unread_notifications' => $unread,
+                'pending_hr_acks' => $pendingHrAcks,
+                'draft_payroll_runs' => $draftPayroll,
+                'blacklisted_customers' => $blacklistedCustomers,
+                'owners_unpaid' => $ownersUnpaid,
             ],
         ]);
+    }
+
+    /**
+     * ملاك لهم رصيد مستحق مسجّل (استحقاقات − صرف) دون إعادة استحقاق جماعي.
+     */
+    private function ownersWithUnpaidBalance(): int
+    {
+        if (! Schema::hasTable('vehicle_owners') || ! Schema::hasTable('owner_month_dues') || ! Schema::hasTable('owner_payouts')) {
+            return 0;
+        }
+
+        return (int) DB::table('vehicle_owners as o')
+            ->whereNull('o.deleted_at')
+            ->whereRaw(
+                '(SELECT COALESCE(SUM(d.amount), 0) FROM owner_month_dues d WHERE d.owner_id = o.id)
+                 > (SELECT COALESCE(SUM(p.amount), 0) FROM owner_payouts p WHERE p.owner_id = o.id)'
+            )
+            ->count();
     }
 }

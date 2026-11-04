@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\Contract;
+use App\Models\Expense;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\MonthLock;
@@ -130,10 +131,16 @@ class AccountingService
         $this->assertMonthOpen($closeYear, $closeMonth);
 
         return DB::transaction(function () use ($contract, $slices, $end, $userId) {
+            $source = 'contract_close:'.$contract->id;
+            $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+            if ($existing) {
+                return $existing->load('lines');
+            }
+
             $entry = JournalEntry::query()->create([
                 'entry_date' => $end->toDateString(),
                 'narration' => 'إقفال عقد '.$contract->number,
-                'source' => 'contract_close:'.$contract->id,
+                'source' => $source,
                 'posted_by' => $userId,
             ]);
 
@@ -225,6 +232,7 @@ class AccountingService
         ?string $narration = null,
         ?int $userId = null,
         ?string $entryDate = null,
+        ?string $sourceKey = null,
     ): JournalEntry {
         if ($amount <= 0) {
             throw new DomainException('مبلغ صرف المخزون غير صالح.');
@@ -236,12 +244,21 @@ class AccountingService
 
         $expense = Account::query()->where('code', '5300')->firstOrFail();
         $inventory = Account::query()->where('code', '1400')->firstOrFail();
+        // source must be unique (idempotency key) — never reuse a bare type string
+        $source = $sourceKey
+            ? (str_starts_with($sourceKey, 'inventory_usage:') ? $sourceKey : 'inventory_usage:'.$sourceKey)
+            : 'inventory_usage:'.uniqid('', true);
 
-        return DB::transaction(function () use ($amount, $vehicleId, $narration, $userId, $date, $expense, $inventory) {
+        return DB::transaction(function () use ($amount, $vehicleId, $narration, $userId, $date, $expense, $inventory, $source) {
+            $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+            if ($existing) {
+                return $existing->load('lines.account');
+            }
+
             $entry = JournalEntry::query()->create([
                 'entry_date' => $date,
                 'narration' => $narration ?: 'صرف مخزون لصيانة',
-                'source' => 'inventory_usage',
+                'source' => $source,
                 'posted_by' => $userId,
             ]);
             JournalLine::query()->create([
@@ -274,6 +291,7 @@ class AccountingService
         ?string $narration = null,
         ?int $userId = null,
         ?string $entryDate = null,
+        ?string $sourceKey = null,
     ): JournalEntry {
         if ($amount <= 0) {
             throw new DomainException('مبلغ الصرف من العهدة غير صالح.');
@@ -293,12 +311,20 @@ class AccountingService
             ],
         );
         $custody = Account::query()->where('code', '1500')->firstOrFail();
+        $source = $sourceKey
+            ? (str_starts_with($sourceKey, 'custody_spend:') ? $sourceKey : 'custody_spend:'.$sourceKey)
+            : 'custody_spend:'.uniqid('', true);
 
-        return DB::transaction(function () use ($amount, $vehicleId, $narration, $userId, $date, $expense, $custody) {
+        return DB::transaction(function () use ($amount, $vehicleId, $narration, $userId, $date, $expense, $custody, $source) {
+            $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+            if ($existing) {
+                return $existing->load('lines.account');
+            }
+
             $entry = JournalEntry::query()->create([
                 'entry_date' => $date,
                 'narration' => $narration ?: 'صرف من عهدة موظف',
-                'source' => 'custody_spend',
+                'source' => $source,
                 'posted_by' => $userId,
             ]);
             JournalLine::query()->create([
@@ -370,6 +396,10 @@ class AccountingService
                 'label' => $dt->translatedFormat('F Y'),
                 'locked' => $lock?->isLocked() ?? false,
                 'rent_revenue' => (int) $rentCredit,
+                'expenses' => (int) Expense::query()
+                    ->whereYear('spent_on', $year)
+                    ->whereMonth('spent_on', $month)
+                    ->sum('amount'),
                 'completed_contracts' => Contract::query()
                     ->where('status', 'completed')
                     ->whereYear('actual_ends_at', $year)

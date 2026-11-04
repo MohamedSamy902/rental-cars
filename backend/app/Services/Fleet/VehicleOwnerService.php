@@ -30,6 +30,8 @@ class VehicleOwnerService
             'phone' => $data['phone'] ?? null,
             'phone_alt' => $data['phone_alt'] ?? null,
             'national_id' => $data['national_id'] ?? null,
+            'id_front_path' => $data['id_front_path'] ?? null,
+            'id_back_path' => $data['id_back_path'] ?? null,
             'notes' => $data['notes'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ]);
@@ -40,6 +42,12 @@ class VehicleOwnerService
      */
     public function updateOwner(VehicleOwner $owner, array $data): VehicleOwner
     {
+        unset(
+            $data['license_front_path'],
+            $data['license_back_path'],
+            $data['license_number'],
+            $data['license_expires_on'],
+        );
         $owner->update($data);
 
         return $owner->fresh();
@@ -90,7 +98,7 @@ class VehicleOwnerService
 
         $amount = (int) ($vehicle->owner_monthly_amount ?? 0);
         if ($amount < 1) {
-            throw new DomainException('لا يوجد مبلغ شهري لهذه السيارة.');
+            throw new DomainException('لا يوجد مبلغ شهري لهذه العربية.');
         }
 
         [$year, $month] = array_map('intval', explode('-', $yearMonth));
@@ -120,7 +128,7 @@ class VehicleOwnerService
             $entry = JournalEntry::query()->create([
                 'entry_date' => $entryDate,
                 'narration' => "استحقاق مالك {$owner->full_name} · {$vehicle->code} · {$yearMonth}",
-                'source' => 'owner_accrual',
+                'source' => "owner_accrual:{$vehicle->id}:{$yearMonth}",
                 'posted_by' => $userId,
             ]);
             JournalLine::query()->create([
@@ -176,7 +184,7 @@ class VehicleOwnerService
         if ($vehicleId) {
             $belongs = Vehicle::query()->where('id', $vehicleId)->where('owner_id', $owner->id)->exists();
             if (! $belongs) {
-                throw new DomainException('السيارة غير مربوطة بهذا المالك.');
+                throw new DomainException('العربية غير مربوطة بهذا المالك.');
             }
         }
 
@@ -189,10 +197,21 @@ class VehicleOwnerService
             $cashCode = $method === 'transfer' || $method === 'bank' ? '1100' : '1000';
             $cash = Account::query()->where('code', $cashCode)->firstOrFail();
 
+            $payout = OwnerPayout::query()->create([
+                'owner_id' => $owner->id,
+                'vehicle_id' => $vehicleId,
+                'amount' => $amount,
+                'paid_on' => $paidOn,
+                'payment_method' => $method,
+                'notes' => $data['notes'] ?? null,
+                'journal_entry_id' => null,
+                'recorded_by' => $userId,
+            ]);
+
             $entry = JournalEntry::query()->create([
                 'entry_date' => $paidOn,
                 'narration' => "صرف لمالك {$owner->full_name}",
-                'source' => 'owner_payout',
+                'source' => 'owner_payout:'.$payout->id,
                 'posted_by' => $userId,
             ]);
             JournalLine::query()->create([
@@ -210,16 +229,9 @@ class VehicleOwnerService
                 'vehicle_id' => $vehicleId,
             ]);
 
-            return OwnerPayout::query()->create([
-                'owner_id' => $owner->id,
-                'vehicle_id' => $vehicleId,
-                'amount' => $amount,
-                'paid_on' => $paidOn,
-                'payment_method' => $method,
-                'notes' => $data['notes'] ?? null,
-                'journal_entry_id' => $entry->id,
-                'recorded_by' => $userId,
-            ])->load('vehicle');
+            $payout->update(['journal_entry_id' => $entry->id]);
+
+            return $payout->fresh('vehicle');
         });
     }
 

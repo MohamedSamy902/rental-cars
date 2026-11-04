@@ -1,6 +1,37 @@
+/* Page containment — prevent any child from blowing past the viewport */
+.rp-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+.rp-page .rpm-metrics {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rp-page .rpm-metric__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-page > *,
+.rp-page .rp-section,
+.rp-page .rp-bento,
+.rp-page .rpm-panel,
+.rp-page .rpm-page-header,
+.rp-page .rpm-filters {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .rp-bento {
   display: grid;
-  gap: 0.85rem;
+  gap: 20px;
   grid-template-columns: minmax(0, 1fr);
 }
 @media (min-width: 981px) {
@@ -80,12 +111,19 @@
 .rp-rent__meta {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 0.75rem;
   margin-block-end: 0.35rem;
   font-size: 0.875rem;
+  min-width: 0;
 }
 .rp-rent__meta span {
   color: var(--text-muted);
+  min-width: 0;
+}
+.rp-rent__meta strong {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 .rp-rent__track {
   height: 0.55rem;
@@ -98,4 +136,192 @@
   height: 100%;
   border-radius: inherit;
   background: var(--accent-solid);
+}
+
+/* Shared report section spacing */
+.rp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rp-section .rpm-panel__head {
+  margin-block-end: 0;
+}
+
+.rp-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Customer statement toolbar + KPI grid */
+.rp-customer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+
+.rp-customer-toolbar__select {
+  flex: 1 1 220px;
+  max-width: 420px;
+  min-width: 0;
+}
+
+.rp-customer-toolbar__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rp-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rp-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  min-width: 0;
+}
+
+.rp-kpi span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rp-kpi strong {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.rp-kpi.is-success strong { color: var(--success); }
+.rp-kpi.is-warning strong { color: var(--warning); }
+.rp-kpi.is-info strong { color: var(--steel); }
+
+.rp-contract-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-block: 0.15rem;
+  padding-inline: 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-contract-link:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.rp-empty {
+  margin: 0;
+  padding: 1rem 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.rp-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.rp-table-scroll .rpm-table {
+  min-width: 820px;
+}
+
+.rp-account-type {
+  display: inline-block;
+  padding-block: 0.1rem;
+  padding-inline: 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .rp-page {
+    padding-inline: 0;
+  }
+
+  .rp-section {
+    gap: 16px;
+  }
+
+  .rp-bento,
+  .rp-section__body {
+    gap: 14px;
+  }
+
+  .rp-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .rp-kpi {
+    padding: 12px;
+  }
+
+  .rp-kpi strong {
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+  }
+
+  .rp-table-scroll {
+    margin-inline: 0;
+    max-width: 100%;
+  }
+
+  .rp-table-scroll .rpm-table {
+    min-width: 640px;
+  }
+
+  .rp-customer-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .rp-customer-toolbar__select {
+    max-width: none;
+  }
+  .rp-customer-toolbar__actions {
+    width: 100%;
+  }
+  .rp-customer-toolbar__actions .rpm-btn {
+    flex: 1 1 auto;
+  }
+
+  .rpm-panel__head {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-width: 0;
+  }
 }

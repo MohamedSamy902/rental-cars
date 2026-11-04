@@ -1,14 +1,38 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Sheet, Fab, DataTable,
-  TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
-  useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench,
+  PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable,
+  useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench, IconEdit,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
+import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './pages.css'
+import './VehiclesPage.css'
+
+const VEHICLE_TABS = [
+  'all', 'available', 'rented', 'reserved', 'maintenance',
+  'expiring', 'license_expiring', 'sim_recharge', 'owner_agreement_expiring',
+] as const
+const EXPIRING_PRESETS = [1, 2, 3, 7] as const
+const LICENSE_EXPIRING_PRESETS = [7, 14, 30] as const
+const LICENSE_EXPIRING_DEFAULT_DAYS = 30
+const SIM_RECHARGE_PRESETS = [3, 7, 14, 30] as const
+const SIM_RECHARGE_DEFAULT_DAYS = 14
+const OWNER_AGREEMENT_PRESETS = [7, 14, 30] as const
+const OWNER_AGREEMENT_DEFAULT_DAYS = 30
+
+function addDaysIso(base: string, days: number): string {
+  const d = new Date(`${base}T12:00:00`)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
 
@@ -25,15 +49,32 @@ type Vehicle = {
   daily_rate: number
   default_deposit: number
   status: string
-  rental_priority: number
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
+  tracker_sim_last_recharged_on?: string | null
+  tracker_sim_next_recharge_on?: string | null
+  tracker_sim_recharge_cycle_days?: number | null
   notes?: string | null
   is_active?: boolean
   owner_id?: number | null
   owner_monthly_amount?: number | null
   owner_since?: string | null
+  owner_agreement_starts_on?: string | null
+  owner_agreement_ends_on?: string | null
+  owner_agreement_number?: string | null
+  owner_agreement_notes?: string | null
   owner?: OwnerOption | null
+  active_contract_ends_at?: string | null
+  license_expires_on?: string | null
+  accessories?: Array<{ id?: number; name?: string | null }> | null
+  purchase_value_estimate?: number | null
+  color?: string | null
+  transmission?: string | null
+  chassis_number?: string | null
+  engine_number?: string | null
+  engine_capacity?: string | null
+  seats?: number | null
+  target_monthly_income?: number | null
 }
 
 const statusLabel: Record<string, string> = {
@@ -42,29 +83,32 @@ const statusLabel: Record<string, string> = {
   rented: 'مؤجرة',
   maintenance: 'في صيانة',
   out_of_service: 'خارج الخدمة',
-}
-
-const emptyForm = {
-  code: '', plate: '', brand: '', model: '', year: '', category: 'اقتصادي', fuel_type: 'بنزين',
-  odometer: '', daily_rate: '', default_deposit: '', rental_priority: '50',
-  tracker_device_number: '', tracker_sim_number: '', notes: '', is_active: true,
-  owner_id: '', owner_monthly_amount: '',
+  expiring: 'قاربت على الانتهاء',
 }
 
 export function VehiclesPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Vehicle[]>([])
-  const [summary, setSummary] = useState({ total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0 })
+  const [summary, setSummary] = useState({
+    total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0,
+    license_expiring: 0, sim_recharge: 0, owner_agreement_expiring: 0,
+  })
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: VEHICLE_TABS, defaultValue: 'all' })
+  const [withinDays, setWithinDays] = useState(2)
+  const [licenseWithinDays, setLicenseWithinDays] = useState(LICENSE_EXPIRING_DEFAULT_DAYS)
+  const [simWithinDays, setSimWithinDays] = useState(SIM_RECHARGE_DEFAULT_DAYS)
+  const [agreementWithinDays, setAgreementWithinDays] = useState(OWNER_AGREEMENT_DEFAULT_DAYS)
+  const [customDays, setCustomDays] = useState('')
+  const [licenseCustomDays, setLicenseCustomDays] = useState('')
+  const [simCustomDays, setSimCustomDays] = useState('')
+  const [agreementCustomDays, setAgreementCustomDays] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [owners, setOwners] = useState<OwnerOption[]>([])
+  const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null)
+
   const chips = useMemo(
     () => [
       { id: 'all', label: 'الكل' },
@@ -73,7 +117,7 @@ export function VehiclesPage() {
         id: 'rented',
         label: 'مؤجرة',
         attention: summary.rented > 0 ? ('warning' as const) : null,
-        attentionLabel: `${summary.rented} مركبة مؤجرة`,
+        attentionLabel: `${summary.rented} عربية مؤجرة`,
       },
       {
         id: 'reserved',
@@ -85,28 +129,70 @@ export function VehiclesPage() {
         id: 'maintenance',
         label: 'صيانة',
         attention: summary.maintenance > 0 ? ('critical' as const) : null,
-        attentionLabel: 'مركبات في الصيانة',
+        attentionLabel: 'عربيات في الصيانة',
+      },
+      {
+        id: 'expiring',
+        label: 'تأجير قارب الانتهاء',
+        attention: 'warning' as const,
+        attentionLabel: `خلال ${withinDays} يوم`,
+      },
+      {
+        id: 'license_expiring',
+        label: 'رخص قاربت الانتهاء',
+        attention: summary.license_expiring > 0 ? ('warning' as const) : null,
+        attentionLabel: `${summary.license_expiring} رخصة خلال ${LICENSE_EXPIRING_DEFAULT_DAYS} يوماً أو أقل`,
+      },
+      {
+        id: 'sim_recharge',
+        label: 'شحن شرائح التتبع',
+        attention: summary.sim_recharge > 0 ? ('warning' as const) : null,
+        attentionLabel: `${summary.sim_recharge} شريحة خلال ${SIM_RECHARGE_DEFAULT_DAYS} يوماً أو أقل`,
+      },
+      {
+        id: 'owner_agreement_expiring',
+        label: 'عقود ملاك قاربت الانتهاء',
+        attention: summary.owner_agreement_expiring > 0 ? ('warning' as const) : null,
+        attentionLabel: `${summary.owner_agreement_expiring} عقد خلال ${OWNER_AGREEMENT_DEFAULT_DAYS} يوماً أو أقل`,
       },
     ],
-    [summary.rented, summary.reserved, summary.maintenance],
+    [
+      summary.rented, summary.reserved, summary.maintenance,
+      summary.license_expiring, summary.sim_recharge, summary.owner_agreement_expiring, withinDays,
+    ],
   )
 
-  useEffect(() => {
-    void api<{ data: OwnerOption[] }>('/owners?active_only=1&per_page=100')
-      .then((res) => setOwners(res.data))
-      .catch(() => setOwners([]))
-  }, [])
-
-  async function load(nextSearch = search, nextChip = chip) {
+  async function load(
+    nextSearch = search,
+    nextChip = chip,
+    days = withinDays,
+    licenseDays = licenseWithinDays,
+    simDays = simWithinDays,
+    agreementDays = agreementWithinDays,
+  ) {
     setLoading(true)
     setError('')
     try {
       const qs = new URLSearchParams()
       if (nextSearch.trim()) qs.set('search', nextSearch.trim())
       if (nextChip !== 'all') qs.set('status', nextChip)
+      if (nextChip === 'expiring') qs.set('within_days', String(days))
+      if (nextChip === 'license_expiring') qs.set('within_days', String(licenseDays))
+      if (nextChip === 'sim_recharge') qs.set('within_days', String(simDays))
+      if (nextChip === 'owner_agreement_expiring') qs.set('within_days', String(agreementDays))
       const res = await api<{ data: Vehicle[]; summary: typeof summary }>(`/vehicles?${qs}`)
       setRows(res.data)
-      setSummary(res.summary)
+      const s = res.summary
+      setSummary({
+        total: s.total ?? 0,
+        available: s.available ?? 0,
+        rented: s.rented ?? 0,
+        reserved: s.reserved ?? 0,
+        maintenance: s.maintenance ?? 0,
+        license_expiring: s.license_expiring ?? 0,
+        sim_recharge: s.sim_recharge ?? 0,
+        owner_agreement_expiring: s.owner_agreement_expiring ?? 0,
+      })
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -117,96 +203,242 @@ export function VehiclesPage() {
   useEffect(() => {
     const t = window.setTimeout(() => load(), 250)
     return () => window.clearTimeout(t)
-  }, [search, chip])
+  }, [search, chip, withinDays, licenseWithinDays, simWithinDays, agreementWithinDays])
 
-  async function onSave() {
-    setSaving(true)
-    setErrors({})
-    try {
-      const res = await api<{ data: Vehicle }>('/vehicles', {
-        method: 'POST',
-        json: {
-          ...form,
-          year: Number(form.year),
-          odometer: Number(form.odometer),
-          daily_rate: Number(form.daily_rate),
-          default_deposit: Number(form.default_deposit),
-          rental_priority: Number(form.rental_priority || 50),
-          owner_id: form.owner_id ? Number(form.owner_id) : null,
-          owner_monthly_amount: form.owner_id && form.owner_monthly_amount !== ''
-            ? Number(form.owner_monthly_amount)
-            : null,
+  const columns: DataColumn<Vehicle>[] = useMemo(() => {
+    if (chip === 'owner_agreement_expiring') {
+      return [
+        {
+          id: 'plate',
+          header: 'رقم العربية',
+          cell: (v) => (
+            <>
+              <strong className="rpm-table__primary tabular-nums">{v.plate}</strong>
+              <span className="rpm-table__sub">{v.brand} {v.model}</span>
+            </>
+          ),
+          sortValue: (v) => v.plate,
+          mobile: 'title',
         },
-      })
-      toast.success('تم إضافة السيارة.')
-      setOpen(false)
-      setForm(emptyForm)
-      await load()
-      if (res.data?.id) navigate(`/vehicles/${res.data.id}`)
-    } catch (e) {
-      const err = e as ApiError
-      const next: Record<string, string> = {}
-      if (err.errors) for (const [k, v] of Object.entries(err.errors)) next[k] = v[0]
-      setErrors(next)
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
+        {
+          id: 'owner',
+          header: 'المالك',
+          cell: (v) => v.owner?.full_name || '—',
+          sortValue: (v) => v.owner?.full_name || '',
+        },
+        {
+          id: 'agreement_number',
+          header: 'رقم العقد',
+          cell: (v) => v.owner_agreement_number || '—',
+          sortValue: (v) => v.owner_agreement_number || '',
+          mobile: 'hidden',
+        },
+        {
+          id: 'agreement_start',
+          header: 'البداية',
+          cell: (v) => (v.owner_agreement_starts_on ? formatDate(v.owner_agreement_starts_on) : '—'),
+          sortValue: (v) => v.owner_agreement_starts_on || '',
+        },
+        {
+          id: 'agreement_end',
+          header: 'النهاية',
+          cell: (v) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+              <strong>{v.owner_agreement_ends_on ? formatDate(v.owner_agreement_ends_on) : '—'}</strong>
+              {v.owner_agreement_notes ? <span className="rpm-table__sub">{v.owner_agreement_notes}</span> : null}
+            </div>
+          ),
+          sortValue: (v) => v.owner_agreement_ends_on || '',
+          mobile: 'badge',
+        },
+      ]
+    }
+
+    if (chip === 'sim_recharge') {
+      return [
+        {
+          id: 'plate',
+          header: 'رقم العربية',
+          cell: (v) => (
+            <>
+              <strong className="rpm-table__primary tabular-nums">{v.plate}</strong>
+              <span className="rpm-table__sub">{v.brand} {v.model}</span>
+            </>
+          ),
+          sortValue: (v) => v.plate,
+          mobile: 'title',
+        },
+        {
+          id: 'sim',
+          header: 'رقم الشريحة',
+          cell: (v) => (
+            <strong className="tabular-nums">{v.tracker_sim_number || '—'}</strong>
+          ),
+          sortValue: (v) => v.tracker_sim_number || '',
+        },
+        {
+          id: 'last_recharge',
+          header: 'آخر شحن',
+          cell: (v) => (v.tracker_sim_last_recharged_on ? formatDate(v.tracker_sim_last_recharged_on) : '—'),
+          sortValue: (v) => v.tracker_sim_last_recharged_on || '',
+        },
+        {
+          id: 'next_recharge',
+          header: 'الشحن القادم',
+          cell: (v) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+              <strong>{v.tracker_sim_next_recharge_on ? formatDate(v.tracker_sim_next_recharge_on) : '—'}</strong>
+              <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+            </div>
+          ),
+          sortValue: (v) => v.tracker_sim_next_recharge_on || '',
+          mobile: 'badge',
+        },
+        {
+          id: 'device',
+          header: 'جهاز التتبع',
+          cell: (v) => v.tracker_device_number || '—',
+          sortValue: (v) => v.tracker_device_number || '',
+          mobile: 'hidden',
+        },
+      ]
+    }
+
+    return [
+      {
+        id: 'vehicle',
+        header: 'العربية',
+        cell: (v) => (
+          <>
+            <strong className="rpm-table__primary">{v.brand} {v.model}</strong>
+            <span className="rpm-table__sub">{v.year} · {v.fuel_type}</span>
+          </>
+        ),
+        sortValue: (v) => `${v.brand} ${v.model}`,
+        mobile: 'title',
+      },
+      {
+        id: 'code',
+        header: 'الكود',
+        cell: (v) => <span className="rpm-table__code">{v.code}</span>,
+        sortValue: (v) => v.code,
+      },
+      { id: 'plate', header: 'اللوحة', cell: (v) => v.plate, sortValue: (v) => v.plate },
+      { id: 'category', header: 'الفئة', cell: (v) => v.category, sortValue: (v) => v.category, mobile: 'hidden' },
+      {
+        id: 'year',
+        header: 'السنة',
+        cell: (v) => <span className="tabular-nums">{v.year}</span>,
+        sortValue: (v) => v.year,
+        mobile: 'hidden',
+      },
+      {
+        id: 'status',
+        header: 'الحالة',
+        cell: (v) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+            <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+            {chip === 'expiring' && v.active_contract_ends_at ? (
+              <span className="rpm-table__sub">ينتهي {formatDate(v.active_contract_ends_at)}</span>
+            ) : null}
+            {chip === 'license_expiring' && v.license_expires_on ? (
+              <span className="rpm-table__sub">الرخصة {formatDate(v.license_expires_on)}</span>
+            ) : null}
+          </div>
+        ),
+        sortValue: (v) => v.license_expires_on || v.active_contract_ends_at || v.status,
+        mobile: 'badge',
+      },
+      {
+        id: 'odometer',
+        header: 'العداد',
+        cell: (v) => `${formatNumber(v.odometer)} كم`,
+        sortValue: (v) => Number(v.odometer),
+      },
+      {
+        id: 'deposit',
+        header: 'التأمين',
+        cell: (v) => formatMoney(v.default_deposit),
+        sortValue: (v) => Number(v.default_deposit),
+        mobile: 'hidden',
+      },
+      {
+        id: 'rate',
+        header: 'اليومي',
+        cell: (v) => formatMoney(v.daily_rate),
+        sortValue: (v) => Number(v.daily_rate),
+      },
+      {
+        id: 'owner',
+        header: 'المالك',
+        cell: (v) => v.owner?.full_name || 'المركز',
+        sortValue: (v) => v.owner?.full_name || 'المركز',
+        mobile: 'hidden',
+      },
+    ]
+  }, [chip])
+
+  async function openEdit(v: Vehicle) {
+    try {
+      const res = await api<{ data: Vehicle }>(`/vehicles/${v.id}`)
+      setEditVehicle(res.data)
+    } catch {
+      setEditVehicle(v)
     }
   }
 
-  const columns: DataColumn<Vehicle>[] = [
-    {
-      id: 'vehicle',
-      header: 'المركبة',
-      cell: (v) => (
-        <>
-          <strong className="rpm-table__primary">{v.brand} {v.model}</strong>
-          <span className="rpm-table__sub">{v.year} · {v.fuel_type}</span>
-        </>
-      ),
-      sortValue: (v) => `${v.brand} ${v.model}`,
-      mobile: 'title',
-    },
-    {
-      id: 'code',
-      header: 'الكود',
-      cell: (v) => <span className="rpm-table__code">{v.code}</span>,
-      sortValue: (v) => v.code,
-    },
-    { id: 'plate', header: 'اللوحة', cell: (v) => v.plate, sortValue: (v) => v.plate },
-    { id: 'category', header: 'الفئة', cell: (v) => v.category, sortValue: (v) => v.category, mobile: 'hidden' },
-    {
-      id: 'status',
-      header: 'الحالة',
-      cell: (v) => <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />,
-      sortValue: (v) => v.status,
-      mobile: 'badge',
-    },
-    {
-      id: 'odometer',
-      header: 'العداد',
-      cell: (v) => `${formatNumber(v.odometer)} كم`,
-      sortValue: (v) => Number(v.odometer),
-    },
-    {
-      id: 'rate',
-      header: 'اليومي',
-      cell: (v) => formatMoney(v.daily_rate),
-      sortValue: (v) => Number(v.daily_rate),
-    },
-    {
-      id: 'owner',
-      header: 'المالك',
-      cell: (v) => v.owner?.full_name || 'المركز',
-      sortValue: (v) => v.owner?.full_name || 'المركز',
-      mobile: 'hidden',
-    },
-  ]
+  async function markSimRecharged(v: Vehicle) {
+    const cycle = v.tracker_sim_recharge_cycle_days && v.tracker_sim_recharge_cycle_days > 0
+      ? v.tracker_sim_recharge_cycle_days
+      : 30
+    const last = todayIso()
+    const next = addDaysIso(last, cycle)
+    try {
+      await api(`/vehicles/${v.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          tracker_sim_last_recharged_on: last,
+          tracker_sim_next_recharge_on: next,
+          tracker_sim_recharge_cycle_days: cycle,
+        }),
+      })
+      toast.success(`تم تسجيل الشحن · القادم ${formatDate(next)}`)
+      void load()
+    } catch (e) {
+      toast.error((e as ApiError).message || 'تعذّر تسجيل الشحن.')
+    }
+  }
 
   function vehicleMenu(v: Vehicle): MenuItem[] {
-    return [
+    const items: MenuItem[] = [
       { id: 'open', label: 'فتح الملف الكامل', icon: <IconEye size={16} />, onSelect: () => navigate(`/vehicles/${v.id}`) },
-      { id: 'calendar', label: 'تقويم الأسطول', icon: <IconCalendar size={16} />, onSelect: () => navigate('/calendar') },
+      { id: 'edit', label: 'تعديل بيانات العربية', icon: <IconEdit size={16} />, onSelect: () => void openEdit(v) },
+    ]
+    if (chip === 'sim_recharge' || v.tracker_sim_number) {
+      items.push({
+        id: 'copy-sim',
+        label: 'نسخ رقم الشريحة',
+        icon: <IconClipboard size={16} />,
+        onSelect: () => {
+          if (!v.tracker_sim_number) {
+            toast.error('لا يوجد رقم شريحة.')
+            return
+          }
+          void navigator.clipboard?.writeText(v.tracker_sim_number).then(
+            () => toast.success('تم نسخ رقم الشريحة.'),
+            () => toast.error('تعذّر النسخ.'),
+          )
+        },
+      })
+      items.push({
+        id: 'mark-sim',
+        label: 'سجّل شحن اليوم',
+        icon: <IconCheck size={16} />,
+        onSelect: () => void markSimRecharged(v),
+      })
+    }
+    items.push(
+      { id: 'calendar', label: 'تقويم العربيات', icon: <IconCalendar size={16} />, onSelect: () => navigate('/calendar') },
       {
         id: 'copy',
         label: 'نسخ رقم اللوحة',
@@ -218,57 +450,55 @@ export function VehiclesPage() {
           )
         },
       },
-    ]
+    )
+    return items
   }
 
-  const formFields = (
-    <div className="rpm-form-grid">
-      <TextField label="الكود الداخلي" required value={form.code} error={errors.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-      <TextField label="رقم اللوحة" required value={form.plate} error={errors.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} />
-      <TextField label="الماركة" required value={form.brand} error={errors.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
-      <TextField label="الموديل" required value={form.model} error={errors.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-      <NumberField label="سنة الصنع" required value={form.year} error={errors.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
-      <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'دفع رباعي', label: 'دفع رباعي' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-      <SelectField label="نوع الوقود" required options={[{ value: 'بنزين', label: 'بنزين' }, { value: 'ديزل', label: 'ديزل' }, { value: 'هجين', label: 'هجين' }]} value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} />
-      <NumberField label="العداد الفعلي" required value={form.odometer} error={errors.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
-      <MoneyField label="الإيجار اليومي الافتراضي" required value={form.daily_rate} error={errors.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
-      <MoneyField label="التأمين النقدي الافتراضي" required value={form.default_deposit} error={errors.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
-      <NumberField label="درجة أولوية التأجير" value={form.rental_priority} onChange={(e) => setForm({ ...form, rental_priority: e.target.value })} hint="من ٠ إلى ١٠٠" />
-      <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
-      <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />
-      <SelectField
-        label="المالك (عربيات الغير)"
-        value={form.owner_id}
-        onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
-        options={[
-          { value: '', label: '— ملك المركز —' },
-          ...owners.map((o) => ({ value: String(o.id), label: o.full_name + (o.phone ? ` · ${o.phone}` : '') })),
-        ]}
-        hint="اتركه فارغاً إن كانت العربية ملك المركز"
-      />
-      {form.owner_id ? (
-        <MoneyField
-          label="المبلغ الشهري للمالك"
-          required
-          value={form.owner_monthly_amount}
-          onChange={(e) => setForm({ ...form, owner_monthly_amount: e.target.value })}
-          hint="المبلغ الثابت المستحق شهرياً لهذا المالك عن هذه العربية"
-        />
-      ) : null}
-      <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-      <SwitchField label="نشطة" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
-    </div>
-  )
+  function applyCustomDays() {
+    const n = Number(customDays)
+    if (!Number.isFinite(n) || n < 0 || n > 60) {
+      toast.error('أدخل عدد أيام بين 0 و 60.')
+      return
+    }
+    setWithinDays(Math.round(n))
+  }
+
+  function applyLicenseCustomDays() {
+    const n = Number(licenseCustomDays)
+    if (!Number.isFinite(n) || n < 0 || n > 90) {
+      toast.error('أدخل عدد أيام بين 0 و 90.')
+      return
+    }
+    setLicenseWithinDays(Math.round(n))
+  }
+
+  function applySimCustomDays() {
+    const n = Number(simCustomDays)
+    if (!Number.isFinite(n) || n < 0 || n > 90) {
+      toast.error('أدخل عدد أيام بين 0 و 90.')
+      return
+    }
+    setSimWithinDays(Math.round(n))
+  }
+
+  function applyAgreementCustomDays() {
+    const n = Number(agreementCustomDays)
+    if (!Number.isFinite(n) || n < 0 || n > 120) {
+      toast.error('أدخل عدد أيام بين 0 و 120.')
+      return
+    }
+    setAgreementWithinDays(Math.round(n))
+  }
 
   return (
     <div className="rpm-stack">
       <PageHeader
-        title="المركبات"
+        title="العربيات"
         subtitle="أسطول التشغيل — اضغط عرض لفتح الملف الكامل"
-        action={<Button onClick={() => setOpen(true)}>إضافة مركبة</Button>}
+        action={<Button onClick={() => setOpen(true)}>إضافة عربية</Button>}
         mobileFab
       />
-      <Fab label="إضافة مركبة" onClick={() => setOpen(true)} />
+      <Fab label="إضافة عربية" onClick={() => setOpen(true)} />
 
       <MetricCardGrid
         label="ملخص الأسطول"
@@ -296,11 +526,155 @@ export function VehiclesPage() {
         placeholder="بحث بالكود أو اللوحة أو الموديل…"
       />
 
+      {chip === 'expiring' ? (
+        <div className="vh-expiring-bar" role="group" aria-label="نافذة قرب انتهاء التأجير">
+          <span className="vh-expiring-bar__label">خلال:</span>
+          <div className="vh-expiring-bar__pills">
+            {EXPIRING_PRESETS.map((d) => (
+              <Button
+                key={d}
+                type="button"
+                size="sm"
+                variant={withinDays === d && customDays === '' ? 'accent' : 'secondary'}
+                onClick={() => { setWithinDays(d); setCustomDays('') }}
+              >
+                {d === 1 ? '1 يوم' : d === 2 ? '2 يوم' : `${d} أيام`}
+              </Button>
+            ))}
+          </div>
+          <span className="vh-expiring-bar__sep" aria-hidden />
+          <label className="vh-expiring-bar__custom">
+            <span className="vh-expiring-bar__custom-label">مخصص:</span>
+            <input
+              className="vh-expiring-bar__input"
+              type="number"
+              min={0}
+              max={60}
+              value={customDays}
+              placeholder={String(withinDays)}
+              onChange={(e) => setCustomDays(e.target.value)}
+              onBlur={() => { if (customDays !== '') applyCustomDays() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyCustomDays() }}
+              aria-label="عدد الأيام المخصص"
+            />
+            <span className="vh-expiring-bar__unit">يوم</span>
+          </label>
+        </div>
+      ) : null}
+
+      {chip === 'license_expiring' ? (
+        <div className="vh-expiring-bar" role="group" aria-label="نافذة قرب انتهاء رخصة التسيير">
+          <span className="vh-expiring-bar__label">خلال:</span>
+          <div className="vh-expiring-bar__pills">
+            {LICENSE_EXPIRING_PRESETS.map((d) => (
+              <Button
+                key={d}
+                type="button"
+                size="sm"
+                variant={licenseWithinDays === d && licenseCustomDays === '' ? 'accent' : 'secondary'}
+                onClick={() => { setLicenseWithinDays(d); setLicenseCustomDays('') }}
+              >
+                {d} يوماً
+              </Button>
+            ))}
+          </div>
+          <span className="vh-expiring-bar__sep" aria-hidden />
+          <label className="vh-expiring-bar__custom">
+            <span className="vh-expiring-bar__custom-label">مخصص:</span>
+            <input
+              className="vh-expiring-bar__input"
+              type="number"
+              min={0}
+              max={90}
+              value={licenseCustomDays}
+              placeholder={String(licenseWithinDays)}
+              onChange={(e) => setLicenseCustomDays(e.target.value)}
+              onBlur={() => { if (licenseCustomDays !== '') applyLicenseCustomDays() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyLicenseCustomDays() }}
+              aria-label="عدد أيام قرب انتهاء الرخصة"
+            />
+            <span className="vh-expiring-bar__unit">يوم</span>
+          </label>
+        </div>
+      ) : null}
+
+      {chip === 'sim_recharge' ? (
+        <div className="vh-expiring-bar" role="group" aria-label="نافذة قرب شحن شريحة التتبع">
+          <span className="vh-expiring-bar__label">خلال:</span>
+          <div className="vh-expiring-bar__pills">
+            {SIM_RECHARGE_PRESETS.map((d) => (
+              <Button
+                key={d}
+                type="button"
+                size="sm"
+                variant={simWithinDays === d && simCustomDays === '' ? 'accent' : 'secondary'}
+                onClick={() => { setSimWithinDays(d); setSimCustomDays('') }}
+              >
+                {d} يوماً
+              </Button>
+            ))}
+          </div>
+          <span className="vh-expiring-bar__sep" aria-hidden />
+          <label className="vh-expiring-bar__custom">
+            <span className="vh-expiring-bar__custom-label">مخصص:</span>
+            <input
+              className="vh-expiring-bar__input"
+              type="number"
+              min={0}
+              max={90}
+              value={simCustomDays}
+              placeholder={String(simWithinDays)}
+              onChange={(e) => setSimCustomDays(e.target.value)}
+              onBlur={() => { if (simCustomDays !== '') applySimCustomDays() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applySimCustomDays() }}
+              aria-label="عدد أيام قرب شحن الشريحة"
+            />
+            <span className="vh-expiring-bar__unit">يوم</span>
+          </label>
+        </div>
+      ) : null}
+
+      {chip === 'owner_agreement_expiring' ? (
+        <div className="vh-expiring-bar" role="group" aria-label="نافذة قرب انتهاء عقد المالك">
+          <span className="vh-expiring-bar__label">خلال:</span>
+          <div className="vh-expiring-bar__pills">
+            {OWNER_AGREEMENT_PRESETS.map((d) => (
+              <Button
+                key={d}
+                type="button"
+                size="sm"
+                variant={agreementWithinDays === d && agreementCustomDays === '' ? 'accent' : 'secondary'}
+                onClick={() => { setAgreementWithinDays(d); setAgreementCustomDays('') }}
+              >
+                {d} يوماً
+              </Button>
+            ))}
+          </div>
+          <span className="vh-expiring-bar__sep" aria-hidden />
+          <label className="vh-expiring-bar__custom">
+            <span className="vh-expiring-bar__custom-label">مخصص:</span>
+            <input
+              className="vh-expiring-bar__input"
+              type="number"
+              min={0}
+              max={120}
+              value={agreementCustomDays}
+              placeholder={String(agreementWithinDays)}
+              onChange={(e) => setAgreementCustomDays(e.target.value)}
+              onBlur={() => { if (agreementCustomDays !== '') applyAgreementCustomDays() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyAgreementCustomDays() }}
+              aria-label="عدد أيام قرب انتهاء عقد المالك"
+            />
+            <span className="vh-expiring-bar__unit">يوم</span>
+          </label>
+        </div>
+      ) : null}
+
       {error ? (
-        <ErrorState title="تعذّر تحميل المركبات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
+        <ErrorState title="تعذّر تحميل العربيات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
       ) : (
         <DataTable
-          label="المركبات"
+          label="العربيات"
           rows={rows}
           columns={columns}
           rowKey={(v) => v.id}
@@ -308,24 +682,32 @@ export function VehiclesPage() {
           loading={loading}
           onRowClick={(v) => navigate(`/vehicles/${v.id}`)}
           rowActions={vehicleMenu}
-          emptyTitle="لا توجد مركبات مطابقة"
+          emptyTitle="لا توجد عربيات مطابقة"
           emptyDescription="جرّب كلمة بحث أخرى أو غيّر فلتر الحالة."
         />
       )}
 
-      <Sheet
+      <VehicleFormSheet
         open={open}
-        title="إضافة مركبة"
+        mode="create"
         onClose={() => setOpen(false)}
-        footer={
-          <>
-            <Button loading={saving} onClick={() => onSave()}>حفظ</Button>
-            <Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button>
-          </>
-        }
-      >
-        {formFields}
-      </Sheet>
+        onSaved={(id) => {
+          void load()
+          if (id) navigate(`/vehicles/${id}`)
+        }}
+      />
+
+      <VehicleFormSheet
+        open={!!editVehicle}
+        mode="edit"
+        vehicleId={editVehicle?.id}
+        initial={editVehicle}
+        onClose={() => setEditVehicle(null)}
+        onSaved={() => {
+          setEditVehicle(null)
+          void load()
+        }}
+      />
     </div>
   )
 }

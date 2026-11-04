@@ -12,7 +12,7 @@ class Expense extends Model
 
     protected $fillable = [
         'title', 'category', 'amount', 'spent_on', 'payment_method',
-        'vehicle_id', 'employee_id', 'from_petty_cash', 'recorded_by', 'notes',
+        'vehicle_id', 'work_order_id', 'employee_id', 'from_petty_cash', 'recorded_by', 'notes',
     ];
 
     protected function casts(): array
@@ -28,8 +28,18 @@ class Expense extends Model
         return $this->belongsTo(Vehicle::class);
     }
 
+    public function workOrder(): BelongsTo
+    {
+        return $this->belongsTo(WorkOrder::class);
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
     }
 }

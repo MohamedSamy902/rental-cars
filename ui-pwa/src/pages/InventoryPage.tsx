@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, TextField, NumberField, MoneyField, SelectField, StatusPill, useToast, DataTable, IconBox,
+  PageHeader, FilterBar, Button, Sheet, Fab, TextField, NumberField, MoneyField, SelectField, StatusPill, useToast, DataTable, IconBox, IconEdit,
   type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -16,6 +17,8 @@ type Item = {
   reorder_level: number
   is_low: boolean
 }
+
+const emptyItemForm = () => ({ code: '', name: '', category: 'زيوت', unit: 'لتر', reorder_level: '5' })
 
 const columns: DataColumn<Item>[] = [
   {
@@ -38,16 +41,20 @@ const columns: DataColumn<Item>[] = [
   },
 ]
 
+const InventoryPageTabs = ['all', 'low'] as const
+
 export function InventoryPage() {
   const toast = useToast()
   const [rows, setRows] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
   const [openItem, setOpenItem] = useState(false)
+  const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [openBatch, setOpenBatch] = useState(false)
-  const [itemForm, setItemForm] = useState({ code: '', name: '', category: 'زيوت', unit: 'لتر', reorder_level: '5' })
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useQueryTab({ allowed: InventoryPageTabs, defaultValue: 'all' })
+  const [itemForm, setItemForm] = useState(emptyItemForm)
   const [batchForm, setBatchForm] = useState({ inventory_item_id: '', received_on: new Date().toISOString().slice(0, 10), quantity: '', unit_cost: '', supplier: '' })
+  const [savingItem, setSavingItem] = useState(false)
 
   const lowCount = useMemo(() => rows.filter((i) => i.is_low).length, [rows])
   const chips = useMemo(
@@ -59,17 +66,15 @@ export function InventoryPage() {
         attention: lowCount > 0 ? ('warning' as const) : null,
         attentionLabel: `${lowCount} صنف تحت حد إعادة الطلب`,
       },
-      { id: 'ok', label: 'رصيد كافٍ' },
     ],
     [lowCount],
   )
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase()
+  const filtered = useMemo(() => {
+    const q = search.trim()
     return rows.filter((i) => {
       if (chip === 'low' && !i.is_low) return false
-      if (chip === 'ok' && i.is_low) return false
       if (!q) return true
-      return i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
+      return `${i.name} ${i.code} ${i.category}`.includes(q)
     })
   }, [rows, chip, search])
 
@@ -85,14 +90,49 @@ export function InventoryPage() {
 
   useEffect(() => { void load() }, [])
 
+  function openCreateItem() {
+    setEditingItem(null)
+    setItemForm(emptyItemForm())
+    setOpenItem(true)
+  }
+
+  function openEditItem(item: Item) {
+    setEditingItem(item)
+    setItemForm({
+      code: item.code || '',
+      name: item.name || '',
+      category: item.category || 'زيوت',
+      unit: item.unit || 'لتر',
+      reorder_level: String(item.reorder_level ?? 5),
+    })
+    setOpenItem(true)
+  }
+
   async function saveItem() {
+    setSavingItem(true)
     try {
-      await api('/inventory/items', { method: 'POST', json: { ...itemForm, reorder_level: Number(itemForm.reorder_level) } })
-      toast.success('تم إضافة الصنف.')
+      const payload = {
+        // Codes are system-owned — never send a manual/placeholder value on create.
+        ...(editingItem ? {} : {}),
+        name: itemForm.name,
+        category: itemForm.category,
+        unit: itemForm.unit,
+        reorder_level: Number(itemForm.reorder_level),
+      }
+      if (editingItem) {
+        await api(`/inventory/items/${editingItem.id}`, { method: 'PUT', json: payload })
+        toast.success('تم تحديث الصنف.')
+      } else {
+        await api('/inventory/items', { method: 'POST', json: payload })
+        toast.success('تم إضافة الصنف.')
+      }
       setOpenItem(false)
+      setEditingItem(null)
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
+    } finally {
+      setSavingItem(false)
     }
   }
 
@@ -123,28 +163,34 @@ export function InventoryPage() {
         action={
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <Button variant="secondary" onClick={() => setOpenBatch(true)}>إدخال دفعة</Button>
-            <Button onClick={() => setOpenItem(true)}>صنف جديد</Button>
+            <Button onClick={openCreateItem}>صنف جديد</Button>
           </div>
         }
         mobileFab
       />
-      <Fab label="صنف جديد" onClick={() => setOpenItem(true)} />
+      <Fab label="صنف جديد" onClick={openCreateItem} />
       <FilterBar
         search={search}
         onSearchChange={setSearch}
         chips={chips}
         activeChip={chip}
         onChipChange={setChip}
-        placeholder="بحث بالاسم أو الكود…"
+        placeholder="بحث بالصنف أو الكود…"
       />
       <DataTable
         label="أصناف المخزون"
-        rows={visible}
+        rows={filtered}
         columns={columns}
         rowKey={(i) => i.id}
         rowLabel={(i) => i.name}
         loading={loading}
         rowActions={(i) => [
+          {
+            id: 'edit',
+            label: 'تعديل',
+            icon: <IconEdit size={16} />,
+            onSelect: () => openEditItem(i),
+          },
           {
             id: 'batch',
             label: 'إدخال دفعة لهذا الصنف',
@@ -159,9 +205,25 @@ export function InventoryPage() {
         emptyDescription="أضف صنفاً ثم أدخل أول دفعة لبدء الصرف بالأقدم أولاً."
       />
 
-      <Sheet open={openItem} title="صنف مخزون" onClose={() => setOpenItem(false)} footer={<><Button onClick={saveItem}>حفظ</Button><Button variant="secondary" onClick={() => setOpenItem(false)}>إلغاء</Button></>}>
+      <Sheet
+        open={openItem}
+        title={editingItem ? 'تعديل صنف المخزون' : 'صنف مخزون'}
+        onClose={() => { setOpenItem(false); setEditingItem(null) }}
+        footer={
+          <>
+            <Button loading={savingItem} onClick={() => void saveItem()}>{editingItem ? 'حفظ التعديلات' : 'حفظ'}</Button>
+            <Button variant="secondary" onClick={() => { setOpenItem(false); setEditingItem(null) }}>إلغاء</Button>
+          </>
+        }
+      >
         <div className="rpm-form-grid">
-          <TextField label="الكود" required value={itemForm.code} onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })} />
+          <TextField
+            label="الكود"
+            value={editingItem ? itemForm.code : (itemForm.code || 'يُولَّد تلقائياً')}
+            disabled
+            hint={editingItem ? 'يُدار تلقائياً ولا يُعدَّل يدوياً' : 'يُولَّد تلقائياً عند الحفظ'}
+            onChange={() => undefined}
+          />
           <TextField label="الاسم" required value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} />
           <TextField label="التصنيف" required value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} />
           <TextField label="وحدة القياس" required value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })} />
@@ -169,7 +231,7 @@ export function InventoryPage() {
         </div>
       </Sheet>
 
-      <Sheet open={openBatch} title="دفعة إدخال" onClose={() => setOpenBatch(false)} footer={<><Button onClick={saveBatch}>حفظ</Button><Button variant="secondary" onClick={() => setOpenBatch(false)}>إلغاء</Button></>}>
+      <Sheet open={openBatch} title="دفعة إدخال" onClose={() => setOpenBatch(false)} footer={<><Button onClick={() => void saveBatch()}>حفظ</Button><Button variant="secondary" onClick={() => setOpenBatch(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
           <SelectField
             label="الصنف"

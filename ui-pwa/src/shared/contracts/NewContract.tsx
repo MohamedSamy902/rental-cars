@@ -1,18 +1,44 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, useToast,
+  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, MediaUpload, NumberField, useToast,
 } from '@/shared/ui'
+import { toApiDateTime, formatMoney } from '@/shared/lib/format'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
-type Vehicle = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number }
+type Accessory = { id: number; name: string; qty?: number }
+type Vehicle = {
+  id: number
+  brand: string
+  model: string
+  plate: string
+  daily_rate: number
+  default_deposit: number
+  odometer?: number
+  accessories?: Accessory[]
+}
 
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
-  daily_rate: '', deposit: '', min_days: '', notes: '',
+  daily_rate: '', deposit: '', odometer: '', notes: '',
+  payment_amount: '', payment_method: 'cash', payment_notes: '',
 }
-const emptyCustomer = { full_name: '', phone: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01' }
+
+const emptyCustomer = {
+  full_name: '',
+  phone: '',
+  phone_alt: '',
+  national_id: '',
+  birth_date: '1990-01-01',
+  license_number: '',
+  license_expires_on: '2030-01-01',
+  notes: '',
+  national_id_image_path: '',
+  national_id_back_path: '',
+  license_image_path: '',
+  license_back_path: '',
+}
 
 export function NewContractProvider({ children }: { children: ReactNode }) {
   const toast = useToast()
@@ -24,35 +50,90 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   const [newCustomer, setNewCustomer] = useState(emptyCustomer)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [accessoryIds, setAccessoryIds] = useState<number[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [lockedVehicleId, setLockedVehicleId] = useState<number | undefined>()
+
+  const loadVehicles = useCallback(async (starts?: string, ends?: string, preferredId?: number) => {
+    const params = new URLSearchParams()
+    if (starts) params.set('from', toApiDateTime(starts))
+    if (ends) params.set('to', toApiDateTime(ends))
+    const qs = params.toString()
+    const path = qs ? `/vehicles/recommend?${qs}` : '/vehicles/recommend'
+    try {
+      const v = await api<{ data: Vehicle[] }>(path)
+      setVehicles(v.data)
+      if (preferredId && !v.data.some((x) => x.id === preferredId)) {
+        const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=100').catch(() => ({ data: [] as Vehicle[] }))
+        const found = fallback.data.find((x) => x.id === preferredId)
+        if (found) setVehicles((prev) => [{ ...found }, ...prev.filter((p) => p.id !== found.id)])
+      }
+      return v.data
+    } catch {
+      const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=100')
+      setVehicles(fallback.data)
+      return fallback.data
+    }
+  }, [])
+
+  const applyVehicleDefaults = useCallback((v: Vehicle | undefined, prev: typeof emptyForm) => {
+    if (!v) return prev
+    return {
+      ...prev,
+      vehicle_id: String(v.id),
+      daily_rate: String(v.daily_rate),
+      deposit: String(v.default_deposit),
+      odometer: v.odometer != null ? String(v.odometer) : prev.odometer,
+    }
+  }, [])
 
   const openNewContract = useCallback((opts?: NewContractOptions) => {
     setOpen(true)
+    setInlineCustomer(false)
+    setErrors({})
+    setNewCustomer(emptyCustomer)
+    setAccessoryIds([])
+    setLockedVehicleId(opts?.vehicleId)
     setForm({
       ...emptyForm,
       vehicle_id: opts?.vehicleId ? String(opts.vehicleId) : '',
+      customer_id: opts?.customerId ? String(opts.customerId) : '',
     })
-    Promise.all([
+    void Promise.all([
       api<{ data: Customer[] }>('/customers?per_page=100'),
-      api<{ data: Vehicle[] }>('/vehicles?per_page=100'),
+      loadVehicles(undefined, undefined, opts?.vehicleId),
     ])
       .then(([c, v]) => {
         setCustomers(c.data)
-        setVehicles(v.data)
-        if (opts?.vehicleId) {
-          const picked = v.data.find((x) => x.id === opts.vehicleId)
-          if (picked) {
-            setForm((f) => ({
-              ...f,
-              vehicle_id: String(picked.id),
-              daily_rate: String(picked.daily_rate),
-              deposit: String(picked.default_deposit),
-            }))
+        setForm((f) => {
+          const next = {
+            ...f,
+            customer_id: opts?.customerId ? String(opts.customerId) : f.customer_id,
           }
-        }
+          if (!opts?.vehicleId) return next
+          const picked = v.find((x) => x.id === opts.vehicleId)
+          if (!picked) return next
+          setAccessoryIds((picked.accessories || []).map((a) => a.id))
+          return applyVehicleDefaults(picked, next)
+        })
       })
       .catch((e) => toast.error((e as ApiError).message))
-  }, [toast])
+  }, [applyVehicleDefaults, loadVehicles, toast])
+
+  useEffect(() => {
+    if (!open) return
+    if (!form.starts_at || !form.planned_ends_at) return
+    const handle = window.setTimeout(() => {
+      void loadVehicles(form.starts_at, form.planned_ends_at, lockedVehicleId).then((list) => {
+        if (form.vehicle_id && !list.some((v) => String(v.id) === form.vehicle_id) && Number(form.vehicle_id) !== lockedVehicleId) {
+          setForm((f) => ({ ...f, vehicle_id: '', daily_rate: '', deposit: '', odometer: '' }))
+          setAccessoryIds([])
+          toast.info('العربية المختارة غير متاحة في هذه الفترة — اختر عربية أخرى.')
+        }
+      })
+    }, 350)
+    return () => window.clearTimeout(handle)
+  }, [open, form.starts_at, form.planned_ends_at, form.vehicle_id, loadVehicles, lockedVehicleId, toast])
 
   function close() {
     setOpen(false)
@@ -62,13 +143,26 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api<{ data: Customer; message: string }>('/customers', {
         method: 'POST',
-        json: newCustomer,
+        json: {
+          full_name: newCustomer.full_name,
+          phone: newCustomer.phone,
+          phone_alt: newCustomer.phone_alt || null,
+          national_id: newCustomer.national_id || null,
+          birth_date: newCustomer.birth_date,
+          license_number: newCustomer.license_number,
+          license_expires_on: newCustomer.license_expires_on,
+          notes: newCustomer.notes || null,
+          national_id_image_path: newCustomer.national_id_image_path || null,
+          national_id_back_path: newCustomer.national_id_back_path || null,
+          license_image_path: newCustomer.license_image_path || null,
+          license_back_path: newCustomer.license_back_path || null,
+        },
       })
       setCustomers((prev) => [res.data, ...prev])
       setForm((f) => ({ ...f, customer_id: String(res.data.id) }))
       setInlineCustomer(false)
       setNewCustomer(emptyCustomer)
-      toast.success('تم تسجيل العميل وربطه بالحجز.')
+      toast.success('تم تسجيل العميل وربطه بالعقد.')
     } catch (e) {
       toast.error((e as ApiError).message)
     }
@@ -83,16 +177,21 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
         json: {
           customer_id: Number(form.customer_id),
           vehicle_id: Number(form.vehicle_id),
-          starts_at: form.starts_at,
-          planned_ends_at: form.planned_ends_at,
+          starts_at: toApiDateTime(form.starts_at),
+          planned_ends_at: toApiDateTime(form.planned_ends_at),
           daily_rate: form.daily_rate ? Number(form.daily_rate) : undefined,
           deposit: form.deposit ? Number(form.deposit) : undefined,
-          min_days: form.min_days ? Number(form.min_days) : undefined,
+          odometer: form.odometer !== '' ? Number(form.odometer) : undefined,
+          accessory_ids: accessoryIds,
+          payment_amount: form.payment_amount !== '' ? Number(form.payment_amount) : undefined,
+          payment_method: form.payment_method || 'cash',
+          payment_notes: form.payment_notes || undefined,
           notes: form.notes || undefined,
         },
       })
       toast.success('تم إنشاء العقد.')
       setForm(emptyForm)
+      setAccessoryIds([])
       setOpen(false)
       setCreatedVersion((v) => v + 1)
     } catch (e) {
@@ -107,17 +206,37 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(() => ({ openNewContract, createdVersion }), [openNewContract, createdVersion])
+  const selected = vehicles.find((v) => String(v.id) === form.vehicle_id)
+  const availableAccessories = selected?.accessories || []
+
+  const estimatedDays = useMemo(() => {
+    if (!form.starts_at || !form.planned_ends_at) return 0
+    const a = new Date(form.starts_at)
+    const b = new Date(form.planned_ends_at)
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b <= a) return 0
+    const ms = b.getTime() - a.getTime()
+    return Math.max(1, Math.ceil(ms / 86400000))
+  }, [form.starts_at, form.planned_ends_at])
+
+  const estimatedTotal = useMemo(() => {
+    const rate = Number(form.daily_rate || 0)
+    if (!estimatedDays || !rate) return 0
+    return estimatedDays * rate
+  }, [estimatedDays, form.daily_rate])
+
+  const paidNow = Number(form.payment_amount || 0)
+  const remainingBalance = Math.max(0, estimatedTotal - paidNow)
 
   return (
     <NewContractContext.Provider value={value}>
       {children}
       <Sheet
         open={open}
-        title="إضافة حجز / عقد"
+        title="عقد جديد"
         onClose={close}
         footer={
           <>
-            <Button loading={saving} onClick={onSave}>حفظ</Button>
+            <Button loading={saving} onClick={() => void onSave()}>حفظ</Button>
             <Button variant="secondary" onClick={close}>إلغاء</Button>
           </>
         }
@@ -133,42 +252,175 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
             />
             <Button type="button" variant="secondary" size="sm" onClick={() => setInlineCustomer((v) => !v)}>
-              + إضافة من هنا
+              + تسجيل عميل جديد
             </Button>
           </div>
 
           {inlineCustomer ? (
             <div className="rpm-inline-box">
-              <p className="rpm-inline-box__title">تسجيل عميل سريع</p>
+              <p className="rpm-inline-box__title">تسجيل عميل كامل</p>
               <TextField label="الاسم الكامل" required value={newCustomer.full_name} onChange={(e) => setNewCustomer({ ...newCustomer, full_name: e.target.value })} />
               <TextField label="الهاتف" required value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
+              <TextField label="هاتف بديل" value={newCustomer.phone_alt} onChange={(e) => setNewCustomer({ ...newCustomer, phone_alt: e.target.value })} />
+              <TextField label="الرقم القومي" value={newCustomer.national_id} onChange={(e) => setNewCustomer({ ...newCustomer, national_id: e.target.value })} />
+              <TextField label="تاريخ الميلاد" required type="date" value={newCustomer.birth_date} onChange={(e) => setNewCustomer({ ...newCustomer, birth_date: e.target.value })} />
               <TextField label="رقم الرخصة" required value={newCustomer.license_number} onChange={(e) => setNewCustomer({ ...newCustomer, license_number: e.target.value })} />
-              <Button type="button" size="sm" onClick={addInlineCustomer}>حفظ واختيار</Button>
+              <TextField label="انتهاء الرخصة" required type="date" value={newCustomer.license_expires_on} onChange={(e) => setNewCustomer({ ...newCustomer, license_expires_on: e.target.value })} />
+              <TextAreaField label="ملاحظات" value={newCustomer.notes} onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })} />
+              <MediaUpload
+                label="صورة البطاقة — وش"
+                value={newCustomer.national_id_image_path || null}
+                collection="customers_id"
+                purpose="national_id"
+                accept="image"
+                onChange={(path) => setNewCustomer({ ...newCustomer, national_id_image_path: path || '' })}
+              />
+              <MediaUpload
+                label="صورة البطاقة — ضهر"
+                value={newCustomer.national_id_back_path || null}
+                collection="customers_id"
+                purpose="national_id_back"
+                accept="image"
+                onChange={(path) => setNewCustomer({ ...newCustomer, national_id_back_path: path || '' })}
+              />
+              <MediaUpload
+                label="صورة الرخصة — وش"
+                value={newCustomer.license_image_path || null}
+                collection="customers_id"
+                purpose="license"
+                accept="image"
+                onChange={(path) => setNewCustomer({ ...newCustomer, license_image_path: path || '' })}
+              />
+              <MediaUpload
+                label="صورة الرخصة — ضهر"
+                value={newCustomer.license_back_path || null}
+                collection="customers_id"
+                purpose="license_back"
+                accept="image"
+                onChange={(path) => setNewCustomer({ ...newCustomer, license_back_path: path || '' })}
+              />
+              <Button type="button" size="sm" onClick={() => void addInlineCustomer()}>حفظ واختيار</Button>
             </div>
           ) : null}
 
-          <SelectField
-            label="السيارة"
+          <DateTimeField
+            label="بداية الحجز"
             required
-            options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))}
+            value={form.starts_at}
+            error={errors.starts_at}
+            onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+          />
+          <DateTimeField
+            label="نهاية الحجز المخططة"
+            required
+            value={form.planned_ends_at}
+            error={errors.planned_ends_at}
+            onChange={(e) => setForm({ ...form, planned_ends_at: e.target.value })}
+          />
+
+          <SelectField
+            label="العربية المتاحة في الفترة"
+            required
+            hint={form.starts_at && form.planned_ends_at ? 'تُستبعد العربيات المحجوزة أو المؤجرة في نفس الفترة' : 'حدد فترة الحجز أولاً لتصفية المتاح'}
+            options={[
+              { value: '', label: vehicles.length ? 'اختر عربية…' : 'لا عربيات متاحة في هذه الفترة' },
+              ...vehicles.map((v) => ({
+                value: String(v.id),
+                label: `${v.brand} ${v.model} · ${v.plate}`,
+              })),
+            ]}
             value={form.vehicle_id}
             error={errors.vehicle_id}
             onChange={(e) => {
               const id = e.target.value
               const v = vehicles.find((x) => String(x.id) === id)
-              setForm({
-                ...form,
-                vehicle_id: id,
-                daily_rate: v ? String(v.daily_rate) : form.daily_rate,
-                deposit: v ? String(v.default_deposit) : form.deposit,
-              })
+              setForm(applyVehicleDefaults(v, { ...form, vehicle_id: id }))
+              setAccessoryIds((v?.accessories || []).map((a) => a.id))
             }}
           />
-          <TextField label="وقت البداية" required type="datetime-local" value={form.starts_at} error={errors.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
-          <TextField label="وقت النهاية المخطط" required type="datetime-local" value={form.planned_ends_at} error={errors.planned_ends_at} onChange={(e) => setForm({ ...form, planned_ends_at: e.target.value })} />
-          <MoneyField label="السعر اليومي" value={form.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
-          <NumberField label="الحد الأدنى للأيام" value={form.min_days} onChange={(e) => setForm({ ...form, min_days: e.target.value })} />
+
+          <MoneyField
+            label="السعر اليومي"
+            required
+            value={form.daily_rate}
+            error={errors.daily_rate}
+            onChange={(e) => setForm({ ...form, daily_rate: e.target.value })}
+            hint="يُعبَّأ تلقائياً من العربية ويمكن تعديله"
+          />
           <MoneyField label="التأمين النقدي المتفق" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} />
+          <NumberField
+            label="العداد الحالي"
+            value={form.odometer}
+            error={errors.odometer}
+            onChange={(e) => setForm({ ...form, odometer: e.target.value })}
+            hint="يُحدَّث عداد العربية عند الحفظ"
+          />
+
+          {estimatedDays > 0 && estimatedTotal > 0 ? (
+            <div className="rpm-inline-box" style={{ margin: 0, gridColumn: '1 / -1' }}>
+              <p className="rpm-inline-box__title">حساب الإيجار</p>
+              <p style={{ margin: 0 }}>
+                {estimatedDays} يوم × {formatMoney(Number(form.daily_rate || 0))} = <strong>{formatMoney(estimatedTotal)}</strong>
+              </p>
+              {paidNow > 0 ? (
+                <p className="muted" style={{ marginBlockStart: '0.35rem' }}>
+                  مدفوع الآن {formatMoney(paidNow)} · المتبقي على العميل {formatMoney(remainingBalance)}
+                </p>
+              ) : (
+                <p className="muted" style={{ marginBlockStart: '0.35rem' }}>يمكن تسجيل دفعة جزئية الآن أو لاحقاً عند التسليم</p>
+              )}
+            </div>
+          ) : null}
+
+          <MoneyField
+            label="دفعة عند الإنشاء"
+            value={form.payment_amount}
+            error={errors.payment_amount}
+            onChange={(e) => setForm({ ...form, payment_amount: e.target.value })}
+            hint="اختياري — يسجّل دفعة جزئية أو كاملة في دفتر العميل"
+          />
+          <SelectField
+            label="طريقة الدفعة"
+            value={form.payment_method}
+            onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+            options={[
+              { value: 'cash', label: 'نقدي' },
+              { value: 'card', label: 'بطاقة' },
+              { value: 'transfer', label: 'تحويل' },
+            ]}
+          />
+          <TextField
+            label="ملاحظة الدفعة / موعد المتبقي"
+            value={form.payment_notes}
+            onChange={(e) => setForm({ ...form, payment_notes: e.target.value })}
+            hint="مثال: الباقي عند التسليم"
+          />
+
+          {availableAccessories.length > 0 ? (
+            <fieldset className="rpm-inline-box" style={{ margin: 0 }}>
+              <legend className="rpm-inline-box__title">مستلزمات العربية</legend>
+              <div className="rpm-form-grid" style={{ gap: '0.5rem' }}>
+                {availableAccessories.map((a) => {
+                  const checked = accessoryIds.includes(a.id)
+                  return (
+                    <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setAccessoryIds((prev) =>
+                            checked ? prev.filter((id) => id !== a.id) : [...prev, a.id],
+                          )
+                        }}
+                      />
+                      <span>{a.name}{a.qty ? ` × ${a.qty}` : ''}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} hint="نص حر فقط — لا ينشئ قواعد مالية" />
         </div>
       </Sheet>

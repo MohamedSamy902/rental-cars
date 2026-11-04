@@ -21,7 +21,7 @@ class Contract extends Model
         'excess_km_amount', 'period_rent', 'discount', 'damage_fee', 'other_fees',
         'other_fees_description', 'final_total', 'extended_from_contract_id',
         'swapped_from_contract_id', 'swap_reason', 'sales_user_id', 'cancel_reason',
-        'notes', 'branch_id',
+        'notes', 'accessories_json', 'branch_id',
     ];
 
     protected function casts(): array
@@ -30,6 +30,7 @@ class Contract extends Model
             'starts_at' => 'datetime',
             'planned_ends_at' => 'datetime',
             'actual_ends_at' => 'datetime',
+            'accessories_json' => 'array',
         ];
     }
 
@@ -41,6 +42,11 @@ class Contract extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    public function salesUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_user_id');
     }
 
     public function deposit(): HasOne
@@ -56,5 +62,10 @@ class Contract extends Model
     public function vehicleSwaps(): HasMany
     {
         return $this->hasMany(ContractVehicleSwap::class);
+    }
+
+    public function violations(): HasMany
+    {
+        return $this->hasMany(Violation::class);
     }
 }

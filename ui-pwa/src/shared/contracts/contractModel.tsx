@@ -12,7 +12,6 @@ export type Inspection = {
   type: string
   inspected_at?: string | null
   odometer?: number | null
-  fuel_level?: number | null
   notes?: string | null
   damages?: InspectionDamage[]
 }
@@ -46,7 +45,7 @@ export type RelatedContract = {
   relation: string
 }
 
-export type TimelineItem = { id: number; action: string; at?: string | null; user?: string | null }
+export type TimelineItem = { id: number; action: string; summary?: string; at?: string | null; user?: string | null }
 
 export type Contract = {
   id: number
@@ -57,6 +56,7 @@ export type Contract = {
   actual_ends_at?: string | null
   frozen_daily_rate: number
   frozen_agreed_deposit?: number
+  approved_days?: number
   odometer_out?: number
   odometer_in?: number
   final_total?: number
@@ -64,8 +64,10 @@ export type Contract = {
   damage_fee?: number
   excess_km_amount?: number
   notes?: string | null
+  created_by?: string | null
+  sales_user?: { id: number; name: string } | null
   vehicle_id?: number
-  customer?: { id: number; full_name: string; phone?: string }
+  customer?: { id: number; full_name: string; phone?: string; national_id_image_path?: string | null; national_id_back_path?: string | null }
   vehicle?: { id: number; brand: string; model: string; plate: string; odometer?: number }
   deposit?: Deposit | null
   inspections?: Inspection[]
@@ -73,7 +75,17 @@ export type Contract = {
   documents?: ContractDoc[]
   related?: RelatedContract[]
   timeline?: TimelineItem[]
-  ledger?: { contract_total: number; paid: number; balance: number; deposit_held: number }
+  open_violations?: Array<{
+    id: number
+    amount: number
+    occurred_at?: string | null
+    status: string
+    photo_paths?: string[]
+    created_by_name?: string | null
+  }>
+  open_violations_total?: number
+  open_violations_count?: number
+  ledger?: { contract_total: number; paid: number; balance: number; deposit_held: number; violations_due?: number }
   progress?: {
     status: string
     tone: 'normal' | 'warning' | 'danger' | 'muted'
@@ -101,11 +113,11 @@ export const depositLabel: Record<string, { label: string; tone: 'success' | 'wa
 }
 
 export const actionTitle: Record<Exclude<ActionKind, null>, string> = {
-  handover: 'تسليم السيارة',
+  handover: 'تسليم العربية',
   return: 'استلام وإقفال',
   cancel: 'إلغاء العقد',
   extend: 'تمديد (عقد جديد)',
-  swap: 'تبديل بسبب عطل (نفس العقد)',
+  swap: 'تبديل بسبب عطل',
   deposit: 'قبض التأمين النقدي',
   deduct: 'خصم من التأمين',
   refund: 'رد متبقي التأمين',
@@ -126,10 +138,39 @@ export const timelineLabel: Record<string, string> = {
   swapped: 'تبديل عطل',
 }
 
-export function DepositBadge({ deposit }: { deposit?: Deposit | null }) {
-  if (!deposit) return <StatusPill status="none" tone="danger" label="غير مقبوض" />
-  const meta = depositLabel[deposit.status] ?? { label: deposit.status, tone: 'muted' as const }
-  return <StatusPill status={deposit.status} tone={meta.tone} label={meta.label} />
+/** Shows the deposit amount first; status is a secondary caption only. */
+export function DepositBadge({
+  deposit,
+  agreedAmount,
+}: {
+  deposit?: Deposit | null
+  /** Fallback when deposit row not yet received (frozen/agreed on contract). */
+  agreedAmount?: number | null
+}) {
+  const amount = deposit?.original_amount ?? agreedAmount ?? null
+  const meta = deposit
+    ? (depositLabel[deposit.status] ?? { label: deposit.status, tone: 'muted' as const })
+    : { label: 'غير مقبوض', tone: 'danger' as const }
+
+  if (amount == null) {
+    return <StatusPill status={deposit?.status || 'none'} tone={meta.tone} label={meta.label} />
+  }
+
+  return (
+    <span className="rpm-deposit-amount">
+      <strong className="rpm-table__primary tabular-nums">{formatMoneyLocal(amount)}</strong>
+      <span className="rpm-table__sub">{meta.label}</span>
+    </span>
+  )
+}
+
+function formatMoneyLocal(value: number): string {
+  return new Intl.NumberFormat('ar-EG', {
+    style: 'currency',
+    currency: 'EGP',
+    maximumFractionDigits: 0,
+    numberingSystem: 'latn',
+  }).format(value)
 }
 
 export function contractMenu(
@@ -138,39 +179,47 @@ export function contractMenu(
     view: () => void
     approve: () => void
     openAction: (kind: Exclude<ActionKind, null>) => void
-    print: () => void
+    print: (kind?: 'contract' | 'invoice' | 'receipt') => void
+    can?: (permission: string) => boolean
   },
 ): MenuItem[] {
+  const can = handlers.can ?? (() => true)
   const items: MenuItem[] = [
     { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: handlers.view },
     { id: 'sep-1', separator: true },
   ]
-  if (b.status === 'pending') {
+  if (b.status === 'pending' && can('contracts.approve')) {
     items.push({ id: 'approve', label: 'اعتماد', icon: <IconCheck size={16} />, onSelect: handlers.approve })
   }
-  if (b.status === 'approved') {
+  if (b.status === 'approved' && can('contracts.update')) {
     items.push({ id: 'handover', label: 'تسليم', icon: <IconKey size={16} />, onSelect: () => handlers.openAction('handover') })
   }
-  if (b.status === 'active') {
+  if (b.status === 'active' && can('contracts.update')) {
     items.push({ id: 'return', label: 'استلام وإقفال', icon: <IconReturn size={16} />, onSelect: () => handlers.openAction('return') })
   }
-  if ((b.status === 'approved' || b.status === 'active') && !b.deposit) {
+  if ((b.status === 'approved' || b.status === 'active') && !b.deposit && can('deposits.collect')) {
     items.push({ id: 'deposit', label: 'قبض تأمين', icon: <IconCash size={16} />, onSelect: () => handlers.openAction('deposit') })
   }
-  if (b.status === 'approved' || b.status === 'active' || b.status === 'completed') {
+  if ((b.status === 'approved' || b.status === 'active' || b.status === 'completed') && can('contracts_extend.execute')) {
     items.push({ id: 'extend', label: 'تمديد', icon: <IconCalendar size={16} />, onSelect: () => handlers.openAction('extend') })
   }
-  if (b.status === 'active') {
+  if (b.status === 'active' && can('contracts_swap.execute')) {
     items.push({ id: 'swap', label: 'تبديل عطل', icon: <IconCar size={16} />, onSelect: () => handlers.openAction('swap') })
   }
-  if (b.deposit && b.deposit.status !== 'returned') {
+  if (b.deposit && b.deposit.status !== 'returned' && can('deposits.settle')) {
     items.push(
       { id: 'deduct', label: 'خصم تأمين', icon: <IconWallet size={16} />, onSelect: () => handlers.openAction('deduct') },
       { id: 'refund', label: 'رد تأمين', icon: <IconReturn size={16} />, onSelect: () => handlers.openAction('refund') },
     )
   }
-  items.push({ id: 'print', label: 'طباعة', icon: <IconPrinter size={16} />, onSelect: handlers.print })
-  if (b.status === 'pending' || b.status === 'approved') {
+  if (can('contracts.print')) {
+    items.push(
+      { id: 'print-contract', label: 'طباعة العقد', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('contract') },
+      { id: 'print-invoice', label: 'الفاتورة / كشف الحساب', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('invoice') },
+      { id: 'print-receipt', label: 'إيصال الاستلام والتأمين', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
+    )
+  }
+  if ((b.status === 'pending' || b.status === 'approved') && can('contracts_cancel.approve')) {
     items.push(
       { id: 'sep-2', separator: true },
       { id: 'cancel', label: 'إلغاء العقد', icon: <IconBan size={16} />, tone: 'danger', onSelect: () => handlers.openAction('cancel') },

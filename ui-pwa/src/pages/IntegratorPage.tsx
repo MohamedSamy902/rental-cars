@@ -10,7 +10,6 @@ type Flags = Record<string, boolean>
 const FLAG_LABELS: Record<string, string> = {
   inventory: 'المخزون',
   petty_cash: 'العهدة',
-  waitlist: 'قائمة الانتظار',
   showroom: 'وضع المعرض',
   department_notice: 'إخطار القسم',
   chat: 'المحادثة',
@@ -40,7 +39,6 @@ export function IntegratorPage() {
         setFlags({
           inventory: true,
           petty_cash: true,
-          waitlist: true,
           showroom: true,
           department_notice: true,
           chat: true,

@@ -6,6 +6,13 @@
   display: grid;
   gap: 0.5rem;
   pointer-events: none;
+  max-width: min(420px, calc(100vw - 2rem));
+}
+
+/* Lift above sheet footers so banners don't cover primary actions */
+body:has(.rpm-sheet-root) .rpm-toasts {
+  inset-block-end: calc(5.75rem + var(--safe-bottom));
+  z-index: 240;
 }
 
 @media (min-width: 981px) {
@@ -14,6 +21,10 @@
     inset-inline-end: 1.5rem;
     inset-block-end: 1.5rem;
     width: min(360px, calc(100vw - 2rem));
+  }
+
+  body:has(.rpm-sheet-root) .rpm-toasts {
+    inset-block-end: 1.5rem;
   }
 }
 
@@ -27,6 +38,8 @@
   border: 1px solid var(--border);
   font-weight: 600;
   font-size: 0.875rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
   box-shadow: var(--shadow-lg);
   animation: rpm-fade-up var(--motion) var(--ease);
   pointer-events: auto;

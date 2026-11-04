@@ -261,7 +261,7 @@ export function CalendarPage() {
                 <p className="cal-event__who">{b.customer?.full_name}</p>
                 <dl className="cal-event__meta">
                   <div>
-                    <dt>المركبة</dt>
+                    <dt>العربية</dt>
                     <dd>{b.vehicle?.brand} {b.vehicle?.model} · {b.vehicle?.plate}</dd>
                   </div>
                   <div>

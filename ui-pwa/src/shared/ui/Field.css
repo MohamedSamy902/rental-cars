@@ -61,6 +61,64 @@
   color: var(--text-muted);
 }
 
+/* Date / time: prevent native picker chrome from overflowing the sheet */
+.rpm-datetime {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.rpm-input--date,
+.rpm-input--time,
+input.rpm-input[type='date'],
+input.rpm-input[type='time'],
+input.rpm-input[type='datetime-local'] {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+input.rpm-input[type='date'],
+input.rpm-input[type='time'],
+input.rpm-input[type='datetime-local'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+@media (max-width: 420px) {
+  .rpm-datetime {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.rpm-money {
+  position: relative;
+  width: 100%;
+}
+
+.rpm-money__input {
+  padding-inline-end: 0.85rem;
+  padding-inline-start: 3.1rem;
+}
+
+.rpm-money__unit {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 0.75rem;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  pointer-events: none;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .rpm-textarea {
   min-height: 96px;
   resize: vertical;
@@ -124,11 +182,18 @@
 }
 
 @media (max-width: 980px) {
+  .rpm-field {
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .rpm-input {
     min-height: 48px;
+    max-width: 100%;
     border-radius: 14px;
     background: var(--surface-2);
     border-color: var(--border);
+    /* ≥16px avoids iOS focus zoom on search/text inputs inside sheets */
     font-size: 1rem;
   }
 

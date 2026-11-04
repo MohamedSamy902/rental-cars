@@ -7,38 +7,49 @@ use App\Http\Controllers\Api\CollaborationController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DocumentTemplateController;
+use App\Http\Controllers\Api\EmployeeAssignmentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\FleetPrepController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\OperationsController;
-use App\Http\Controllers\Api\PushSubscriptionController;
-use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\PayrollController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\SalaryAdvanceController;
 use App\Http\Controllers\Api\StaffController;
+use App\Http\Controllers\Api\VehicleAssetController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\VehicleCustodyAgreementController;
+use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\ViolationController;
+use App\Http\Controllers\Api\ViolationInquiryController;
 use App\Http\Controllers\Api\WorkOrderController;
 use App\Models\Notification;
 use App\Models\TenantSetting;
-use App\Services\Operations\WaitlistService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
-    Route::get('/dashboard', DashboardController::class);
+    // Self-service profile — any authenticated user; no RBAC permission middleware.
+    Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::match(['put', 'patch'], '/auth/profile', [AuthController::class, 'updateProfile']);
+    Route::match(['put', 'patch'], '/profile', [AuthController::class, 'updateProfile']);
+    Route::get('/dashboard', DashboardController::class)->middleware('permission:reports.view|contracts.view|vehicles.view');
     Route::get('/attention', AttentionController::class);
 
-    Route::post('/media', [MediaController::class, 'store']);
-    Route::get('/media/{medium}', [MediaController::class, 'show']);
-    Route::get('/media/{medium}/file', [MediaController::class, 'file']);
-    Route::delete('/media/{medium}', [MediaController::class, 'destroy']);
+    Route::get('/media/limits', [MediaController::class, 'limits'])->middleware('permission:media.view|media.upload|customers.view|vehicles.view|contracts.view');
+    Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload|customers.create|customers.update|vehicles.update|contracts.update|violations.create|maintenance.create');
+    Route::get('/media/{medium}', [MediaController::class, 'show'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
+    Route::get('/media/{medium}/file', [MediaController::class, 'file'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
+    Route::delete('/media/{medium}', [MediaController::class, 'destroy'])->middleware('permission:media.delete|customers.update|vehicles.update|settings.update');
 
     Route::get('/settings/tenant', function () {
         return response()->json(['data' => TenantSetting::query()->first()]);
@@ -50,6 +61,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:settings.update');
     Route::put('/integrator/tenant', [OperationsController::class, 'updateIntegrator'])
         ->middleware('integrator');
+
+    // Document print templates (RSD §١٧) — view for settings/print consumers; mutate for admins.
+    Route::get('/document-templates', [DocumentTemplateController::class, 'index'])
+        ->middleware('permission:settings.view|settings.update|contracts.print');
+    Route::post('/document-templates', [DocumentTemplateController::class, 'store'])
+        ->middleware('permission:settings.update');
+    Route::post('/document-templates/preview', [DocumentTemplateController::class, 'preview'])
+        ->middleware('permission:settings.view|settings.update');
 
     Route::middleware('permission:staff.view')->group(function () {
         Route::get('/staff', [StaffController::class, 'index']);
@@ -63,23 +82,66 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::get('/employees/lookup', [OperationsController::class, 'employeesLookup'])
-        ->middleware('permission:hr.view,petty_cash.view,petty_cash.manage,maintenance.view');
-    Route::middleware('permission:hr.view')->group(function () {
+        ->middleware('permission:hr.view,hr.salaries,hr.custody,hr.advances,petty_cash.view,petty_cash.manage,maintenance.view');
+    Route::middleware('permission:hr.view,hr.salaries,hr.custody,hr.advances,hr.expenses,staff.view')->group(function () {
         Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::get('/employees/{employee}', [EmployeeController::class, 'show']);
+    });
+    Route::middleware('permission:hr.salaries,hr.view')->group(function () {
         Route::get('/payroll', [PayrollController::class, 'index']);
     });
-    Route::middleware('permission:hr.create')->group(function () {
+    Route::middleware('permission:hr.create,hr.salaries')->group(function () {
         Route::post('/employees', [EmployeeController::class, 'store']);
         Route::post('/payroll/draft', [PayrollController::class, 'draft']);
     });
     Route::put('/employees/{employee}', [EmployeeController::class, 'update'])
-        ->middleware('permission:hr.update');
+        ->middleware('permission:hr.update,hr.salaries');
     Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve'])
-        ->middleware('permission:hr.payroll_approve');
+        ->middleware('permission:hr.payroll_approve,hr.salaries');
+    Route::post('/payroll/lines/{payrollLine}/payout', [PayrollController::class, 'payout'])
+        ->middleware('permission:hr.salaries,hr.payroll_approve');
+
+    Route::middleware('permission:hr.custody,hr.view')->group(function () {
+        Route::get('/employee-assignments', [EmployeeAssignmentController::class, 'index']);
+    });
+    Route::middleware('permission:hr.custody,hr.update')->group(function () {
+        Route::post('/employee-assignments', [EmployeeAssignmentController::class, 'store']);
+        Route::post('/employee-assignments/{assignment}/acknowledge', [EmployeeAssignmentController::class, 'acknowledgeReceipt']);
+    });
+
+    Route::middleware('permission:hr.advances,hr.salaries,hr.view')->group(function () {
+        Route::get('/salary-advances', [SalaryAdvanceController::class, 'index']);
+    });
+    Route::middleware('permission:hr.advances')->group(function () {
+        Route::post('/salary-advances', [SalaryAdvanceController::class, 'store']);
+        Route::delete('/salary-advances/{salaryAdvance}', [SalaryAdvanceController::class, 'destroy']);
+    });
 
     Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('permission:vehicles.view');
+    Route::get('/vehicles/catalogs', [VehicleController::class, 'catalogs'])->middleware('permission:vehicles.view,vehicles.create,vehicles.update');
+    Route::post('/vehicles/brands', [VehicleController::class, 'storeBrand'])->middleware('permission:vehicles.create,vehicles.update');
+    Route::get('/vehicles/recommend', [VehicleController::class, 'recommend'])->middleware('permission:vehicles.view,contracts.create');
+    Route::get('/fleet/daily-prep', [FleetPrepController::class, 'daily'])
+        ->middleware('permission:vehicles.view|contracts.view|maintenance.view');
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
     Route::get('/vehicles/{vehicle}/dossier', [VehicleController::class, 'dossier'])->middleware('permission:vehicles.view');
+    Route::get('/vehicles/{vehicle}/custody-agreements', [VehicleCustodyAgreementController::class, 'index'])
+        ->middleware('permission:vehicles.view');
+    Route::post('/vehicles/{vehicle}/custody-agreements', [VehicleCustodyAgreementController::class, 'store'])
+        ->middleware('permission:vehicles.update');
+    Route::get('/vehicles/{vehicle}/custody-agreements/{custodyAgreement}', [VehicleCustodyAgreementController::class, 'show'])
+        ->middleware('permission:vehicles.view');
+    Route::get('/vehicles/{vehicle}/custody-agreements/{custodyAgreement}/print', [VehicleCustodyAgreementController::class, 'print'])
+        ->middleware('permission:vehicles.view');
+    Route::get('/vehicles/{vehicle}/document-history', [OperationsController::class, 'vehicleDocumentHistory'])
+        ->middleware('permission:vehicles.view');
+    Route::get('/vehicles/{vehicle}/assets', [VehicleAssetController::class, 'extras'])->middleware('permission:vehicles.view');
+    Route::post('/vehicles/{vehicle}/tires', [VehicleAssetController::class, 'storeTire'])->middleware('permission:vehicles.update');
+    Route::post('/vehicles/{vehicle}/batteries', [VehicleAssetController::class, 'storeBattery'])->middleware('permission:vehicles.update');
+    Route::post('/vehicles/{vehicle}/downtime', [VehicleAssetController::class, 'storeDowntime'])->middleware('permission:vehicles.update,maintenance.create');
+    Route::post('/vehicles/{vehicle}/consumables', [VehicleAssetController::class, 'setConsumable'])->middleware('permission:vehicles.update');
+    Route::get('/consumable-templates', [VehicleAssetController::class, 'templates'])->middleware('permission:vehicles.view,maintenance.view');
+    Route::post('/consumable-templates', [VehicleAssetController::class, 'storeTemplate'])->middleware('permission:vehicles.update,maintenance.create');
     Route::get('/vehicles/{vehicle}', [VehicleController::class, 'show'])->middleware('permission:vehicles.view');
     Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->middleware('permission:vehicles.update');
     Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->middleware('permission:vehicles.archive');
@@ -111,6 +173,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/contracts', [ContractController::class, 'store'])->middleware('permission:contracts.create');
     Route::get('/contracts/{contract}', [ContractController::class, 'show'])->middleware('permission:contracts.view');
     Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve'])->middleware('permission:contracts.approve');
+    Route::post('/contracts/{contract}/pricing', [ContractController::class, 'updatePricing'])->middleware('permission:contracts_price.override');
     Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->middleware('permission:contracts_cancel.approve');
@@ -130,10 +193,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/print-snapshots', [OperationsController::class, 'storePrintSnapshot'])
         ->middleware('permission:contracts.print,department_notice.print');
 
-    Route::middleware(['feature:petty_cash', 'permission:petty_cash.view'])->group(function () {
+    Route::middleware(['feature:petty_cash', 'permission:petty_cash.view,hr.custody'])->group(function () {
         Route::get('/petty-cash', [OperationsController::class, 'pettyCashIndex']);
+        Route::get('/petty-cash/{account}', [OperationsController::class, 'pettyCashShow']);
     });
-    Route::middleware(['feature:petty_cash', 'permission:petty_cash.manage'])->group(function () {
+    Route::middleware(['feature:petty_cash', 'permission:petty_cash.manage,hr.custody'])->group(function () {
         Route::post('/petty-cash', [OperationsController::class, 'pettyCashStore']);
         Route::post('/petty-cash/{account}/move', [OperationsController::class, 'pettyCashMove']);
     });
@@ -143,9 +207,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/inventory/items', [InventoryController::class, 'storeItem']);
         Route::post('/inventory/batches', [InventoryController::class, 'receiveBatch']);
     });
+    Route::middleware(['feature:inventory', 'permission:inventory.update'])->put('/inventory/items/{item}', [InventoryController::class, 'updateItem']);
 
-    Route::middleware('permission:expenses.view')->get('/expenses', [ExpenseController::class, 'index']);
-    Route::middleware('permission:expenses.create')->post('/expenses', [ExpenseController::class, 'store']);
+    Route::middleware('permission:expenses.view,hr.expenses')->get('/expenses', [ExpenseController::class, 'index']);
+    Route::middleware('permission:expenses.create,hr.expenses')->post('/expenses', [ExpenseController::class, 'store']);
+    Route::middleware('permission:expenses.update,hr.expenses')->put('/expenses/{expense}', [ExpenseController::class, 'update']);
 
     Route::middleware('permission:owners.view')->group(function () {
         Route::get('/owners', [VehicleOwnerController::class, 'index']);
@@ -158,11 +224,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:owners.payout')->post('/owners/{owner}/payouts', [VehicleOwnerController::class, 'payout']);
 
     Route::get('/accounting/overview', [AccountingController::class, 'overview'])->middleware('permission:accounting.view');
+    Route::get('/accounting/months/{year}/{month}', [AccountingController::class, 'month'])
+        ->whereNumber(['year', 'month'])
+        ->middleware('permission:accounting.view');
     Route::post('/accounting/lock-month', [AccountingController::class, 'lockMonth'])->middleware('permission:accounting.lock_month');
     Route::post('/accounting/reopen-month', [AccountingController::class, 'reopenMonth'])->middleware('permission:accounting.reopen_month');
     Route::get('/accounting/payments', [AccountingController::class, 'payments'])->middleware('permission:payments.view');
     Route::post('/accounting/payments', [AccountingController::class, 'storePayment'])->middleware('permission:payments.create');
-    Route::get('/reports/summary', [ReportController::class, 'summary'])->middleware('permission:reports.view');
+    Route::middleware('permission:reports.view,accounting.view')->group(function () {
+        Route::get('/reports/summary', [ReportController::class, 'summary']);
+        Route::get('/reports/profitability-compare', [ReportController::class, 'profitabilityCompare']);
+        Route::get('/reports/trial-balance', [ReportController::class, 'trialBalance']);
+        Route::get('/reports/income-statement', [ReportController::class, 'incomeStatement']);
+        Route::get('/reports/payment-methods', [ReportController::class, 'paymentMethodBalances']);
+        Route::get('/reports/petty-cash-balances', [ReportController::class, 'pettyCashBalances']);
+        Route::get('/reports/customers/{customer}/statement', [ReportController::class, 'customerStatement']);
+    });
 
     Route::get('/work-orders', [WorkOrderController::class, 'index'])->middleware('permission:maintenance.view');
     Route::post('/work-orders', [WorkOrderController::class, 'store'])->middleware('permission:maintenance.create');
@@ -170,33 +247,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/violations', [ViolationController::class, 'index'])->middleware('permission:violations.view');
     Route::post('/violations', [ViolationController::class, 'store'])->middleware('permission:violations.create');
+    Route::put('/violations/{violation}', [ViolationController::class, 'update'])->middleware('permission:violations.update');
     Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment'])->middleware('permission:violations.update');
 
-    Route::middleware(['feature:waitlist', 'permission:waitlist.view'])->get('/waitlist', function (WaitlistService $service) {
-        return response()->json(['data' => $service->list()]);
-    });
-    Route::middleware(['feature:waitlist', 'permission:waitlist.create'])->post('/waitlist', function (Request $request, WaitlistService $service) {
-        $data = $request->validate([
-            'customer_id' => ['required', 'exists:customers,id'],
-            'category' => ['required', 'string'],
-            'preferred_vehicle_id' => ['nullable', 'exists:vehicles,id'],
-            'desired_start' => ['nullable', 'date'],
-            'desired_end' => ['nullable', 'date'],
-            'priority' => ['nullable', 'integer'],
-            'notes' => ['nullable', 'string'],
-        ], [], [
-            'customer_id' => 'العميل',
-            'category' => 'الفئة المطلوبة',
-        ]);
-
-        $row = $service->create($data, (int) $request->user()->id);
-
-        return response()->json(['data' => $row, 'message' => 'تم إضافة طلب الانتظار.'], 201);
-    });
+    Route::get('/violation-inquiries', [ViolationInquiryController::class, 'index'])->middleware('permission:violations.view');
+    Route::post('/violation-inquiries/{vehicle}/mark', [ViolationInquiryController::class, 'mark'])->middleware('permission:violations.update');
 
     Route::middleware(['feature:chat'])->group(function () {
-        Route::get('/chat', [CollaborationController::class, 'chatIndex']);
-        Route::post('/chat', [CollaborationController::class, 'chatStore']);
+        Route::get('/chat', [CollaborationController::class, 'chatIndex'])->middleware('permission:chat.view');
+        Route::post('/chat', [CollaborationController::class, 'chatStore'])->middleware('permission:chat.create');
     });
     Route::middleware(['feature:evaluations', 'permission:hr.view'])->get('/evaluations', [CollaborationController::class, 'evaluationsIndex']);
     Route::middleware(['feature:evaluations', 'permission:hr.create'])->post('/evaluations', [CollaborationController::class, 'evaluationsStore']);

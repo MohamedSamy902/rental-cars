@@ -8,16 +8,17 @@ import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import { AttentionDot } from './AttentionDot'
 import { BrandLogo } from './BrandLogo'
 import { CommandPalette } from './CommandPalette'
+import { ProfileSheet } from '@/shared/forms/ProfileSheet'
 import { useSheetDrag } from './useSheetDrag'
 import {
-  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart, IconChat,
-  IconChevron, IconClipboard, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
-  IconLogout, IconMenu, IconMoon, IconPlus, IconQueue, IconReceipt, IconSearch, IconSettings,
+  IconAlert, IconBell, IconBox, IconBriefcase, IconCalendar, IconCar, IconChart,
+  IconChevron, IconClipboard, IconEdit, IconFileText, IconHistory, IconHome, IconKey, IconLandmark,
+  IconLogout, IconMenu, IconMoon, IconPlus, IconReceipt, IconSearch, IconSettings,
   IconStore, IconSun, IconUserCog, IconUsers, IconWallet, IconWrench,
 } from './Icons'
-import './AttentionDot.css'
 import './Button.css'
 import './AppShell.css'
+import './AttentionDot.css'
 
 type NavItem = {
   to: string
@@ -30,10 +31,9 @@ type NavItem = {
 
 const railNav: NavItem[] = [
   { to: '/', label: 'لوحة اليوم', icon: <IconHome />, end: true },
-  { to: '/vehicles', label: 'المركبات', icon: <IconCar />, permission: 'vehicles.view' },
+  { to: '/vehicles', label: 'العربيات', icon: <IconCar />, permission: 'vehicles.view' },
   { to: '/bookings', label: 'العقود', icon: <IconClipboard />, permission: 'contracts.view' },
   { to: '/calendar', label: 'التقويم', icon: <IconCalendar />, permission: 'contracts.view' },
-  { to: '/waitlist', label: 'الانتظار', icon: <IconQueue />, feature: 'waitlist', permission: 'waitlist.view' },
   { to: '/showroom', label: 'المعرض', icon: <IconStore />, feature: 'showroom', permission: 'showroom.run' },
   { to: '/maintenance', label: 'الصيانة', icon: <IconWrench />, permission: 'maintenance.view' },
   { to: '/inventory', label: 'المخزون', icon: <IconBox />, feature: 'inventory', permission: 'inventory.view' },
@@ -41,12 +41,13 @@ const railNav: NavItem[] = [
   { to: '/expenses', label: 'المصروفات', icon: <IconReceipt />, permission: 'expenses.view' },
   { to: '/owners', label: 'ملاك العربيات', icon: <IconKey />, permission: 'owners.view' },
   { to: '/violations', label: 'المخالفات', icon: <IconAlert />, permission: 'violations.view' },
+  { to: '/violation-inquiries', label: 'استعلامات المخالفات', icon: <IconSearch />, permission: 'violations.view' },
   { to: '/customers', label: 'العملاء', icon: <IconUsers />, permission: 'customers.view' },
   { to: '/department-notice', label: 'إخطار القسم', icon: <IconFileText />, feature: 'department_notice', permission: 'department_notice.print' },
   { to: '/accounts', label: 'الحسابات', icon: <IconLandmark />, permission: 'accounting.view' },
   { to: '/reports', label: 'التقارير', icon: <IconChart />, permission: 'reports.view' },
   { to: '/hr', label: 'الموارد البشرية', icon: <IconBriefcase />, feature: 'hr', permission: 'hr.view' },
-  { to: '/chat', label: 'المحادثة', icon: <IconChat />, feature: 'chat' },
+  // Chat hidden from client delivery nav (route kept for integrator/feature flag).
   { to: '/staff', label: 'الموظفون', icon: <IconUserCog />, permission: 'staff.view' },
   { to: '/audit-logs', label: 'سجل التعديلات', icon: <IconHistory />, permission: 'audit.view' },
   { to: '/notifications', label: 'الإشعارات', icon: <IconBell />, permission: 'notifications.view' },
@@ -55,7 +56,7 @@ const railNav: NavItem[] = [
 
 const mobileNav: NavItem[] = [
   { to: '/', label: 'اليوم', icon: <IconHome />, end: true },
-  { to: '/vehicles', label: 'أسطول', icon: <IconCar /> },
+  { to: '/vehicles', label: 'العربيات', icon: <IconCar /> },
   { to: '/bookings', label: 'عقود', icon: <IconClipboard /> },
   { to: '/calendar', label: 'تقويم', icon: <IconCalendar /> },
   { to: '/maintenance', label: 'صيانة', icon: <IconWrench /> },
@@ -72,6 +73,7 @@ export function AppShell() {
   const location = useLocation()
   const [cmdOpen, setCmdOpen] = useState(false)
   const [drawer, setDrawer] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [unread, setUnread] = useState(0)
   const { byPath: attentionByPath, counts: attentionCounts } = useAttentionSignals(
     Boolean(user),
@@ -262,7 +264,13 @@ export function AppShell() {
                 </span>
                 <span className="rpm-btn__label">عقد جديد</span>
               </button>
-              <div className="shell-user shell-user--desk">
+              <button
+                type="button"
+                className="shell-user shell-user--desk shell-user--action"
+                onClick={() => setProfileOpen(true)}
+                title="حسابي / تعديل البيانات"
+                aria-label={`حسابي · ${user?.name || 'تعديل البيانات'}`}
+              >
                 <span className="shell-user__avatar" aria-hidden>
                   {(user?.name || 'م').slice(0, 1)}
                 </span>
@@ -270,7 +278,10 @@ export function AppShell() {
                   <strong>{user?.name}</strong>
                   <em>{user?.role || 'مستخدم'}</em>
                 </span>
-              </div>
+                <span className="shell-user__edit" aria-hidden>
+                  <IconEdit size={14} />
+                </span>
+              </button>
             </div>
           </div>
         </header>
@@ -340,8 +351,9 @@ export function AppShell() {
               <div className="shell-drawer__grab" onPointerDown={startDrawerDrag}>
                 <div className="shell-drawer__handle" aria-hidden />
                 <div className="shell-drawer__head">
-                  <BrandLogo variant="mark" />
                   <span className="shell-drawer__title">كل الأقسام</span>
+                  <BrandLogo variant="mark" className="shell-drawer__brand" />
+                  <span className="shell-drawer__head-spacer" aria-hidden />
                 </div>
               </div>
               <div className="shell-drawer__grid">
@@ -371,6 +383,17 @@ export function AppShell() {
                 })}
               </div>
               <div className="shell-drawer__foot">
+                <button
+                  type="button"
+                  className="shell-drawer__action shell-drawer__action--profile"
+                  onClick={() => {
+                    closeDrawer()
+                    setProfileOpen(true)
+                  }}
+                >
+                  <IconEdit size={18} />
+                  <span>حسابي الشخصي</span>
+                </button>
                 <button type="button" className="shell-drawer__action" onClick={toggleTheme}>
                   {theme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
                   <span>{theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
@@ -400,6 +423,7 @@ export function AppShell() {
       </AnimatePresence>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   )
 }

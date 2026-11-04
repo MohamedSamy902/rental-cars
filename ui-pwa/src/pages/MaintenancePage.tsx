@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, Fab, DataTable, StatusPill, useToast,
   IconCheck, IconWrench, IconCash, type DataColumn,
@@ -24,7 +25,7 @@ const statusLabel: Record<string, string> = {
 const columns: DataColumn<WorkOrder>[] = [
   {
     id: 'vehicle',
-    header: 'المركبة',
+    header: 'العربية',
     cell: (r) => (
       <>
         <strong className="rpm-table__primary">{r.vehicle?.brand} {r.vehicle?.model}</strong>
@@ -46,14 +47,29 @@ const columns: DataColumn<WorkOrder>[] = [
   },
 ]
 
+const MaintenancePageTabs = ['all', 'open', 'closed'] as const
+
 export function MaintenancePage() {
   const toast = useToast()
   const [rows, setRows] = useState<WorkOrder[]>([])
-  const [summary, setSummary] = useState({ open: 0, open_only: 0, in_progress: 0, closed: 0 })
-  const [chip, setChip] = useState('all')
-  const [search, setSearch] = useState('')
+  const [summary, setSummary] = useState({ open: 0, closed: 0 })
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useQueryTab({ allowed: MaintenancePageTabs, defaultValue: 'all' })
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await api<{ data: WorkOrder[]; summary: typeof summary }>('/work-orders')
+      setRows(res.data)
+      setSummary(res.summary)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void load() }, [])
 
   const chips = useMemo(
     () => [
@@ -61,57 +77,29 @@ export function MaintenancePage() {
       {
         id: 'open',
         label: 'مفتوح',
-        attention: summary.open_only > 0 ? ('critical' as const) : null,
-        attentionLabel: `${summary.open_only} أمر مفتوح`,
-      },
-      {
-        id: 'in_progress',
-        label: 'قيد التنفيذ',
-        attention: summary.in_progress > 0 ? ('warning' as const) : null,
-        attentionLabel: `${summary.in_progress} أمر قيد التنفيذ`,
+        attention: summary.open > 0 ? ('critical' as const) : null,
+        attentionLabel: `${summary.open} أمر شغل مفتوح`,
       },
       { id: 'closed', label: 'مغلق' },
     ],
-    [summary.open_only, summary.in_progress],
+    [summary.open],
   )
 
-  async function load() {
-    setLoading(true)
-    try {
-      const qs = new URLSearchParams()
-      if (chip !== 'all') qs.set('status', chip)
-      const res = await api<{ data: WorkOrder[]; summary: typeof summary }>(`/work-orders?${qs}`)
-      const data = res.data.filter((r) => {
-        if (!search.trim()) return true
-        const q = search.trim().toLowerCase()
-        return (
-          (r.vehicle?.plate || '').toLowerCase().includes(q)
-          || (r.vehicle?.brand || '').toLowerCase().includes(q)
-          || (r.vehicle?.model || '').toLowerCase().includes(q)
-          || (r.workshop || '').toLowerCase().includes(q)
-        )
-      })
-      setRows(data)
-      setSummary({
-        open: res.summary.open ?? 0,
-        open_only: res.summary.open_only ?? 0,
-        in_progress: res.summary.in_progress ?? 0,
-        closed: res.summary.closed ?? 0,
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const t = window.setTimeout(() => void load(), 200)
-    return () => window.clearTimeout(t)
-  }, [chip, search])
+  const filtered = useMemo(() => {
+    const q = search.trim()
+    return rows.filter((r) => {
+      if (chip === 'open' && !['open', 'in_progress'].includes(r.status)) return false
+      if (chip === 'closed' && r.status !== 'closed') return false
+      if (!q) return true
+      const hay = `${r.vehicle?.brand ?? ''} ${r.vehicle?.model ?? ''} ${r.vehicle?.plate ?? ''} ${r.workshop ?? ''}`
+      return hay.includes(q)
+    })
+  }, [rows, chip, search])
 
   async function closeOrder(id: number) {
     try {
       await api(`/work-orders/${id}/close`, { method: 'POST' })
-      toast.success('تم إغلاق أمر الشغل.')
+      toast.success('تم إغلاق أمر الصيانة.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -120,10 +108,10 @@ export function MaintenancePage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="أوامر الشغل" subtitle="صرف FIFO بترحيل محاسبي · شراء من العهدة اختياري" action={<Button onClick={() => setOpen(true)}>أمر شغل</Button>} mobileFab />
-      <Fab label="أمر شغل" onClick={() => setOpen(true)} />
+      <PageHeader title="الصيانة" subtitle="فتح صيانة · صرف من المخزون أو العهدة · تنبيه الصيانة التالية" action={<Button onClick={() => setOpen(true)}>صيانة جديدة</Button>} mobileFab />
+      <Fab label="صيانة جديدة" onClick={() => setOpen(true)} />
       <MetricCardGrid
-        label="ملخص أوامر الشغل"
+        label="ملخص الصيانة"
         mobile="wrap"
         items={[
           { id: 'open', label: 'أوامر مفتوحة', value: summary.open, tone: 'warning', icon: <IconWrench size={16} /> },
@@ -140,11 +128,11 @@ export function MaintenancePage() {
         chips={chips}
         activeChip={chip}
         onChipChange={setChip}
-        placeholder="بحث باللوحة أو الورشة…"
+        placeholder="بحث بالعربية أو الورشة…"
       />
       <DataTable
-        label="أوامر الشغل"
-        rows={rows}
+        label="أوامر الصيانة"
+        rows={filtered}
         columns={columns}
         rowKey={(r) => r.id}
         rowLabel={(r) => `أمر شغل · ${r.vehicle?.plate ?? ''}`}

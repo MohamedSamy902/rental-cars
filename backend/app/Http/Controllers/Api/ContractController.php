@@ -3,10 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ExtendContractRequest;
 use App\Http\Requests\StoreContractRequest;
+use App\Http\Requests\UpdateContractPricingRequest;
 use App\Models\Contract;
+use App\Models\DocumentTemplate;
+use App\Models\TenantSetting;
+use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
 use App\Services\Contracts\RentalProgressService;
+use App\Services\Documents\DocumentTemplateService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,13 +22,27 @@ class ContractController extends Controller
     public function __construct(
         private readonly ContractLifecycleService $lifecycle,
         private readonly RentalProgressService $progress,
+        private readonly DocumentTemplateService $documentTemplates,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $q = Contract::query()->with(['customer', 'vehicle', 'deposit'])->latest('id');
+        $q = Contract::query()->with(['customer', 'vehicle', 'deposit', 'salesUser:id,name'])->latest('id');
+        $user = $request->user();
+        if ($user && $user->role?->name === 'sales' && ! $user->hasPermission('contracts.approve')) {
+            $q->where('sales_user_id', $user->id);
+        }
         if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);
+        }
+        if ($tab = $request->string('tab')->toString()) {
+            if ($tab === 'upcoming') {
+                $q->whereIn('status', ['pending', 'approved'])
+                    ->where('starts_at', '>', now()->endOfDay());
+            } elseif ($tab === 'handover_today') {
+                $q->whereIn('status', ['pending', 'approved'])
+                    ->whereDate('starts_at', now()->toDateString());
+            }
         }
         if ($search = $request->string('search')->toString()) {
             $q->where(function ($qq) use ($search) {
@@ -35,12 +55,32 @@ class ContractController extends Controller
         }
 
         $rows = $q->paginate((int) $request->integer('per_page', 50));
-        $data = collect($rows->items())->map(function (Contract $c) {
+        $contractIds = collect($rows->items())->pluck('id')->all();
+        $openViolationTotals = $contractIds === []
+            ? collect()
+            : \App\Models\Violation::query()
+                ->selectRaw('contract_id, SUM(amount) as total_amount, COUNT(*) as cnt')
+                ->whereIn('contract_id', $contractIds)
+                ->open()
+                ->groupBy('contract_id')
+                ->get()
+                ->keyBy('contract_id');
+
+        $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals) {
             $arr = $c->toArray();
             $arr['progress'] = $this->progress->forContract($c);
+            $arr['created_by'] = $c->salesUser?->name;
+            $arr['sales_user'] = $c->salesUser
+                ? ['id' => $c->salesUser->id, 'name' => $c->salesUser->name]
+                : null;
+            $agg = $openViolationTotals->get($c->id);
+            $arr['open_violations_total'] = (int) ($agg->total_amount ?? 0);
+            $arr['open_violations_count'] = (int) ($agg->cnt ?? 0);
 
             return $arr;
         })->all();
+
+        $today = now()->toDateString();
 
         return response()->json([
             'data' => $data,
@@ -56,6 +96,14 @@ class ContractController extends Controller
                 'active' => Contract::query()->where('status', 'active')->count(),
                 'completed' => Contract::query()->where('status', 'completed')->count(),
                 'cancelled' => Contract::query()->where('status', 'cancelled')->count(),
+                'upcoming' => Contract::query()
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->where('starts_at', '>', now()->endOfDay())
+                    ->count(),
+                'handover_today' => Contract::query()
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->whereDate('starts_at', $today)
+                    ->count(),
             ],
         ]);
     }
@@ -63,7 +111,8 @@ class ContractController extends Controller
     public function store(StoreContractRequest $request): JsonResponse
     {
         try {
-            $contract = $this->lifecycle->create($request->validated(), $request->user()?->id);
+            $allowOverride = (bool) $request->user()?->hasPermission('contracts_price.override');
+            $contract = $this->lifecycle->create($request->validated(), $request->user()?->id, $allowOverride);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -71,13 +120,11 @@ class ContractController extends Controller
         return response()->json(['data' => $contract, 'message' => 'تم إنشاء العقد.'], 201);
     }
 
-    public function show(Contract $contract): JsonResponse
+    public function show(Request $request, Contract $contract, ContractDossierService $dossier): JsonResponse
     {
-        $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections']);
-        $arr = $contract->toArray();
-        $arr['progress'] = $this->progress->forContract($contract);
+        $this->authorize('view', $contract);
 
-        return response()->json(['data' => $arr]);
+        return response()->json(['data' => $dossier->build($contract)]);
     }
 
     public function approve(Request $request, Contract $contract): JsonResponse
@@ -91,13 +138,26 @@ class ContractController extends Controller
         return response()->json(['data' => $contract, 'message' => 'تم اعتماد العقد وتثبيت الأسعار.']);
     }
 
+    public function updatePricing(UpdateContractPricingRequest $request, Contract $contract): JsonResponse
+    {
+        try {
+            $contract = $this->lifecycle->updateFrozenPricing($contract, $request->validated(), $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $contract, 'message' => 'تم تعديل الأسعار مع تسجيل في سجل التدقيق.']);
+    }
+
     public function handover(Request $request, Contract $contract): JsonResponse
     {
         $data = $request->validate([
             'odometer_out' => ['required', 'integer', 'min:0'],
-            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string'],
             'signature_data' => ['nullable', 'string'],
+            'payment_amount' => ['nullable', 'integer', 'min:0'],
+            'payment_method' => ['nullable', 'string', 'in:cash,card,transfer'],
+            'payment_reference' => ['nullable', 'string', 'max:100'],
             'accessories' => ['nullable', 'array'],
             'accessories.*.name' => ['required_with:accessories', 'string'],
             'accessories.*.expected_qty' => ['nullable', 'integer', 'min:0'],
@@ -106,7 +166,11 @@ class ContractController extends Controller
             'damages' => ['nullable', 'array'],
             'damages.*.position' => ['required_with:damages', 'string'],
             'damages.*.description' => ['required_with:damages', 'string'],
-        ], [], ['odometer_out' => 'عداد الخروج', 'signature_data' => 'توقيع العميل']);
+        ], [], [
+            'odometer_out' => 'عداد الخروج',
+            'payment_amount' => 'مبلغ الدفعة',
+            'payment_method' => 'طريقة الدفع',
+        ]);
 
         try {
             $contract = $this->lifecycle->activateOnHandover(
@@ -128,7 +192,6 @@ class ContractController extends Controller
             'odometer_in' => ['required', 'integer', 'min:0'],
             'returned_at' => ['nullable', 'date'],
             'damage_fee' => ['nullable', 'integer', 'min:0'],
-            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string'],
             'signature_data' => ['nullable', 'string'],
             'accessories' => ['nullable', 'array'],
@@ -139,7 +202,7 @@ class ContractController extends Controller
             'damages' => ['nullable', 'array'],
             'damages.*.position' => ['required_with:damages', 'string'],
             'damages.*.description' => ['required_with:damages', 'string'],
-        ], [], ['odometer_in' => 'عداد العودة', 'signature_data' => 'توقيع العميل']);
+        ], [], ['odometer_in' => 'عداد العودة']);
 
         $returnedAt = isset($data['returned_at']) ? new \DateTimeImmutable($data['returned_at']) : null;
 
@@ -162,15 +225,85 @@ class ContractController extends Controller
     public function printData(Contract $contract): JsonResponse
     {
         $contract->load(['customer', 'vehicle.documents', 'vehicle.accessories', 'deposit.deductions', 'inspections.damages']);
-        $tenant = \App\Models\TenantSetting::query()->first();
+        $tenant = TenantSetting::query()->first();
+        $ops = is_array($tenant?->operational) ? $tenant->operational : [];
+
+        $payments = \App\Models\Payment::query()
+            ->where('link_type', 'contract')
+            ->where('link_id', $contract->id)
+            ->orderBy('paid_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($p) => [
+                'amount' => (int) $p->amount,
+                'direction' => $p->direction,
+                'method' => $p->method,
+                'reference' => $p->reference ?? null,
+                'paid_at' => $p->paid_at?->toDateString(),
+                'date' => $p->paid_at?->toDateString(),
+            ])
+            ->values()
+            ->all();
+
+        $payload = $contract->toArray();
+        $payload['payments'] = $payments;
+        // Ensure print consumers always see a stable document number.
+        $payload['number'] = $contract->number ?: ('C-'.$contract->id);
+
+        // Templates are optional for print: never fail the whole print payload
+        // if the migration has not been applied yet or rendering hits an edge case.
+        $templates = [
+            'contract' => null,
+            'handover_receipt' => null,
+        ];
+        try {
+            $contractTpl = $this->documentTemplates->getActive(DocumentTemplate::TYPE_CONTRACT);
+            $handoverTpl = $this->documentTemplates->getActive(DocumentTemplate::TYPE_HANDOVER_RECEIPT);
+            if ($contractTpl) {
+                $contractVars = $this->documentTemplates->variablesForContract($contract, $tenant, $contractTpl);
+                $templates['contract'] = [
+                    ...$this->documentTemplates->present($contractTpl),
+                    'rendered_html' => $this->documentTemplates->render(
+                        $contractTpl->content,
+                        $contractTpl->format,
+                        $contractVars,
+                    ),
+                    'variables' => $contractVars,
+                ];
+            }
+            if ($handoverTpl) {
+                $handoverVars = $this->documentTemplates->variablesForContract($contract, $tenant, $handoverTpl);
+                $templates['handover_receipt'] = [
+                    ...$this->documentTemplates->present($handoverTpl),
+                    'rendered_html' => $this->documentTemplates->render(
+                        $handoverTpl->content,
+                        $handoverTpl->format,
+                        $handoverVars,
+                    ),
+                    'variables' => $handoverVars,
+                ];
+            }
+        } catch (\Throwable) {
+            $templates = [
+                'contract' => null,
+                'handover_receipt' => null,
+            ];
+        }
 
         return response()->json([
             'data' => [
                 'tenant' => [
                     'center_name' => $tenant?->center_name,
                     'print_footer' => $tenant?->print_footer,
+                    'logo_path' => $tenant?->logo_path,
+                    'print_phone' => $ops['print_phone'] ?? null,
+                    'print_address' => $ops['print_address'] ?? null,
+                    'print_commercial_register' => $ops['print_commercial_register'] ?? null,
+                    'print_tax_info' => $ops['print_tax_info'] ?? null,
+                    'contract_terms' => $ops['contract_terms'] ?? null,
                 ],
-                'contract' => $contract,
+                'contract' => $payload,
+                'templates' => $templates,
             ],
         ]);
     }
@@ -190,15 +323,10 @@ class ContractController extends Controller
         return response()->json(['data' => $contract, 'message' => 'تم إلغاء العقد.']);
     }
 
-    public function extend(Request $request, Contract $contract): JsonResponse
+    public function extend(ExtendContractRequest $request, Contract $contract): JsonResponse
     {
-        $data = $request->validate([
-            'planned_ends_at' => ['required', 'date'],
-            'starts_at' => ['nullable', 'date'],
-        ], [], ['planned_ends_at' => 'نهاية التمديد']);
-
         try {
-            $created = $this->lifecycle->extend($contract, $data, $request->user()?->id);
+            $created = $this->lifecycle->extend($contract, $request->validated(), $request->user()?->id);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -214,21 +342,29 @@ class ContractController extends Controller
             'odometer_out' => ['required', 'integer', 'min:0'],
             'planned_ends_at' => ['nullable', 'date'],
             'damage_fee' => ['nullable', 'integer', 'min:0'],
+            'signature_data' => ['nullable', 'string'],
+            'damages' => ['nullable', 'array'],
+            'damages.*.position' => ['required_with:damages', 'string', 'max:120'],
+            'damages.*.description' => ['required_with:damages', 'string', 'max:500'],
+            'damages.*.photo_path' => ['nullable', 'string', 'max:500'],
+            'accessories' => ['nullable', 'array'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ], [], [
-            'replacement_vehicle_id' => 'السيارة البديلة',
-            'odometer_in' => 'عداد السيارة القديمة',
-            'odometer_out' => 'عداد السيارة البديلة',
+            'replacement_vehicle_id' => 'العربية البديلة',
+            'odometer_in' => 'عداد العربية القديمة',
+            'odometer_out' => 'عداد العربية البديلة',
+            'damages' => 'الأضرار',
         ]);
 
         try {
-            $updated = $this->lifecycle->swapDueToFault($contract, $data, $request->user()?->id);
+            $result = $this->lifecycle->swapDueToFault($contract, $data, $request->user()?->id);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
         return response()->json([
-            'data' => $updated,
-            'message' => 'تم التبديل بسبب عطل: أُغلق العقد القديم وأنشئ عقد جديد.',
+            'data' => $result,
+            'message' => 'تم التبديل بسبب عطل على نفس العقد مع فتح أمر صيانة للعربية السابقة.',
         ]);
     }
 

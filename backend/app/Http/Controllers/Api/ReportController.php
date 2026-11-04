@@ -9,10 +9,21 @@ use App\Models\JournalLine;
 use App\Models\Payment;
 use App\Models\Vehicle;
 use App\Models\Violation;
+use App\Services\Accounting\ProfitabilityService;
+use App\Services\Accounting\ReportQueryService;
+use App\Services\Fleet\OccupancyService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
+    public function __construct(
+        private readonly OccupancyService $occupancy,
+        private readonly ProfitabilityService $profitability,
+        private readonly ReportQueryService $reports,
+    ) {}
+
     public function summary(): JsonResponse
     {
         $arDebit = (int) JournalLine::query()
@@ -40,6 +51,9 @@ class ReportController extends Controller
         ];
         $fleet['available'] = max(0, $fleet['total'] - $fleet['maintenance'] - $fleet['rented'] - $fleet['reserved']);
 
+        $from = now()->startOfMonth();
+        $to = now();
+
         return response()->json([
             'data' => [
                 'receivables' => max(0, $arDebit - $arCredit),
@@ -52,6 +66,7 @@ class ReportController extends Controller
                 'open_violations' => Violation::query()->whereNotIn('status', ['confirmed', 'paid'])->count(),
                 'fleet' => $fleet,
                 'rent_by_month' => $rentByMonth,
+                'occupancy_pct' => $this->occupancy->percent($from, $to),
                 'expected_revenue_active' => (int) Contract::query()
                     ->where('status', 'active')
                     ->get()
@@ -62,5 +77,56 @@ class ReportController extends Controller
                     }),
             ],
         ]);
+    }
+
+    public function profitabilityCompare(Request $request): JsonResponse
+    {
+        $anchor = $request->filled('month')
+            ? Carbon::createFromFormat('Y-m', $request->string('month')->toString())->startOfMonth()
+            : now()->startOfMonth();
+
+        return response()->json(['data' => $this->profitability->monthOverMonth($anchor)]);
+    }
+
+    public function trialBalance(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        return response()->json(['data' => $this->reports->trialBalance($from, $to)]);
+    }
+
+    public function incomeStatement(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        return response()->json(['data' => $this->reports->incomeStatement($from, $to)]);
+    }
+
+    public function paymentMethodBalances(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        return response()->json(['data' => $this->reports->paymentMethodBalances($from, $to)]);
+    }
+
+    public function customerStatement(Customer $customer): JsonResponse
+    {
+        return response()->json(['data' => $this->reports->customerStatement($customer)]);
+    }
+
+    public function pettyCashBalances(): JsonResponse
+    {
+        return response()->json(['data' => $this->reports->pettyCashBalances()]);
+    }
+
+    /**
+     * @return array{0:?Carbon,1:?Carbon}
+     */
+    private function range(Request $request): array
+    {
+        $from = $request->filled('from') ? Carbon::parse($request->string('from')->toString())->startOfDay() : null;
+        $to = $request->filled('to') ? Carbon::parse($request->string('to')->toString())->endOfDay() : null;
+
+        return [$from, $to];
     }
 }

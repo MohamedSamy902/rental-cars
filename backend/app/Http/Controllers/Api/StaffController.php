@@ -54,8 +54,8 @@ class StaffController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:200'],
-            'email' => ['required', 'email', 'max:190', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:190', 'unique:users,email'],
+            'phone' => ['required', 'string', 'max:30', 'unique:users,phone'],
             'password' => ['required', 'string', 'min:8', 'max:100'],
             'role_id' => ['required', 'exists:roles,id'],
             'employee_id' => ['nullable', 'exists:employees,id'],
@@ -65,10 +65,15 @@ class StaffController extends Controller
             'job_title' => ['nullable', 'string', 'max:120'],
             'hired_on' => ['nullable', 'date'],
             'base_salary' => ['nullable', 'integer', 'min:0'],
-        ], [], [
+        ], [
+            'phone.required' => 'رقم الموبايل مطلوب.',
+            'phone.unique' => 'رقم الموبايل مستخدم مسبقاً.',
+            'email.email' => 'البريد الإلكتروني غير صالح.',
+            'email.unique' => 'البريد الإلكتروني مستخدم مسبقاً.',
+        ], [
             'name' => 'الاسم',
             'email' => 'البريد الإلكتروني',
-            'phone' => 'الهاتف',
+            'phone' => 'رقم الموبايل',
             'password' => 'كلمة المرور',
             'role_id' => 'الدور',
             'employee_id' => 'الموظف',
@@ -92,10 +97,14 @@ class StaffController extends Controller
                 $employeeId = $employee->id;
             }
 
+            $email = isset($data['email']) && is_string($data['email']) && trim($data['email']) !== ''
+                ? trim($data['email'])
+                : null;
+
             return User::query()->create([
                 'name' => $data['name'],
-                'email' => $data['email'],
-                'phone' => $data['phone'] ?? null,
+                'email' => $email,
+                'phone' => trim((string) $data['phone']),
                 'password' => $data['password'],
                 'role_id' => $data['role_id'],
                 'employee_id' => $employeeId,
@@ -114,17 +123,22 @@ class StaffController extends Controller
     {
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:200'],
-            'email' => ['sometimes', 'email', 'max:190', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:190', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['sometimes', 'required', 'string', 'max:30', Rule::unique('users', 'phone')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:8', 'max:100'],
             'role_id' => ['sometimes', 'exists:roles,id'],
             'employee_id' => ['nullable', 'exists:employees,id'],
             'is_active' => ['sometimes', 'boolean'],
             'session_minutes' => ['nullable', 'integer', 'min:15', 'max:1440'],
-        ], [], [
+        ], [
+            'phone.required' => 'رقم الموبايل مطلوب.',
+            'phone.unique' => 'رقم الموبايل مستخدم مسبقاً.',
+            'email.email' => 'البريد الإلكتروني غير صالح.',
+            'email.unique' => 'البريد الإلكتروني مستخدم مسبقاً.',
+        ], [
             'name' => 'الاسم',
             'email' => 'البريد الإلكتروني',
-            'phone' => 'الهاتف',
+            'phone' => 'رقم الموبايل',
             'password' => 'كلمة المرور',
             'role_id' => 'الدور',
             'employee_id' => 'الموظف',
@@ -133,6 +147,15 @@ class StaffController extends Controller
 
         if (array_key_exists('password', $data) && ($data['password'] === null || $data['password'] === '')) {
             unset($data['password']);
+        }
+
+        if (array_key_exists('email', $data)) {
+            $email = is_string($data['email']) ? trim($data['email']) : '';
+            $data['email'] = $email !== '' ? $email : null;
+        }
+
+        if (array_key_exists('phone', $data)) {
+            $data['phone'] = trim((string) $data['phone']);
         }
 
         $user->update($data);

@@ -30,7 +30,7 @@ class ContractLifecycleTest extends TestCase
         TenantSetting::query()->create([
             'center_name' => 'اختبار',
             'feature_flags' => [
-                'showroom' => true, 'petty_cash' => true, 'waitlist' => true, 'inventory' => true,
+                'showroom' => true, 'petty_cash' => true, 'inventory' => true,
                 'department_notice' => true, 'chat' => true, 'evaluations' => true, 'hr' => true,
             ],
             'operational' => [
@@ -90,7 +90,6 @@ class ContractLifecycleTest extends TestCase
         $this->postJson("/api/contracts/{$id}/handover", [
             'odometer_out' => 10000,
             'signature_data' => $signature,
-            'fuel_level' => 80,
             'accessories' => [
                 ['name' => 'مثلث تحذير', 'expected_qty' => 1, 'actual_qty' => 1, 'ok' => true],
             ],
@@ -99,7 +98,6 @@ class ContractLifecycleTest extends TestCase
             'odometer_in' => 10300,
             'damage_fee' => 100,
             'signature_data' => $signature,
-            'fuel_level' => 40,
             'damages' => [
                 ['position' => 'الباب الأمامي', 'description' => 'خدش سطحي'],
             ],

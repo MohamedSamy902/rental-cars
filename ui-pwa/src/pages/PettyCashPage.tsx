@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, NumberField, MoneyField, SelectField, TextAreaField,
-  useToast, DataTable, IconWallet, type DataColumn,
+  PageHeader, Button, Sheet, Fab, MoneyField, SelectField, TextAreaField,
+  useToast, DataTable, IconWallet, IconEye, IconCash, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -27,49 +28,20 @@ const columns: DataColumn<Account>[] = [
     mobile: 'title',
   },
   { id: 'job', header: 'الوظيفة', cell: (a) => a.employee?.job_title || '—', sortValue: (a) => a.employee?.job_title, mobile: 'subtitle' },
-  { id: 'balance', header: 'الرصيد', cell: (a) => <strong>{formatMoney(a.balance)}</strong>, sortValue: (a) => Number(a.balance) },
-  { id: 'limit', header: 'حد العهدة', cell: (a) => formatMoney(a.limit_amount), sortValue: (a) => Number(a.limit_amount) },
+  { id: 'balance', header: 'الرصيد', cell: (a) => <strong>{formatMoney(a.balance)}</strong>, sortValue: (a) => Number(a.balance), mobile: 'badge' },
 ]
 
 export function PettyCashPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [rows, setRows] = useState<Account[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
   const [open, setOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState<Account | null>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ employee_id: '', limit_amount: '1000', balance: '' })
-  const [move, setMove] = useState({ type: 'spend', amount: '', notes: '' })
-
-  const lowBalanceCount = useMemo(
-    () => rows.filter((a) => Number(a.balance) <= Number(a.limit_amount) * 0.2).length,
-    [rows],
-  )
-  const chips = useMemo(
-    () => [
-      { id: 'all', label: 'الكل' },
-      { id: 'active', label: 'نشطة' },
-      {
-        id: 'low',
-        label: 'رصيد منخفض',
-        attention: lowBalanceCount > 0 ? ('warning' as const) : null,
-        attentionLabel: `${lowBalanceCount} عهدة رصيدها منخفض`,
-      },
-    ],
-    [lowBalanceCount],
-  )
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((a) => {
-      if (chip === 'active' && !a.is_active) return false
-      if (chip === 'low' && Number(a.balance) > Number(a.limit_amount) * 0.2) return false
-      if (!q) return true
-      return (a.employee?.name || '').toLowerCase().includes(q) || (a.employee?.job_title || '').toLowerCase().includes(q)
-    })
-  }, [rows, chip, search])
+  const [form, setForm] = useState({ employee_id: '', balance: '' })
+  const [move, setMove] = useState({ type: 'topup', amount: '', notes: '' })
 
   async function load() {
     setLoading(true)
@@ -86,6 +58,7 @@ export function PettyCashPage() {
   useEffect(() => { void load() }, [])
 
   async function openCreate() {
+    setForm({ employee_id: '', balance: '' })
     setOpen(true)
     try {
       const res = await api<{ data: Employee[] }>('/employees/lookup')
@@ -99,15 +72,18 @@ export function PettyCashPage() {
   async function saveAccount() {
     setSaving(true)
     try {
+      const amount = form.balance ? Number(form.balance) : 0
       await api('/petty-cash', {
         method: 'POST',
         json: {
           employee_id: Number(form.employee_id),
-          limit_amount: Number(form.limit_amount),
-          balance: form.balance ? Number(form.balance) : undefined,
+          // Limit kept nullable/zero for schema compatibility — not shown in UI.
+          limit_amount: 0,
+          balance: amount,
+          topup_amount: amount > 0 ? amount : undefined,
         },
       })
-      toast.success('تم حفظ العهدة.')
+      toast.success(amount > 0 ? 'تم فتح/تغذية العهدة.' : 'تم حفظ العهدة.')
       setOpen(false)
       await load()
     } catch (e) {
@@ -126,12 +102,12 @@ export function PettyCashPage() {
         json: {
           type: move.type,
           amount: Number(move.amount),
-          notes: move.notes || undefined,
+          notes: move.notes || (move.type === 'topup' ? 'تغذية عهدة' : move.type === 'return' ? 'سحب / استرداد من العهدة' : undefined),
         },
       })
       toast.success('تم تسجيل حركة العهدة.')
       setMoveOpen(null)
-      setMove({ type: 'spend', amount: '', notes: '' })
+      setMove({ type: 'topup', amount: '', notes: '' })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -144,37 +120,41 @@ export function PettyCashPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العهدة النقدية"
-        subtitle="تسليم واستخدام ومرتجع للعهدة المرتبطة بالموظفين"
+        subtitle="تسليم واستخدام واسترداد العهدة المرتبطة بالموظفين"
         action={<Button onClick={() => void openCreate()}>عهدة جديدة</Button>}
         mobileFab
       />
       <Fab label="عهدة جديدة" onClick={() => void openCreate()} />
-      <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        chips={chips}
-        activeChip={chip}
-        onChipChange={setChip}
-        placeholder="بحث باسم الموظف…"
-      />
       <DataTable
         label="العهد"
-        rows={visible}
+        rows={rows}
         columns={columns}
         rowKey={(a) => a.id}
         rowLabel={(a) => `عهدة ${a.employee?.name ?? ''}`}
         loading={loading}
-        onRowClick={(a) => setMoveOpen(a)}
+        onRowClick={(a) => navigate(`/petty-cash/${a.id}`)}
         rowActions={(a) => [
-          { id: 'move', label: 'تسجيل حركة', icon: <IconWallet size={16} />, onSelect: () => setMoveOpen(a) },
+          { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: () => navigate(`/petty-cash/${a.id}`) },
+          {
+            id: 'topup',
+            label: 'تغذية عهدة',
+            icon: <IconCash size={16} />,
+            onSelect: () => { setMove({ type: 'topup', amount: '', notes: '' }); setMoveOpen(a) },
+          },
+          {
+            id: 'return',
+            label: 'سحب / استرداد من العهدة',
+            icon: <IconWallet size={16} />,
+            onSelect: () => { setMove({ type: 'return', amount: String(a.balance || ''), notes: '' }); setMoveOpen(a) },
+          },
         ]}
         emptyTitle="لا توجد عهد مسجّلة"
-        emptyDescription="سجّل عهدة لموظف لتتبع التسليم والاستخدام والمرتجع."
+        emptyDescription="سجّل عهدة لموظف لتتبع التسليم والاستخدام والاسترداد."
       />
 
       <Sheet
         open={open}
-        title="تسجيل / تحديث عهدة"
+        title="تسجيل عهدة"
         onClose={() => setOpen(false)}
         footer={<><Button loading={saving} onClick={() => void saveAccount()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}
       >
@@ -186,8 +166,12 @@ export function PettyCashPage() {
             onChange={(e) => setForm({ ...form, employee_id: e.target.value })}
             options={employees.map((e) => ({ value: String(e.id), label: `${e.name}${e.job_title ? ` · ${e.job_title}` : ''}` }))}
           />
-          <MoneyField label="حد العهدة" required value={form.limit_amount} onChange={(e) => setForm({ ...form, limit_amount: e.target.value })} />
-          <MoneyField label="الرصيد الابتدائي" value={form.balance} hint="اتركه فارغاً = نفس الحد" onChange={(e) => setForm({ ...form, balance: e.target.value })} />
+          <MoneyField
+            label="مبلغ التغذية الابتدائي"
+            value={form.balance}
+            hint="يُضاف إلى رصيد الموظف إن وُجدت عهدة سابقة — اتركه فارغاً لفتح عهدة برصيد صفر"
+            onChange={(e) => setForm({ ...form, balance: e.target.value })}
+          />
         </div>
       </Sheet>
 
@@ -204,12 +188,28 @@ export function PettyCashPage() {
             value={move.type}
             onChange={(e) => setMove({ ...move, type: e.target.value })}
             options={[
-              { value: 'topup', label: 'تسليم / تعزيز' },
+              { value: 'topup', label: 'تغذية عهدة (إضافة للرصيد)' },
+              { value: 'return', label: 'سحب / استرداد من العهدة' },
               { value: 'spend', label: 'استخدام' },
-              { value: 'adjust', label: 'تسوية رصيد' },
             ]}
           />
-          <NumberField label="المبلغ" required value={move.amount} onChange={(e) => setMove({ ...move, amount: e.target.value })} />
+          <MoneyField
+            label="المبلغ"
+            required
+            value={move.amount}
+            hint={move.type === 'return' && moveOpen ? `الرصيد الحالي ${formatMoney(moveOpen.balance)} — يمكن سحب جزء أو الكل` : undefined}
+            onChange={(e) => setMove({ ...move, amount: e.target.value })}
+          />
+          {move.type === 'return' && moveOpen && moveOpen.balance > 0 ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setMove({ ...move, amount: String(moveOpen.balance) })}
+            >
+              سحب الرصيد بالكامل ({formatMoney(moveOpen.balance)})
+            </Button>
+          ) : null}
           <TextAreaField label="ملاحظات" value={move.notes} onChange={(e) => setMove({ ...move, notes: e.target.value })} />
         </div>
       </Sheet>

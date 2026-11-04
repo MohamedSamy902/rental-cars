@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
+import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
-  MediaUpload, useToast, SkeletonBlock, Badge, IconEye, IconEdit, IconClipboard,
+  MediaUpload, useToast, SkeletonBlock, IconEye, IconEdit, IconClipboard, PhoneActions,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
@@ -19,44 +21,37 @@ type Customer = {
   birth_date?: string
   national_id?: string | null
   national_id_image_path?: string | null
+  national_id_back_path?: string | null
   license_image_path?: string | null
+  license_back_path?: string | null
   status: string
   notes?: string | null
   blacklist_reason?: string | null
-  credit_balance?: number
-}
-
-type CreditMovement = {
-  id: number
-  direction: string
-  amount: number
-  reason: string
-  moved_at: string
-  notes?: string | null
 }
 
 const emptyForm = {
-  full_name: '', phone: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01', national_id: '', notes: '',
-  national_id_image_path: '', license_image_path: '',
+  full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01', national_id: '', notes: '',
+  national_id_image_path: '', national_id_back_path: '', license_image_path: '', license_back_path: '',
 }
+
+const CustomersPageTabs = ['all', 'active', 'blacklist'] as const
 
 export function CustomersPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [rows, setRows] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: CustomersPageTabs, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<Customer | null>(null)
-  const [creditLedger, setCreditLedger] = useState<CreditMovement[]>([])
-  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [blacklistReason, setBlacklistReason] = useState('')
-  const [blacklistTotal, setBlacklistTotal] = useState(0)
-  const [creditTotal, setCreditTotal] = useState(0)
+  const { counts: attention } = useAttentionSignals(true)
 
   const chips = useMemo(
     () => [
@@ -65,17 +60,11 @@ export function CustomersPage() {
       {
         id: 'blacklist',
         label: 'قائمة سوداء',
-        attention: blacklistTotal > 0 ? ('critical' as const) : null,
-        attentionLabel: `${blacklistTotal} عميل في القائمة السوداء`,
-      },
-      {
-        id: 'credit',
-        label: 'رصيد دائن',
-        attention: creditTotal > 0 ? ('warning' as const) : null,
-        attentionLabel: `${creditTotal} عميل برصيد دائن`,
+        attention: attention.blacklisted_customers > 0 ? ('warning' as const) : null,
+        attentionLabel: `${attention.blacklisted_customers} عميل في القائمة السوداء`,
       },
     ],
-    [blacklistTotal, creditTotal],
+    [attention.blacklisted_customers],
   )
 
   async function load() {
@@ -86,14 +75,7 @@ export function CustomersPage() {
       if (chip === 'blacklist') qs.set('status', 'blacklist')
       if (chip === 'active') qs.set('status', 'active')
       const res = await api<{ data: Customer[] }>(`/customers?${qs}`)
-      let data = res.data
-      if (chip === 'credit') data = data.filter((c) => Number(c.credit_balance || 0) > 0)
-      setRows(data)
-      if (chip === 'all' || chip === 'credit') {
-        setCreditTotal(res.data.filter((c) => Number(c.credit_balance || 0) > 0).length)
-      }
-      if (chip === 'all') setBlacklistTotal(res.data.filter((c) => c.status === 'blacklist').length)
-      if (chip === 'blacklist') setBlacklistTotal(res.data.length)
+      setRows(res.data)
     } finally {
       setLoading(false)
     }
@@ -105,30 +87,7 @@ export function CustomersPage() {
   }, [search, chip])
 
   async function openDetail(id: number) {
-    setDetailLoading(true)
-    setEditing(false)
-    setBlacklistReason('')
-    try {
-      const res = await api<{ data: Customer; credit_ledger?: CreditMovement[] }>(`/customers/${id}`)
-      setDetail(res.data)
-      setCreditLedger(res.credit_ledger || [])
-      setForm({
-        full_name: res.data.full_name,
-        phone: res.data.phone,
-        birth_date: res.data.birth_date || '1990-01-01',
-        license_number: res.data.license_number,
-        license_expires_on: res.data.license_expires_on,
-        national_id: res.data.national_id || '',
-        notes: res.data.notes || '',
-        national_id_image_path: res.data.national_id_image_path || '',
-        license_image_path: res.data.license_image_path || '',
-      })
-      setBlacklistReason(res.data.blacklist_reason || '')
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setDetailLoading(false)
-    }
+    navigate(`/customers/${id}`)
   }
 
   function mapApiErrors(e: unknown) {
@@ -199,8 +158,7 @@ export function CustomersPage() {
   }
 
   async function openEdit(id: number) {
-    await openDetail(id)
-    setEditing(true)
+    navigate(`/customers/${id}`)
   }
 
   const statusPill = (c: Customer) => (
@@ -215,28 +173,19 @@ export function CustomersPage() {
     {
       id: 'name',
       header: 'العميل',
-      cell: (c) => (
-        <>
-          <strong className="rpm-table__primary">{c.full_name}</strong>
-          {(c.credit_balance || 0) > 0 ? (
-            <span className="rpm-table__sub">رصيد دائن {formatMoney(c.credit_balance || 0)}</span>
-          ) : null}
-        </>
-      ),
+      cell: (c) => <strong className="rpm-table__primary">{c.full_name}</strong>,
       sortValue: (c) => c.full_name,
       mobile: 'title',
     },
-    { id: 'phone', header: 'الهاتف', cell: (c) => <span dir="ltr">{c.phone}</span>, sortValue: (c) => c.phone, mobile: 'subtitle' },
-    { id: 'license', header: 'رقم الرخصة', cell: (c) => c.license_number, sortValue: (c) => c.license_number },
-    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => c.license_expires_on, sortValue: (c) => c.license_expires_on },
     {
-      id: 'credit',
-      header: 'رصيد دائن',
-      cell: (c) => ((c.credit_balance || 0) > 0
-        ? <Badge tone="accent" dot={false}>{formatMoney(c.credit_balance || 0)}</Badge>
-        : <span className="muted">—</span>),
-      sortValue: (c) => Number(c.credit_balance || 0),
+      id: 'phone',
+      header: 'الهاتف',
+      cell: (c) => <PhoneActions phone={c.phone} name={c.full_name} compact />,
+      sortValue: (c) => c.phone,
+      mobile: 'subtitle',
     },
+    { id: 'license', header: 'رقم الرخصة', cell: (c) => c.license_number, sortValue: (c) => c.license_number },
+    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => (c.license_expires_on || '').slice(0, 10), sortValue: (c) => c.license_expires_on },
     { id: 'status', header: 'الحالة', cell: statusPill, sortValue: (c) => c.status, mobile: 'badge' },
   ]
 
@@ -267,27 +216,42 @@ export function CustomersPage() {
       <TextField label="رقم الرخصة" required error={fieldErrors.license_number} value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
       <TextField label="انتهاء الرخصة" required error={fieldErrors.license_expires_on} type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
       <MediaUpload
-        label="صورة البطاقة"
+        label="صورة البطاقة — وش"
         value={form.national_id_image_path || null}
         collection="customers_id"
         purpose="national_id"
         accept="image"
         error={fieldErrors.national_id_image_path}
-        attachableType={editing && detail ? 'customer' : undefined}
-        attachableId={editing && detail ? detail.id : undefined}
         onChange={(path) => setForm({ ...form, national_id_image_path: path || '' })}
       />
       <MediaUpload
-        label="صورة الرخصة"
+        label="صورة البطاقة — ضهر"
+        value={form.national_id_back_path || null}
+        collection="customers_id"
+        purpose="national_id_back"
+        accept="image"
+        error={fieldErrors.national_id_back_path}
+        onChange={(path) => setForm({ ...form, national_id_back_path: path || '' })}
+      />
+      <MediaUpload
+        label="صورة الرخصة — وش"
         value={form.license_image_path || null}
         collection="customers_id"
         purpose="license"
         accept="image"
         error={fieldErrors.license_image_path}
-        attachableType={editing && detail ? 'customer' : undefined}
-        attachableId={editing && detail ? detail.id : undefined}
         onChange={(path) => setForm({ ...form, license_image_path: path || '' })}
+      />
+      <MediaUpload
+        label="صورة الرخصة — ضهر"
+        value={form.license_back_path || null}
+        collection="customers_id"
+        purpose="license_back"
+        accept="image"
+        error={fieldErrors.license_back_path}
+        onChange={(path) => setForm({ ...form, license_back_path: path || '' })}
       />
     </div>
   )
@@ -296,7 +260,7 @@ export function CustomersPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العملاء"
-        subtitle="رصيد دائن من الإنهاء المبكر · قائمة سوداء بصلاحية"
+        subtitle="بلا رصيد دائن على النظام · قائمة سوداء بصلاحية"
         action={<Button onClick={() => setOpen(true)}>إضافة عميل</Button>}
         mobileFab
       />
@@ -326,7 +290,7 @@ export function CustomersPage() {
       </Sheet>
 
       <Sheet
-        open={!!detail || detailLoading}
+        open={false}
         title={detail?.full_name || 'تفاصيل العميل'}
         onClose={() => setDetail(null)}
         closeLabel="إغلاق"
@@ -354,34 +318,19 @@ export function CustomersPage() {
             <DetailList
               rows={[
                 { label: 'الحالة', value: statusPill(detail) },
-                { label: 'الهاتف', value: <span dir="ltr">{detail.phone}</span> },
-                { label: 'هاتف بديل', value: detail.phone_alt || '—' },
+                { label: 'الهاتف', value: <PhoneActions phone={detail.phone} name={detail.full_name} /> },
+                { label: 'هاتف بديل', value: detail.phone_alt ? <PhoneActions phone={detail.phone_alt} name={detail.full_name} /> : '—' },
                 { label: 'البريد', value: detail.email || '—' },
                 { label: 'الرقم القومي', value: detail.national_id || '—' },
                 { label: 'تاريخ الميلاد', value: detail.birth_date || '—' },
                 { label: 'رقم الرخصة', value: detail.license_number },
                 { label: 'انتهاء الرخصة', value: detail.license_expires_on },
-                { label: 'الرصيد الدائن', value: formatMoney(detail.credit_balance || 0) },
                 { label: 'صورة البطاقة', value: detail.national_id_image_path ? 'مرفوعة' : '—' },
                 { label: 'صورة الرخصة', value: detail.license_image_path ? 'مرفوعة' : '—' },
                 { label: 'سبب القائمة السوداء', value: detail.blacklist_reason || '—', wide: true },
                 { label: 'ملاحظات', value: detail.notes || '—', wide: true },
               ]}
             />
-            {creditLedger.length > 0 ? (
-              <div className="rpm-card-list" style={{ marginBlockStart: '0.75rem' }}>
-                <strong>حركة الرصيد الدائن</strong>
-                {creditLedger.slice(0, 8).map((m) => (
-                  <article key={m.id} className="rpm-card">
-                    <div className="rpm-card__row">
-                      <span>{m.direction === 'credit' ? 'إضافة' : 'خصم'} · {m.reason}</span>
-                      <strong>{formatMoney(m.amount)}</strong>
-                    </div>
-                    <p className="muted">{m.moved_at}{m.notes ? ` · ${m.notes}` : ''}</p>
-                  </article>
-                ))}
-              </div>
-            ) : null}
             {(detail.national_id_image_path || detail.license_image_path) ? (
               <div className="rpm-form-grid" style={{ marginTop: '0.75rem' }}>
                 {detail.national_id_image_path ? (

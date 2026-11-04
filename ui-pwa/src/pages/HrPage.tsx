@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatMoney } from '@/shared/lib/format'
+import { useAuth } from '@/shared/auth/AuthContext'
+import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, FilterBar, Button, Sheet, NumberField, TextAreaField, SelectField, MoneyField, TextField,
   useToast, EmptyState, SkeletonBlock, StatusPill, MetricCardGrid,
@@ -50,44 +53,124 @@ type Advance = {
   employee?: { id: number; name: string }
 }
 
+type Assignment = {
+  id: number
+  title: string
+  status: string
+  notes?: string | null
+  assigned_at?: string | null
+  acknowledged_at?: string | null
+  employee?: { id: number; name: string }
+  assignable_type?: string
+  assignable_id?: number | null
+  assigned_by?: { id: number; name: string } | null
+  acknowledged_by?: { id: number; name: string } | null
+}
+
+type PettyCashAccount = {
+  id: number
+  employee_id: number
+  balance: number
+  is_active: boolean
+}
+
+/** Raw assignable_type keys → Arabic labels for custody handover cards & form. */
+const ASSIGNABLE_TYPE_LABELS: Record<string, string> = {
+  manual: 'تسليم يدوي / مستند',
+  asset: 'أصل / معدة تشغيل',
+  phone: 'هاتف عمل',
+  car: 'عربية خدمة',
+  petty_cash: 'عهدة نقدية',
+  customer: 'مستند / بيانات عميل',
+}
+
+function assignableTypeLabel(raw?: string | null): string {
+  const key = (raw || 'manual').trim()
+  return ASSIGNABLE_TYPE_LABELS[key] || key
+}
+
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
 function periodLabel(year: number, month: number) {
   return `${monthNames[month - 1] ?? month} ${year}`
 }
 
+const HrPageTabs = ['all', 'advances', 'payroll', 'custody', 'evals'] as const
+
 export function HrPage() {
   const toast = useToast()
+  const navigate = useNavigate()
+  const { can } = useAuth()
+  const canSalaries = can('hr.salaries') || can('hr.view') || can('hr.payroll_approve')
+  const canAdvances = can('hr.advances') || can('hr.salaries')
+  const canCustody = can('hr.custody') || can('hr.view')
   const now = useMemo(() => new Date(), [])
   const [payrolls, setPayrolls] = useState<Payroll[]>([])
   const [evals, setEvals] = useState<Evaluation[]>([])
   const [employees, setEmployees] = useState<{ id: number; name: string }[]>([])
   const [advances, setAdvances] = useState<Advance[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [pettyByEmployee, setPettyByEmployee] = useState<Record<number, PettyCashAccount>>({})
   const [loading, setLoading] = useState(true)
   const [evalOpen, setEvalOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
   const [payoutLine, setPayoutLine] = useState<Line | null>(null)
   const [saving, setSaving] = useState(false)
   const [evalForm, setEvalForm] = useState({ employee_id: '', score: '4', period: '', notes: '' })
   const [advanceForm, setAdvanceForm] = useState({
     employee_id: '', amount: '', advanced_on: now.toISOString().slice(0, 10), method: 'cash', notes: '',
   })
+  const [assignForm, setAssignForm] = useState({
+    employee_id: '', title: 'تسليم عهدة', assignable_type: 'manual', notes: '', handed_on: new Date().toISOString().slice(0, 10),
+  })
   const [payoutForm, setPayoutForm] = useState({ amount: '', paid_on: now.toISOString().slice(0, 10), method: 'cash', notes: '' })
-  const [chip, setChip] = useState('all')
+  const [chip, setChip] = useQueryTab({ allowed: HrPageTabs, defaultValue: 'all' })
 
   async function load() {
     setLoading(true)
     try {
-      const [p, e, emp, adv] = await Promise.all([
-        api<{ data: Payroll[] }>('/payroll'),
-        api<{ data: Evaluation[] }>('/evaluations'),
-        api<{ data: { id: number; name: string }[] }>('/employees/lookup'),
-        api<{ data: Advance[] }>(`/salary-advances?year=${now.getFullYear()}&month=${now.getMonth() + 1}`),
-      ])
-      setPayrolls(p.data)
-      setEvals(e.data)
-      setEmployees(emp.data)
-      setAdvances(adv.data)
+      const tasks: Array<Promise<void>> = [
+        api<{ data: { id: number; name: string }[] }>('/employees/lookup')
+          .then((emp) => { setEmployees(emp.data) })
+          .catch(() => { setEmployees([]) }),
+      ]
+      if (canSalaries) {
+        tasks.push(
+          api<{ data: Payroll[] }>('/payroll').then((p) => { setPayrolls(p.data) }).catch(() => { setPayrolls([]) }),
+        )
+      }
+      tasks.push(
+        api<{ data: Evaluation[] }>('/evaluations').then((e) => { setEvals(e.data) }).catch(() => { setEvals([]) }),
+      )
+      if (canAdvances || canSalaries) {
+        tasks.push(
+          api<{ data: Advance[] }>(`/salary-advances?year=${now.getFullYear()}&month=${now.getMonth() + 1}`)
+            .then((adv) => { setAdvances(adv.data) })
+            .catch(() => { setAdvances([]) }),
+        )
+      }
+      if (canCustody) {
+        tasks.push(
+          api<{ data: Assignment[] }>('/employee-assignments')
+            .then((a) => { setAssignments(a.data) })
+            .catch(() => { setAssignments([]) }),
+        )
+        tasks.push(
+          api<{ data: PettyCashAccount[] }>('/petty-cash')
+            .then((res) => {
+              const map: Record<number, PettyCashAccount> = {}
+              for (const row of res.data || []) {
+                if (!row.is_active) continue
+                // Prefer the first active account per employee
+                if (!map[row.employee_id]) map[row.employee_id] = row
+              }
+              setPettyByEmployee(map)
+            })
+            .catch(() => { setPettyByEmployee({}) }),
+        )
+      }
+      await Promise.all(tasks)
     } catch (err) {
       toast.error((err as ApiError).message)
     } finally {
@@ -100,7 +183,7 @@ export function HrPage() {
   async function draftPayroll() {
     try {
       await api('/payroll/draft', { method: 'POST', json: { year: now.getFullYear(), month: now.getMonth() + 1 } })
-      toast.success('تم تجهيز مسودة المسير.')
+      toast.success('تم إعداد كشف رواتب الشهر.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -110,7 +193,7 @@ export function HrPage() {
   async function approve(id: number) {
     try {
       await api(`/payroll/${id}/approve`, { method: 'POST' })
-      toast.success('تم اعتماد المسير.')
+      toast.success('تم اعتماد كشف الرواتب.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -172,6 +255,45 @@ export function HrPage() {
     }
   }
 
+  async function saveAssignment() {
+    setSaving(true)
+    try {
+      const note = (assignForm.notes || '').trim()
+      if (!note) {
+        toast.error('أدخل ملاحظات التسليم.')
+        return
+      }
+      const day = assignForm.handed_on || new Date().toISOString().slice(0, 10)
+      await api('/employee-assignments', {
+        method: 'POST',
+        json: {
+          employee_id: Number(assignForm.employee_id),
+          title: note.slice(0, 200),
+          assignable_type: 'manual',
+          notes: `تاريخ التسليم: ${day}\n${note}`,
+        },
+      })
+      toast.success('تم تسليم العهدة/الأصل — بانتظار تأكيد استلام الأدمن.')
+      setAssignOpen(false)
+      setAssignForm({ employee_id: '', title: 'تسليم عهدة', assignable_type: 'manual', notes: '', handed_on: new Date().toISOString().slice(0, 10) })
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function acknowledgeAssignment(id: number) {
+    try {
+      await api(`/employee-assignments/${id}/acknowledge`, { method: 'POST' })
+      toast.success('تم تأكيد استلام الأدمن.')
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    }
+  }
+
   function openPayout(line: Line) {
     const remaining = Math.max(0, line.net_amount - line.paid_amount)
     setPayoutLine(line)
@@ -220,45 +342,53 @@ export function HrPage() {
     }
   }, [advances, payrolls, now])
 
+  const pendingAck = assignments.filter((a) => a.status === 'pending_ack').length
   const chips = useMemo(
     () => [
       { id: 'all', label: 'الكل' },
-      {
+      ...(canAdvances || canSalaries ? [{
         id: 'advances',
         label: 'السلف',
         attention: stats.advanceCount > 0 ? ('warning' as const) : null,
         attentionLabel: `${stats.advanceCount} سلفة هذا الشهر`,
-      },
-      {
+      }] : []),
+      ...(canSalaries ? [{
         id: 'payroll',
-        label: 'المسير',
+        label: 'كشف الرواتب',
         attention: stats.draftCount > 0 ? ('warning' as const) : stats.remaining > 0 ? ('critical' as const) : null,
-        attentionLabel: stats.draftCount > 0 ? 'مسيرات بانتظار الاعتماد' : 'متبقي للصرف',
-      },
+        attentionLabel: stats.draftCount > 0 ? 'كشوف رواتب بانتظار الاعتماد' : 'متبقي للصرف',
+      }] : []),
+      ...(canCustody ? [{
+        id: 'custody',
+        label: 'تسليم عهدة',
+        attention: pendingAck > 0 ? ('critical' as const) : null,
+        attentionLabel: 'بانتظار تأكيد استلام الأدمن',
+      }] : []),
       { id: 'evals', label: 'التقييمات' },
     ],
-    [stats.advanceCount, stats.draftCount, stats.remaining],
+    [stats.advanceCount, stats.draftCount, stats.remaining, canAdvances, canSalaries, canCustody, pendingAck],
   )
 
   return (
     <div className="rpm-stack hr-page">
       <PageHeader
         title="الموارد البشرية"
-        subtitle="سلف شهرية · مسير · صرف جزئي وترحيل المتبقي"
+        subtitle="سلف · كشف الرواتب · تسليم العهد والأصول · التقييمات"
         action={
           <>
-            <Button variant="secondary" onClick={() => setAdvanceOpen(true)}>سلفة</Button>
+            {canAdvances ? <Button variant="secondary" onClick={() => setAdvanceOpen(true)}>سلفة</Button> : null}
+            {canCustody ? <Button variant="secondary" onClick={() => setAssignOpen(true)}>تسليم عهدة</Button> : null}
             <Button variant="secondary" onClick={() => setEvalOpen(true)}>تقييم</Button>
-            <Button onClick={() => void draftPayroll()}>مسودة مسير</Button>
+            {canSalaries ? <Button onClick={() => void draftPayroll()}>إعداد رواتب الشهر</Button> : null}
           </>
         }
       />
 
       <MetricCardGrid
-        label="ملخص المسير الحالي"
+        label="ملخص رواتب الشهر الحالي"
         items={[
           { id: 'adv', label: 'سلف هذا الشهر', value: stats.advances, format: 'money', tone: 'warning', icon: <IconWallet size={16} /> },
-          { id: 'net', label: 'صافي المسير', value: stats.net, format: 'money', icon: <IconBriefcase size={16} /> },
+          { id: 'net', label: 'إجمالي صافي الرواتب', value: stats.net, format: 'money', icon: <IconBriefcase size={16} /> },
           { id: 'paid', label: 'مصروف', value: stats.paid, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
           { id: 'left', label: 'متبقي للترحيل', value: stats.remaining, format: 'money', tone: 'info', icon: <IconTrend size={16} /> },
         ]}
@@ -275,13 +405,13 @@ export function HrPage() {
 
       {loading ? <SkeletonBlock rows={5} /> : null}
 
-      {chip === 'all' || chip === 'advances' ? (
+      {(canAdvances || canSalaries) && (chip === 'all' || chip === 'advances') ? (
       <section className="rpm-panel">
         <div className="rpm-panel__head">
           <h3>سلف {periodLabel(now.getFullYear(), now.getMonth() + 1)}</h3>
-          <Button size="sm" variant="secondary" onClick={() => setAdvanceOpen(true)}>تسجيل سلفة</Button>
+          {canAdvances ? <Button size="sm" variant="secondary" onClick={() => setAdvanceOpen(true)}>تسجيل سلفة</Button> : null}
         </div>
-        {!loading && advances.length === 0 ? <EmptyState title="لا سلف هذا الشهر" description="سجّل السلفة أثناء الشهر لتُخصم تلقائياً من المسير." /> : null}
+        {!loading && advances.length === 0 ? <EmptyState title="لا سلف هذا الشهر" description="سجّل سلفة الموظف هنا لتُخصم تلقائياً من كشف رواتب الشهر." /> : null}
         <div className="rpm-card-list">
           {advances.map((a) => (
             <article key={a.id} className="rpm-card hr-card">
@@ -291,7 +421,12 @@ export function HrPage() {
               </div>
               <p className="muted">{a.advanced_on} · {a.method === 'transfer' ? 'تحويل' : a.method === 'card' ? 'بطاقة' : 'نقدي'}{a.notes ? ` · ${a.notes}` : ''}</p>
               <div className="rpm-card__actions">
-                <Button size="sm" variant="danger" onClick={() => void deleteAdvance(a.id)}>حذف</Button>
+                {a.employee?.id ? (
+                  <Button size="sm" variant="secondary" onClick={() => navigate(`/employees/${a.employee!.id}`)}>عرض الملف الكامل</Button>
+                ) : null}
+                {canAdvances ? (
+                  <Button size="sm" variant="danger" onClick={() => void deleteAdvance(a.id)}>حذف</Button>
+                ) : null}
               </div>
             </article>
           ))}
@@ -299,18 +434,92 @@ export function HrPage() {
       </section>
       ) : null}
 
-      {chip === 'all' || chip === 'payroll' ? (
+      {canCustody && (chip === 'all' || chip === 'custody') ? (
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>مسير الرواتب</h3></div>
-        {!loading && payrolls.length === 0 ? <EmptyState title="لا مسيرات بعد" /> : null}
+        <div className="rpm-panel__head">
+          <h3>تسليم العهد والأصول للموظفين</h3>
+          <Button size="sm" variant="secondary" onClick={() => setAssignOpen(true)}>تسليم جديد</Button>
+        </div>
+        {!loading && assignments.length === 0 ? <EmptyState title="لا تسليمات بعد" description="سلّم معدة أو هاتف أو سيارة خدمة أو مستنداً للموظف، ثم أكّد استلام الأدمن." /> : null}
+        <div className="rpm-card-list">
+          {assignments.map((a) => {
+            const empId = a.employee?.id
+            const petty = empId ? pettyByEmployee[empId] : undefined
+            return (
+              <article key={a.id} className="rpm-card hr-card">
+                <div className="rpm-card__row">
+                  <strong>{a.title}</strong>
+                  <StatusPill status={a.status === 'acknowledged' ? 'completed' : 'pending'} label={a.status === 'acknowledged' ? 'مؤكَّد' : 'بانتظار التأكيد'} />
+                </div>
+                <dl className="hr-custody-meta">
+                  <div>
+                    <dt>الموظف</dt>
+                    <dd>
+                      {a.employee?.id ? (
+                        <button type="button" className="rpm-link-btn" onClick={() => navigate(`/employees/${a.employee!.id}`)}>
+                          {a.employee?.name || 'موظف'}
+                        </button>
+                      ) : (a.employee?.name || 'موظف')}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>نوع التسليم</dt>
+                    <dd>{assignableTypeLabel(a.assignable_type)}</dd>
+                  </div>
+                  <div>
+                    <dt>تاريخ التسليم</dt>
+                    <dd>{a.assigned_at ? formatDateTime(a.assigned_at) : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>سلّم بواسطة</dt>
+                    <dd>{a.assigned_by?.name || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>تأكيد الاستلام</dt>
+                    <dd>
+                      {a.status === 'acknowledged'
+                        ? `${a.acknowledged_at ? formatDateTime(a.acknowledged_at) : 'مؤكَّد'}${a.acknowledged_by?.name ? ` · ${a.acknowledged_by.name}` : ''}`
+                        : 'بانتظار تأكيد الأدمن'}
+                    </dd>
+                  </div>
+                  {a.notes ? (
+                    <div className="hr-custody-meta__wide">
+                      <dt>ملاحظات</dt>
+                      <dd>{a.notes}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+                <div className="rpm-card__actions">
+                  {petty ? (
+                    <Link className="rpm-link-btn" to={`/petty-cash/${petty.id}`}>
+                      دفتر العهدة النقدية · {formatMoney(petty.balance)}
+                    </Link>
+                  ) : empId ? (
+                    <Link className="rpm-link-btn" to="/petty-cash">فتح صفحة العهدة النقدية</Link>
+                  ) : null}
+                  {a.status === 'pending_ack' && can('hr.custody') ? (
+                    <Button size="sm" onClick={() => void acknowledgeAssignment(a.id)}>تأكيد استلام الأدمن</Button>
+                  ) : null}
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </section>
+      ) : null}
+
+      {canSalaries && (chip === 'all' || chip === 'payroll') ? (
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>كشف الرواتب الشهري</h3></div>
+        {!loading && payrolls.length === 0 ? <EmptyState title="لا كشوف رواتب بعد" description="ابدأ بإعداد رواتب الشهر الحالي من الزر أعلاه." /> : null}
         <div className="rpm-card-list">
           {payrolls.map((p) => (
             <article key={p.id} className="rpm-card hr-card">
               <div className="rpm-card__row">
                 <strong>{periodLabel(p.year, p.month)}</strong>
-                <StatusPill status={p.status === 'approved' ? 'completed' : 'pending'} label={p.status === 'approved' ? 'معتمد' : 'مسودة'} />
+                <StatusPill status={p.status === 'approved' ? 'completed' : 'pending'} label={p.status === 'approved' ? 'معتمد' : 'قيد الإعداد'} />
               </div>
-              <p>صافي المسير: {formatMoney(p.total_amount)} · {p.lines?.length || 0} موظف</p>
+              <p>إجمالي صافي الرواتب: {formatMoney(p.total_amount)} · {p.lines?.length || 0} موظف</p>
               <ul className="hr-lines">
                 {(p.lines ?? []).map((l) => {
                   const remaining = Math.max(0, l.net_amount - l.paid_amount)
@@ -338,7 +547,7 @@ export function HrPage() {
               </ul>
               {p.status !== 'approved' ? (
                 <div className="rpm-card__actions">
-                  <Button size="sm" onClick={() => void approve(p.id)}>اعتماد المسير</Button>
+                  <Button size="sm" onClick={() => void approve(p.id)}>اعتماد كشف الرواتب</Button>
                 </div>
               ) : null}
             </article>
@@ -384,6 +593,15 @@ export function HrPage() {
         </div>
       </Sheet>
 
+      <Sheet open={assignOpen} title="تسليم عهدة / أصل للموظف" onClose={() => setAssignOpen(false)} footer={<><Button loading={saving} onClick={() => void saveAssignment()}>حفظ التسليم</Button><Button variant="secondary" onClick={() => setAssignOpen(false)}>إلغاء</Button></>}>
+        <div className="rpm-form-grid">
+          <SelectField label="الموظف" required value={assignForm.employee_id} onChange={(e) => setAssignForm({ ...assignForm, employee_id: e.target.value })} options={employees.map((e) => ({ value: String(e.id), label: e.name }))} />
+          <TextAreaField label="ملاحظات" value={assignForm.notes} required hint="وصف مختصر لما يُسلَّم (هاتف · لابتوب · ملف…)" onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value, title: e.target.value.slice(0, 120) || 'تسليم عهدة' })} />
+          <TextField label="تاريخ التسليم" type="date" value={assignForm.handed_on || new Date().toISOString().slice(0, 10)} onChange={(e) => setAssignForm({ ...assignForm, handed_on: e.target.value })} />
+          <p className="muted">بعد الحفظ يبقى التسليم بانتظار «تأكيد استلام الأدمن».</p>
+        </div>
+      </Sheet>
+
       <Sheet
         open={!!payoutLine}
         title={payoutLine ? `صرف راتب · ${payoutLine.employee?.name || ''}` : ''}
@@ -394,7 +612,7 @@ export function HrPage() {
           <div className="rpm-form-grid">
             <p className="muted">
               الصافي {formatMoney(payoutLine.net_amount)} · مصروف {formatMoney(payoutLine.paid_amount)} · متبقي {formatMoney(Math.max(0, payoutLine.net_amount - payoutLine.paid_amount))}.
-              أي مبلغ أقل من المتبقي يُرحَّل تلقائياً للمسير التالي.
+              أي مبلغ أقل من المتبقي يُرحَّل تلقائياً لكشف الرواتب التالي.
             </p>
             <MoneyField label="المبلغ المصروف" required value={payoutForm.amount} onChange={(e) => setPayoutForm({ ...payoutForm, amount: e.target.value })} />
             <TextField label="تاريخ الصرف" type="date" required value={payoutForm.paid_on} onChange={(e) => setPayoutForm({ ...payoutForm, paid_on: e.target.value })} />

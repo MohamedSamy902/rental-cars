@@ -2,8 +2,8 @@
 
 | البند | القيمة |
 |--------|--------|
-| الإصدار | ١٫٠ |
-| التاريخ | ٢٨ أكتوبر ٢٠٢٦ |
+| الإصدار | ١٫١ |
+| التاريخ | ٢٩ أكتوبر ٢٠٢٦ |
 | القاعدة | `https://{host}/api` |
 | المصادقة | Laravel Sanctum — Bearer Token |
 | اللغة | رسائل الخطأ والعقود عربية |
@@ -101,9 +101,33 @@ Query شائع: `?per_page=50&page=1&search=...`
     "open_violations": 0, "low_stock": 0
   },
   "tasks": [{ "id": 1, "title": "...", "subtitle": "...", "status": "active", "at": "..." }],
+  "important_tasks": [
+    {
+      "id": "contract_pending:12",
+      "rule": "contract_pending",
+      "severity": "critical",
+      "title": "اعتماد حجز معلّق · C-12",
+      "subtitle": "عميل · ماركة موديل · لوحة",
+      "href": "/contracts/12",
+      "due_on": "2026-11-05"
+    }
+  ],
+  "fleet_prep": { "horizon_days": 5, "days": [], "totals": {} },
   "unread_notifications": 1
 }
 ```
+
+`important_tasks` قائمة مهام تشغيلية للوحة اليوم (حد أقصى ٢٠)، مرتّبة بالحرج ثم التاريخ، ومفلترة بصلاحيات المستخدم الحالي:
+
+| `rule` | صلاحية | متى يظهر |
+|--------|--------|----------|
+| `contract_overdue` / `contract_pending` / `contract_pickup` / `contract_return` | `contracts.view` | استلام متأخر · حجز معلّق · تسليم/استلام اليوم |
+| `work_order_open` / `maintenance_due` | `maintenance.view` أو `vehicles.view` | أمر شغل مفتوح · صيانة مستحقة خلال ٧ أيام |
+| `license_expiring` | `vehicles.view` | رخصة تسيير ≤ ٣٠ يوماً |
+| `sim_recharge` | `vehicles.view` | شحن شريحة تتبع ≤ ١٤ يوماً |
+| `owner_agreement_end` | `vehicles.view` أو `owners.view` | عقد مالك ≤ ٣٠ يوماً |
+| `violation_open` | `violations.view` | مخالفة غير مدفوعة/مؤكّدة |
+| `low_stock` | `inventory.view` | صنف تحت حد التنبيه |
 
 ---
 
@@ -154,12 +178,12 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/staff` | إنشاء مستخدم |
 | PUT | `/staff/{user}` | تحديث |
 
-**POST /staff Body**
+**POST /staff Body** — `phone` إلزامي · `email` اختياري (`null` مسموح)
 ```json
 {
   "name": "أحمد",
-  "email": "a@rpm.local",
   "phone": "0100...",
+  "email": null,
   "password": "secret123",
   "role_id": 1,
   "employee_id": null,
@@ -177,6 +201,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 |--------|------|
 | GET | `/employees/lookup` | `{id,name,job_title}` نشطون فقط |
 | GET | `/employees` | قائمة مصفحة `?search=&status=` |
+| GET | `/employees/{employee}` | ملف كامل (حساب · سلف · عهدة · رواتب · تقييمات) — واجهة `/staff/:id` |
 | POST | `/employees` | إنشاء |
 | PUT | `/employees/{employee}` | تحديث |
 
@@ -193,23 +218,34 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | وصف |
 |--------|------|-----|
-| GET | `/vehicles` | قائمة + summary حالات — `?search=&status=&per_page=` |
-| POST | `/vehicles` | إضافة |
+| GET | `/vehicles` | قائمة + summary — `status=license_expiring` (٣٠) · `sim_recharge` (١٤) · `owner_agreement_expiring` (٣٠) · حقول `license_expires_on` · `tracker_sim_*` · `owner_agreement_*` · `summary.*` |
+| GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
+| POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية من نموذج العربية |
+| POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
-| PUT | `/vehicles/{vehicle}` | تعديل |
+| PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) · عند تغيير رخصة التسيير (تاريخ/صورة) تُؤرشف السابقة تلقائياً ثم تُكتب الجديدة |
 | DELETE | `/vehicles/{vehicle}` | أرشفة ناعمة (apiResource) |
-| POST | `/vehicles/{vehicle}/documents` | مستند |
+| POST | `/vehicles/{vehicle}/documents` | مستند (`type` · `document_number` · وش/ضهر · تواريخ) |
+| PUT | `/vehicles/{vehicle}/documents/{id}` | تحديث؛ رخصة تسيير مع `archive_previous` تؤرشف السجل القديم (يشمل رقم الرخصة) |
+| GET | `/vehicles/{vehicle}/document-history` | سجل الرخص/المستندات المؤرشفة |
 | POST | `/vehicles/{vehicle}/accessories` | مستلزم |
 
 **حالات مشتقة `status`:** `available` | `reserved` | `rented` | `maintenance` | `out_of_service`
 
 **POST /vehicles — حقول أساسية**
-`code`, `plate`, `brand`, `model`, `year`, `category`, `fuel_type`, `odometer`, `daily_rate`, `default_deposit`  
-اختياري: `rental_priority`, `tracker_device_number`, `tracker_sim_number`, `color`, `transmission`, `notes`, `is_active`
+`plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit`  
+الكود: يُولَّد تلقائياً إن لم يُرسل.  
+اختياري: `chassis_number`, `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_agreement_number`, `owner_agreement_notes`, `owner_inline{full_name,phone,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}`  
+**ملغى:** `rental_priority` · قائمة الانتظار · `fuel_level` في الفحص.
 
 **POST documents**
 ```json
 { "type": "رخصة تسيير", "file_path": "manual/...", "issued_on": "2025-01-01", "expires_on": "2027-01-01", "notes": null }
+```
+
+**PUT documents (تجديد رخصة)**
+```json
+{ "type": "رخصة تسيير", "issued_on": "2026-01-01", "expires_on": "2027-01-01", "archive_previous": true }
 ```
 
 **POST accessories**
@@ -299,7 +335,6 @@ Query شائع: `?per_page=50&page=1&search=...`
 ```json
 {
   "odometer_out": 18200,
-  "fuel_level": 70,
   "notes": null,
   "signature_data": "data:image/png;base64,...",
   "accessories": [
@@ -310,7 +345,7 @@ Query شائع: `?per_page=50&page=1&search=...`
   ]
 }
 ```
-التوقيع إلزامي افتراضياً (`operational.require_handover_signature`).
+التوقيع إلزامي افتراضياً (`operational.require_handover_signature`). بلا `fuel_level`.
 
 ### POST …/return
 ```json
@@ -318,7 +353,6 @@ Query شائع: `?per_page=50&page=1&search=...`
   "odometer_in": 18600,
   "returned_at": null,
   "damage_fee": 100,
-  "fuel_level": 40,
   "notes": null,
   "signature_data": "...",
   "accessories": [],
@@ -397,8 +431,18 @@ Query: `filter=all|one|today|week|range`
 - `range` → `from` & `to` (dates)  
 يتطلب `feature_flags.department_notice !== false`.
 
-### `GET /audit-logs?limit=50`
-آخر سجلات `audit_logs`.
+### `GET /audit-logs`
+آخر سجلات `audit_logs` بجمل عربية + خيارات فلترة.
+
+Query:
+- `limit` (1–200، افتراضي 50)
+- `user_id` — مستخدم نفّذ الحركة
+- `action` — مفتاح نوع الحدث (مثل `handover` · `created`)
+- `date_from` / `date_to` — تاريخ `YYYY-MM-DD` على `created_at`
+
+الاستجابة: `{ data: [{ …, summary, user_name, user_role_title, user_phrase }], meta: { users: [{id,name,role_title,label}], actions: [{value,label}], filters } }`.
+
+`summary` بصيغة عربية: «قام {الدور/المسمى} ({الاسم}) ب…» — يُفضَّل `employee.job_title` ثم تسمية الدور السردية.
 
 ---
 
@@ -407,10 +451,11 @@ Query: `filter=all|one|today|week|range`
 | Method | Path |
 |--------|------|
 | GET | `/petty-cash` |
+| GET | `/petty-cash/{account}` | ملف عهدة: `account` + `summary` (حد · تغذية · منصرف · مرتجع · رصيد) + `ledger[]` موحّد زمنياً (تغذية/مصروف/صيانة/تسوية) مع عربية وروابط وأرصدة بعد الحركة |
 | POST | `/petty-cash` | `{ employee_id, limit_amount, balance? }` |
-| POST | `/petty-cash/{account}/move` | `{ type: topup\|spend\|adjust, amount, notes? }` |
+| POST | `/petty-cash/{account}/move` | `{ type: topup\|spend\|adjust\|return, amount, notes? }` |
 
-`spend` يرفض إن المبلغ > الرصيد (`422`).
+`spend` و`return` يرفضان إن المبلغ > الرصيد (`422`). `return` = رد/تسوية نقدية تخصم من الرصيد.
 
 ---
 
@@ -419,6 +464,7 @@ Query: `filter=all|one|today|week|range`
 | Method | Path |
 |--------|------|
 | GET | `/accounting/overview` | شهور · حسابات · مدفوعات |
+| GET | `/accounting/months/{year}/{month}` | دفتر الشهر: إيجار · رسوم · مصروفات · تأمينات · مدفوعات عملاء · رواتب · مخالفات متابعة · سجل إقفال |
 | POST | `/accounting/lock-month` | `{ year, month }` |
 | POST | `/accounting/reopen-month` | `{ year, month, reason }` |
 | GET | `/accounting/payments` | آخر ١٠٠ |
@@ -439,7 +485,19 @@ Query: `filter=all|one|today|week|range`
 ```
 
 ### `GET /reports/summary`
-KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب الشهر · مخالفات مفتوحة · …
+KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب الشهر · مخالفات مفتوحة · `occupancy_pct` (أيام مؤجّرة ÷ سعة الفترة) · …
+
+### تقارير P1 (١٥٫٦)
+| Method | Path | ملاحظة |
+|--------|------|--------|
+| GET | `/reports/profitability-compare?month=YYYY-MM` | مقارنة ربحية شهر بشهر (أسطول + سيارات) |
+| GET | `/reports/trial-balance?from=&to=` | ميزان مراجعة |
+| GET | `/reports/income-statement?from=&to=` | قائمة دخل |
+| GET | `/reports/payment-methods?from=&to=` | أرصدة طرق الدفع |
+| GET | `/reports/customers/{customer}/statement` | كشف عميل + `credit_balance` |
+| GET | `/reports/petty-cash-balances` | أرصدة العهدة |
+
+`GET /dashboard` يضمّن `occupancy_pct` بنفس المعادلة و`profitability_compare` جاهزة لضغطة واحدة.
 
 ---
 
@@ -457,10 +515,14 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 {
   "vehicle_id": 1,
   "workshop": "ورشة النور",
+  "opened_at": "2026-10-30T14:30:00",
+  "opened_on": "2026-10-30",
   "odometer": 89000,
   "puts_in_maintenance": true,
+  "next_service_on": "2027-04-30",
+  "next_service_odometer": 95000,
   "force_after_resolution": false,
-  "labor_cost": 300,
+  "labor_cost": 0,
   "notes": null,
   "lines": [
     {
@@ -489,6 +551,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 |--------|------|
 | GET | `/inventory` | أصناف + `remaining` + `is_low` |
 | POST | `/inventory/items` | صنف |
+| PUT | `/inventory/items/{id}` | تعديل صنف (اسم · كود اختياري · تصنيف · وحدة · حد تنبيه) |
 | POST | `/inventory/batches` | دفعة استلام |
 
 **Batch:** `inventory_item_id`, `received_on`, `quantity`, `unit_cost`, اختياري `supplier`, `payment_method`, `from_petty_cash`, `reference`, `notes`
@@ -501,6 +564,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 |--------|------|
 | GET | `/violations` |
 | POST | `/violations` | تسجيل مع إسناد حيازة تلقائي إن أمكن |
+| PUT | `/violations/{id}` | تعديل (تاريخ · عقد · مبلغ · مكان · حالة · مرفق) |
 | POST | `/violations/{id}/confirm` | تأكيد سداد دون قيد |
 
 ```json
@@ -554,15 +618,27 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ---
 
-## ١٥) قائمة الانتظار · الإشعارات
+## ١٥) الإشعارات
 
-### Waitlist
-| Method | Path |
-|--------|------|
-| GET | `/waitlist` |
-| POST | `/waitlist` | `{ customer_id, category, preferred_vehicle_id?, desired_start?, desired_end?, priority?, notes? }` |
+### `GET /attention`
+عدّادات خفيفة لنقاط الانتباه في القائمة وتبويبات الصفحات. بلا أثر جانبي (لا استحقاق جماعي للملاك).
 
-الحالة الابتدائية: `waiting` · انتهاء افتراضي بعد ٧ أيام.
+| الحقل | المعنى | النقطة |
+|--------|--------|--------|
+| `overdue_returns` | عقود نشطة تجاوزت `planned_ends_at` | العقود · حرج |
+| `pending_approvals` | عقود `pending` | العقود · حرج |
+| `returning_today` / `pickups_today` | راجعة اليوم / تسليم اليوم | تبويب العقود |
+| `open_work_orders` | أوامر شغل `open` أو `in_progress` | الصيانة · حرج |
+| `blocking_work_orders` | أوامر توقف السيارة | ضمن الصيانة |
+| `low_stock` | أصناف رصيدها ≤ حد إعادة الطلب | المخزون · تحذير |
+| `open_violations` | مخالفات ليست `paid` ولا `confirmed` | المخالفات · تحذير |
+| `unread_notifications` | إشعارات المستخدم الحالي بلا `read_at` | الإشعارات |
+| `pending_hr_acks` | إسناد `pending_ack` | الموارد البشرية · حرج |
+| `draft_payroll_runs` | مسيرات `draft` | الموارد البشرية · تحذير |
+| `blacklisted_customers` | عملاء `blacklist` | العملاء · تحذير |
+| `owners_unpaid` | ملاك استحقاقهم المسجّل أكبر من مجموع الصرف | الملاك · تحذير |
+
+العهدة والمصروفات وإخطار القسم بلا طابور معلّق في البيانات، فلا نقطة لها.
 
 ### Notifications
 | Method | Path |
@@ -571,8 +647,10 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/notifications/unread-count` | `{ "unread": N }` |
 | POST | `/notifications/{id}/read` | تعليم مقروء (مالك الإشعار فقط — حماية IDOR) |
 
+الماسح `php artisan notifications:scan` يشتغل كل ساعة من `schedule:run` (Cron على cPanel). يرسل الإشعار الأول عند تحقق الشرط ثم تذكيراً كل ٢٤ ساعة لنفس السجل ونفس القاعدة: بداية حجز معلّق/معتمد أو نهاية عقد نشط قبلها بيومين، والمستحقات المالية (عقد، تأمين، مالك، راتب معتمد، مخالفة)، ونقص المخزون، والمستندات، والصيانة. Web Push يُرسل مع نفس الصف إن وُجد VAPID.
+
 ### Web Push (موبايل)
-صلاحية `notifications.view` · يحتاج VAPID في `.env` (`php artisan push:vapid --write`) وHTTPS.
+صلاحية `notifications.view` · يحتاج VAPID في `.env` (`php artisan push:vapid --write`) وHTTPS. `VAPID_SUBJECT` لازم يكون `https://` لنفس الموقع؛ عنوان `mailto` على نطاق غير عام (مثل `.local`) يرفضه آيفون بـ 403.
 
 | Method | Path | الوصف |
 |--------|------|--------|
@@ -580,7 +658,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/push/status` | `{ enabled, devices }` |
 | POST | `/push/subscribe` | تسجيل جهاز `{ endpoint, keys:{p256dh,auth} }` |
 | POST | `/push/unsubscribe` | إلغاء جهاز |
-| POST | `/push/test` | إرسال إشعار تجريبي للأجهزة المسجّلة |
+| POST | `/push/test` | إرسال إشعار تجريبي. المتصفح لازم يتفعّل من الصفحة أولاً (ترميز aes128gcm). من غير جهاز مشترك يرجع 422 برسالة تطلب التفعيل، ومن غير مفاتيح VAPID رسالة منفصلة. |
 
 ---
 
@@ -591,19 +669,18 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | أسطول | `/vehicles*` | `/vehicles` |
 | عقود | `/contracts*` | `/bookings` |
 | تقويم | عبر contracts | `/calendar` |
-| انتظار | `/waitlist` | `/waitlist` |
 | معرض | `/showroom` | `/showroom` |
 | QR | `/qr` | من تفاصيل مركبة |
 | فحص/توقيع | handover/return | Bookings sheet |
 | وديعة | `/contracts/.../deposit*` | Bookings |
 | عملاء/سوداء | `/customers` | `/customers` |
-| مخالفات | `/violations` | `/violations` |
+| مخالفات | `/violations` · `/violation-inquiries` | `/violations` · `/violation-inquiries` |
 | صيانة | `/work-orders` | `/maintenance` |
 | مخزون | `/inventory*` | `/inventory` |
 | عهدة | `/petty-cash*` | `/petty-cash` |
 | حسابات | `/accounting*` | `/accounts` |
 | تقارير | `/reports/summary` | `/reports` |
-| موظفون/صلاحيات | `/staff` `/roles` `/employees` | `/staff` |
+| موظفون/صلاحيات | `/staff` `/roles` `/employees` | `/staff` · `/staff/:id` |
 | إخطار قسم | `/department-notice` | `/department-notice` |
 | إعدادات | `/settings/tenant` | `/settings` |
 | مُدمج | نفس settings + flags | `/integrator` |
@@ -628,7 +705,20 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/owners/{id}/payouts` | `owners.payout` (حسّاسة) |
 | GET | `/owner-payouts` | `owners.view` |
 
-**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since`
+**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · حقول مدة عقد الاعتماد (`owner_agreement_*`)
+
+**عقد الاعتماد (custody agreement)** — بين المركز ومالك العربية عند اعتماد السيارة للتأجير (مستقل عن عقود العملاء):
+
+| Method | Path | صلاحية |
+|--------|------|--------|
+| GET | `/vehicles/{id}/custody-agreements` | `vehicles.view` |
+| POST | `/vehicles/{id}/custody-agreements` | `vehicles.update` — يصدر نسخة ثابتة من القالب النشط `custody_agreement` بعد ملء بيانات المركز/المالك/العربية/المدة |
+| GET | `/vehicles/{id}/custody-agreements/{aid}` | `vehicles.view` |
+| GET | `/vehicles/{id}/custody-agreements/{aid}/print` | `vehicles.view` — يعيد `html` المجمد عند الإصدار |
+
+`POST` يقبل اختيارياً `number` · `starts_on` · `ends_on` · `monthly_amount`؛ إن غابت تُؤخذ من حقول `owner_agreement_*` / `owner_monthly_amount` على العربية. تعديل قالب الإعدادات لاحقاً لا يغيّر النسخ الصادرة.
+
+**حقول المالك:** اسم · هاتف · هاتف بديل · رقم قومي · بطاقة وش/ضهر · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
 
 **ترحيل محاسبي**
 - استحقاق شهري: مدين `5200` مصروف إيجار ملاك · دائن `2100` مستحقات ملاك
@@ -669,7 +759,7 @@ password: password
 
 ---
 
-*نهاية وثائق API — الإصدار ١٫٠ — يُحدَّث مع أي مسار جديد في نفس الـ PR*
+*نهاية وثائق API — الإصدار ١٫١ — يُحدَّث مع أي مسار جديد في نفس الـ PR*
 
 ---
 
@@ -679,8 +769,16 @@ password: password
 |--------|------|------------------|
 | PUT | `/settings/operational` | `settings.update` — تشغيل يومي فقط |
 | PUT | `/integrator/tenant` | دور `super_admin` فقط |
-| GET/POST | `/expenses` | `expenses.view` / `expenses.create` |
-| GET/POST | `/payroll` · `/payroll/draft` · `/payroll/{id}/approve` | HR |
+| GET/POST/PUT | `/expenses` · `/expenses/{id}` | `expenses.view` / `create` / `update` — صيانة ↔ `work_order_id` · عهدة `from_petty_cash`+`employee_id` |
+| GET/POST | `/payroll` · `/payroll/draft` · `/payroll/{id}/approve` | `hr.salaries` / `hr.payroll_approve` |
+| GET/POST/DELETE | `/salary-advances` · `/salary-advances/{id}` | `hr.advances` — سلف الشهر تُخصم من المسودة |
+| POST | `/payroll/lines/{id}/payout` | صرف جزئي أو كامل بعد الاعتماد؛ المتبقي يُرحَّل |
+| GET/POST | `/employee-assignments` · `…/acknowledge` | `hr.custody` — تأكيد استلام الأدمن |
+| GET | `/vehicles/recommend` | العربيات المتاحة في الفترة (بلا أوزان/درجات) |
+| GET/POST | `/vehicles/{id}/tires|batteries|downtime|consumables` | أصول المركبة ٦٫٩–٦٫١١ · ١٤٫١ |
+| GET/POST | `/vehicles/{id}/custody-agreements` · `…/{aid}/print` | عقد اعتماد مالك↔مركز · نسخة ثابتة قابلة للطباعة |
+| GET/POST | `/document-templates` · `/document-templates/preview` | قوالب العقد · إيصال الاستلام · **عقد الاعتماد** (`custody_agreement`) |
+| GET/POST | `/consumable-templates` | قوالب قطع استهلاكية |
 | GET/POST | `/evaluations` | خلف `feature:evaluations` |
 | GET/POST | `/chat` | خلف `feature:chat` · حد 100/يوم |
 | POST | `/ocr/review` | مراجعة حقول داخلية بلا إرسال خارجي |
@@ -688,3 +786,5 @@ password: password
 | GET | `/vehicles/{id}/estimated-odometer` | عداد تقديري أثناء التأجير |
 
 كل المسارات الحساسة محمية بـ `permission:` و/أو `feature:` و/أو `integrator`.
+
+صلاحيات HR الدقيقة: `hr.salaries` · `hr.custody` · `hr.advances` · `hr.expenses` (حساسة حيث ينطبق).

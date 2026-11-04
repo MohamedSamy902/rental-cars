@@ -6,8 +6,9 @@ import { type ActionKind, type Contract, type VehicleOption } from './contractMo
 const emptyForm = {
   odometer_out: '', odometer_in: '', damage_fee: '', reason: '', planned_ends_at: '',
   replacement_vehicle_id: '', method: 'cash', receipt_number: '',
-  fuel_level: '50', notes: '', signature_data: '', damage_position: '', damage_description: '',
+  notes: '', damage_position: '', damage_description: '',
   damage_photo_path: '', deduct_amount: '', deduct_reason: '',
+  payment_amount: '', payment_method: 'cash',
 }
 
 export function useContractLifecycle(onMutated?: () => void) {
@@ -30,6 +31,23 @@ export function useContractLifecycle(onMutated?: () => void) {
     if (kind === 'swap' || kind === 'extend') {
       const v = await api<{ data: VehicleOption[] }>('/vehicles?per_page=100')
       setVehicles(v.data)
+    }
+    if (kind === 'return' && (contract.open_violations === undefined || contract.open_violations_total === undefined)) {
+      try {
+        const dossier = await api<{ data: Contract }>(`/contracts/${contract.id}`)
+        setSelected({
+          ...contract,
+          open_violations: dossier.data.open_violations ?? [],
+          open_violations_total: dossier.data.open_violations_total
+            ?? dossier.data.ledger?.violations_due
+            ?? 0,
+          open_violations_count: dossier.data.open_violations?.length
+            ?? contract.open_violations_count
+            ?? 0,
+        })
+      } catch {
+        /* الشيت يعمل بإجمالي القائمة إن وُجد */
+      }
     }
   }
 
@@ -57,9 +75,9 @@ export function useContractLifecycle(onMutated?: () => void) {
           method: 'POST',
           json: {
             odometer_out: Number(actionForm.odometer_out),
-            fuel_level: actionForm.fuel_level ? Number(actionForm.fuel_level) : 50,
             notes: actionForm.notes || undefined,
-            signature_data: actionForm.signature_data || undefined,
+            payment_amount: actionForm.payment_amount ? Number(actionForm.payment_amount) : undefined,
+            payment_method: actionForm.payment_method || 'cash',
           },
         })
         toast.success('تم التسليم وتفعيل العقد.')
@@ -76,9 +94,7 @@ export function useContractLifecycle(onMutated?: () => void) {
           json: {
             odometer_in: Number(actionForm.odometer_in),
             damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
-            fuel_level: actionForm.fuel_level ? Number(actionForm.fuel_level) : 50,
             notes: actionForm.notes || undefined,
-            signature_data: actionForm.signature_data || undefined,
             damages,
           },
         })
@@ -100,8 +116,6 @@ export function useContractLifecycle(onMutated?: () => void) {
             odometer_in: Number(actionForm.odometer_in),
             odometer_out: Number(actionForm.odometer_out),
             damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
-            fuel_level: actionForm.fuel_level ? Number(actionForm.fuel_level) : 50,
-            signature_data: actionForm.signature_data || undefined,
             notes: actionForm.notes || undefined,
             damages: actionForm.damage_position
               ? [{
@@ -112,7 +126,7 @@ export function useContractLifecycle(onMutated?: () => void) {
               : [],
           },
         })
-        toast.success('تم التبديل بسبب عطل على نفس العقد.')
+        toast.success('تم التبديل بسبب عطل.')
       } else if (action === 'deposit') {
         await api(`/contracts/${selected.id}/deposit`, {
           method: 'POST',

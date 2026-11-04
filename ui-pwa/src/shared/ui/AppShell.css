@@ -82,8 +82,9 @@
     color var(--motion-fast) ease;
 }
 .shell-rail__toggle:hover {
-  background: var(--action);
-  color: var(--on-action);
+  /* Never use --action fill as icon ink in dark mode (action ≈ surface-hover). */
+  background: var(--accent-solid);
+  color: var(--on-accent);
 }
 .shell.is-collapsed .shell-rail__toggle {
   transform: scaleX(-1);
@@ -132,9 +133,20 @@
   color: var(--nav-muted);
   font-size: 0.875rem;
 }
+.shell-rail__link .shell-rail__ico,
+.shell-rail__link .shell-rail__ico svg {
+  color: inherit;
+  stroke: currentColor;
+}
 .shell-rail__link:hover {
   background: var(--surface-hover);
   color: var(--text);
+}
+.shell-rail__link:hover .shell-rail__ico,
+.shell-rail__link:hover .shell-rail__ico svg {
+  color: var(--text);
+  stroke: currentColor;
+  opacity: 1;
 }
 .shell-rail__link:active {
   transform: scale(0.98);
@@ -210,7 +222,12 @@
 }
 .shell-rail__theme:hover {
   color: var(--text);
-  background: var(--surface-hover);
+  background: var(--surface-3);
+}
+.shell-rail__theme:hover svg {
+  color: var(--text);
+  stroke: currentColor;
+  opacity: 1;
 }
 .shell-rail__quit {
   color: var(--danger-ink);
@@ -330,9 +347,19 @@
     color var(--motion-fast) ease,
     transform var(--motion-fast) ease;
 }
+.shell-icon svg {
+  color: inherit;
+  stroke: currentColor;
+}
 .shell-icon:hover {
-  background: var(--surface-hover);
+  background: var(--surface-3);
   border-color: var(--border-strong);
+  color: var(--text);
+}
+.shell-icon:hover svg {
+  color: var(--text);
+  stroke: currentColor;
+  opacity: 1;
 }
 .shell-icon:active {
   transform: scale(0.95);
@@ -363,10 +390,35 @@
   align-items: center;
   gap: 0.55rem;
   padding-block: 0.25rem;
-  padding-inline: 0.25rem 0.6rem;
+  padding-inline: 0.25rem 0.55rem;
   border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--border);
+  color: var(--text);
+}
+.shell-user--action {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
+}
+/* Clean chip hover: neutral wash + border highlight — no crimson overlay. */
+.shell-user--action:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+.shell-user--action:focus-visible {
+  outline: 2px solid var(--ring-strong);
+  outline-offset: 2px;
+}
+.shell-user--action:active {
+  transform: scale(0.985);
 }
 .shell-user__avatar {
   width: 32px;
@@ -374,21 +426,64 @@
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: var(--action);
-  color: var(--on-action);
+  background: var(--brand);
+  color: var(--on-brand);
   font-weight: 700;
   font-size: 0.85rem;
+  flex-shrink: 0;
 }
 .shell-user__meta {
   display: grid;
+  min-width: 0;
 }
 .shell-user__meta strong {
   font-size: 0.8rem;
   line-height: 1.2;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .shell-user__meta em {
   font-style: normal;
   font-size: 0.68rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-user__edit {
+  display: grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  opacity: 0.85;
+  transition:
+    opacity var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
+}
+.shell-user__edit svg {
+  color: inherit;
+  stroke: currentColor;
+}
+/* Pencil stays crisp: translucent neutral disc, no red blob. */
+.shell-user--action:hover .shell-user__edit {
+  opacity: 1;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-color: var(--border);
+}
+.shell-user--action:hover .shell-user__meta strong {
+  color: var(--text);
+}
+.shell-user--action:hover .shell-user__meta em {
   color: var(--text-muted);
 }
 
@@ -474,20 +569,36 @@
   background: var(--text-faint);
 }
 .shell-drawer__head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.65rem;
+  column-gap: 0.65rem;
   padding-block-end: 0.75rem;
   border-block-end: 1px solid var(--border);
 }
-.shell-drawer__head .rpm-logo {
-  --logo-h: 28px;
-}
 .shell-drawer__title {
-  flex: 1;
+  grid-column: 1;
+  justify-self: start;
+  text-align: start;
+  min-width: 0;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.95rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-drawer__brand,
+.shell-drawer__head .rpm-logo {
+  grid-column: 2;
+  justify-self: center;
+  --logo-h: 28px;
+}
+.shell-drawer__head-spacer {
+  grid-column: 3;
+  min-width: 0;
+  pointer-events: none;
 }
 .shell-drawer__grid {
   flex: 1 1 auto;
@@ -565,6 +676,27 @@
 .shell-drawer__action:active {
   transform: scale(0.98);
   background: var(--surface-hover);
+}
+.shell-drawer__action--profile {
+  grid-column: 1 / -1;
+  /* Use brand/accent ink — --action is a fill color and vanishes on dark hover. */
+  color: var(--brand);
+  border-color: color-mix(in srgb, var(--brand) 28%, var(--border));
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface-2));
+}
+.shell-drawer__action--profile:hover,
+.shell-drawer__action--profile:active {
+  color: var(--text);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+.shell-drawer__link:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.shell-drawer__link:hover .shell-drawer__ico {
+  color: var(--text);
 }
 .shell-drawer__action--quit {
   color: var(--danger-ink);

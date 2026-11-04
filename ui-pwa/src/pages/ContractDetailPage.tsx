@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
+import { useAuth } from '@/shared/auth/AuthContext'
 import {
-  Button, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
-  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey,
+  Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
+  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, IconAlert, PhoneActions,
 } from '@/shared/ui'
 import {
   DepositBadge, inspectionTypeLabel, statusLabel, timelineLabel, type Contract,
@@ -12,7 +13,7 @@ import {
 import { ContractActionsBar } from '@/shared/contracts/ContractActionsBar'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
-import { printContract } from '@/shared/contracts/printContract'
+import { printContractDocument } from '@/shared/contracts/printContract'
 import './pages.css'
 import './ContractDetailPage.css'
 
@@ -25,8 +26,8 @@ const relationLabel: Record<string, string> = {
 
 export function ContractDetailPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const toast = useToast()
+  const { can } = useAuth()
   const contractId = Number(id)
   const [row, setRow] = useState<Contract | null>(null)
   const [loading, setLoading] = useState(true)
@@ -63,7 +64,7 @@ export function ContractDetailPage() {
           description={error || 'لا توجد بيانات'}
           action={
             <div className="rpm-actions-row">
-              <Button variant="secondary" onClick={() => navigate('/bookings')}>رجوع للعقود</Button>
+              <BackNavButton to="/bookings" label="رجوع للعقود" />
               <Button onClick={() => void load()}>إعادة المحاولة</Button>
             </div>
           }
@@ -84,26 +85,37 @@ export function ContractDetailPage() {
     <div className="cd">
       <header className="cd-hero">
         <div className="cd-hero__top">
-          <button type="button" className="cd-back" onClick={() => navigate('/bookings')}>رجوع للعقود</button>
+          <BackNavButton to="/bookings" label="رجوع للعقود" />
           <div className="cd-hero__actions">
-            <Button size="sm" variant="secondary" onClick={() => void printContract(row.id, toast.error)}>طباعة</Button>
+            {can('contracts.print') ? (
+              <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'contract', toast.error)}>طباعة العقد</Button>
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'invoice', toast.error)}>الفاتورة / كشف الحساب</Button>
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'receipt', toast.error)}>إيصال الاستلام والتأمين</Button>
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="cd-identity">
           <div className="cd-identity__pills">
             <StatusPill status={row.status} label={statusLabel[row.status] || row.status} />
-            <DepositBadge deposit={row.deposit} />
+            <DepositBadge deposit={row.deposit} agreedAmount={row.frozen_agreed_deposit} />
             <span className="cd-code">{row.number}</span>
           </div>
           <h1>{row.customer?.full_name || 'عقد'}</h1>
           <p>{vehicleLabel}</p>
+          {row.customer?.phone ? (
+            <div className="cd-identity__phone">
+              <PhoneActions phone={row.customer.phone} name={row.customer.full_name} />
+            </div>
+          ) : null}
           <RentalProgressBar progress={row.progress} />
         </div>
         <ContractActionsBar
           contract={row}
           onApprove={() => void life.approve(row.id)}
           onAction={(kind) => void life.openAction(kind, row)}
-          onPrint={() => void printContract(row.id, toast.error)}
+          onPrint={(kind = 'contract') => void printContractDocument(row.id, kind, toast.error)}
         />
       </header>
 
@@ -123,6 +135,15 @@ export function ContractDetailPage() {
             icon: <IconKey size={16} />,
             hint: ledger ? `مدفوع ${formatMoney(ledger.paid)}` : undefined,
           },
+          {
+            id: 'violations',
+            label: 'مخالفات مفتوحة (مطلوب)',
+            value: row.open_violations_total ?? ledger?.violations_due ?? 0,
+            format: 'money',
+            tone: (row.open_violations_total ?? ledger?.violations_due ?? 0) > 0 ? 'warning' : 'success',
+            icon: <IconAlert size={16} />,
+            hint: 'متابعة تشغيلية — بلا ترحيل محاسبي',
+          },
         ]}
       />
 
@@ -130,12 +151,22 @@ export function ContractDetailPage() {
         <div className="rpm-panel__head"><h3>بيانات العقد</h3></div>
         <DetailList
           rows={[
-            { label: 'العميل', value: row.customer?.full_name || '—', wide: true },
-            { label: 'المركبة', value: vehicleLabel, wide: true },
-            { label: 'البداية', value: formatDateTime(row.starts_at) },
-            { label: 'النهاية المخططة', value: formatDateTime(row.planned_ends_at) },
-            { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDateTime(row.actual_ends_at) : '—' },
+            {
+              label: 'العميل',
+              value: (
+                <span className="rpm-inline-stack">
+                  {row.customer?.full_name || '—'}
+                  {row.customer?.phone ? <PhoneActions phone={row.customer.phone} name={row.customer.full_name} /> : null}
+                </span>
+              ),
+              wide: true,
+            },
+            { label: 'العربية', value: vehicleLabel, wide: true },
+            { label: 'البداية', value: formatDate(row.starts_at) },
+            { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },
+            { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },
             { label: 'التأمين المتفق', value: formatMoney(row.frozen_agreed_deposit || 0) },
+            { label: 'أنشأه', value: row.created_by || row.sales_user?.name || '—' },
             { label: 'عداد الخروج', value: row.odometer_out != null ? `${formatNumber(row.odometer_out)} كم` : '—' },
             { label: 'عداد العودة', value: row.odometer_in != null ? `${formatNumber(row.odometer_in)} كم` : '—' },
             { label: 'كيلومترات زيادة', value: row.excess_km_amount ? formatMoney(row.excess_km_amount) : '—' },
@@ -157,7 +188,6 @@ export function ContractDetailPage() {
                 </header>
                 <p className="muted">
                   عداد {ins.odometer != null ? `${formatNumber(ins.odometer)} كم` : '—'}
-                  {ins.fuel_level != null ? ` · بنزين ${ins.fuel_level}%` : ''}
                 </p>
                 {ins.notes ? <p>{ins.notes}</p> : null}
                 {(ins.damages ?? []).map((d, i) => (
@@ -226,7 +256,7 @@ export function ContractDetailPage() {
           <ol className="cd-timeline">
             {timeline.map((t) => (
               <li key={t.id}>
-                <strong>{timelineLabel[t.action] || t.action}</strong>
+                <strong>{t.summary || timelineLabel[t.action] || t.action}</strong>
                 <span className="muted">{t.user || 'النظام'} · {t.at ? formatDateTime(t.at) : '—'}</span>
               </li>
             ))}

@@ -30,7 +30,6 @@ class BusinessGapsTest extends TestCase
             'feature_flags' => [
                 'showroom' => true,
                 'petty_cash' => true,
-                'waitlist' => true,
                 'inventory' => true,
                 'department_notice' => true,
                 'chat' => true,
@@ -48,7 +47,7 @@ class BusinessGapsTest extends TestCase
         Sanctum::actingAs($this->admin);
     }
 
-    public function test_handover_without_signature_fails(): void
+    public function test_handover_without_signature_succeeds(): void
     {
         $customer = Customer::query()->create([
             'full_name' => 'عميل',
@@ -70,8 +69,10 @@ class BusinessGapsTest extends TestCase
             'planned_ends_at' => now()->addDays(2)->toIso8601String(),
         ])->assertCreated()->json('data.id');
         $this->postJson("/api/contracts/{$id}/approve")->assertOk();
+        // Signature canvas removed from handover/close — delivery succeeds without signature_data.
         $this->postJson("/api/contracts/{$id}/handover", ['odometer_out' => 1000])
-            ->assertStatus(422);
+            ->assertOk()
+            ->assertJsonPath('data.status', 'active');
     }
 
     public function test_blacklist_blocks_contract_create(): void
@@ -107,11 +108,27 @@ class BusinessGapsTest extends TestCase
             'status' => 'active',
         ]);
 
+        $vehicle = Vehicle::query()->create([
+            'code' => 'VEH-BG01',
+            'plate' => 'ب ج 3344',
+            'brand' => 'تويوتا',
+            'model' => 'يارس',
+            'year' => 2019,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 40000,
+            'odometer_source' => 'manual',
+            'daily_rate' => 600,
+            'default_deposit' => 1500,
+            'is_active' => true,
+        ]);
+
         $this->postJson('/api/expenses', [
             'title' => 'زيوت',
             'amount' => 250,
             'spent_on' => now()->toDateString(),
             'category' => 'صيانة',
+            'vehicle_id' => $vehicle->id,
         ])->assertCreated();
 
         $runId = $this->postJson('/api/payroll/draft', [

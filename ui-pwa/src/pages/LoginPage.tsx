@@ -3,26 +3,29 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { BrandLogo, Button, useToast } from '@/shared/ui'
-import { IconCheck, IconEye, IconEyeOff, IconLock, IconMail } from '@/shared/ui/Icons'
+import { IconCheck, IconEye, IconEyeOff, IconLock, IconPhone } from '@/shared/ui/Icons'
 import type { ApiError } from '@/shared/api/client'
 import './LoginPage.css'
 
-const REMEMBER_KEY = 'rpm.login.email'
+const REMEMBER_KEY = 'rpm.login.identifier'
 const IS_DEV = import.meta.env.DEV
-const DEMO = { email: 'admin@rpm.local', password: 'password' }
+const DEMO = { login: '01000000000', email: 'admin@rpm.local', password: 'password' }
 
-function readRememberedEmail() {
+function readRememberedLogin() {
   try {
-    return localStorage.getItem(REMEMBER_KEY) ?? ''
+    return localStorage.getItem(REMEMBER_KEY) ?? localStorage.getItem('rpm.login.email') ?? ''
   } catch {
     return ''
   }
 }
 
-function persistRememberedEmail(remember: boolean, email: string) {
+function persistRememberedLogin(remember: boolean, login: string) {
   try {
-    if (remember) localStorage.setItem(REMEMBER_KEY, email)
-    else localStorage.removeItem(REMEMBER_KEY)
+    if (remember) localStorage.setItem(REMEMBER_KEY, login)
+    else {
+      localStorage.removeItem(REMEMBER_KEY)
+      localStorage.removeItem('rpm.login.email')
+    }
   } catch {
     /* private mode */
   }
@@ -37,7 +40,7 @@ type AuthInputProps = {
   error?: string
   onChange: (value: string) => void
   trailing?: ReactNode
-  inputMode?: 'email' | 'text'
+  inputMode?: 'email' | 'text' | 'tel'
 }
 
 function AuthInput({ label, icon, type, value, autoComplete, error, onChange, trailing, inputMode }: AuthInputProps) {
@@ -80,12 +83,13 @@ export function LoginPage() {
   const { user, loading, login } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
-  const [email, setEmail] = useState(() => readRememberedEmail() || (IS_DEV ? DEMO.email : ''))
+  const [loginId, setLoginId] = useState(() => readRememberedLogin() || (IS_DEV ? DEMO.login : ''))
   const [password, setPassword] = useState(() => (IS_DEV ? DEMO.password : ''))
-  const [remember, setRemember] = useState(() => readRememberedEmail() !== '')
+  const [remember, setRemember] = useState(() => readRememberedLogin() !== '')
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState('')
 
   if (!loading && user) return <Navigate to="/" replace />
 
@@ -93,19 +97,26 @@ export function LoginPage() {
     e.preventDefault()
     setSaving(true)
     setErrors({})
+    setFormError('')
     try {
-      await login(email, password)
-      persistRememberedEmail(remember, email)
+      await login(loginId, password)
+      persistRememberedLogin(remember, loginId.trim())
       toast.success('مرحباً بك في آر بي إم')
       navigate('/')
     } catch (err) {
       const apiErr = err as ApiError
+      const topMessage = apiErr.message || 'تعذّر الدخول. تحقق من الموبايل/البريد وكلمة المرور.'
+      // Auth failures stay in the top alert only — avoid duplicating the same text under fields.
       const fieldErrors: Record<string, string> = {}
       if (apiErr.errors) {
-        for (const [k, v] of Object.entries(apiErr.errors)) fieldErrors[k] = v[0]
+        for (const [k, v] of Object.entries(apiErr.errors)) {
+          if (v[0] && v[0] !== topMessage) {
+            fieldErrors[k === 'email' || k === 'phone' ? 'login' : k] = v[0]
+          }
+        }
       }
       setErrors(fieldErrors)
-      toast.error(apiErr.message || 'تعذّر الدخول')
+      setFormError(topMessage)
     } finally {
       setSaving(false)
     }
@@ -129,18 +140,24 @@ export function LoginPage() {
         <div className="auth-card__body">
           <div className="auth-card__intro">
             <h1>تسجيل الدخول</h1>
-            <p>أدخل بيانات حسابك للوصول إلى لوحة التشغيل.</p>
+            <p>ادخل برقم الموبايل للوصول إلى لوحة التشغيل. البريد الإلكتروني مقبول كبديل اختياري.</p>
           </div>
 
+          {formError ? (
+            <div className="auth-alert" role="alert">
+              {formError}
+            </div>
+          ) : null}
+
           <AuthInput
-            label="البريد الإلكتروني"
-            icon={<IconMail size={18} />}
-            type="email"
-            inputMode="email"
-            autoComplete="username"
-            value={email}
-            error={errors.email}
-            onChange={setEmail}
+            label="رقم الموبايل"
+            icon={<IconPhone size={18} />}
+            type="text"
+            inputMode="tel"
+            autoComplete="tel"
+            value={loginId}
+            error={errors.login || errors.phone || errors.email}
+            onChange={setLoginId}
           />
 
           <AuthInput
@@ -172,13 +189,6 @@ export function LoginPage() {
               </span>
               <span>تذكرني</span>
             </label>
-            <button
-              type="button"
-              className="auth-link"
-              onClick={() => toast.info('لإعادة تعيين كلمة المرور تواصل مع مدير النظام في فرعك.')}
-            >
-              نسيت كلمة المرور؟
-            </button>
           </div>
 
           <Button type="submit" variant="accent" size="lg" loading={saving} className="auth-submit">
@@ -187,7 +197,7 @@ export function LoginPage() {
 
           {IS_DEV ? (
             <p className="auth-demo" dir="ltr">
-              Demo: {DEMO.email} / {DEMO.password}
+              Demo: {DEMO.login} أو {DEMO.email} / {DEMO.password}
             </p>
           ) : null}
         </div>

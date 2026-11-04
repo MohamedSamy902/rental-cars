@@ -18,15 +18,23 @@ class EnsurePermission
             return response()->json(['message' => 'غير مصرح.'], 401);
         }
 
+        $required = [];
         foreach ($permissions as $permission) {
-            if ($user->hasPermission($permission)) {
-                return $next($request);
+            foreach (preg_split('/[|,]/', $permission) ?: [] as $key) {
+                $key = trim($key);
+                if ($key === '') {
+                    continue;
+                }
+                $required[] = $key;
+                if ($user->hasPermission($key)) {
+                    return $next($request);
+                }
             }
         }
 
         return response()->json([
             'message' => 'ليست لديك صلاحية لتنفيذ هذا الإجراء.',
-            'required' => array_values($permissions),
+            'required' => array_values(array_unique($required)),
         ], 403);
     }
 }

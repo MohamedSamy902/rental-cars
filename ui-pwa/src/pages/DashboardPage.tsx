@@ -25,7 +25,7 @@ import {
 import { AnimatedNumber } from '@/shared/ui/AnimatedNumber'
 import { Badge, type BadgeTone } from '@/shared/ui/Badge'
 import { Card, CardContent, CardHeader } from '@/shared/ui/Card'
-import { DropdownMenu, ErrorState, SkeletonBlock, useToast, type MenuItem } from '@/shared/ui'
+import { Button, DropdownMenu, ErrorState, Sheet, SkeletonBlock, useToast, type MenuItem } from '@/shared/ui'
 import {
   IconCalendar,
   IconCar,
@@ -42,12 +42,71 @@ import {
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import './DashboardPage.css'
 
+type ProfitCompare = {
+  current_month: string
+  previous_month: string
+  fleet: {
+    current: { revenue: number; maintenance: number; expenses: number; operating_profit: number }
+    previous: { revenue: number; maintenance: number; expenses: number; operating_profit: number }
+    delta: number
+    delta_pct: number
+  }
+  vehicles: Array<{
+    vehicle_id: number
+    label: string
+    current: { operating_profit: number }
+    previous: { operating_profit: number }
+    delta: number
+    delta_pct: number
+  }>
+}
+
+type FleetPrepItem = {
+  id: number
+  kind: string
+  number?: string
+  title?: string
+  customer?: string | null
+  vehicle?: { id: number; label: string; plate: string } | null
+  at?: string | null
+}
+
+type FleetPrepDay = {
+  date: string
+  label: string
+  is_today: boolean
+  is_tomorrow: boolean
+  counts: { pickups: number; returns: number; maintenance: number; total: number }
+  groups: {
+    pickups: FleetPrepItem[]
+    returns: FleetPrepItem[]
+    maintenance: FleetPrepItem[]
+  }
+}
+
+type ImportantTask = {
+  id: string
+  rule: string
+  severity: 'critical' | 'warning' | 'info'
+  title: string
+  subtitle: string
+  href: string
+  due_on: string | null
+}
+
 type Dash = {
   occupancy_pct: number
   fleet_total: number
   fleet_status: Record<string, number>
+  profitability_compare?: ProfitCompare
   kpis: Record<string, number>
   tasks: { id: number; title: string; subtitle: string; status: string; at: string }[]
+  important_tasks?: ImportantTask[]
+  fleet_prep?: {
+    horizon_days: number
+    days: FleetPrepDay[]
+    totals: { pickups: number; returns: number; maintenance: number; total: number }
+  }
   recent_contracts: {
     id: number
     number: string
@@ -99,14 +158,32 @@ function startOfDay(d: Date) {
   return x
 }
 
-function urgencyPill(at: string, status: string): { label: string; tone: BadgeTone } {
-  if (status === 'completed') return { label: 'مكتمل', tone: 'success' }
-  const diffH = (new Date(at).getTime() - Date.now()) / 36e5
-  if (diffH < 0) return { label: 'متأخر', tone: 'danger' }
-  if (diffH < 24) return { label: 'اليوم', tone: 'warning' }
-  if (diffH < 48) return { label: 'غداً', tone: 'warning' }
-  const days = Math.ceil(diffH / 24)
-  return { label: `${days} يوم`, tone: 'muted' }
+function severityPill(severity: ImportantTask['severity'], dueOn: string | null): { label: string; tone: BadgeTone } {
+  if (severity === 'critical') {
+    if (dueOn && startOfDay(new Date(dueOn)).getTime() < startOfDay(new Date()).getTime()) {
+      return { label: 'متأخر', tone: 'danger' }
+    }
+    return { label: 'عاجل', tone: 'danger' }
+  }
+  if (severity === 'warning') {
+    if (!dueOn) return { label: 'يحتاج متابعة', tone: 'warning' }
+    const diffH = (startOfDay(new Date(dueOn)).getTime() - startOfDay(new Date()).getTime()) / 36e5
+    if (diffH <= 0) return { label: 'اليوم', tone: 'warning' }
+    if (diffH < 48) return { label: 'غداً', tone: 'warning' }
+    return { label: `${Math.ceil(diffH / 24)} يوم`, tone: 'warning' }
+  }
+  return { label: 'متابعة', tone: 'muted' }
+}
+
+function taskIcon(rule: string) {
+  if (rule.startsWith('work_order') || rule.startsWith('maintenance')) return <IconWrench size={14} />
+  if (rule.startsWith('license') || rule.startsWith('sim') || rule.startsWith('owner_agreement')) {
+    return <IconCar size={14} />
+  }
+  if (rule.startsWith('violation')) return <IconClipboard size={14} />
+  if (rule.startsWith('stock')) return <IconStore size={14} />
+  if (rule.includes('return')) return <IconReturn size={14} />
+  return <IconClipboard size={14} />
 }
 
 function contractStatusPill(status: string): { label: string; tone: BadgeTone } {
@@ -193,9 +270,26 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [revenueRange, setRevenueRange] = useState<RevenueRange>('week')
   const [refreshing, setRefreshing] = useState(false)
+  const [momOpen, setMomOpen] = useState(false)
+  const [mom, setMom] = useState<ProfitCompare | null>(null)
   const navigate = useNavigate()
   const toast = useToast()
   const { openNewContract } = useNewContract()
+
+  const openMom = useCallback(() => {
+    const embedded = data?.profitability_compare
+    if (embedded) {
+      setMom(embedded)
+      setMomOpen(true)
+      return
+    }
+    api<{ data: ProfitCompare }>('/reports/profitability-compare')
+      .then((r) => {
+        setMom(r.data)
+        setMomOpen(true)
+      })
+      .catch((e) => toast.error(e.message || 'تعذّر تحميل مقارنة الربحية'))
+  }, [data?.profitability_compare, toast])
 
   useEffect(() => {
     api<Dash>('/dashboard')
@@ -229,7 +323,7 @@ export function DashboardPage() {
     return {
       occupancy: [
         go('fleet', 'عرض الأسطول', '/vehicles', <IconCar size={16} />),
-        go('maintenance', 'الصيانة وأوامر الشغل', '/maintenance', <IconWrench size={16} />),
+        go('maintenance', 'الصيانة', '/maintenance', <IconWrench size={16} />),
         ...tail,
       ],
       operations: [
@@ -352,8 +446,8 @@ export function DashboardPage() {
     return <ErrorState title="تعذّر تحميل لوحة اليوم" description={error} />
   }
 
-  const firstName = (user?.name || 'مستخدم').split(' ')[0]
-  const openTasks = data.tasks.length
+  const displayName = (user?.name || '').trim() || 'مستخدم'
+  const openTasks = (data.important_tasks ?? data.tasks ?? []).length
   const ring = Math.PI * 2 * 54
 
   const revenueSpark = revenueSeries.map((d) => d.value)
@@ -417,11 +511,11 @@ export function DashboardPage() {
       >
         <div className="db-hero__copy">
           <p className="db-hero__eyebrow">لوحة التشغيل · RPM</p>
-          <h1>مرحباً، {firstName}</h1>
+          <h1>مرحباً، {displayName}</h1>
           <p className="db-hero__sub">
             لديك <strong className="tabular-nums">{formatNumber(openTasks)}</strong> مهام تحتاج متابعة
             و <strong className="tabular-nums">{formatNumber(data.kpis.returning_today || 0)}</strong>{' '}
-            مركبة ترجع اليوم.
+            عربية ترجع اليوم.
           </p>
         </div>
       </motion.header>
@@ -456,141 +550,7 @@ export function DashboardPage() {
         ))}
       </section>
 
-      <section className={`db-bento ${refreshing ? 'is-refreshing' : ''}`.trim()} aria-busy={refreshing}>
-        <motion.div
-          className="db-span-5"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.35 }}
-        >
-          <Card>
-            <CardHeader
-              title="صحة الإشغال"
-              description="قراءة لحظية للأسطول النشط"
-              action={
-                <>
-                  <Link to="/vehicles">الأسطول</Link>
-                  <CardMenu label="خيارات الإشغال" items={menus.occupancy} />
-                </>
-              }
-            />
-            <CardContent>
-              <div className="db-gauge">
-                <div className="db-gauge__ring" aria-hidden>
-                  <svg viewBox="0 0 140 140">
-                    <circle cx="70" cy="70" r="54" className="track" />
-                    <circle className="dots" cx="70" cy="70" r="62" strokeDasharray="2 8" />
-                    <motion.circle
-                      cx="70"
-                      cy="70"
-                      r="54"
-                      className="progress"
-                      strokeDasharray={ring}
-                      initial={{ strokeDashoffset: ring }}
-                      animate={{
-                        strokeDashoffset: ring * (1 - Math.min(data.occupancy_pct, 100) / 100),
-                      }}
-                      transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  </svg>
-                  <div className="db-gauge__center">
-                    <AnimatedNumber value={data.occupancy_pct} kind="percent" className="db-gauge__pct" />
-                    <span>إشغال</span>
-                  </div>
-                </div>
-
-                <ul className="db-gauge__stats">
-                  <li>
-                    <span>أسطول</span>
-                    <b className="tabular-nums">{formatNumber(data.fleet_total)}</b>
-                  </li>
-                  <li>
-                    <span>مؤجّر</span>
-                    <b className="tabular-nums">{formatNumber(data.kpis.rented || 0)}</b>
-                  </li>
-                  <li>
-                    <span>صيانة</span>
-                    <b className="tabular-nums">{formatNumber(data.fleet_status.maintenance || 0)}</b>
-                  </li>
-                  <li>
-                    <span>أوامر شغل</span>
-                    <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
-                  </li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          className="db-span-7"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.14, duration: 0.35 }}
-        >
-          <Card>
-            <CardHeader
-              title="عمليات قادمة"
-              description="ما يحتاج قراراً أولاً"
-              action={
-                <>
-                  <Link to="/bookings">العقود</Link>
-                  <CardMenu label="خيارات العمليات" items={menus.operations} />
-                </>
-              }
-            />
-            <CardContent flush>
-              <div className="db-table-wrap">
-                <table className="db-table">
-                  <thead>
-                    <tr>
-                      <th>المهمة</th>
-                      <th>التفاصيل</th>
-                      <th>الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.tasks.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="db-empty-cell">
-                          لا تذكيرات معلّقة
-                        </td>
-                      </tr>
-                    ) : (
-                      data.tasks.map((task, i) => {
-                        const pill = urgencyPill(task.at, task.status)
-                        return (
-                          <motion.tr
-                            key={task.id}
-                            initial={{ opacity: 0, x: 8 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.03 * i }}
-                          >
-                            <td>
-                              <div className="db-table__primary">
-                                <span className="db-table__ico" aria-hidden>
-                                  <IconClipboard size={14} />
-                                </span>
-                                <strong>{task.title}</strong>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="db-table__muted">{task.subtitle}</span>
-                            </td>
-                            <td>
-                              <Badge tone={pill.tone}>{pill.label}</Badge>
-                            </td>
-                          </motion.tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
+      <section className={`db-bento db-bento--charts ${refreshing ? 'is-refreshing' : ''}`.trim()} aria-label="الرسوم البيانية" aria-busy={refreshing}>
         <motion.div
           className="db-span-7"
           initial={{ opacity: 0, y: 12 }}
@@ -673,7 +633,7 @@ export function DashboardPage() {
           <Card>
             <CardHeader
               title="حالة الأسطول"
-              description="توزيع المركبات"
+              description="توزيع العربيات"
               action={<CardMenu label="خيارات الأسطول" items={menus.fleet} />}
             />
             <CardContent>
@@ -699,7 +659,7 @@ export function DashboardPage() {
                   </ResponsiveContainer>
                   <div className="db-fleet__center">
                     <strong className="tabular-nums">{formatNumber(data.fleet_total)}</strong>
-                    <span>مركبة</span>
+                    <span>عربية</span>
                   </div>
                 </div>
                 <ul className="db-fleet__legend">
@@ -712,6 +672,249 @@ export function DashboardPage() {
                   ))}
                 </ul>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+      </section>
+
+      {data.fleet_prep ? (
+        <section className="db-prep" aria-label="تجهيز العربيات اليومي">
+          <header className="db-prep__head">
+            <div>
+              <h2>تجهيز العربيات اليومي</h2>
+              <p>جدول زمني لليوم وغداً والأيام التالية</p>
+            </div>
+            <div className="db-prep__summary" aria-label="ملخص الحركات">
+              <span className="db-prep__pill db-prep__pill--pickup">
+                تسليم <b className="tabular-nums">{formatNumber(data.fleet_prep.totals.pickups)}</b>
+              </span>
+              <span className="db-prep__pill db-prep__pill--return">
+                استلام <b className="tabular-nums">{formatNumber(data.fleet_prep.totals.returns)}</b>
+              </span>
+              <span className="db-prep__pill db-prep__pill--maint">
+                صيانة <b className="tabular-nums">{formatNumber(data.fleet_prep.totals.maintenance)}</b>
+              </span>
+              <Link to="/calendar" className="db-prep__link">التقويم</Link>
+            </div>
+          </header>
+
+          <div className="db-prep__timeline" role="list">
+            {data.fleet_prep.days.map((day) => {
+              const dayTitle = day.is_today ? 'اليوم' : day.is_tomorrow ? 'غداً' : day.label
+              const lanes: Array<{
+                key: 'pickups' | 'returns' | 'maintenance'
+                verb: string
+                href: (item: FleetPrepItem) => string
+              }> = [
+                { key: 'pickups', verb: 'تسليم', href: (item) => `/contracts/${item.id}` },
+                { key: 'returns', verb: 'استلام', href: (item) => `/contracts/${item.id}` },
+                { key: 'maintenance', verb: 'صيانة', href: () => '/maintenance' },
+              ]
+              return (
+                <article
+                  key={day.date}
+                  role="listitem"
+                  className={`db-prep-col ${day.is_today ? 'is-today' : ''} ${day.is_tomorrow ? 'is-tomorrow' : ''}`.trim()}
+                >
+                  <header className="db-prep-col__head">
+                    <div className="db-prep-col__title">
+                      <strong>{dayTitle}</strong>
+                      <time dateTime={day.date}>{day.date}</time>
+                    </div>
+                    <div className="db-prep-col__badges">
+                      <span className="db-prep-chip db-prep-chip--pickup" title="تسليم">
+                        {formatNumber(day.counts.pickups)}
+                      </span>
+                      <span className="db-prep-chip db-prep-chip--return" title="استلام">
+                        {formatNumber(day.counts.returns)}
+                      </span>
+                      <span className="db-prep-chip db-prep-chip--maint" title="صيانة">
+                        {formatNumber(day.counts.maintenance)}
+                      </span>
+                    </div>
+                  </header>
+
+                  {day.counts.total === 0 ? (
+                    <p className="db-prep-col__empty">لا حركات</p>
+                  ) : (
+                    <div className="db-prep-col__scroll">
+                      {lanes.map((lane) => {
+                        const items = day.groups[lane.key]
+                        if (items.length === 0) return null
+                        return (
+                          <div key={lane.key} className={`db-prep-block db-prep-block--${lane.key}`}>
+                            <div className="db-prep-block__label">
+                              <Badge
+                                tone={lane.key === 'pickups' ? 'success' : lane.key === 'returns' ? 'warning' : 'steel'}
+                                dot={false}
+                              >
+                                {lane.verb}
+                              </Badge>
+                              <span className="tabular-nums">{formatNumber(items.length)}</span>
+                            </div>
+                            <ul className="db-prep-block__list">
+                              {items.map((item) => {
+                                const plate = item.vehicle?.plate || item.number || `#${item.id}`
+                                const who = item.customer || item.vehicle?.label || item.title || '—'
+                                const when = item.at ? formatTime(item.at) : null
+                                return (
+                                  <li key={`${lane.key}-${item.id}`}>
+                                    <Link to={lane.href(item)} className="db-prep-row">
+                                      <span className="db-prep-row__rail" aria-hidden />
+                                      <span className="db-prep-row__body">
+                                        <span className="db-prep-row__plate">{plate}</span>
+                                        <span className="db-prep-row__who">{who}</span>
+                                      </span>
+                                      {when ? <span className="db-prep-row__when tabular-nums">{when}</span> : null}
+                                    </Link>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <section className={`db-bento ${refreshing ? 'is-refreshing' : ''}`.trim()} aria-busy={refreshing}>
+        <motion.div
+          className="db-span-5"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.35 }}
+        >
+          <Card>
+            <CardHeader
+              title="صحة الإشغال"
+              description="قراءة لحظية للأسطول النشط"
+              action={
+                <>
+                  <button type="button" className="db-text-action" onClick={openMom}>مقارنة ربحية شهر بشهر</button>
+                  <Link to="/vehicles">الأسطول</Link>
+                  <CardMenu label="خيارات الإشغال" items={menus.occupancy} />
+                </>
+              }
+            />
+            <CardContent>
+              <div className="db-gauge">
+                <div className="db-gauge__ring" aria-hidden>
+                  <svg viewBox="0 0 140 140">
+                    <circle cx="70" cy="70" r="54" className="track" />
+                    <circle className="dots" cx="70" cy="70" r="62" strokeDasharray="2 8" />
+                    <motion.circle
+                      cx="70"
+                      cy="70"
+                      r="54"
+                      className="progress"
+                      strokeDasharray={ring}
+                      initial={{ strokeDashoffset: ring }}
+                      animate={{
+                        strokeDashoffset: ring * (1 - Math.min(data.occupancy_pct, 100) / 100),
+                      }}
+                      transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </svg>
+                  <div className="db-gauge__center">
+                    <AnimatedNumber value={data.occupancy_pct} kind="percent" className="db-gauge__pct" />
+                    <span>إشغال</span>
+                  </div>
+                </div>
+
+                <ul className="db-gauge__stats">
+                  <li>
+                    <span>أسطول</span>
+                    <b className="tabular-nums">{formatNumber(data.fleet_total)}</b>
+                  </li>
+                  <li>
+                    <span>مؤجّر</span>
+                    <b className="tabular-nums">{formatNumber(data.kpis.rented || 0)}</b>
+                  </li>
+                  <li>
+                    <span>صيانة</span>
+                    <b className="tabular-nums">{formatNumber(data.fleet_status.maintenance || 0)}</b>
+                  </li>
+                  <li>
+                    <span>أوامر شغل</span>
+                    <b className="tabular-nums">{formatNumber(data.kpis.open_work_orders || 0)}</b>
+                  </li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          className="db-span-7"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.14, duration: 0.35 }}
+        >
+          <Card className="db-tasks-card">
+            <CardHeader
+              title="مهام مهمة"
+              description="ما يجب تنفيذه حسب صلاحياتك"
+              action={
+                <>
+                  <span className="db-tasks__count tabular-nums">
+                    {(data.important_tasks ?? []).length}
+                  </span>
+                  <CardMenu label="خيارات المهام" items={menus.operations} />
+                </>
+              }
+            />
+            <CardContent flush>
+              {(data.important_tasks ?? []).length === 0 ? (
+                <div className="db-tasks__empty" role="status">
+                  <IconClipboard size={22} />
+                  <strong>لا مهام عاجلة حالياً</strong>
+                  <span>كل شيء ضمن الصلاحيات المتاحة تحت السيطرة</span>
+                </div>
+              ) : (
+                <ul className="db-tasks">
+                  {(data.important_tasks ?? []).map((task, i) => {
+                    const pill = severityPill(task.severity, task.due_on)
+                    return (
+                      <motion.li
+                        key={task.id}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.03 * i, type: 'spring', stiffness: 380, damping: 28 }}
+                      >
+                        <button
+                          type="button"
+                          className={`db-task db-task--${task.severity}`}
+                          onClick={() => navigate(task.href)}
+                        >
+                          <span className="db-task__rail" aria-hidden />
+                          <span className="db-task__ico" aria-hidden>
+                            {taskIcon(task.rule)}
+                          </span>
+                          <span className="db-task__body">
+                            <strong>{task.title}</strong>
+                            <span className="db-task__sub">{task.subtitle}</span>
+                          </span>
+                          <span className="db-task__meta">
+                            <Badge tone={pill.tone}>{pill.label}</Badge>
+                            {task.due_on ? (
+                              <time className="db-task__due tabular-nums" dateTime={task.due_on}>
+                                {formatDayShort(task.due_on)}
+                              </time>
+                            ) : null}
+                          </span>
+                        </button>
+                      </motion.li>
+                    )
+                  })}
+                </ul>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -738,7 +941,7 @@ export function DashboardPage() {
                 <table className="db-table">
                   <thead>
                     <tr>
-                      <th>المركبة</th>
+                      <th>العربية</th>
                       <th>العقد / العميل</th>
                       <th>الحالة</th>
                       <th>الموعد</th>
@@ -824,11 +1027,60 @@ export function DashboardPage() {
                   <span className="db-quick__label">المتاح</span>
                   <b className="tabular-nums">{formatPercent(100 - data.occupancy_pct)}</b>
                 </Link>
+                <button type="button" className="db-quick__btn" onClick={openMom}>
+                  <span className="db-quick__ico">
+                    <IconTrend size={18} />
+                  </span>
+                  <span className="db-quick__label">ربحية شهر بشهر</span>
+                  <b className="tabular-nums">
+                    {data.profitability_compare
+                      ? `${data.profitability_compare.fleet.delta_pct >= 0 ? '+' : ''}${formatNumber(data.profitability_compare.fleet.delta_pct)}%`
+                      : '—'}
+                  </b>
+                </button>
               </div>
             </CardContent>
           </Card>
         </motion.div>
       </section>
+
+      <Sheet open={momOpen} title="مقارنة ربحية شهر بشهر" onClose={() => setMomOpen(false)}>
+        {mom ? (
+          <div className="rpm-stack">
+            <p className="muted">{mom.current_month} مقابل {mom.previous_month}</p>
+            <div className="db-mom-grid">
+              <div>
+                <span>ربح التشغيل الحالي</span>
+                <strong className="tabular-nums">{formatMoney(mom.fleet.current.operating_profit)}</strong>
+              </div>
+              <div>
+                <span>الشهر السابق</span>
+                <strong className="tabular-nums">{formatMoney(mom.fleet.previous.operating_profit)}</strong>
+              </div>
+              <div>
+                <span>الفرق</span>
+                <strong className="tabular-nums">{formatMoney(mom.fleet.delta)}</strong>
+              </div>
+              <div>
+                <span>نسبة التغيّر</span>
+                <strong className="tabular-nums">{formatNumber(mom.fleet.delta_pct)}%</strong>
+              </div>
+            </div>
+            <ul className="db-mom-vehicles">
+              {mom.vehicles.slice(0, 12).map((v) => (
+                <li key={v.vehicle_id}>
+                  <span>{v.label}</span>
+                  <b className="tabular-nums">{formatMoney(v.current.operating_profit)}</b>
+                  <em className="tabular-nums">{formatNumber(v.delta_pct)}%</em>
+                </li>
+              ))}
+            </ul>
+            <Button variant="secondary" onClick={() => navigate('/reports')}>فتح التقارير</Button>
+          </div>
+        ) : (
+          <SkeletonBlock rows={3} />
+        )}
+      </Sheet>
     </div>
   )
 }

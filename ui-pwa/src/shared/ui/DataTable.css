@@ -334,9 +334,9 @@
 .rpm-dt-card {
   position: relative;
   display: grid;
-  gap: 0.75rem;
-  padding-block: 0.875rem;
-  padding-inline: 1rem;
+  gap: 12px;
+  padding-block: 0.75rem;
+  padding-inline: 0.875rem;
   border-radius: 18px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -365,7 +365,8 @@
 
 .rpm-dt-card__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
 }
 
@@ -383,6 +384,34 @@
   overflow-wrap: anywhere;
 }
 
+.rpm-dt-card__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.rpm-dt-card__contact {
+  display: grid;
+  gap: 0.35rem;
+  /* Card gap already leaves 12px before the license/data grid */
+  min-inline-size: 0;
+}
+
+.rpm-dt-card__contact-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-inline-size: 0;
+  width: 100%;
+}
+
+.rpm-dt-card__contact-item .rpm-phone-actions {
+  /* Keep call+WA packed at RTL start so the FAB end stays clear */
+  max-inline-size: 100%;
+  width: auto;
+}
+
 .rpm-dt-card__sub {
   color: var(--text-muted);
   font-size: 0.8125rem;
@@ -391,12 +420,10 @@
 
 .rpm-dt-card__badge {
   flex-shrink: 0;
-  padding-block-start: 0.1rem;
 }
 
 .rpm-dt-card__head .rpm-icon-btn {
-  margin-block-start: -0.25rem;
-  margin-inline-end: -0.4rem;
+  margin-inline-end: -0.35rem;
   width: 2.25rem;
   height: 2.25rem;
 }

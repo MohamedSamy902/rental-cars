@@ -1,0 +1,96 @@
+/* Compact single-row toolbar for «قاربت على الانتهاء» day window */
+.vh-expiring-bar {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin-block: 0.15rem 0.35rem;
+  margin-inline: 0;
+  padding: 8px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-sizing: border-box;
+}
+
+.vh-expiring-bar__label {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.vh-expiring-bar__pills {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.vh-expiring-bar__pills .rpm-btn {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: auto;
+  white-space: nowrap;
+}
+
+.vh-expiring-bar__sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 1.25rem;
+  background: var(--border);
+  margin-inline: 2px;
+}
+
+.vh-expiring-bar__custom {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.vh-expiring-bar__custom-label {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.vh-expiring-bar__input {
+  width: 64px;
+  height: 32px;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 0.45rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.vh-expiring-bar__input:focus {
+  outline: 2px solid color-mix(in srgb, var(--brand, #0f766e) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.vh-expiring-bar__unit {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .vh-expiring-bar {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}

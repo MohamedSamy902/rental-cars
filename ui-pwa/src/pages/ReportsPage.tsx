@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
+import { printHtmlDocument } from '@/utils/printHtml'
 import {
-  PageHeader, SkeletonBlock, ErrorState, MetricCardGrid,
+  PageHeader, SkeletonBlock, ErrorState, MetricCardGrid, FilterBar, Button, Sheet, SelectField, StatusPill,
   IconCash, IconReturn, IconTrend, IconWallet, IconClipboard, IconCheck, IconUsers, IconBan, IconAlert,
+  type BadgeTone,
 } from '@/shared/ui'
 import './pages.css'
 import './ReportsPage.css'
@@ -19,8 +23,60 @@ type Report = {
   blacklisted_customers: number
   open_violations: number
   expected_revenue_active: number
+  occupancy_pct?: number
   fleet: { total: number; available: number; rented: number; reserved: number; maintenance: number }
   rent_by_month: { ym: string; total: number }[]
+}
+
+type TrialRow = { code: string; name: string; type: string; debit: number; credit: number; balance: number }
+type IncomeStatement = {
+  income: Array<TrialRow & { amount: number }>
+  expenses: Array<TrialRow & { amount: number }>
+  income_total: number
+  expense_total: number
+  net: number
+}
+type PayMethod = { method: string; label: string; in: number; out: number; net: number }
+type ProfitCompare = {
+  current_month: string
+  previous_month: string
+  fleet: {
+    current: { revenue: number; maintenance: number; expenses: number; operating_profit: number }
+    previous: { revenue: number; maintenance: number; expenses: number; operating_profit: number }
+    delta: number
+    delta_pct: number
+  }
+  vehicles: Array<{
+    vehicle_id: number
+    label: string
+    current: { operating_profit: number; revenue: number }
+    previous: { operating_profit: number }
+    delta: number
+    delta_pct: number
+  }>
+}
+type CustomerOption = { id: number; full_name: string; phone?: string }
+type StatementContract = {
+  id: number
+  number: string
+  status: string
+  starts_at?: string | null
+  planned_ends_at?: string | null
+  actual_ends_at?: string | null
+  final_total: number
+  period_rent: number
+  total?: number
+  paid?: number
+  remaining?: number
+  vehicle?: { id: number; brand?: string; model?: string; plate?: string; label?: string } | null
+}
+type CustomerStatement = {
+  credit_balance: number
+  contracts_total: number
+  payments_in: number
+  open_receivable: number
+  customer: { id: number; full_name: string; phone?: string; credit_balance: number }
+  contracts: StatementContract[]
 }
 
 const fleetMeta: Record<string, { label: string; tone: string }> = {
@@ -30,6 +86,14 @@ const fleetMeta: Record<string, { label: string; tone: string }> = {
   maintenance: { label: 'في الصيانة', tone: 'danger' },
 }
 
+const accountTypeLabel: Record<string, string> = {
+  asset: 'أصل',
+  liability: 'التزام',
+  equity: 'حقوق ملكية',
+  income: 'إيراد',
+  expense: 'مصروف',
+}
+
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
 function ymLabel(ym: string) {
@@ -37,9 +101,84 @@ function ymLabel(ym: string) {
   return `${monthNames[Number(m) - 1] ?? m} ${y}`
 }
 
+function contractStatusMeta(status: string): { label: string; tone: BadgeTone; key: string } {
+  const key = (status || '').toLowerCase()
+  if (key === 'pending') return { label: 'معلّق', tone: 'warning', key: 'pending' }
+  if (key === 'approved' || key === 'confirmed') return { label: 'معتمد', tone: 'steel', key: 'approved' }
+  if (key === 'active' || key === 'handed_over') return { label: 'نشط / مسلّم', tone: 'success', key: 'active' }
+  if (key === 'completed' || key === 'returned' || key === 'closed') return { label: 'مكتمل', tone: 'muted', key: 'completed' }
+  if (key === 'cancelled' || key === 'canceled') return { label: 'ملغي', tone: 'danger', key: 'cancelled' }
+  return { label: status || '—', tone: 'muted', key: key || 'muted' }
+}
+
+function esc(s: string) {
+  return s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch))
+}
+
+function printCustomerStatement(statement: CustomerStatement) {
+  const rows = statement.contracts.map((c) => {
+    const total = c.total ?? c.final_total ?? c.period_rent ?? 0
+    const paid = c.paid ?? 0
+    const remaining = c.remaining ?? Math.max(0, total - paid)
+    const meta = contractStatusMeta(c.status)
+    const period = `${formatDate(c.starts_at)} ← ${formatDate(c.planned_ends_at || c.actual_ends_at)}`
+    return `<tr>
+      <td>${esc(c.number)}</td>
+      <td>${esc(c.vehicle?.label || '—')}</td>
+      <td>${esc(period)}</td>
+      <td>${esc(meta.label)}</td>
+      <td>${formatMoney(total)}</td>
+      <td>${formatMoney(paid)}</td>
+      <td>${formatMoney(remaining)}</td>
+    </tr>`
+  }).join('')
+
+  printHtmlDocument(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف عميل · ${esc(statement.customer.full_name)}</title>
+  <style>
+    body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a}
+    h1{margin:0 0 4px;font-size:22px}
+    .muted{color:#64748b}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    td,th{border:1px solid #cbd5e1;padding:8px;text-align:start}
+    th{background:#f8fafc}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+    .kpi{border:1px solid #e2e8f0;border-radius:10px;padding:10px}
+    .kpi span{display:block;color:#64748b;font-size:12px}
+    .kpi strong{font-size:16px}
+  </style></head><body>
+  <h1>كشف عميل · ${esc(statement.customer.full_name)}</h1>
+  <p class="muted">${statement.customer.phone ? `<span dir="ltr">${esc(statement.customer.phone)}</span>` : ''}</p>
+  <div class="kpis">
+    <div class="kpi"><span>إجمالي عقود</span><strong>${formatMoney(statement.contracts_total)}</strong></div>
+    <div class="kpi"><span>مدفوع</span><strong>${formatMoney(statement.payments_in)}</strong></div>
+    <div class="kpi"><span>ذمم مفتوحة</span><strong>${formatMoney(statement.open_receivable)}</strong></div>
+    <div class="kpi"><span>رصيد دائن</span><strong>${formatMoney(statement.credit_balance)}</strong></div>
+  </div>
+  <table>
+    <thead><tr><th>العقد</th><th>العربية</th><th>الفترة</th><th>الحالة</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7">لا عقود لهذا العميل.</td></tr>'}</tbody>
+  </table>
+  </body></html>`)
+}
+
+type TabId = 'overview' | 'trial' | 'income' | 'payments' | 'customer' | 'profit'
+
+const ReportsPageTabs = ['overview', 'trial', 'income', 'payments', 'customer', 'profit'] as const satisfies readonly TabId[]
+
 export function ReportsPage() {
   const [data, setData] = useState<Report | null>(null)
   const [error, setError] = useState('')
+  const [tab, setTab] = useQueryTab<TabId>({ allowed: ReportsPageTabs, defaultValue: 'overview' })
+  const [trial, setTrial] = useState<TrialRow[] | null>(null)
+  const [income, setIncome] = useState<IncomeStatement | null>(null)
+  const [methods, setMethods] = useState<PayMethod[] | null>(null)
+  const [profit, setProfit] = useState<ProfitCompare | null>(null)
+  const [profitOpen, setProfitOpen] = useState(false)
+  const [customers, setCustomers] = useState<CustomerOption[]>([])
+  const [customerId, setCustomerId] = useState('')
+  const [statement, setStatement] = useState<CustomerStatement | null>(null)
+  const [tabError, setTabError] = useState('')
+  const [tabLoading, setTabLoading] = useState(false)
 
   useEffect(() => {
     api<{ data: Report }>('/reports/summary')
@@ -47,103 +186,430 @@ export function ReportsPage() {
       .catch((e) => setError((e as ApiError).message))
   }, [])
 
+  useEffect(() => {
+    if (tab === 'overview') return
+    setTabError('')
+    setTabLoading(true)
+    const run = async () => {
+      try {
+        if (tab === 'trial') {
+          const r = await api<{ data: TrialRow[] }>('/reports/trial-balance')
+          setTrial(r.data)
+        } else if (tab === 'income') {
+          const r = await api<{ data: IncomeStatement }>('/reports/income-statement')
+          setIncome(r.data)
+        } else if (tab === 'payments') {
+          const r = await api<{ data: PayMethod[] }>('/reports/payment-methods')
+          setMethods(r.data)
+        } else if (tab === 'profit') {
+          const r = await api<{ data: ProfitCompare }>('/reports/profitability-compare')
+          setProfit(r.data)
+        } else if (tab === 'customer') {
+          const list = await api<{ data: CustomerOption[] }>('/customers?per_page=100')
+          setCustomers(list.data)
+        }
+      } catch (e) {
+        setTabError((e as ApiError).message)
+      } finally {
+        setTabLoading(false)
+      }
+    }
+    void run()
+  }, [tab])
+
+  useEffect(() => {
+    if (tab !== 'customer' || !customerId) {
+      setStatement(null)
+      return
+    }
+    setTabError('')
+    setTabLoading(true)
+    api<{ data: CustomerStatement }>(`/reports/customers/${customerId}/statement`)
+      .then((r) => setStatement(r.data))
+      .catch((e) => setTabError((e as ApiError).message))
+      .finally(() => setTabLoading(false))
+  }, [tab, customerId])
+
   const peak = useMemo(() => Math.max(1, ...(data?.rent_by_month.map((r) => r.total) ?? [0])), [data])
+
+  async function openMom() {
+    setProfitOpen(true)
+    try {
+      const r = await api<{ data: ProfitCompare }>('/reports/profitability-compare')
+      setProfit(r.data)
+    } catch (e) {
+      setTabError((e as ApiError).message)
+    }
+  }
 
   if (error) return <ErrorState title="تعذّر تحميل التقارير" description={error} />
   if (!data) return <SkeletonBlock rows={8} />
 
-  const occupancy = data.fleet.total ? Math.round((data.fleet.rented / data.fleet.total) * 100) : 0
+  const occupancy = typeof data.occupancy_pct === 'number'
+    ? Math.round(data.occupancy_pct)
+    : (data.fleet.total ? Math.round((data.fleet.rented / data.fleet.total) * 100) : 0)
+
+  const chips = [
+    { id: 'overview', label: 'ملخص' },
+    { id: 'profit', label: 'ربحية شهر بشهر' },
+    { id: 'trial', label: 'ميزان مراجعة' },
+    { id: 'income', label: 'قائمة دخل' },
+    { id: 'payments', label: 'أرصدة طرق الدفع' },
+    { id: 'customer', label: 'كشف عميل' },
+  ]
 
   return (
-    <div className="rpm-stack">
-      <PageHeader title="التقارير" subtitle="إشغال · مديونيات عقود · ربحية تشغيل — مخالفات خارج المحاسبة" />
-
-      <MetricCardGrid
-        label="المؤشرات المالية"
-        items={[
-          { id: 'receivables', label: 'ذمم عقود', value: data.receivables, format: 'money', tone: 'warning', icon: <IconWallet size={16} /> },
-          { id: 'in', label: 'مقبوضات', value: data.payments_in, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
-          { id: 'out', label: 'مدفوع للعملاء', value: data.payments_out, format: 'money', icon: <IconReturn size={16} /> },
-          { id: 'expected', label: 'إيراد متوقع (نشط)', value: data.expected_revenue_active, format: 'money', tone: 'info', icon: <IconTrend size={16} /> },
-        ]}
+    <div className="rpm-stack rp-page">
+      <PageHeader
+        title="التقارير"
+        subtitle="إشغال أيامي · ميزان مراجعة · قائمة دخل · ربحية تشغيل"
+        action={<Button onClick={() => void openMom()}>مقارنة ربحية شهر بشهر</Button>}
       />
 
+      <FilterBar
+        search=""
+        onSearchChange={() => undefined}
+        chips={chips}
+        activeChip={tab}
+        onChipChange={(id) => setTab(id as TabId)}
+        hideSearch
+      />
+
+      {tab === 'overview' ? (
+        <div className="rp-section">
+          <MetricCardGrid
+            label="المؤشرات المالية"
+            mobile="wrap"
+            items={[
+              { id: 'receivables', label: 'ذمم عقود', value: data.receivables, format: 'money', tone: 'warning', icon: <IconWallet size={16} /> },
+              { id: 'in', label: 'مقبوضات', value: data.payments_in, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
+              { id: 'out', label: 'مدفوع للعملاء', value: data.payments_out, format: 'money', icon: <IconReturn size={16} /> },
+              { id: 'expected', label: 'إيراد متوقع (نشط)', value: data.expected_revenue_active, format: 'money', tone: 'info', icon: <IconTrend size={16} /> },
+            ]}
+          />
+
+          <MetricCardGrid
+            label="المؤشرات التشغيلية"
+            mobile="wrap"
+            items={[
+              { id: 'active', label: 'عقود نشطة', value: data.active_contracts, tone: 'info', icon: <IconClipboard size={16} /> },
+              { id: 'completed', label: 'عقود مكتملة', value: data.completed_contracts, tone: 'success', icon: <IconCheck size={16} /> },
+              { id: 'customers', label: 'عملاء', value: data.customers, icon: <IconUsers size={16} /> },
+              { id: 'blacklist', label: 'قائمة سوداء', value: data.blacklisted_customers, tone: 'danger', icon: <IconBan size={16} /> },
+              { id: 'violations', label: 'مخالفات مفتوحة', value: data.open_violations, tone: 'warning', icon: <IconAlert size={16} />, hint: 'للمتابعة فقط — بلا ترحيل' },
+            ]}
+          />
+
+          <div className="rp-bento">
+            <section className="rpm-panel rp-fleet">
+              <div className="rpm-panel__head">
+                <h3>توزيع حالة الأسطول</h3>
+                <span className="rp-chip tabular-nums">إشغال {occupancy}%</span>
+              </div>
+              <div className="rp-fleet__stack" aria-hidden>
+                {Object.entries(fleetMeta).map(([key, meta]) => {
+                  const value = data.fleet[key as keyof Report['fleet']] ?? 0
+                  const pct = data.fleet.total ? (value / data.fleet.total) * 100 : 0
+                  return pct > 0 ? (
+                    <motion.span
+                      key={key}
+                      className={`rp-fleet__seg is-${meta.tone}`}
+                      initial={{ flexGrow: 0 }}
+                      animate={{ flexGrow: pct }}
+                      transition={{ type: 'spring', stiffness: 160, damping: 26 }}
+                    />
+                  ) : null
+                })}
+              </div>
+              <ul className="rp-fleet__legend">
+                {Object.entries(fleetMeta).map(([key, meta]) => {
+                  const value = data.fleet[key as keyof Report['fleet']] ?? 0
+                  return (
+                    <li key={key}>
+                      <i className={`rp-dot is-${meta.tone}`} />
+                      <span>{meta.label}</span>
+                      <strong className="tabular-nums">{formatNumber(value)}</strong>
+                    </li>
+                  )
+                })}
+                <li className="is-total">
+                  <span>الإجمالي</span>
+                  <strong className="tabular-nums">{formatNumber(data.fleet.total)}</strong>
+                </li>
+              </ul>
+            </section>
+
+            <section className="rpm-panel rp-rent">
+              <div className="rpm-panel__head"><h3>إيراد الإيجار حسب الشهر</h3></div>
+              {data.rent_by_month.length === 0 ? (
+                <p className="muted">يظهر بعد استلام عقود مكتملة وترحيلها محاسبياً.</p>
+              ) : (
+                <ol className="rp-rent__list">
+                  {data.rent_by_month.map((row, i) => (
+                    <li key={row.ym}>
+                      <div className="rp-rent__meta">
+                        <span>{ymLabel(row.ym)}</span>
+                        <strong className="tabular-nums">{formatMoney(row.total)}</strong>
+                      </div>
+                      <div className="rp-rent__track">
+                        <motion.span
+                          initial={{ width: '0%' }}
+                          animate={{ width: `${(row.total / peak) * 100}%` }}
+                          transition={{ type: 'spring', stiffness: 140, damping: 24, delay: i * 0.04 }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </div>
+        </div>
+      ) : null}
+
+      {tabLoading ? <SkeletonBlock rows={4} /> : null}
+      {tabError ? <ErrorState title="تعذّر تحميل هذا القسم" description={tabError} /> : null}
+
+      {tab === 'trial' && trial ? (
+        <section className="rpm-panel rp-section">
+          <div className="rpm-panel__head"><h3>ميزان مراجعة</h3></div>
+          <div className="rp-section__body">
+            <div className="rp-table-scroll">
+              <table className="rpm-table rpm-table--stack">
+                <thead>
+                  <tr><th>الحساب</th><th>النوع</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr>
+                </thead>
+                <tbody>
+                  {trial.map((r) => (
+                    <tr key={r.code}>
+                      <td data-label="الحساب"><strong className="rpm-table__primary">{r.code} · {r.name}</strong></td>
+                      <td data-label="النوع"><span className="rp-account-type">{accountTypeLabel[r.type] || r.type}</span></td>
+                      <td data-label="مدين" className="tabular-nums">{formatMoney(r.debit)}</td>
+                      <td data-label="دائن" className="tabular-nums">{formatMoney(r.credit)}</td>
+                      <td data-label="الرصيد" className="tabular-nums">{formatMoney(r.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 'income' && income ? (
+        <section className="rpm-panel rp-section">
+          <div className="rpm-panel__head">
+            <h3>قائمة دخل</h3>
+            <span className="rp-chip tabular-nums">صافي {formatMoney(income.net)}</span>
+          </div>
+          <div className="rp-section__body">
+            <MetricCardGrid
+              label="ملخص الفترة"
+              mobile="wrap"
+              items={[
+                { id: 'inc', label: 'إيرادات', value: income.income_total, format: 'money', tone: 'success' },
+                { id: 'exp', label: 'مصروفات', value: income.expense_total, format: 'money', tone: 'warning' },
+                { id: 'net', label: 'صافي', value: income.net, format: 'money', tone: 'info' },
+              ]}
+            />
+            <div className="rp-table-scroll">
+              <table className="rpm-table rpm-table--stack">
+                <thead><tr><th>البند</th><th>النوع</th><th>المبلغ</th></tr></thead>
+                <tbody>
+                  {income.income.map((r) => (
+                    <tr key={`i-${r.code}`}>
+                      <td data-label="البند">{r.code} · {r.name}</td>
+                      <td data-label="النوع"><span className="rp-account-type">إيراد</span></td>
+                      <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
+                    </tr>
+                  ))}
+                  {income.expenses.map((r) => (
+                    <tr key={`e-${r.code}`}>
+                      <td data-label="البند">{r.code} · {r.name}</td>
+                      <td data-label="النوع"><span className="rp-account-type">مصروف</span></td>
+                      <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 'payments' && methods ? (
+        <section className="rpm-panel rp-section">
+          <div className="rpm-panel__head"><h3>أرصدة طرق الدفع</h3></div>
+          <div className="rp-section__body">
+            <div className="rp-kpi-grid">
+              {methods.map((m) => (
+                <article key={m.method} className="rp-kpi">
+                  <span>{m.label}</span>
+                  <strong>{formatMoney(m.net)}</strong>
+                  <span className="muted">داخل {formatMoney(m.in)} · خارج {formatMoney(m.out)}</span>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 'customer' ? (
+        <section className="rpm-panel rp-section">
+          <div className="rpm-panel__head"><h3>كشف عميل</h3></div>
+          <div className="rp-section__body">
+            <div className="rp-customer-toolbar">
+              <div className="rp-customer-toolbar__select">
+                <SelectField
+                  label="العميل"
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  options={[
+                    { value: '', label: 'اختر عميلاً…' },
+                    ...customers.map((c) => ({
+                      value: String(c.id),
+                      label: `${c.full_name}${c.phone ? ` · ${c.phone}` : ''}`,
+                    })),
+                  ]}
+                />
+              </div>
+              <div className="rp-customer-toolbar__actions">
+                <Button
+                  variant="secondary"
+                  disabled={!statement}
+                  onClick={() => { if (statement) printCustomerStatement(statement) }}
+                >
+                  طباعة كشف العميل
+                </Button>
+                {customerId ? (
+                  <Link className="rpm-link-btn" to={`/customers/${customerId}`}>
+                    ملف العميل ←
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+
+            {statement ? (
+              <>
+                <div className="rp-kpi-grid" aria-label={`ملخص ${statement.customer.full_name}`}>
+                  <article className="rp-kpi">
+                    <span>إجمالي عقود</span>
+                    <strong>{formatMoney(statement.contracts_total)}</strong>
+                  </article>
+                  <article className="rp-kpi is-success">
+                    <span>مدفوع</span>
+                    <strong>{formatMoney(statement.payments_in)}</strong>
+                  </article>
+                  <article className="rp-kpi is-warning">
+                    <span>ذمم مفتوحة</span>
+                    <strong>{formatMoney(statement.open_receivable)}</strong>
+                  </article>
+                  <article className="rp-kpi is-info">
+                    <span>رصيد دائن</span>
+                    <strong>{formatMoney(statement.credit_balance)}</strong>
+                  </article>
+                </div>
+
+                {statement.contracts.length === 0 ? (
+                  <p className="rp-empty">لا عقود مسجّلة لهذا العميل بعد.</p>
+                ) : (
+                  <div className="rp-table-scroll">
+                    <table className="rpm-table rpm-table--stack">
+                      <thead>
+                        <tr>
+                          <th>العقد</th>
+                          <th>العربية</th>
+                          <th>الفترة</th>
+                          <th>الحالة</th>
+                          <th>الإجمالي</th>
+                          <th>المدفوع</th>
+                          <th>المتبقي</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {statement.contracts.map((c) => {
+                          const total = c.total ?? c.final_total ?? c.period_rent ?? 0
+                          const paid = c.paid ?? 0
+                          const remaining = c.remaining ?? Math.max(0, total - paid)
+                          const meta = contractStatusMeta(c.status)
+                          return (
+                            <tr key={c.id}>
+                              <td data-label="العقد">
+                                <Link className="rp-contract-link" to={`/bookings/${c.id}`}>
+                                  {c.number}
+                                </Link>
+                              </td>
+                              <td data-label="العربية">
+                                <strong className="rpm-table__primary">{c.vehicle?.label || '—'}</strong>
+                              </td>
+                              <td data-label="الفترة" className="tabular-nums">
+                                {formatDate(c.starts_at)} ← {formatDate(c.planned_ends_at || c.actual_ends_at)}
+                              </td>
+                              <td data-label="الحالة">
+                                <StatusPill status={meta.key} label={meta.label} tone={meta.tone} />
+                              </td>
+                              <td data-label="الإجمالي" className="tabular-nums">{formatMoney(total)}</td>
+                              <td data-label="المدفوع" className="tabular-nums">{formatMoney(paid)}</td>
+                              <td data-label="المتبقي" className="tabular-nums"><strong>{formatMoney(remaining)}</strong></td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              !tabLoading && customerId === '' ? (
+                <p className="rp-empty">اختر عميلاً لعرض كشف الحساب والعقود.</p>
+              ) : null
+            )}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 'profit' && profit ? (
+        <div className="rp-section">
+          <ProfitPanel data={profit} />
+        </div>
+      ) : null}
+
+      <Sheet open={profitOpen} title="مقارنة ربحية شهر بشهر" onClose={() => setProfitOpen(false)}>
+        {profit ? <ProfitPanel data={profit} /> : <SkeletonBlock rows={3} />}
+      </Sheet>
+    </div>
+  )
+}
+
+function ProfitPanel({ data }: { data: ProfitCompare }) {
+  return (
+    <div className="rp-section">
       <MetricCardGrid
-        label="المؤشرات التشغيلية"
+        label={`${data.current_month} مقابل ${data.previous_month}`}
         mobile="wrap"
         items={[
-          { id: 'active', label: 'عقود نشطة', value: data.active_contracts, tone: 'info', icon: <IconClipboard size={16} /> },
-          { id: 'completed', label: 'عقود مكتملة', value: data.completed_contracts, tone: 'success', icon: <IconCheck size={16} /> },
-          { id: 'customers', label: 'عملاء', value: data.customers, icon: <IconUsers size={16} /> },
-          { id: 'blacklist', label: 'قائمة سوداء', value: data.blacklisted_customers, tone: 'danger', icon: <IconBan size={16} /> },
-          { id: 'violations', label: 'مخالفات مفتوحة', value: data.open_violations, tone: 'warning', icon: <IconAlert size={16} />, hint: 'للمتابعة فقط — بلا ترحيل' },
+          { id: 'cur', label: 'ربح التشغيل الحالي', value: data.fleet.current.operating_profit, format: 'money', tone: 'success' },
+          { id: 'prev', label: 'الشهر السابق', value: data.fleet.previous.operating_profit, format: 'money' },
+          { id: 'delta', label: 'الفرق', value: data.fleet.delta, format: 'money', tone: data.fleet.delta >= 0 ? 'info' : 'warning' },
+          { id: 'pct', label: 'نسبة التغيّر %', value: data.fleet.delta_pct, tone: data.fleet.delta_pct >= 0 ? 'success' : 'danger' },
         ]}
       />
-
-      <div className="rp-bento">
-        <section className="rpm-panel rp-fleet">
-          <div className="rpm-panel__head">
-            <h3>توزيع حالة الأسطول</h3>
-            <span className="rp-chip tabular-nums">إشغال {occupancy}%</span>
-          </div>
-          <div className="rp-fleet__stack" aria-hidden>
-            {Object.entries(fleetMeta).map(([key, meta]) => {
-              const value = data.fleet[key as keyof Report['fleet']] ?? 0
-              const pct = data.fleet.total ? (value / data.fleet.total) * 100 : 0
-              return pct > 0 ? (
-                <motion.span
-                  key={key}
-                  className={`rp-fleet__seg is-${meta.tone}`}
-                  initial={{ flexGrow: 0 }}
-                  animate={{ flexGrow: pct }}
-                  transition={{ type: 'spring', stiffness: 160, damping: 26 }}
-                />
-              ) : null
-            })}
-          </div>
-          <ul className="rp-fleet__legend">
-            {Object.entries(fleetMeta).map(([key, meta]) => {
-              const value = data.fleet[key as keyof Report['fleet']] ?? 0
-              return (
-                <li key={key}>
-                  <i className={`rp-dot is-${meta.tone}`} />
-                  <span>{meta.label}</span>
-                  <strong className="tabular-nums">{formatNumber(value)}</strong>
-                </li>
-              )
-            })}
-            <li className="is-total">
-              <span>الإجمالي</span>
-              <strong className="tabular-nums">{formatNumber(data.fleet.total)}</strong>
-            </li>
-          </ul>
-        </section>
-
-        <section className="rpm-panel rp-rent">
-          <div className="rpm-panel__head"><h3>إيراد الإيجار حسب الشهر</h3></div>
-          {data.rent_by_month.length === 0 ? (
-            <p className="muted">يظهر بعد استلام عقود مكتملة وترحيلها محاسبياً.</p>
-          ) : (
-            <ol className="rp-rent__list">
-              {data.rent_by_month.map((row, i) => (
-                <li key={row.ym}>
-                  <div className="rp-rent__meta">
-                    <span>{ymLabel(row.ym)}</span>
-                    <strong className="tabular-nums">{formatMoney(row.total)}</strong>
-                  </div>
-                  <div className="rp-rent__track">
-                    <motion.span
-                      initial={{ width: '0%' }}
-                      animate={{ width: `${(row.total / peak) * 100}%` }}
-                      transition={{ type: 'spring', stiffness: 140, damping: 24, delay: i * 0.04 }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-      </div>
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>حسب العربية</h3></div>
+        <div className="rpm-card-list" style={{ marginBlockStart: '12px' }}>
+          {data.vehicles.slice(0, 24).map((v) => (
+            <article key={v.vehicle_id} className="rpm-card">
+              <div className="rpm-card__row">
+                <strong>{v.label}</strong>
+                <strong className="tabular-nums">{formatMoney(v.current.operating_profit)}</strong>
+              </div>
+              <p className="muted">
+                السابق {formatMoney(v.previous.operating_profit)} · فرق {formatMoney(v.delta)} · {formatNumber(v.delta_pct)}%
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }

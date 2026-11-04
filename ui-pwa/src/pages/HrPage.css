@@ -3,16 +3,52 @@
 }
 
 @media (max-width: 980px) {
+  /* Horizontal action strip — never cram 4 labels into a 3-col grid */
+  .hr-page .rpm-page-header__action {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-block: 0.1rem;
+    padding-inline: 0.1rem;
+  }
+  .hr-page .rpm-page-header__action::-webkit-scrollbar {
+    display: none;
+  }
+  .hr-page .rpm-page-header__action .rpm-btn {
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-height: 42px;
+    padding-inline: 0.9rem;
+    font-size: 0.86rem;
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  /* Very narrow: 2×2 grid keeps labels fully visible without sideways scroll */
   .hr-page .rpm-page-header__action {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
     gap: 0.45rem;
   }
   .hr-page .rpm-page-header__action .rpm-btn {
     width: 100%;
-    min-height: 42px;
-    padding-inline: 0.4rem;
-    font-size: 0.86rem;
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.25;
+    padding-block: 0.55rem;
+    padding-inline: 0.55rem;
   }
 }
 
@@ -68,4 +104,42 @@
 .hr-lines .rpm-card__actions {
   margin-block-start: 0.35rem;
   padding-block-start: 0.55rem;
+}
+
+.hr-custody-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.85rem;
+  margin: 0;
+}
+
+.hr-custody-meta > div {
+  display: grid;
+  gap: 0.15rem;
+  min-inline-size: 0;
+}
+
+.hr-custody-meta__wide {
+  grid-column: 1 / -1;
+}
+
+.hr-custody-meta dt {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
+  font-weight: 600;
+}
+
+.hr-custody-meta dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .hr-custody-meta {
+    grid-template-columns: 1fr;
+  }
 }

@@ -94,16 +94,22 @@ export function SelectField({
     const gap = 6
     const sidePad = 12
     const vv = window.visualViewport
+    const viewW = vv?.width ?? window.innerWidth
     const viewH = vv?.height ?? window.innerHeight
+    const viewLeft = vv?.offsetLeft ?? 0
     const viewTop = vv?.offsetTop ?? 0
+    const viewRight = viewLeft + viewW
     const viewBottom = viewTop + viewH
-    const preferred = Math.min(280, viewH * 0.42)
+    const inSheet = Boolean(el.closest('.rpm-sheet__body'))
+    const preferred = Math.min(inSheet ? 220 : 280, viewH * (inSheet ? 0.34 : 0.42))
     const spaceBelow = viewBottom - rect.bottom - gap - 10
     const spaceAbove = rect.top - viewTop - gap - 10
     const openUp = spaceBelow < 160 && spaceAbove > spaceBelow
     const maxHeight = Math.max(140, Math.min(preferred, openUp ? spaceAbove : spaceBelow))
-    const width = Math.min(Math.max(rect.width, 200), window.innerWidth - sidePad * 2)
-    const left = Math.min(Math.max(sidePad, rect.left), window.innerWidth - width - sidePad)
+    const availableW = Math.max(160, viewW - sidePad * 2)
+    const width = Math.min(Math.max(rect.width, Math.min(200, availableW)), availableW)
+    const rawLeft = Math.max(viewLeft + sidePad, rect.left)
+    const left = Math.min(rawLeft, viewRight - width - sidePad)
     setPos({
       top: openUp ? rect.top - gap : rect.bottom + gap,
       left,

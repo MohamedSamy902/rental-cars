@@ -15,7 +15,7 @@ import { MaintenancePage } from '@/pages/MaintenancePage'
 import { CustomersPage } from '@/pages/CustomersPage'
 import { InventoryPage } from '@/pages/InventoryPage'
 import { ViolationsPage } from '@/pages/ViolationsPage'
-import { WaitlistPage } from '@/pages/WaitlistPage'
+import { ViolationInquiriesPage } from '@/pages/ViolationInquiriesPage'
 import { NotificationsPage } from '@/pages/NotificationsPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { AccountsPage } from '@/pages/AccountsPage'
@@ -24,12 +24,17 @@ import { StaffPage } from '@/pages/StaffPage'
 import { ShowroomPage } from '@/pages/ShowroomPage'
 import { DepartmentNoticePage } from '@/pages/DepartmentNoticePage'
 import { PettyCashPage } from '@/pages/PettyCashPage'
+import { PettyCashDetailPage } from '@/pages/PettyCashDetailPage'
 import { IntegratorPage } from '@/pages/IntegratorPage'
 import { AuditLogsPage } from '@/pages/AuditLogsPage'
 import { ExpensesPage } from '@/pages/ExpensesPage'
 import { OwnersPage } from '@/pages/OwnersPage'
+import { OwnerDetailPage } from '@/pages/OwnerDetailPage'
 import { HrPage } from '@/pages/HrPage'
 import { ChatPage } from '@/pages/ChatPage'
+import { CustomerDetailPage } from '@/pages/CustomerDetailPage'
+import { EmployeeDetailPage } from '@/pages/EmployeeDetailPage'
+import { ProfilePage } from '@/pages/ProfilePage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -72,16 +77,22 @@ export default function App() {
                 <Route path="maintenance" element={<MaintenancePage />} />
                 <Route path="inventory" element={<InventoryPage />} />
                 <Route path="customers" element={<CustomersPage />} />
+                <Route path="customers/:id" element={<CustomerDetailPage />} />
                 <Route path="violations" element={<ViolationsPage />} />
-                <Route path="waitlist" element={<WaitlistPage />} />
+                <Route path="violation-inquiries" element={<ViolationInquiriesPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="accounts/months/:monthId" element={<MonthLedgerPage />} />
                 <Route path="expenses" element={<ExpensesPage />} />
                 <Route path="owners" element={<OwnersPage />} />
+                <Route path="owners/:id" element={<OwnerDetailPage />} />
                 <Route path="petty-cash" element={<PettyCashPage />} />
+                <Route path="petty-cash/:id" element={<PettyCashDetailPage />} />
                 <Route path="hr" element={<HrPage />} />
+                <Route path="staff/:id" element={<EmployeeDetailPage />} />
+                <Route path="employees/:id" element={<EmployeeDetailPage />} />
+                <Route path="users/:id" element={<EmployeeDetailPage />} />
                 <Route path="chat" element={<ChatPage />} />
                 <Route path="showroom" element={<ShowroomPage />} />
                 <Route path="department-notice" element={<DepartmentNoticePage />} />
@@ -89,6 +100,8 @@ export default function App() {
                 <Route path="staff" element={<StaffPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="integrator" element={<IntegratorPage />} />
+                {/* Self-profile: any authenticated user — no permission gate */}
+                <Route path="profile" element={<ProfilePage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>
