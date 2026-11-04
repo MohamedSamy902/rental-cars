@@ -22,7 +22,6 @@ use App\Models\VehicleDocument;
 use App\Models\VehicleOwner;
 use App\Models\VehicleTire;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Services\Notifications\DueNotificationService;
 use App\Support\PermissionCatalog;
@@ -184,7 +183,7 @@ class DueNotificationScanTest extends TestCase
         $this->travelBack();
     }
 
-    public function test_stock_documents_owner_payroll_and_waitlist(): void
+    public function test_stock_documents_owner_payroll_and_evaluations(): void
     {
         $low = InventoryItem::query()->create([
             'code' => 'OIL-LOW', 'name' => 'زيت ناقص', 'category' => 'زيوت', 'unit' => 'لتر', 'reorder_level' => 5, 'is_active' => true,
@@ -290,16 +289,6 @@ class DueNotificationScanTest extends TestCase
             'paid_amount' => 0,
         ]);
 
-        $waiting = WaitlistRequest::query()->create([
-            'customer_id' => $this->customer->id,
-            'category' => 'اقتصادي',
-            'status' => 'waiting',
-            'desired_start' => now()->toDateString(),
-            'desired_end' => now()->addDays(2)->toDateString(),
-            'created_by' => $this->admin->id,
-            'expires_at' => now()->addDays(7),
-        ]);
-
         app(DueNotificationService::class)->scan();
 
         $this->assertSame(1, $this->titlesLike('صنف تحت حد التنبيه: زيت ناقص'));
@@ -315,9 +304,6 @@ class DueNotificationScanTest extends TestCase
         $this->assertSame(1, $this->titlesLike('راتب لم يُصرف: راتب معلّق'));
         $this->assertSame(0, $this->titlesLike('راتب لم يُصرف: راتب مسودة'));
         $this->assertSame(1, $this->titlesLike('تقييم معلّق: راتب معلّق'));
-        $this->assertSame(1, $this->titlesLike('سيارة متاحة لطلب انتظار'));
-        $waiting->refresh();
-        $this->assertSame('notified', $waiting->status);
 
         Evaluation::query()->create([
             'employee_id' => $unpaidEmployee->id,

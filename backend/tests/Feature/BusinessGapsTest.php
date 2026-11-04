@@ -30,7 +30,6 @@ class BusinessGapsTest extends TestCase
             'feature_flags' => [
                 'showroom' => true,
                 'petty_cash' => true,
-                'waitlist' => true,
                 'inventory' => true,
                 'department_notice' => true,
                 'chat' => true,

@@ -50,7 +50,7 @@ class P1SpecRequirementsTest extends TestCase
         TenantSetting::query()->create([
             'center_name' => 'اختبار P1',
             'feature_flags' => [
-                'showroom' => true, 'petty_cash' => true, 'waitlist' => true, 'inventory' => true,
+                'showroom' => true, 'petty_cash' => true, 'inventory' => true,
                 'department_notice' => true, 'chat' => true, 'evaluations' => true, 'hr' => true,
             ],
             'operational' => [

@@ -29,7 +29,6 @@ use App\Models\VehicleBrand;
 use App\Models\VehicleDocument;
 use App\Models\VehicleOwner;
 use App\Models\Violation;
-use App\Models\WaitlistRequest;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
 use App\Services\Notifications\NotificationDispatchService;
@@ -65,7 +64,6 @@ class E2EDataSeeder extends Seeder
         $this->seedContractsPaymentsAndFleetPrep($actorId, $salesId, $opsId);
         $this->seedMaintenance($actorId, $maintId, $employees['tech'], $employees['driver']);
         $this->seedViolationsAndExpenses($actorId, $accountsId, $employees['tech']);
-        $this->seedWaitlist($actorId);
         $this->seedOwnersFinance($actorId, $accountsId);
         $this->seedPayrollAndAdvances($actorId, $hrId, $employees);
         $this->seedAuditTrail($actorId, $salesId, $opsId, $maintId, $accountsId, $hrId);
@@ -965,42 +963,6 @@ class E2EDataSeeder extends Seeder
                 'notes' => 'مصروف مرتبط بعربية',
             ],
         );
-    }
-
-    private function seedWaitlist(int $actorId): void
-    {
-        $sara = Customer::query()->where('phone', '01044445555')->first();
-        $karim = Customer::query()->where('phone', '01055557777')->first();
-        $sportage = Vehicle::query()->where('code', 'S-012')->first();
-
-        if ($sara) {
-            WaitlistRequest::query()->firstOrCreate(
-                ['customer_id' => $sara->id, 'category' => 'SUV', 'status' => 'waiting'],
-                [
-                    'preferred_vehicle_id' => $sportage?->id,
-                    'desired_start' => now()->addDays(7)->toDateString(),
-                    'desired_end' => now()->addDays(12)->toDateString(),
-                    'priority' => 2,
-                    'expires_at' => now()->addDays(14),
-                    'created_by' => $actorId,
-                    'notes' => 'تفضّل سبورتاج أو مشابه',
-                ],
-            );
-        }
-        if ($karim) {
-            WaitlistRequest::query()->firstOrCreate(
-                ['customer_id' => $karim->id, 'category' => 'اقتصادي', 'status' => 'notified'],
-                [
-                    'desired_start' => now()->addDays(2)->toDateString(),
-                    'desired_end' => now()->addDays(5)->toDateString(),
-                    'priority' => 1,
-                    'notified_at' => now()->subHours(5),
-                    'expires_at' => now()->addDays(3),
-                    'created_by' => $actorId,
-                    'notes' => 'تم إخطار العميل بتوفر عربية',
-                ],
-            );
-        }
     }
 
     private function seedOwnersFinance(int $actorId, int $accountsId): void

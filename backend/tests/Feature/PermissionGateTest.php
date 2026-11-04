@@ -23,7 +23,6 @@ class PermissionGateTest extends TestCase
             'feature_flags' => [
                 'showroom' => false,
                 'petty_cash' => true,
-                'waitlist' => true,
                 'inventory' => true,
                 'department_notice' => true,
                 'chat' => true,

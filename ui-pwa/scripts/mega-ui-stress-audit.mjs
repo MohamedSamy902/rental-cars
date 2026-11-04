@@ -25,7 +25,6 @@ const PAGES = [
   { name: 'expenses', path: '/expenses', expectAll: true },
   { name: 'violations', path: '/violations', expectAll: true },
   { name: 'owners', path: '/owners', expectAll: true },
-  { name: 'waitlist', path: '/waitlist', expectAll: true },
   { name: 'notifications', path: '/notifications', expectAll: true },
   { name: 'reports', path: '/reports' },
   { name: 'audit-logs', path: '/audit-logs' },

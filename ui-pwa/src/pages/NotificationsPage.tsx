@@ -30,7 +30,6 @@ function shortcut(type?: string | null, id?: number | null): { to: string; label
   if (type === 'employee') return { to: id ? `/employees/${id}` : '/hr', label: 'الموظف' }
   if (type === 'violation') return { to: '/violations', label: 'المخالفات' }
   if (type === 'inventory') return { to: '/inventory', label: 'المخزون' }
-  if (type === 'waitlist') return { to: '/bookings?tab=upcoming', label: 'الحجوزات القادمة' }
   if (type === 'maintenance') return { to: '/maintenance', label: 'الصيانة' }
   if (type === 'expense') return { to: '/expenses', label: 'المصروفات' }
   return null
@@ -57,8 +56,6 @@ function categoryMeta(type?: string | null): { label: string; tone: 'brand' | 'w
       return { label: 'صيانة', tone: 'steel' }
     case 'expense':
       return { label: 'مصروف', tone: 'muted' }
-    case 'waitlist':
-      return { label: 'حجز قادم', tone: 'accent' }
     case 'deposit':
       return { label: 'تأمين', tone: 'warning' }
     default:

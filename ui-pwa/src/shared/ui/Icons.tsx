@@ -67,9 +67,6 @@ export const IconRefresh = (p: Props) => (
 export const IconLogout = (p: Props) => (
   <Svg {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></Svg>
 )
-export const IconQueue = (p: Props) => (
-  <Svg {...p}><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="18" cy="15" r="3" /></Svg>
-)
 export const IconChevron = (p: Props) => (
   <Svg {...p}><path d="m9 18 6-6-6-6" /></Svg>
 )
