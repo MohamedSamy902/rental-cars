@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\Customer;
+use App\Models\Violation;
 use App\Services\Customers\CustomerCreditService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -69,8 +70,8 @@ class CustomerController extends Controller
             'contracts' => fn ($q) => $q->with('vehicle:id,brand,model,plate,code')->latest('id')->limit(50),
         ]);
 
-        $violations = \App\Models\Violation::query()
-            ->with(['vehicle:id,brand,model,plate', 'contract:id,code'])
+        $violations = Violation::query()
+            ->with(['vehicle:id,brand,model,plate', 'contract:id,number'])
             ->where('customer_id', $customer->id)
             ->latest('id')
             ->limit(50)
@@ -80,13 +81,13 @@ class CustomerController extends Controller
         $payload['contracts'] = $customer->contracts->map(function ($c) {
             return [
                 'id' => $c->id,
-                'code' => $c->code,
+                'number' => $c->number,
                 'status' => $c->status,
                 'starts_at' => optional($c->starts_at)?->toDateString(),
                 'planned_ends_at' => optional($c->planned_ends_at)?->toDateString(),
                 'actual_ends_at' => optional($c->actual_ends_at)?->toDateString(),
-                'daily_rate' => $c->daily_rate,
-                'deposit' => $c->deposit,
+                'frozen_daily_rate' => (int) $c->frozen_daily_rate,
+                'frozen_agreed_deposit' => (int) $c->frozen_agreed_deposit,
                 'vehicle' => $c->vehicle,
             ];
         })->values();

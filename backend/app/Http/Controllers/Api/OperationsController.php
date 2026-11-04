@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\PettyCashAccount;
@@ -14,9 +13,10 @@ use App\Models\TenantSetting;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleDocumentHistory;
-use App\Models\WorkOrder;
-use App\Services\Fleet\VehicleAvailabilityService;
+use App\Services\Contracts\ContractPricingService;
+use App\Services\Fleet\VehicleFleetStatusService;
 use App\Services\Fleet\VehicleService;
+use App\Services\Operations\AuditNarrator;
 use App\Services\Operations\PettyCashLedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +25,8 @@ use Illuminate\Support\Facades\DB;
 class OperationsController extends Controller
 {
     public function __construct(
-        private readonly VehicleAvailabilityService $availability,
+        private readonly VehicleFleetStatusService $fleetStatus,
+        private readonly ContractPricingService $pricing,
         private readonly PettyCashLedgerService $pettyCashLedger,
     ) {}
 
@@ -35,36 +36,16 @@ class OperationsController extends Controller
         $flags = $settings?->feature_flags ?? [];
         abort_unless(($flags['showroom'] ?? true) === true, 403, 'وضع المعرض غير مفعّل.');
 
-        $activeIds = Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip();
-        $reservedIds = Contract::query()
-            ->where('status', 'approved')
-            ->where('starts_at', '<=', now())
-            ->where('planned_ends_at', '>=', now())
-            ->pluck('vehicle_id')
-            ->flip();
+        $vehicles = Vehicle::query()->where('is_active', true)->orderBy('brand')->orderBy('model')->get();
+        $context = $this->fleetStatus->buildContext($vehicles);
 
-        $rows = Vehicle::query()->where('is_active', true)->orderBy('brand')->orderBy('model')->get()
-            ->map(function (Vehicle $v) use ($activeIds, $reservedIds) {
-                $status = $this->availability->statusOnDate([
-                    'manual_status' => $v->manual_status,
-                    'has_active_handover' => $activeIds->has($v->id),
-                    'has_approved_covering_date' => $reservedIds->has($v->id),
-                    'open_work_order_blocks' => $v->manual_status === 'maintenance'
-                        || WorkOrder::query()
-                            ->where('vehicle_id', $v->id)
-                            ->where('puts_in_maintenance', true)
-                            ->whereIn('status', ['open', 'in_progress'])
-                            ->exists(),
-                ]);
-
-                $returning = null;
-                if ($status !== 'available') {
-                    $returning = Contract::query()
-                        ->where('vehicle_id', $v->id)
-                        ->whereIn('status', ['active', 'approved'])
-                        ->orderBy('planned_ends_at')
-                        ->value('planned_ends_at');
-                }
+        $rows = $vehicles
+            ->map(function (Vehicle $v) use ($context) {
+                $status = $this->fleetStatus->statusFor($v, $context);
+                $returning = $status !== 'available'
+                    ? $context['returningByVehicle']->get($v->id)
+                    : null;
+                $daily = (int) $v->daily_rate;
 
                 return [
                     'id' => $v->id,
@@ -77,9 +58,9 @@ class OperationsController extends Controller
                     'color' => $v->color,
                     'seats' => $v->seats,
                     'plate' => $v->plate,
-                    'daily_rate' => (int) $v->daily_rate,
-                    'weekly_rate' => (int) round(((int) $v->daily_rate) * 7 * 0.9),
-                    'monthly_rate' => (int) round(((int) $v->daily_rate) * 30 * 0.75),
+                    'daily_rate' => $daily,
+                    'weekly_rate' => $this->pricing->showroomWeeklyRate($daily),
+                    'monthly_rate' => $this->pricing->showroomMonthlyRate($daily),
                     'default_deposit' => (int) $v->default_deposit,
                     'status' => $status,
                     'available' => $status === 'available',
@@ -230,7 +211,7 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function auditLogs(Request $request, \App\Services\Operations\AuditNarrator $narrator): JsonResponse
+    public function auditLogs(Request $request, AuditNarrator $narrator): JsonResponse
     {
         $validated = $request->validate([
             'limit' => ['nullable', 'integer', 'min:1', 'max:200'],

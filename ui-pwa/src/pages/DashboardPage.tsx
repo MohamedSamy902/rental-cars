@@ -374,10 +374,10 @@ export function DashboardPage() {
 
   const revenueRangeLabel =
     revenueRange === 'week'
-      ? 'أسبوعي · ٧ أيام'
+      ? 'آخر ٧ أيام · قبض فعلي'
       : revenueRange === 'month'
-        ? 'شهري · ٤ أسابيع'
-        : 'سنوي · ١٢ شهراً'
+        ? 'هذا الشهر · قبض فعلي'
+        : 'آخر ١٢ شهراً · قبض فعلي'
 
   const donut = useMemo(() => {
     if (!data) return []

@@ -6,6 +6,7 @@ use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\MediaFile;
 use App\Models\Notification;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -46,11 +47,11 @@ class AuditFollowupFixesTest extends TestCase
         $this->life = app(ContractLifecycleService::class);
     }
 
-    public function test_approve_freezes_current_vehicle_rates(): void
+    public function test_approve_keeps_rates_frozen_at_create_not_vehicle_snapshot(): void
     {
         $opsRole = Role::query()->where('name', 'ops_manager')->firstOrFail();
         $opsRole->permissions()->syncWithoutDetaching(
-            \App\Models\Permission::query()->whereIn('key', ['contracts.view', 'notifications.view'])->pluck('id')
+            Permission::query()->whereIn('key', ['contracts.view', 'notifications.view'])->pluck('id')
         );
         User::factory()->create(['role_id' => $opsRole->id, 'is_active' => true]);
 
@@ -63,12 +64,14 @@ class AuditFollowupFixesTest extends TestCase
         ], $this->admin->id);
 
         $this->assertSame(900, (int) $c->frozen_daily_rate);
+        $this->assertSame(2000, (int) $c->frozen_agreed_deposit);
 
+        // Changing the vehicle after create must not rewrite the contract freeze on approve.
         $vehicle->update(['daily_rate' => 1100, 'default_deposit' => 3000]);
         $approved = $this->life->approve($c, $this->admin->id);
 
-        $this->assertSame(1100, (int) $approved->frozen_daily_rate);
-        $this->assertSame(3000, (int) $approved->frozen_agreed_deposit);
+        $this->assertSame(900, (int) $approved->frozen_daily_rate);
+        $this->assertSame(2000, (int) $approved->frozen_agreed_deposit);
         $this->assertTrue(Notification::query()->where('link_type', 'contract')->where('link_id', $approved->id)->exists());
     }
 
@@ -178,7 +181,7 @@ class AuditFollowupFixesTest extends TestCase
     {
         $salesRole = Role::query()->where('name', 'sales')->firstOrFail();
         $salesRole->permissions()->syncWithoutDetaching(
-            \App\Models\Permission::query()->where('key', 'contracts.view')->pluck('id')
+            Permission::query()->where('key', 'contracts.view')->pluck('id')
         );
         $salesA = User::factory()->create(['role_id' => $salesRole->id, 'is_active' => true]);
         $salesB = User::factory()->create(['role_id' => $salesRole->id, 'is_active' => true]);

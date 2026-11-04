@@ -11,20 +11,25 @@ use App\Models\MediaFile;
 use App\Models\OwnerMonthDue;
 use App\Models\OwnerPayout;
 use App\Models\Vehicle;
+use App\Models\VehicleDocument;
 use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Services\Fleet\VehicleAssetService;
-use App\Services\Fleet\VehicleAvailabilityService;
+use App\Services\Fleet\VehicleFleetStatusService;
 use App\Services\Fleet\VehicleRecommendationService;
 use App\Services\Fleet\VehicleService;
+use Carbon\Carbon;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class VehicleController extends Controller
 {
     public function __construct(
-        private readonly VehicleAvailabilityService $availability,
+        private readonly VehicleFleetStatusService $fleetStatus,
         private readonly VehicleRecommendationService $recommendation,
         private readonly VehicleAssetService $assets,
         private readonly VehicleService $vehicles,
@@ -66,8 +71,8 @@ class VehicleController extends Controller
     public function recommend(Request $request): JsonResponse
     {
         $category = $request->string('category')->toString() ?: null;
-        $from = $request->filled('from') ? \Carbon\Carbon::parse((string) $request->input('from')) : null;
-        $to = $request->filled('to') ? \Carbon\Carbon::parse((string) $request->input('to')) : null;
+        $from = $request->filled('from') ? Carbon::parse((string) $request->input('from')) : null;
+        $to = $request->filled('to') ? Carbon::parse((string) $request->input('to')) : null;
 
         return response()->json([
             'data' => $this->recommendation->rankAvailable($category ?: null, null, $from, $to),
@@ -92,10 +97,10 @@ class VehicleController extends Controller
                 $q->where('manual_status', 'maintenance');
             } elseif ($status === 'available') {
                 $periodFrom = $request->filled('from')
-                    ? \Carbon\Carbon::parse((string) $request->input('from'))
+                    ? Carbon::parse((string) $request->input('from'))
                     : null;
                 $periodTo = $request->filled('to')
-                    ? \Carbon\Carbon::parse((string) $request->input('to'))
+                    ? Carbon::parse((string) $request->input('to'))
                     : null;
                 $q->where(function ($qq) {
                     $qq->whereNull('manual_status')->orWhereNotIn('manual_status', ['maintenance', 'out_of_service', 'sold']);
@@ -121,7 +126,12 @@ class VehicleController extends Controller
             } elseif ($status === 'rented') {
                 $q->whereHas('contracts', fn ($c) => $c->where('status', 'active'));
             } elseif ($status === 'reserved') {
-                $q->whereHas('contracts', fn ($c) => $c->where('status', 'approved'));
+                // يطابق statusOnDate: عقد معتمد يغطي الآن (ليس أي approved مستقبلي).
+                $q->whereHas('contracts', function ($c) {
+                    $c->where('status', 'approved')
+                        ->where('starts_at', '<=', now())
+                        ->where('planned_ends_at', '>=', now());
+                })->whereDoesntHave('contracts', fn ($c) => $c->where('status', 'active'));
             } elseif ($status === 'expiring') {
                 $within = max(0, (int) $request->integer('within_days', 2));
                 $from = now()->startOfDay();
@@ -162,9 +172,11 @@ class VehicleController extends Controller
             },
         ]);
         $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $items = collect($rows->items());
+        $statusContext = $this->fleetStatus->buildContext($items);
 
-        $data = collect($rows->items())->map(function (Vehicle $v) {
-            return $this->present($v);
+        $data = $items->map(function (Vehicle $v) use ($statusContext) {
+            return $this->present($v, $statusContext);
         });
 
         return response()->json([
@@ -174,7 +186,7 @@ class VehicleController extends Controller
                 'last_page' => $rows->lastPage(),
                 'total' => $rows->total(),
             ],
-            'summary' => $this->summary(),
+            'summary' => $this->fleetStatus->summarizeActiveFleet(),
         ]);
     }
 
@@ -446,25 +458,17 @@ class VehicleController extends Controller
     }
 
     /**
+     * @param  array{
+     *     activeIds?: Collection<int|string, int>,
+     *     reservedIds?: Collection<int|string, int>,
+     *     blockingWoIds?: Collection<int|string, int>
+     * }|null  $statusContext
      * @return array<string, mixed>
      */
-    private function present(Vehicle $v): array
+    private function present(Vehicle $v, ?array $statusContext = null): array
     {
-        $status = $this->availability->statusOnDate([
-            'manual_status' => $v->manual_status,
-            'has_active_handover' => $v->contracts()->where('status', 'active')->exists(),
-            'has_approved_covering_date' => $v->contracts()
-                ->where('status', 'approved')
-                ->where('starts_at', '<=', now())
-                ->where('planned_ends_at', '>=', now())
-                ->exists(),
-            'open_work_order_blocks' => $v->manual_status === 'maintenance'
-                || WorkOrder::query()
-                    ->where('vehicle_id', $v->id)
-                    ->where('puts_in_maintenance', true)
-                    ->whereIn('status', ['open', 'in_progress'])
-                    ->exists(),
-        ]);
+        $statusContext ??= $this->fleetStatus->buildContext([$v]);
+        $status = $this->fleetStatus->statusFor($v, $statusContext);
 
         return [
             'id' => $v->id,
@@ -520,8 +524,8 @@ class VehicleController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\VehicleDocument>|\Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\VehicleDocument, \App\Models\Vehicle>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\VehicleDocument>|\Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\VehicleDocument, \App\Models\Vehicle>
+     * @param  Builder<VehicleDocument>|HasMany<VehicleDocument, Vehicle>  $query
+     * @return Builder<VehicleDocument>|HasMany<VehicleDocument, Vehicle>
      */
     private function constrainLicenseDocuments($query)
     {
@@ -569,55 +573,5 @@ class VehicleController extends Controller
         $active = $v->contracts()->where('status', 'active')->orderBy('planned_ends_at')->first();
 
         return $active?->planned_ends_at?->toIso8601String();
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    private function summary(): array
-    {
-        $all = Vehicle::query()->where('is_active', true)->get();
-        $counts = [
-            'total' => $all->count(),
-            'available' => 0,
-            'rented' => 0,
-            'reserved' => 0,
-            'maintenance' => 0,
-            'license_expiring' => 0,
-            'sim_recharge' => 0,
-            'owner_agreement_expiring' => 0,
-        ];
-        foreach ($all as $v) {
-            $status = $this->present($v)['status'];
-            if (isset($counts[$status]) && ! in_array($status, ['license_expiring', 'sim_recharge', 'owner_agreement_expiring'], true)) {
-                $counts[$status]++;
-            }
-        }
-
-        $licenseUntil = now()->addDays(30)->toDateString();
-        $counts['license_expiring'] = Vehicle::query()
-            ->where('is_active', true)
-            ->whereHas('documents', function ($d) use ($licenseUntil) {
-                $this->constrainLicenseDocuments($d)
-                    ->whereNotNull('expires_on')
-                    ->whereDate('expires_on', '<=', $licenseUntil);
-            })
-            ->count();
-
-        $simUntil = now()->addDays(14)->toDateString();
-        $counts['sim_recharge'] = Vehicle::query()
-            ->where('is_active', true)
-            ->whereNotNull('tracker_sim_next_recharge_on')
-            ->whereDate('tracker_sim_next_recharge_on', '<=', $simUntil)
-            ->count();
-
-        $agreementUntil = now()->addDays(30)->toDateString();
-        $counts['owner_agreement_expiring'] = Vehicle::query()
-            ->where('is_active', true)
-            ->whereNotNull('owner_agreement_ends_on')
-            ->whereDate('owner_agreement_ends_on', '<=', $agreementUntil)
-            ->count();
-
-        return $counts;
     }
 }

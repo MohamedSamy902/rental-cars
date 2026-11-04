@@ -11,6 +11,8 @@ use App\Models\Vehicle;
 use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Services\Operations\AuditNarrator;
+use Database\Seeders\DemoSeeder;
+use Database\Seeders\MegaSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,7 +22,8 @@ class MegaSeederTest extends TestCase
 
     public function test_mega_seeder_hits_volume_targets(): void
     {
-        $this->seed();
+        $this->seed(DemoSeeder::class);
+        $this->seed(MegaSeeder::class);
 
         $this->assertGreaterThanOrEqual(50, Vehicle::query()->count());
         $this->assertGreaterThanOrEqual(100, Contract::query()->count());

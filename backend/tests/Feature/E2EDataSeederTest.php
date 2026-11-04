@@ -19,6 +19,8 @@ use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
 use App\Services\Operations\AuditNarrator;
+use Database\Seeders\DemoSeeder;
+use Database\Seeders\E2EDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,7 +30,9 @@ class E2EDataSeederTest extends TestCase
 
     public function test_database_seeder_fills_every_major_module(): void
     {
-        $this->seed();
+        // Demo افتراضي؛ الملف الكامل يحتاج SEED_PROFILE=e2e|full
+        $this->seed(DemoSeeder::class);
+        $this->seed(E2EDataSeeder::class);
 
         $this->assertGreaterThanOrEqual(10, Vehicle::query()->count());
         $this->assertGreaterThanOrEqual(8, Contract::query()->count());

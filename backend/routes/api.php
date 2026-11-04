@@ -42,7 +42,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::match(['put', 'patch'], '/auth/profile', [AuthController::class, 'updateProfile']);
     Route::match(['put', 'patch'], '/profile', [AuthController::class, 'updateProfile']);
     Route::get('/dashboard', DashboardController::class)->middleware('permission:reports.view|contracts.view|vehicles.view');
-    Route::get('/attention', AttentionController::class);
+    Route::get('/attention', AttentionController::class)
+        ->middleware('permission:contracts.view|vehicles.view|reports.view|customers.view|hr.salaries|owners.view');
 
     Route::get('/media/limits', [MediaController::class, 'limits'])->middleware('permission:media.view|media.upload|customers.view|vehicles.view|contracts.view');
     Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload|customers.create|customers.update|vehicles.update|contracts.update|violations.create|maintenance.create');
