@@ -94,6 +94,7 @@ type FormState = {
   owner_agreement_number: string
   owner_agreement_notes: string
   has_license: boolean
+  license_number: string
   license_expires_on: string
   license_issued_on: string
   license_status: 'none' | 'active' | 'expired'
@@ -141,6 +142,7 @@ function emptyForm(): FormState {
     owner_agreement_number: '',
     owner_agreement_notes: '',
     has_license: false,
+    license_number: '',
     license_expires_on: '',
     license_issued_on: '',
     license_status: 'none',
@@ -268,6 +270,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       const docs = (initial as VehicleFormInitial & {
         documents?: Array<{
           type?: string
+          document_number?: string | null
           expires_on?: string | null
           issued_on?: string | null
           file_path?: string | null
@@ -279,6 +282,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         const exp = lic.expires_on ? String(lic.expires_on).slice(0, 10) : ''
         const expired = Boolean(exp && exp < new Date().toISOString().slice(0, 10))
         next.has_license = true
+        next.license_number = lic.document_number ? String(lic.document_number) : ''
         next.license_expires_on = exp
         next.license_issued_on = lic.issued_on ? String(lic.issued_on).slice(0, 10) : ''
         next.license_status = expired ? 'expired' : 'active'
@@ -363,6 +367,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       payload.addon_ids = selectedAddons
       payload.license = {
         has_license: form.has_license,
+        document_number: form.has_license && form.license_number ? form.license_number : null,
         expires_on: form.has_license && form.license_expires_on ? form.license_expires_on : null,
         issued_on: form.has_license && form.license_issued_on ? form.license_issued_on : null,
         file_path: form.has_license && form.license_file_path ? form.license_file_path : null,
@@ -606,6 +611,12 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
           />
           {form.has_license ? (
             <div className="rpm-form-grid" style={{ marginBlockStart: '0.5rem' }}>
+              <TextField
+                label="رقم الرخصة"
+                value={form.license_number}
+                error={errors['license.document_number']}
+                onChange={(e) => setForm({ ...form, license_number: e.target.value })}
+              />
               <SelectField
                 label="حالة الرخصة"
                 value={form.license_status === 'none' ? 'active' : form.license_status}

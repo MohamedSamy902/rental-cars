@@ -12,7 +12,7 @@ class VehicleOwner extends Model
 
     protected $fillable = [
         'full_name', 'phone', 'phone_alt', 'national_id', 'id_front_path', 'id_back_path',
-        'license_front_path', 'license_back_path', 'notes', 'is_active',
+        'notes', 'is_active',
     ];
 
     protected function casts(): array

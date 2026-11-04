@@ -225,8 +225,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
 | PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) · عند تغيير رخصة التسيير (تاريخ/صورة) تُؤرشف السابقة تلقائياً ثم تُكتب الجديدة |
 | DELETE | `/vehicles/{vehicle}` | أرشفة ناعمة (apiResource) |
-| POST | `/vehicles/{vehicle}/documents` | مستند |
-| PUT | `/vehicles/{vehicle}/documents/{id}` | تحديث؛ رخصة تسيير مع `archive_previous` تؤرشف السجل القديم |
+| POST | `/vehicles/{vehicle}/documents` | مستند (`type` · `document_number` · وش/ضهر · تواريخ) |
+| PUT | `/vehicles/{vehicle}/documents/{id}` | تحديث؛ رخصة تسيير مع `archive_previous` تؤرشف السجل القديم (يشمل رقم الرخصة) |
 | GET | `/vehicles/{vehicle}/document-history` | سجل الرخص/المستندات المؤرشفة |
 | POST | `/vehicles/{vehicle}/accessories` | مستلزم |
 
@@ -716,7 +716,9 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/owners/{id}/payouts` | `owners.payout` (حسّاسة) |
 | GET | `/owner-payouts` | `owners.view` |
 
-**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since`
+**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · عقد المالك (`owner_agreement_*`)
+
+**حقول المالك:** اسم · هاتف · هاتف بديل · رقم قومي · بطاقة وش/ضهر · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
 
 **ترحيل محاسبي**
 - استحقاق شهري: مدين `5200` مصروف إيجار ملاك · دائن `2100` مستحقات ملاك

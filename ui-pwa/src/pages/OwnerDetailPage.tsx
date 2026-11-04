@@ -54,8 +54,6 @@ type Owner = {
   national_id?: string | null
   id_front_path?: string | null
   id_back_path?: string | null
-  license_front_path?: string | null
-  license_back_path?: string | null
   notes?: string | null
   is_active: boolean
   balance?: Balance | null
@@ -66,7 +64,7 @@ type Owner = {
 
 const emptyForm = {
   full_name: '', phone: '', phone_alt: '', national_id: '', notes: '', is_active: true,
-  id_front_path: '', id_back_path: '', license_front_path: '', license_back_path: '',
+  id_front_path: '', id_back_path: '',
 }
 
 export function OwnerDetailPage() {
@@ -103,8 +101,6 @@ export function OwnerDetailPage() {
         is_active: res.data.is_active !== false,
         id_front_path: res.data.id_front_path || '',
         id_back_path: res.data.id_back_path || '',
-        license_front_path: res.data.license_front_path || '',
-        license_back_path: res.data.license_back_path || '',
       })
     } catch (e) {
       setError((e as ApiError).message)
@@ -213,8 +209,6 @@ export function OwnerDetailPage() {
         <div className="rpm-form-grid">
           <MediaUpload label="بطاقة — وش" value={owner.id_front_path || null} collection="owners_id" purpose="id_front" disabled onChange={() => undefined} />
           <MediaUpload label="بطاقة — ضهر" value={owner.id_back_path || null} collection="owners_id" purpose="id_back" disabled onChange={() => undefined} />
-          <MediaUpload label="رخصة — وش" value={owner.license_front_path || null} collection="owners_id" purpose="license_front" disabled onChange={() => undefined} />
-          <MediaUpload label="رخصة — ضهر" value={owner.license_back_path || null} collection="owners_id" purpose="license_back" disabled onChange={() => undefined} />
         </div>
       </section>
 
@@ -287,8 +281,6 @@ export function OwnerDetailPage() {
           <SwitchField label="نشط" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
           <MediaUpload label="بطاقة — وش" value={form.id_front_path || null} collection="owners_id" purpose="id_front" accept="image" onChange={(path) => setForm({ ...form, id_front_path: path || '' })} />
           <MediaUpload label="بطاقة — ضهر" value={form.id_back_path || null} collection="owners_id" purpose="id_back" accept="image" onChange={(path) => setForm({ ...form, id_back_path: path || '' })} />
-          <MediaUpload label="رخصة — وش" value={form.license_front_path || null} collection="owners_id" purpose="license_front" accept="image" onChange={(path) => setForm({ ...form, license_front_path: path || '' })} />
-          <MediaUpload label="رخصة — ضهر" value={form.license_back_path || null} collection="owners_id" purpose="license_back" accept="image" onChange={(path) => setForm({ ...form, license_back_path: path || '' })} />
         </div>
       </Sheet>
 

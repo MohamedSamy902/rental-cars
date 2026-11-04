@@ -139,7 +139,7 @@ class VehicleService
     /**
      * Optional traffic license on create/edit — allowed missing or expired.
      *
-     * @param  array{has_license?: bool|int|string|null, expires_on?: string|null, issued_on?: string|null, file_path?: string|null, file_path_back?: string|null, notes?: string|null}|null  $license
+     * @param  array{has_license?: bool|int|string|null, document_number?: string|null, expires_on?: string|null, issued_on?: string|null, file_path?: string|null, file_path_back?: string|null, notes?: string|null}|null  $license
      */
     private function syncLicenseDocument(Vehicle $vehicle, ?array $license): void
     {
@@ -164,6 +164,9 @@ class VehicleService
 
         $payload = [
             'type' => 'رخصة تسيير',
+            'document_number' => array_key_exists('document_number', $license)
+                ? ($license['document_number'] ?: null)
+                : $existing?->document_number,
             'file_path' => array_key_exists('file_path', $license) && filled($license['file_path'])
                 ? (string) $license['file_path']
                 : ($existing?->file_path ?? 'manual/رخصة تسيير'),
@@ -185,7 +188,8 @@ class VehicleService
             $materialChange = (string) ($existing->expires_on?->toDateString() ?? '') !== (string) ($payload['expires_on'] ?? '')
                 || (string) ($existing->issued_on?->toDateString() ?? '') !== (string) ($payload['issued_on'] ?? '')
                 || (string) ($existing->file_path ?? '') !== (string) ($payload['file_path'] ?? '')
-                || (string) ($existing->file_path_back ?? '') !== (string) ($payload['file_path_back'] ?? '');
+                || (string) ($existing->file_path_back ?? '') !== (string) ($payload['file_path_back'] ?? '')
+                || (string) ($existing->document_number ?? '') !== (string) ($payload['document_number'] ?? '');
 
             if ($materialChange) {
                 $this->renewLicense($vehicle, $existing, $payload, auth()->id());
@@ -304,6 +308,7 @@ class VehicleService
                 'vehicle_id' => $vehicle->id,
                 'vehicle_document_id' => $document->id,
                 'type' => $document->type,
+                'document_number' => $document->document_number,
                 'file_path' => $document->file_path,
                 'file_path_back' => $document->file_path_back,
                 'issued_on' => $document->issued_on,
@@ -315,6 +320,9 @@ class VehicleService
 
             $document->update([
                 'type' => $data['type'] ?? $document->type,
+                'document_number' => array_key_exists('document_number', $data)
+                    ? ($data['document_number'] ?: null)
+                    : $document->document_number,
                 'file_path' => $data['file_path'] ?? $document->file_path,
                 'file_path_back' => $data['file_path_back'] ?? $document->file_path_back,
                 'issued_on' => $data['issued_on'] ?? $document->issued_on,
