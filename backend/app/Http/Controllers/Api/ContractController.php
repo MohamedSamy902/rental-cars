@@ -8,7 +8,9 @@ use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\UpdateContractPricingRequest;
 use App\Models\Contract;
 use App\Models\DocumentTemplate;
+use App\Models\Payment;
 use App\Models\TenantSetting;
+use App\Models\Violation;
 use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
 use App\Services\Contracts\RentalProgressService;
@@ -58,7 +60,7 @@ class ContractController extends Controller
         $contractIds = collect($rows->items())->pluck('id')->all();
         $openViolationTotals = $contractIds === []
             ? collect()
-            : \App\Models\Violation::query()
+            : Violation::query()
                 ->selectRaw('contract_id, SUM(amount) as total_amount, COUNT(*) as cnt')
                 ->whereIn('contract_id', $contractIds)
                 ->open()
@@ -89,23 +91,36 @@ class ContractController extends Controller
                 'last_page' => $rows->lastPage(),
                 'total' => $rows->total(),
             ],
-            'summary' => [
-                'total' => Contract::query()->count(),
-                'pending' => Contract::query()->where('status', 'pending')->count(),
-                'approved' => Contract::query()->where('status', 'approved')->count(),
-                'active' => Contract::query()->where('status', 'active')->count(),
-                'completed' => Contract::query()->where('status', 'completed')->count(),
-                'cancelled' => Contract::query()->where('status', 'cancelled')->count(),
-                'upcoming' => Contract::query()
-                    ->whereIn('status', ['pending', 'approved'])
-                    ->where('starts_at', '>', now()->endOfDay())
-                    ->count(),
-                'handover_today' => Contract::query()
-                    ->whereIn('status', ['pending', 'approved'])
-                    ->whereDate('starts_at', $today)
-                    ->count(),
-            ],
+            'summary' => $this->buildIndexSummary($today),
         ]);
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function buildIndexSummary(string $today): array
+    {
+        $byStatus = Contract::query()
+            ->selectRaw('status, COUNT(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status');
+
+        return [
+            'total' => (int) $byStatus->sum(),
+            'pending' => (int) ($byStatus['pending'] ?? 0),
+            'approved' => (int) ($byStatus['approved'] ?? 0),
+            'active' => (int) ($byStatus['active'] ?? 0),
+            'completed' => (int) ($byStatus['completed'] ?? 0),
+            'cancelled' => (int) ($byStatus['cancelled'] ?? 0),
+            'upcoming' => Contract::query()
+                ->whereIn('status', ['pending', 'approved'])
+                ->where('starts_at', '>', now()->endOfDay())
+                ->count(),
+            'handover_today' => Contract::query()
+                ->whereIn('status', ['pending', 'approved'])
+                ->whereDate('starts_at', $today)
+                ->count(),
+        ];
     }
 
     public function store(StoreContractRequest $request): JsonResponse
@@ -228,7 +243,7 @@ class ContractController extends Controller
         $tenant = TenantSetting::query()->first();
         $ops = is_array($tenant?->operational) ? $tenant->operational : [];
 
-        $payments = \App\Models\Payment::query()
+        $payments = Payment::query()
             ->where('link_type', 'contract')
             ->where('link_id', $contract->id)
             ->orderBy('paid_at')

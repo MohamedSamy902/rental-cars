@@ -72,4 +72,35 @@ class ContractPricingService
 
         return $period - $discount + $excess + $damage + $operating + $other;
     }
+
+    /**
+     * Expected / dossier rent before close — uses approved_days when set,
+     * otherwise the canonical rental day count (never calendar diffInDays).
+     */
+    public function estimatedPeriodRent(
+        int $dailyRate,
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+        ?int $approvedDays = null,
+        ?int $fractionExtraDayAfterHours = null,
+        int $discount = 0,
+        int $otherFees = 0,
+    ): int {
+        $days = $approvedDays !== null && $approvedDays > 0
+            ? $approvedDays
+            : $this->countRentalDays($start, $end, $fractionExtraDayAfterHours);
+
+        return max(0, ($days * max(0, $dailyRate)) - max(0, $discount) + max(0, $otherFees));
+    }
+
+    /** Showroom display packages (marketing discounts, not billed totals). */
+    public function showroomWeeklyRate(int $dailyRate): int
+    {
+        return (int) round($dailyRate * 7 * 0.9);
+    }
+
+    public function showroomMonthlyRate(int $dailyRate): int
+    {
+        return (int) round($dailyRate * 30 * 0.75);
+    }
 }

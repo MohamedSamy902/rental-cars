@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { IconClose } from './Icons'
 import { useIsMobile, useSheetDrag } from './useSheetDrag'
 import './Sheet.css'
@@ -51,6 +51,7 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
   const close = useCallback(() => onCloseRef.current(), [])
   const titleId = useId()
   const mobile = useIsMobile()
+  const reduceMotion = useReducedMotion()
   const { startDrag, dragProps } = useSheetDrag(close, mobile)
 
   useEffect(() => {
@@ -149,13 +150,18 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
     return () => body.removeEventListener('focusin', onFocusIn)
   }, [])
 
-  const motionIn = mobile
-    ? { initial: { y: '100%' }, animate: { y: 0 }, exit: { y: '100%' } }
-    : {
-        initial: { opacity: 0, y: 14, scale: 0.98 },
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: 10, scale: 0.98 },
-      }
+  const motionIn = reduceMotion
+    ? { initial: false as const, animate: {}, exit: {} }
+    : mobile
+      ? { initial: { y: '100%' }, animate: { y: 0 }, exit: { y: '100%' } }
+      : {
+          initial: { opacity: 0, y: 14, scale: 0.98 },
+          animate: { opacity: 1, y: 0, scale: 1 },
+          exit: { opacity: 0, y: 10, scale: 0.98 },
+        }
+
+  const backdropTransition = reduceMotion ? { duration: 0 } : { duration: 0.2 }
+  const panelTransition = reduceMotion ? { duration: 0 } : sheetSpring
 
   return (
     <div className="rpm-sheet-root" role="presentation" ref={rootRef}>
@@ -167,13 +173,13 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={backdropTransition}
       />
       <motion.div
         className="rpm-sheet-wrap"
         ref={wrapRef}
         {...motionIn}
-        transition={sheetSpring}
+        transition={panelTransition}
         {...dragProps}
       >
         <aside className="rpm-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>

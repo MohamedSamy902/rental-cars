@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { debounceAbortable } from '@/shared/lib/debounceAbort'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
@@ -81,7 +82,7 @@ export function BookingsPage() {
     [summary.pending, summary.upcoming, summary.handover_today, attention.pickups_today, attention.overdue_returns, attention.returning_today],
   )
 
-  async function load() {
+  async function load(signal?: AbortSignal) {
     setLoading(true)
     setError('')
     try {
@@ -92,7 +93,8 @@ export function BookingsPage() {
       } else if (chip !== 'all') {
         qs.set('status', chip)
       }
-      const res = await api<{ data: Contract[]; summary: typeof summary }>(`/contracts?${qs}`)
+      const res = await api<{ data: Contract[]; summary: typeof summary }>(`/contracts?${qs}`, { signal })
+      if (signal?.aborted) return
       setRows(res.data)
       setSummary({
         total: res.summary.total ?? 0,
@@ -104,16 +106,19 @@ export function BookingsPage() {
         handover_today: res.summary.handover_today ?? 0,
       })
     } catch (e) {
+      if (signal?.aborted) return
       setError((e as ApiError).message)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }
 
+  const searchDebounce = useMemo(() => debounceAbortable(250), [])
+
   useEffect(() => {
-    const t = window.setTimeout(() => load(), 250)
-    return () => window.clearTimeout(t)
-  }, [search, chip, createdVersion])
+    searchDebounce.schedule((signal) => load(signal))
+    return () => searchDebounce.cancel()
+  }, [search, chip, createdVersion, searchDebounce])
 
   const wantNew = searchParams.get('new') === '1'
   useEffect(() => {

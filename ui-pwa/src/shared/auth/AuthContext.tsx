@@ -47,6 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    const onExpired = () => {
+      setToken(null)
+      setUser(null)
+      setLoading(false)
+    }
+    window.addEventListener('rpm:auth-expired', onExpired)
+    return () => window.removeEventListener('rpm:auth-expired', onExpired)
+  }, [])
+
   const applyUser = useCallback((next: AuthUser) => {
     setUser(next)
   }, [])

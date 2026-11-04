@@ -41,6 +41,26 @@ function applyIdempotency(headers: Headers, method: string, explicit?: string): 
   return existing
 }
 
+function parseJsonBody(text: string, status: number): unknown {
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    const err: ApiError = {
+      message: 'استجابة غير صالحة من الخادم.',
+      status: status >= 400 ? status : 502,
+    }
+    throw err
+  }
+}
+
+function handleUnauthorized() {
+  setToken(null)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('rpm:auth-expired'))
+  }
+}
+
 export async function api<T>(
   path: string,
   options: ApiOptions = {},
@@ -66,10 +86,15 @@ export async function api<T>(
       method,
       headers,
       body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
+      signal: options.signal,
     })
 
     const text = await res.text()
-    const data = text ? JSON.parse(text) : null
+    const data = parseJsonBody(text, res.status) as { message?: string; errors?: Record<string, string[]> } | null
+
+    if (res.status === 401) {
+      handleUnauthorized()
+    }
 
     if (!res.ok) {
       const err: ApiError = {
@@ -100,7 +125,7 @@ export async function api<T>(
 export async function apiUpload<T>(
   path: string,
   formData: FormData,
-  options: { idempotencyKey?: string } = {},
+  options: { idempotencyKey?: string; signal?: AbortSignal } = {},
 ): Promise<T> {
   const headers = new Headers({ Accept: 'application/json' })
   const token = getToken()
@@ -116,10 +141,15 @@ export async function apiUpload<T>(
       method: 'POST',
       headers,
       body: formData,
+      signal: options.signal,
     })
 
     const text = await res.text()
-    const data = text ? JSON.parse(text) : null
+    const data = parseJsonBody(text, res.status) as { message?: string; errors?: Record<string, string[]> } | null
+
+    if (res.status === 401) {
+      handleUnauthorized()
+    }
 
     if (!res.ok) {
       const err: ApiError = {
@@ -158,6 +188,9 @@ export async function apiBlob(path: string): Promise<Blob> {
         : `/${path}`
 
   const res = await fetch(`/api${normalized}`, { headers })
+  if (res.status === 401) {
+    handleUnauthorized()
+  }
   if (!res.ok) {
     const err: ApiError = {
       message: 'تعذّر تحميل الملف.',
@@ -167,3 +200,5 @@ export async function apiBlob(path: string): Promise<Blob> {
   }
   return res.blob()
 }
+
+export { debounceAbortable } from '@/shared/lib/debounceAbort'

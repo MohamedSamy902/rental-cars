@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { debounceAbortable } from '@/shared/lib/debounceAbort'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
@@ -67,24 +68,30 @@ export function CustomersPage() {
     [attention.blacklisted_customers],
   )
 
-  async function load() {
+  async function load(signal?: AbortSignal) {
     setLoading(true)
     try {
       const qs = new URLSearchParams()
       if (search.trim()) qs.set('search', search.trim())
       if (chip === 'blacklist') qs.set('status', 'blacklist')
       if (chip === 'active') qs.set('status', 'active')
-      const res = await api<{ data: Customer[] }>(`/customers?${qs}`)
+      const res = await api<{ data: Customer[] }>(`/customers?${qs}`, { signal })
+      if (signal?.aborted) return
       setRows(res.data)
+    } catch (e) {
+      if (signal?.aborted) return
+      toast.error((e as ApiError).message)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }
 
+  const searchDebounce = useMemo(() => debounceAbortable(250), [])
+
   useEffect(() => {
-    const t = window.setTimeout(load, 250)
-    return () => window.clearTimeout(t)
-  }, [search, chip])
+    searchDebounce.schedule((signal) => load(signal))
+    return () => searchDebounce.cancel()
+  }, [search, chip, searchDebounce])
 
   async function openDetail(id: number) {
     navigate(`/customers/${id}`)

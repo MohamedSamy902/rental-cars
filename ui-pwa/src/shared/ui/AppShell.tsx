@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -79,6 +79,13 @@ export function AppShell() {
     Boolean(user),
     location.pathname,
   )
+  const reduceMotion = useReducedMotion()
+  const pageTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const }
+  const drawerSpring = reduceMotion
+    ? { duration: 0 }
+    : { type: 'spring' as const, stiffness: 420, damping: 38 }
 
   const visibleRail = railNav.filter((item) => {
     if (item.feature && !featureEnabled(item.feature)) return false
@@ -290,10 +297,10 @@ export function AppShell() {
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+              exit={reduceMotion ? {} : { opacity: 0, y: -4 }}
+              transition={pageTransition}
             >
               <Outlet />
             </motion.div>
@@ -335,14 +342,19 @@ export function AppShell() {
 
       <AnimatePresence>
         {drawer ? (
-          <motion.div className="shell-drawer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div
+            className="shell-drawer"
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={reduceMotion ? {} : { opacity: 0 }}
+          >
             <button type="button" className="shell-drawer__scrim" aria-label="إغلاق" onClick={closeDrawer} />
             <motion.div
               className="shell-drawer__sheet"
-              initial={{ y: '110%' }}
+              initial={reduceMotion ? false : { y: '110%' }}
               animate={{ y: 0 }}
-              exit={{ y: '110%' }}
-              transition={{ type: 'spring', stiffness: 420, damping: 38 }}
+              exit={reduceMotion ? {} : { y: '110%' }}
+              transition={drawerSpring}
               role="dialog"
               aria-modal="true"
               aria-label="كل الأقسام"

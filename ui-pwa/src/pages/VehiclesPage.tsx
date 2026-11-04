@@ -8,6 +8,8 @@ import {
   useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench, IconEdit,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
+import { vehicleStatusLabel } from '@/shared/lib/statusLabels'
+import { debounceAbortable } from '@/shared/lib/debounceAbort'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
 import './pages.css'
 import './VehiclesPage.css'
@@ -75,15 +77,6 @@ type Vehicle = {
   engine_capacity?: string | null
   seats?: number | null
   target_monthly_income?: number | null
-}
-
-const statusLabel: Record<string, string> = {
-  available: 'متاحة',
-  reserved: 'محجوزة',
-  rented: 'مؤجرة',
-  maintenance: 'في صيانة',
-  out_of_service: 'خارج الخدمة',
-  expiring: 'قاربت على الانتهاء',
 }
 
 export function VehiclesPage() {
@@ -169,6 +162,7 @@ export function VehiclesPage() {
     licenseDays = licenseWithinDays,
     simDays = simWithinDays,
     agreementDays = agreementWithinDays,
+    signal?: AbortSignal,
   ) {
     setLoading(true)
     setError('')
@@ -180,7 +174,8 @@ export function VehiclesPage() {
       if (nextChip === 'license_expiring') qs.set('within_days', String(licenseDays))
       if (nextChip === 'sim_recharge') qs.set('within_days', String(simDays))
       if (nextChip === 'owner_agreement_expiring') qs.set('within_days', String(agreementDays))
-      const res = await api<{ data: Vehicle[]; summary: typeof summary }>(`/vehicles?${qs}`)
+      const res = await api<{ data: Vehicle[]; summary: typeof summary }>(`/vehicles?${qs}`, { signal })
+      if (signal?.aborted) return
       setRows(res.data)
       const s = res.summary
       setSummary({
@@ -194,16 +189,21 @@ export function VehiclesPage() {
         owner_agreement_expiring: s.owner_agreement_expiring ?? 0,
       })
     } catch (e) {
+      if (signal?.aborted) return
       setError((e as ApiError).message)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }
 
+  const searchDebounce = useMemo(() => debounceAbortable(250), [])
+
   useEffect(() => {
-    const t = window.setTimeout(() => load(), 250)
-    return () => window.clearTimeout(t)
-  }, [search, chip, withinDays, licenseWithinDays, simWithinDays, agreementWithinDays])
+    searchDebounce.schedule((signal) =>
+      load(search, chip, withinDays, licenseWithinDays, simWithinDays, agreementWithinDays, signal),
+    )
+    return () => searchDebounce.cancel()
+  }, [search, chip, withinDays, licenseWithinDays, simWithinDays, agreementWithinDays, searchDebounce])
 
   const columns: DataColumn<Vehicle>[] = useMemo(() => {
     if (chip === 'owner_agreement_expiring') {
@@ -288,7 +288,7 @@ export function VehiclesPage() {
           cell: (v) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
               <strong>{v.tracker_sim_next_recharge_on ? formatDate(v.tracker_sim_next_recharge_on) : '—'}</strong>
-              <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+              <StatusPill status={v.status} label={vehicleStatusLabel[v.status] || v.status} />
             </div>
           ),
           sortValue: (v) => v.tracker_sim_next_recharge_on || '',
@@ -337,7 +337,7 @@ export function VehiclesPage() {
         header: 'الحالة',
         cell: (v) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-            <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+            <StatusPill status={v.status} label={vehicleStatusLabel[v.status] || v.status} />
             {chip === 'expiring' && v.active_contract_ends_at ? (
               <span className="rpm-table__sub">ينتهي {formatDate(v.active_contract_ends_at)}</span>
             ) : null}

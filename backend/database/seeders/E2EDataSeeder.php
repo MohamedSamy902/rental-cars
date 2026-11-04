@@ -12,11 +12,12 @@ use App\Models\Expense;
 use App\Models\Inspection;
 use App\Models\InventoryBatch;
 use App\Models\InventoryItem;
+use App\Models\Notification;
 use App\Models\OwnerMonthDue;
 use App\Models\OwnerPayout;
 use App\Models\Payment;
 use App\Models\PayrollLine;
-use App\Models\PayrollLinePayout;
+use App\Models\PayrollPayout;
 use App\Models\PayrollRun;
 use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
@@ -1091,14 +1092,14 @@ class E2EDataSeeder extends Seeder
                 ],
             );
             $total += $net;
-            if (! PayrollLinePayout::query()->where('payroll_line_id', $line->id)->exists()) {
-                PayrollLinePayout::query()->create([
+            if (! PayrollPayout::query()->where('payroll_line_id', $line->id)->exists()) {
+                PayrollPayout::query()->create([
                     'payroll_line_id' => $line->id,
                     'amount' => (int) $line->paid_amount,
                     'paid_on' => now()->subDay()->toDateString(),
                     'method' => 'transfer',
                     'notes' => 'صرف جزئي — بذرة',
-                    'created_by' => $hrId,
+                    'paid_by' => $hrId,
                 ]);
             }
             SalaryAdvance::query()
@@ -1235,7 +1236,7 @@ class E2EDataSeeder extends Seeder
             if (! $user) {
                 continue;
             }
-            if (! \App\Models\Notification::query()->where('user_id', $user->id)->where('title', 'تسليم اليوم — CNT-TODAY-01')->exists()) {
+            if (! Notification::query()->where('user_id', $user->id)->where('title', 'تسليم اليوم — CNT-TODAY-01')->exists()) {
                 $dispatcher->notify(
                     $user,
                     'تسليم اليوم — CNT-TODAY-01',
@@ -1244,7 +1245,7 @@ class E2EDataSeeder extends Seeder
                     (int) (Contract::query()->where('number', 'CNT-TODAY-01')->value('id') ?? 0) ?: null,
                 );
             }
-            if (! \App\Models\Notification::query()->where('user_id', $user->id)->where('title', 'مخزون منخفض — مياه ردّياتير')->exists()) {
+            if (! Notification::query()->where('user_id', $user->id)->where('title', 'مخزون منخفض — مياه ردّياتير')->exists()) {
                 $dispatcher->notify(
                     $user,
                     'مخزون منخفض — مياه ردّياتير',

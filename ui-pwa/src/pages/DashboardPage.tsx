@@ -40,7 +40,10 @@ import {
   IconWrench,
 } from '@/shared/ui/Icons'
 import { useNewContract } from '@/shared/contracts/newContractContext'
+import { contractStatusLabel } from '@/shared/lib/statusLabels'
 import './DashboardPage.css'
+
+type RevenueRange = 'week' | 'month' | 'year'
 
 type ProfitCompare = {
   current_month: string
@@ -117,6 +120,8 @@ type Dash = {
     customer?: { full_name: string }
     vehicle?: { brand: string; model: string; plate: string }
   }[]
+  revenue_series?: { label: string; value: number }[]
+  revenue_range?: RevenueRange
 }
 
 /** SVG chart attributes can't resolve CSS variables, so charts read a per-theme palette */
@@ -187,15 +192,15 @@ function taskIcon(rule: string) {
 }
 
 function contractStatusPill(status: string): { label: string; tone: BadgeTone } {
-  const map: Record<string, { label: string; tone: BadgeTone }> = {
-    active: { label: 'نشط', tone: 'steel' },
-    approved: { label: 'معتمد', tone: 'success' },
-    pending: { label: 'معلّق', tone: 'warning' },
-    draft: { label: 'مسودة', tone: 'muted' },
-    completed: { label: 'مكتمل', tone: 'muted' },
-    cancelled: { label: 'ملغى', tone: 'danger' },
+  const map: Record<string, BadgeTone> = {
+    active: 'steel',
+    approved: 'success',
+    pending: 'warning',
+    draft: 'muted',
+    completed: 'muted',
+    cancelled: 'danger',
   }
-  return map[status] || { label: status, tone: 'muted' }
+  return { label: contractStatusLabel[status] || status, tone: map[status] || 'muted' }
 }
 
 function MiniSpark({ values, tone = 'brand' }: { values: number[]; tone?: string }) {
@@ -237,7 +242,6 @@ function sparkFromValue(value: number, seed: number): number[] {
   })
 }
 
-type RevenueRange = 'week' | 'month' | 'year'
 
 function ChartTooltip({
   active,
@@ -255,6 +259,10 @@ function ChartTooltip({
       <strong>{formatMoney(Number(payload[0]?.value ?? 0))}</strong>
     </div>
   )
+}
+
+function dashboardPath(range: RevenueRange) {
+  return `/dashboard?revenue_range=${range}`
 }
 
 function CardMenu({ label, items }: { label: string; items: MenuItem[] }) {
@@ -292,22 +300,34 @@ export function DashboardPage() {
   }, [data?.profitability_compare, toast])
 
   useEffect(() => {
-    api<Dash>('/dashboard')
-      .then(setData)
-      .catch((e) => setError(e.message || 'تعذّر تحميل اللوحة'))
-      .finally(() => setLoading(false))
-  }, [])
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    api<Dash>(dashboardPath(revenueRange))
+      .then((next) => {
+        if (!cancelled) setData(next)
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || 'تعذّر تحميل اللوحة')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [revenueRange])
 
   const refresh = useCallback(() => {
     setRefreshing(true)
-    api<Dash>('/dashboard')
+    api<Dash>(dashboardPath(revenueRange))
       .then((next) => {
         setData(next)
         toast.success('تم تحديث بيانات اللوحة')
       })
       .catch((e) => toast.error(e.message || 'تعذّر تحديث اللوحة'))
       .finally(() => setRefreshing(false))
-  }, [toast])
+  }, [toast, revenueRange])
 
   const menus = useMemo(() => {
     const go = (id: string, label: string, to: string, icon: ReactNode): MenuItem => ({
@@ -345,65 +365,7 @@ export function DashboardPage() {
     }
   }, [navigate, refresh, openNewContract])
 
-  const revenueSeries = useMemo(() => {
-    if (!data) return []
-    const today = startOfDay(new Date())
-    const activeRates = data.recent_contracts
-      .filter((c) => c.status === 'active' || c.status === 'approved')
-      .reduce((sum, c) => sum + (c.frozen_daily_rate || 0), 0)
-    const dailyBase = activeRates || Math.round((data.kpis.expected_revenue || 0) / 7)
-
-    if (revenueRange === 'week') {
-      return Array.from({ length: 7 }, (_, i) => {
-        const day = new Date(today)
-        day.setDate(today.getDate() + i)
-        const ending = data.recent_contracts.filter(
-          (c) => startOfDay(new Date(c.planned_ends_at)).getTime() === day.getTime(),
-        )
-        const endingRevenue = ending.reduce((s, c) => s + (c.frozen_daily_rate || 0), 0)
-        return {
-          label: formatDayShort(day.toISOString()),
-          value: Math.max(0, Math.round(dailyBase * (0.94 + i * 0.015) - endingRevenue * 0.3)),
-        }
-      })
-    }
-
-    if (revenueRange === 'month') {
-      return Array.from({ length: 4 }, (_, i) => {
-        const weekBase = dailyBase * 7
-        const wave = 0.9 + i * 0.05 + Math.sin(i * 1.1) * 0.06
-        return {
-          label: `أسبوع ${i + 1}`,
-          value: Math.max(0, Math.round(weekBase * wave)),
-        }
-      })
-    }
-
-    const monthNames = [
-      'يناير',
-      'فبراير',
-      'مارس',
-      'أبريل',
-      'مايو',
-      'يونيو',
-      'يوليو',
-      'أغسطس',
-      'سبتمبر',
-      'أكتوبر',
-      'نوفمبر',
-      'ديسمبر',
-    ]
-    const nowMonth = today.getMonth()
-    return Array.from({ length: 12 }, (_, i) => {
-      const monthIndex = (nowMonth - 11 + i + 12) % 12
-      const monthBase = dailyBase * 30
-      const season = 0.82 + Math.sin((i / 12) * Math.PI * 2) * 0.14 + i * 0.012
-      return {
-        label: monthNames[monthIndex],
-        value: Math.max(0, Math.round(monthBase * season)),
-      }
-    })
-  }, [data, revenueRange])
+  const revenueSeries = useMemo(() => data?.revenue_series ?? [], [data?.revenue_series])
 
   const revenueTotal = useMemo(
     () => revenueSeries.reduce((sum, row) => sum + row.value, 0),
@@ -412,10 +374,10 @@ export function DashboardPage() {
 
   const revenueRangeLabel =
     revenueRange === 'week'
-      ? 'أسبوعي · ٧ أيام'
+      ? 'آخر ٧ أيام · قبض فعلي'
       : revenueRange === 'month'
-        ? 'شهري · ٤ أسابيع'
-        : 'سنوي · ١٢ شهراً'
+        ? 'هذا الشهر · قبض فعلي'
+        : 'آخر ١٢ شهراً · قبض فعلي'
 
   const donut = useMemo(() => {
     if (!data) return []

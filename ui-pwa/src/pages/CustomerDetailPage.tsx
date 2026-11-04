@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
+import { contractStatusLabel, violationStatusLabel } from '@/shared/lib/statusLabels'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
   useToast, SkeletonBlock, ErrorState, StatusPill, PhoneActions,
@@ -11,11 +12,11 @@ import './pages.css'
 
 type ContractRow = {
   id: number
-  code: string
+  number: string
   status: string
   starts_at?: string | null
   planned_ends_at?: string | null
-  daily_rate?: number
+  frozen_daily_rate?: number
   deposit?: number
   vehicle?: { brand: string; model: string; plate: string } | null
 }
@@ -27,7 +28,7 @@ type ViolationRow = {
   status: string
   location?: string
   vehicle?: { brand: string; model: string; plate: string }
-  contract?: { id: number; code: string } | null
+  contract?: { id: number; number: string } | null
 }
 
 type Customer = {
@@ -215,14 +216,14 @@ export function CustomerDetailPage() {
             {(customer.contracts || []).map((c) => (
               <article key={c.id} className="rpm-card">
                 <div className="rpm-card__row">
-                  <strong><Link to={`/contracts/${c.id}`}>{c.code}</Link></strong>
-                  <StatusPill status={c.status} label={c.status} />
+                  <strong><Link to={`/contracts/${c.id}`}>{c.number}</Link></strong>
+                  <StatusPill status={c.status} label={contractStatusLabel[c.status] || c.status} />
                 </div>
                 <p className="muted">
                   {c.vehicle ? `${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}` : '—'}
                   {' · '}
                   {formatDate(c.starts_at)} → {formatDate(c.planned_ends_at)}
-                  {c.daily_rate != null ? ` · ${formatMoney(c.daily_rate)}/يوم` : ''}
+                  {c.frozen_daily_rate != null ? ` · ${formatMoney(c.frozen_daily_rate)}/يوم` : ''}
                 </p>
               </article>
             ))}
@@ -238,11 +239,15 @@ export function CustomerDetailPage() {
               <article key={v.id} className="rpm-card">
                 <div className="rpm-card__row">
                   <strong>{formatMoney(v.amount)}</strong>
-                  <span>{formatDate(v.occurred_at)}</span>
+                  <StatusPill
+                    status={v.status === 'confirmed' ? 'completed' : 'pending'}
+                    label={violationStatusLabel[v.status] || v.status}
+                  />
                 </div>
                 <p className="muted">
-                  {v.vehicle ? `${v.vehicle.brand} ${v.vehicle.model}` : '—'}
-                  {v.contract?.code ? ` · ${v.contract.code}` : ''}
+                  {formatDate(v.occurred_at)}
+                  {v.vehicle ? ` · ${v.vehicle.brand} ${v.vehicle.model}` : ''}
+                  {v.contract?.number ? ` · ${v.contract.number}` : ''}
                   {v.location ? ` · ${v.location}` : ''}
                 </p>
                 {!['paid', 'confirmed'].includes(v.status) ? (

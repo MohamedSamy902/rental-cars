@@ -20,6 +20,11 @@ import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { printContractDocument } from '@/shared/contracts/printContract'
 import type { Contract } from '@/shared/contracts/contractModel'
+import {
+  contractStatusLabel,
+  vehicleStatusLabel,
+  workOrderStatusLabel,
+} from '@/shared/lib/statusLabels'
 import { printDomSubtree } from '@/utils/printHtml'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
@@ -218,13 +223,6 @@ const tirePosLabel: Record<string, string> = {
   spare: 'احتياطي',
 }
 
-const statusLabel: Record<string, string> = {
-  available: 'متاحة', reserved: 'محجوزة', rented: 'مؤجرة', maintenance: 'في صيانة',
-  out_of_service: 'خارج الخدمة', pending: 'قيد الانتظار', approved: 'معتمدة',
-  active: 'نشطة', completed: 'مكتملة', cancelled: 'ملغاة', open: 'مفتوحة',
-  in_progress: 'قيد التنفيذ', closed: 'مغلقة',
-}
-
 const chartColors = ['#dc2626', '#64748b', '#f59e0b', '#059669', '#a1a1aa', '#b91c1c', '#475569']
 
 const emptyAcc = {
@@ -354,7 +352,7 @@ export function VehicleDetailPage() {
       .filter((s) => s.count > 0)
       .map((s) => ({
         key: s.status,
-        name: statusLabel[s.status] || s.label || s.status,
+        name: vehicleStatusLabel[s.status] || s.label || s.status,
         value: s.count,
       })),
     [dossier],
@@ -668,7 +666,7 @@ export function VehicleDetailPage() {
         <Fact label="الإيجار اليومي" value={formatMoney(v.daily_rate)} />
         <Fact label="التأمين النقدي" value={formatMoney(v.default_deposit)} />
         <Fact label="المستهدف الشهري" value={v.target_monthly_income != null ? formatMoney(v.target_monthly_income) : '—'} />
-        <Fact label="الحالة التشغيلية" value={statusLabel[v.status] || v.status} />
+        <Fact label="الحالة التشغيلية" value={vehicleStatusLabel[v.status] || v.status} />
         <Fact label="حالة يدوية" value={v.manual_status || '—'} />
         <Fact label="نشطة" value={v.is_active === false ? 'لا' : 'نعم'} />
         <Fact label="جهاز التتبع" value={v.tracker_device_number || '—'} />
@@ -873,7 +871,7 @@ export function VehicleDetailPage() {
                       </div>
                     ) : null}
                   </div>
-                  <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
+                  <StatusPill status={c.status} label={contractStatusLabel[c.status] || c.status} />
                 </div>
                 <p className="tabular-nums">{c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : '—')}</p>
                 <div className="vd-no-print">
@@ -917,7 +915,7 @@ export function VehicleDetailPage() {
                   <strong>أمر #{w.id}</strong>
                   <p className="muted">{w.workshop || '—'} · فتح {w.opened_on || '—'} · عداد {w.odometer != null ? formatNumber(w.odometer) : '—'}</p>
                 </div>
-                <StatusPill status={w.status} label={statusLabel[w.status] || w.status} />
+                <StatusPill status={w.status} label={workOrderStatusLabel[w.status] || w.status} />
               </div>
               <p className="tabular-nums">{formatMoney(w.parts_cost || 0)} قطع · {formatMoney(w.labor_cost || 0)} عمالة</p>
               {w.lines.length > 0 ? <p className="muted">{w.lines.map((l) => l.description).join(' · ')}</p> : null}
@@ -1354,7 +1352,7 @@ export function VehicleDetailPage() {
         <div className="vd-hero__body">
           <div className="vd-identity">
             <div className="vd-identity__status">
-              <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
+              <StatusPill status={v.status} label={vehicleStatusLabel[v.status] || v.status} />
               <span className="vd-code">{v.code}</span>
             </div>
             <div className="vd-plate" aria-label={`لوحة ${v.plate}`}>

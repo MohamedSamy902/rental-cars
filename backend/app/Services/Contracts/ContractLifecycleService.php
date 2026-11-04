@@ -196,9 +196,13 @@ class ContractLifecycleService
         ])->values()->all();
     }
 
-    public function approve(Contract $contract, ?int $userId = null, bool $reSnapshotRatesFromVehicle = true): Contract
+    /**
+     * الاعتماد يثبّت الأيام المسموحة ويؤكّد الأسعار المجمَّدة عند الإنشاء
+     * (أو عند تجاوز السعر). لا يُعاد أخذ لقطة من أسعار المركبة — وإلا يُلغى أي override.
+     */
+    public function approve(Contract $contract, ?int $userId = null): Contract
     {
-        return DB::transaction(function () use ($contract, $userId, $reSnapshotRatesFromVehicle) {
+        return DB::transaction(function () use ($contract, $userId) {
             /** @var Contract $locked */
             $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'pending') {
@@ -222,10 +226,9 @@ class ContractLifecycleService
                 $this->fractionDayThreshold(),
             );
 
-            // لحظة التجميد الرسمية = الاعتماد (ن٫٥): لقطة من أسعار السيارة الحالية
-            // التمديد/التبديل يمرّر أسعاراً مُجمَّدة مسبقاً فلا نعيد اللقطة.
-            $rate = $reSnapshotRatesFromVehicle ? (int) $vehicle->daily_rate : (int) $locked->frozen_daily_rate;
-            $deposit = $reSnapshotRatesFromVehicle ? (int) $vehicle->default_deposit : (int) $locked->frozen_agreed_deposit;
+            // الأسعار مُجمَّدة عند الإنشاء؛ الاعتماد لا يستبدلها بأسعار المركبة الحالية.
+            $rate = (int) ($locked->frozen_daily_rate ?? $vehicle->daily_rate);
+            $deposit = (int) ($locked->frozen_agreed_deposit ?? $vehicle->default_deposit);
 
             $locked->fill([
                 'status' => 'approved',
