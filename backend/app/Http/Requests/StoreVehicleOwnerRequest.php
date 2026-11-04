@@ -36,8 +36,6 @@ class StoreVehicleOwnerRequest extends FormRequest
             'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId],
             'id_front_path' => ['nullable', 'string', 'max:500'],
             'id_back_path' => ['nullable', 'string', 'max:500'],
-            'license_front_path' => ['nullable', 'string', 'max:500'],
-            'license_back_path' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
         ];
@@ -55,8 +53,6 @@ class StoreVehicleOwnerRequest extends FormRequest
             'national_id' => 'الرقم القومي',
             'id_front_path' => 'وجه البطاقة',
             'id_back_path' => 'ظهر البطاقة',
-            'license_front_path' => 'وجه الرخصة',
-            'license_back_path' => 'ظهر الرخصة',
             'notes' => 'الملاحظات',
         ];
     }

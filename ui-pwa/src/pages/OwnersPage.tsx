@@ -36,7 +36,7 @@ type Owner = {
 
 const emptyForm = {
   full_name: '', phone: '', phone_alt: '', national_id: '', id_front_path: '', id_back_path: '',
-  license_front_path: '', license_back_path: '', notes: '', is_active: true,
+  notes: '', is_active: true,
 }
 
 const OwnersPageTabs = ['all', 'due'] as const
@@ -137,22 +137,6 @@ export function OwnersPage() {
         purpose="national_id"
         accept="both"
         onChange={(path) => setForm({ ...form, id_back_path: path || '' })}
-      />
-      <MediaUpload
-        label="رخصة القيادة — الوجه"
-        accept="image"
-        collection="owner_ids"
-        purpose="license_front"
-        value={form.license_front_path || null}
-        onChange={(path) => setForm({ ...form, license_front_path: path || '' })}
-      />
-      <MediaUpload
-        label="رخصة القيادة — الظهر"
-        accept="image"
-        collection="owner_ids"
-        purpose="license_back"
-        value={form.license_back_path || null}
-        onChange={(path) => setForm({ ...form, license_back_path: path || '' })}
       />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       <SwitchField label="نشط" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />

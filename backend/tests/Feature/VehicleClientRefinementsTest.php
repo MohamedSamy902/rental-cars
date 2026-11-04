@@ -344,6 +344,52 @@ class VehicleClientRefinementsTest extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
+    public function test_vehicle_license_stores_document_number_and_owner_has_no_license_fields(): void
+    {
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('vehicle_owners', 'license_front_path'));
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('vehicle_owners', 'license_back_path'));
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('vehicle_documents', 'document_number'));
+
+        $owner = $this->postJson('/api/owners', [
+            'full_name' => 'مالك بلا رخصة',
+            'phone' => '01055556666',
+            'license_front_path' => 'should/be/ignored.jpg',
+            'license_back_path' => 'should/be/ignored-back.jpg',
+        ])->assertCreated()->json('data');
+
+        $this->assertArrayNotHasKey('license_front_path', $owner);
+        $this->assertArrayNotHasKey('license_back_path', $owner);
+
+        $vehicle = $this->postJson('/api/vehicles', [
+            'plate_letters' => 'ر خ ص',
+            'plate_numbers' => '9988',
+            'brand' => 'شيفروليه',
+            'model' => 'أوبترا',
+            'year' => 2020,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 15000,
+            'daily_rate' => 550,
+            'default_deposit' => 2000,
+            'license' => [
+                'has_license' => true,
+                'document_number' => 'LIC-VEH-9988',
+                'issued_on' => '2025-01-01',
+                'expires_on' => '2027-01-01',
+                'file_path' => '/media/license-front.jpg',
+                'file_path_back' => '/media/license-back.jpg',
+            ],
+        ])->assertCreated()->json('data');
+
+        $this->assertDatabaseHas('vehicle_documents', [
+            'vehicle_id' => $vehicle['id'],
+            'type' => 'رخصة تسيير',
+            'document_number' => 'LIC-VEH-9988',
+            'file_path' => '/media/license-front.jpg',
+            'file_path_back' => '/media/license-back.jpg',
+        ]);
+    }
+
     public function test_maintenance_expense_links_work_order(): void
     {
         $vehicle = Vehicle::query()->create([

@@ -176,8 +176,6 @@ class VehicleOwnerController extends Controller
             'national_id' => $nid,
             'id_front_path' => $o->id_front_path,
             'id_back_path' => $o->id_back_path,
-            'license_front_path' => $o->license_front_path,
-            'license_back_path' => $o->license_back_path,
             'notes' => $o->notes,
             'is_active' => $o->is_active,
             'vehicles_count' => $o->vehicles_count ?? $o->vehicles()->count(),
