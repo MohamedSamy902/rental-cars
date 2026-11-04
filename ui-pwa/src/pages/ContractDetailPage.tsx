@@ -5,7 +5,7 @@ import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
   Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
-  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, PhoneActions,
+  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, IconAlert, PhoneActions,
 } from '@/shared/ui'
 import {
   DepositBadge, inspectionTypeLabel, statusLabel, timelineLabel, type Contract,
@@ -134,6 +134,15 @@ export function ContractDetailPage() {
             tone: (ledger?.balance ?? 0) > 0 ? 'warning' : 'success',
             icon: <IconKey size={16} />,
             hint: ledger ? `مدفوع ${formatMoney(ledger.paid)}` : undefined,
+          },
+          {
+            id: 'violations',
+            label: 'مخالفات مفتوحة (مطلوب)',
+            value: row.open_violations_total ?? ledger?.violations_due ?? 0,
+            format: 'money',
+            tone: (row.open_violations_total ?? ledger?.violations_due ?? 0) > 0 ? 'warning' : 'success',
+            icon: <IconAlert size={16} />,
+            hint: 'متابعة تشغيلية — بلا ترحيل محاسبي',
           },
         ]}
       />

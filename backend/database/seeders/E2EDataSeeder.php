@@ -897,6 +897,7 @@ class E2EDataSeeder extends Seeder
                     'contract_id' => $active->id,
                     'customer_id' => $ahmed->id,
                     'status' => 'new',
+                    'created_by' => $accountsId,
                     'notes' => 'تجاوز سرعة — بانتظار الإسناد',
                 ],
             );
@@ -909,6 +910,7 @@ class E2EDataSeeder extends Seeder
                     'status' => 'confirmed',
                     'confirmed_by' => $accountsId,
                     'confirmed_at' => now()->subDays(9),
+                    'created_by' => $accountsId,
                     'collection_note' => 'تُحصّل من العميل عند الاستلام',
                     'notes' => 'مخالفة مؤكدة',
                 ],

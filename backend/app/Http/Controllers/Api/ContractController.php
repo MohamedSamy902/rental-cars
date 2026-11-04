@@ -55,13 +55,27 @@ class ContractController extends Controller
         }
 
         $rows = $q->paginate((int) $request->integer('per_page', 50));
-        $data = collect($rows->items())->map(function (Contract $c) {
+        $contractIds = collect($rows->items())->pluck('id')->all();
+        $openViolationTotals = $contractIds === []
+            ? collect()
+            : \App\Models\Violation::query()
+                ->selectRaw('contract_id, SUM(amount) as total_amount, COUNT(*) as cnt')
+                ->whereIn('contract_id', $contractIds)
+                ->open()
+                ->groupBy('contract_id')
+                ->get()
+                ->keyBy('contract_id');
+
+        $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals) {
             $arr = $c->toArray();
             $arr['progress'] = $this->progress->forContract($c);
             $arr['created_by'] = $c->salesUser?->name;
             $arr['sales_user'] = $c->salesUser
                 ? ['id' => $c->salesUser->id, 'name' => $c->salesUser->name]
                 : null;
+            $agg = $openViolationTotals->get($c->id);
+            $arr['open_violations_total'] = (int) ($agg->total_amount ?? 0);
+            $arr['open_violations_count'] = (int) ($agg->cnt ?? 0);
 
             return $arr;
         })->all();

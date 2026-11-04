@@ -8,6 +8,7 @@ use App\Models\Inspection;
 use App\Models\MediaFile;
 use App\Models\Payment;
 use App\Models\User;
+use App\Models\Violation;
 
 /**
  * Full read model for the contract page: parties, inspections, payment ledger,
@@ -126,6 +127,22 @@ class ContractDossierService
                 - (int) $contract->discount;
         }
 
+        $openViolations = Violation::query()
+            ->with('creator:id,name')
+            ->where('contract_id', $contract->id)
+            ->open()
+            ->orderByDesc('occurred_at')
+            ->get()
+            ->map(fn (Violation $v) => [
+                'id' => $v->id,
+                'amount' => (int) $v->amount,
+                'occurred_at' => $v->occurred_at?->toDateString(),
+                'status' => $v->status,
+                'photo_paths' => $v->resolvedPhotoPaths(),
+                'created_by_name' => $v->creator?->name,
+            ])->values();
+        $openViolationsTotal = (int) $openViolations->sum('amount');
+
         return [
             ...$contract->toArray(),
             'created_by' => $contract->salesUser?->name,
@@ -137,6 +154,8 @@ class ContractDossierService
             'documents' => $documents,
             'related' => $related,
             'timeline' => $timeline,
+            'open_violations' => $openViolations,
+            'open_violations_total' => $openViolationsTotal,
             'ledger' => [
                 'contract_total' => $total,
                 'paid' => $in - $out,
@@ -144,6 +163,8 @@ class ContractDossierService
                 'deposit_held' => $contract->deposit && in_array($contract->deposit->status, ['received', 'partial'], true)
                     ? $contract->deposit->remaining()
                     : 0,
+                // متابعة تشغيلية فقط — لا يدخل إجمالي العقد المحاسبي
+                'violations_due' => $openViolationsTotal,
             ],
         ];
     }
