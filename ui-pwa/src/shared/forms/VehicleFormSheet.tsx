@@ -608,11 +608,34 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
           <SwitchField
             label="يوجد رخصة تسيير"
             checked={form.has_license}
-            onChange={(has_license) => setForm({
-              ...form,
-              has_license,
-              license_status: has_license ? (form.license_status === 'none' ? 'active' : form.license_status) : 'none',
-            })}
+            onChange={(has_license) => {
+              // #region agent log
+              try {
+                const payload = {
+                  hypothesisId: 'E',
+                  location: 'VehicleFormSheet.tsx:has_license',
+                  message: 'license toggle',
+                  data: { has_license, prev: form.has_license },
+                  timestamp: Date.now(),
+                }
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const w = window as any
+                w.__rpmDbg = w.__rpmDbg || []
+                w.__rpmDbg.push(payload)
+                console.info('[rpm-dbg]', JSON.stringify(payload))
+                fetch('http://127.0.0.1:7242/ingest/3b8c0e2a-8f5d-4c1a-9e7b-dbg-sheet', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'license-sheet' },
+                  body: JSON.stringify(payload),
+                }).catch(() => {})
+              } catch { /* ignore */ }
+              // #endregion
+              setForm({
+                ...form,
+                has_license,
+                license_status: has_license ? (form.license_status === 'none' ? 'active' : form.license_status) : 'none',
+              })
+            }}
           />
           {form.has_license ? (
             <div className="rpm-form-grid" style={{ marginBlockStart: '0.5rem' }}>

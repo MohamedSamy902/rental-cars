@@ -192,6 +192,23 @@ export function MediaUpload({
   const resolvedHint = hint ?? limits.hint ?? DEFAULT_MEDIA_LIMITS.hint
   const acceptAttr = acceptForKind(limits, accept)
 
+  // #region agent log
+  function dbgMedia(hypothesisId: string, message: string, data: Record<string, unknown> = {}) {
+    try {
+      const payload = { hypothesisId, location: 'MediaUpload.tsx', message, data: { label, ...data }, timestamp: Date.now() }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w = window as any
+      w.__rpmDbg = w.__rpmDbg || []
+      w.__rpmDbg.push(payload)
+      console.info('[rpm-dbg]', JSON.stringify(payload))
+      fetch('http://127.0.0.1:7242/ingest/3b8c0e2a-8f5d-4c1a-9e7b-dbg-sheet', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'license-sheet' },
+        body: JSON.stringify(payload),
+      }).catch(() => {})
+    } catch { /* ignore */ }
+  }
+  // #endregion
+
   return (
     <FieldShell label={label} required={required} error={showError} hint={resolvedHint} htmlFor={inputId}>
       <div className={`rpm-media ${disabled ? 'is-disabled' : ''} ${uploading ? 'is-uploading' : ''}`}>
@@ -217,13 +234,35 @@ export function MediaUpload({
             capture={capture}
             disabled={disabled || uploading}
             className="rpm-media__input"
-            onChange={(e) => void onPick(e.target.files?.[0] || null)}
+            onFocus={() => {
+              // #region agent log
+              dbgMedia('D', 'file input focus', { id: inputId })
+              // #endregion
+            }}
+            onChange={(e) => {
+              // #region agent log
+              dbgMedia('E', 'file input change', { hasFile: Boolean(e.target.files?.[0]) })
+              // #endregion
+              void onPick(e.target.files?.[0] || null)
+            }}
           />
           <button
             type="button"
             className="rpm-media__btn"
             disabled={disabled || uploading}
-            onClick={() => inputRef.current?.click()}
+            onClick={() => {
+              // #region agent log
+              const sheetBody = inputRef.current?.closest('.rpm-sheet__body') as HTMLElement | null
+              const sheet = inputRef.current?.closest('.rpm-sheet') as HTMLElement | null
+              const head = sheet?.querySelector('.rpm-sheet__head h2')
+              dbgMedia('D', 'اختيار ملف click → input.click()', {
+                bodyScrollTop: sheetBody?.scrollTop ?? null,
+                title: head?.textContent || null,
+                headTop: head ? Math.round(head.getBoundingClientRect().top) : null,
+              })
+              // #endregion
+              inputRef.current?.click()
+            }}
           >
             {uploading ? 'جارٍ الرفع…' : value ? 'استبدال' : 'اختيار ملف'}
           </button>
