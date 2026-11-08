@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { todayCivilIso } from '@/shared/lib/dates'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, TextField, NumberField, MoneyField, SelectField, StatusPill, useToast, DataTable, IconBox, IconEdit,
@@ -53,7 +54,7 @@ export function InventoryPage() {
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: InventoryPageTabs, defaultValue: 'all' })
   const [itemForm, setItemForm] = useState(emptyItemForm)
-  const [batchForm, setBatchForm] = useState({ inventory_item_id: '', received_on: new Date().toISOString().slice(0, 10), quantity: '', unit_cost: '', supplier: '' })
+  const [batchForm, setBatchForm] = useState({ inventory_item_id: '', received_on: todayCivilIso(), quantity: '', unit_cost: '', supplier: '' })
   const [savingItem, setSavingItem] = useState(false)
 
   const lowCount = useMemo(() => rows.filter((i) => i.is_low).length, [rows])

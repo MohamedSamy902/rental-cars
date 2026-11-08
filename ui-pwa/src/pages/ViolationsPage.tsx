@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney, toApiDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -38,11 +39,7 @@ type ContractOption = {
 }
 
 function todayDateOnly(): string {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  return todayCivilIso()
 }
 
 function contractLabel(c: ContractOption): string {

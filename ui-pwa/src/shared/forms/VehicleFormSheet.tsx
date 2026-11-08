@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { addCivilDays, todayCivilIso } from '@/shared/lib/dates'
 import { BrandSelectField } from '@/shared/forms/BrandSelectField'
 import {
   Button, Sheet, TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
@@ -260,7 +261,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       const lic = docs.find((d) => /رخص|license/i.test(d.type || ''))
       if (lic) {
         const exp = lic.expires_on ? String(lic.expires_on).slice(0, 10) : ''
-        const expired = Boolean(exp && exp < new Date().toISOString().slice(0, 10))
+        const expired = Boolean(exp && exp < todayCivilIso())
         next.has_license = true
         next.license_number = lic.document_number ? String(lic.document_number) : ''
         next.license_expires_on = exp
@@ -490,9 +491,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
             const cycle = Number(form.tracker_sim_recharge_cycle_days) || 30
             let next = form.tracker_sim_next_recharge_on
             if (last) {
-              const d = new Date(`${last}T12:00:00`)
-              d.setDate(d.getDate() + cycle)
-              next = d.toISOString().slice(0, 10)
+              next = addCivilDays(last, cycle)
             }
             setForm({ ...form, tracker_sim_last_recharged_on: last, tracker_sim_next_recharge_on: next })
           }}
@@ -631,7 +630,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
                 error={errors['license.expires_on']}
                 onChange={(e) => {
                   const license_expires_on = e.target.value
-                  const expired = license_expires_on && license_expires_on < new Date().toISOString().slice(0, 10)
+                  const expired = license_expires_on && license_expires_on < todayCivilIso()
                   setForm({
                     ...form,
                     license_expires_on,

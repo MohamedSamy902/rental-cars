@@ -1,3 +1,5 @@
+import { civilDateOnly } from '@/shared/lib/dates'
+
 /** Western digits (0-9) required — numberingSystem: latn */
 const latn = { numberingSystem: 'latn' as const }
 
@@ -37,17 +39,9 @@ export function formatDateTime(iso: string): string {
   }).format(d)
 }
 
-/** Normalize any ISO/datetime string to YYYY-MM-DD (Western digits). */
+/** Normalize any ISO/datetime string to YYYY-MM-DD (Western digits, Africa/Cairo). */
 export function toDateOnly(iso: string | null | undefined): string {
-  if (!iso) return ''
-  const raw = String(iso).trim()
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10)
-  const d = new Date(raw)
-  if (Number.isNaN(d.getTime())) return ''
-  const y = d.getUTCFullYear()
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(d.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  return civilDateOnly(iso)
 }
 
 /** Date only as YYYY-MM-DD (Western digits) — platform display standard. */

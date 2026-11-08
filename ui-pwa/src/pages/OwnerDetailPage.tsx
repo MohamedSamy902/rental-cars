@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
@@ -80,7 +81,7 @@ export function OwnerDetailPage() {
   const [form, setForm] = useState(emptyForm)
   const [payoutOpen, setPayoutOpen] = useState(false)
   const [payoutForm, setPayoutForm] = useState({
-    amount: '', paid_on: new Date().toISOString().slice(0, 10), payment_method: 'cash', vehicle_id: '', notes: '',
+    amount: '', paid_on: todayCivilIso(), payment_method: 'cash', vehicle_id: '', notes: '',
   })
   const [woVehicle, setWoVehicle] = useState<{ id: number; label: string } | null>(null)
   const [expVehicle, setExpVehicle] = useState<{ id: number; label: string } | null>(null)

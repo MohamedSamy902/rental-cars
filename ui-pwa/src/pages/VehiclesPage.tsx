@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { addCivilDays, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -25,13 +26,11 @@ const OWNER_AGREEMENT_PRESETS = [7, 14, 30] as const
 const OWNER_AGREEMENT_DEFAULT_DAYS = 30
 
 function addDaysIso(base: string, days: number): string {
-  const d = new Date(`${base}T12:00:00`)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  return addCivilDays(base, days)
 }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
+  return todayCivilIso()
 }
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }

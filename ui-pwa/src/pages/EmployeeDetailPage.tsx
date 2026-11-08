@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, NumberField, SelectField, SwitchField,
@@ -105,9 +106,9 @@ export function EmployeeDetailPage() {
   const [accountErrors, setAccountErrors] = useState<Record<string, string>>({})
   const [passwordForm, setPasswordForm] = useState({ password: '', password_confirmation: '' })
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
-  const [advanceForm, setAdvanceForm] = useState({ amount: '', advanced_on: new Date().toISOString().slice(0, 10), method: 'cash', notes: '' })
+  const [advanceForm, setAdvanceForm] = useState({ amount: '', advanced_on: todayCivilIso(), method: 'cash', notes: '' })
   const [evalForm, setEvalForm] = useState({ score: '5', period: '', notes: '' })
-  const [assignForm, setAssignForm] = useState({ notes: '', handed_on: new Date().toISOString().slice(0, 10) })
+  const [assignForm, setAssignForm] = useState({ notes: '', handed_on: todayCivilIso() })
 
   async function load() {
     if (!id) return
@@ -241,7 +242,7 @@ export function EmployeeDetailPage() {
       })
       toast.success('تم تسجيل السلفة.')
       setAdvanceOpen(false)
-      setAdvanceForm({ amount: '', advanced_on: new Date().toISOString().slice(0, 10), method: 'cash', notes: '' })
+      setAdvanceForm({ amount: '', advanced_on: todayCivilIso(), method: 'cash', notes: '' })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -283,7 +284,7 @@ export function EmployeeDetailPage() {
     }
     setSaving(true)
     try {
-      const day = assignForm.handed_on || new Date().toISOString().slice(0, 10)
+      const day = assignForm.handed_on || todayCivilIso()
       await api('/employee-assignments', {
         method: 'POST',
         json: {
@@ -295,7 +296,7 @@ export function EmployeeDetailPage() {
       })
       toast.success('تم تسجيل تسليم العهدة.')
       setAssignOpen(false)
-      setAssignForm({ notes: '', handed_on: new Date().toISOString().slice(0, 10) })
+      setAssignForm({ notes: '', handed_on: todayCivilIso() })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)

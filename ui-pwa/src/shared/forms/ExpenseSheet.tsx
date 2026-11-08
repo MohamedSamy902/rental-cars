@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { todayCivilIso } from '@/shared/lib/dates'
 import {
   Button, Sheet, TextField, MoneyField, SelectField, TextAreaField, DateField, SwitchField, useToast,
 } from '@/shared/ui'
@@ -37,7 +38,7 @@ type VehicleOption = { id: number; brand: string; model: string; plate: string }
 type WorkOrderOption = { id: number; workshop?: string | null; status: string; opened_on?: string | null }
 type EmployeeOption = { id: number; name: string }
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => todayCivilIso()
 const emptyForm = () => ({
   title: '',
   category: 'تشغيل',
