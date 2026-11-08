@@ -29,6 +29,7 @@ import { Button, DropdownMenu, ErrorState, Sheet, SkeletonBlock, useToast, type 
 import {
   IconCalendar,
   IconCar,
+  IconCash,
   IconClipboard,
   IconMore,
   IconPlus,
@@ -37,6 +38,7 @@ import {
   IconStore,
   IconTrend,
   IconUsers,
+  IconWallet,
   IconWrench,
 } from '@/shared/ui/Icons'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -69,6 +71,25 @@ type FleetPrepItem = {
   customer?: string | null
   vehicle?: { id: number; label: string; plate: string } | null
   at?: string | null
+  href?: string | null
+}
+
+type DailyCashEntry = {
+  id: string
+  source: 'payment' | 'expense' | string
+  direction: 'in' | 'out'
+  amount: number
+  title: string
+  subtitle: string
+  method?: string | null
+  at?: string | null
+  href: string
+}
+
+type DailyCash = {
+  date: string
+  totals: { in: number; out: number; net: number; count: number }
+  entries: DailyCashEntry[]
 }
 
 type FleetPrepDay = {
@@ -107,6 +128,7 @@ type Dash = {
     days: FleetPrepDay[]
     totals: { pickups: number; returns: number; maintenance: number; total: number }
   }
+  daily_cash?: DailyCash | null
   recent_contracts: {
     id: number
     number: string
@@ -702,14 +724,18 @@ export function DashboardPage() {
           <div className="db-prep__timeline" role="list">
             {data.fleet_prep.days.map((day) => {
               const dayTitle = day.is_today ? 'اليوم' : day.is_tomorrow ? 'غداً' : day.label
-              const lanes: Array<{
+              const               lanes: Array<{
                 key: 'pickups' | 'returns' | 'maintenance'
                 verb: string
                 href: (item: FleetPrepItem) => string
               }> = [
                 { key: 'pickups', verb: 'تسليم', href: (item) => `/contracts/${item.id}` },
                 { key: 'returns', verb: 'استلام', href: (item) => `/contracts/${item.id}` },
-                { key: 'maintenance', verb: 'صيانة', href: () => '/maintenance' },
+                {
+                  key: 'maintenance',
+                  verb: 'صيانة',
+                  href: (item) => item.href || (item.vehicle?.id ? `/vehicles/${item.vehicle.id}` : '/maintenance'),
+                },
               ]
               return (
                 <article
@@ -781,6 +807,70 @@ export function DashboardPage() {
               )
             })}
           </div>
+        </section>
+      ) : null}
+
+      {data.daily_cash ? (
+        <section className="db-cash" aria-label="حركة الفلوس اليوم">
+          <header className="db-cash__head">
+            <div>
+              <h2>حركة الفلوس اليوم</h2>
+              <p>كل المبالغ التي دخلت أو خرجت اليوم</p>
+            </div>
+            <div className="db-cash__summary" aria-label="ملخص اليوم">
+              <span className="db-cash__pill db-cash__pill--in">
+                دخل <b className="tabular-nums">{formatMoney(data.daily_cash.totals.in)}</b>
+              </span>
+              <span className="db-cash__pill db-cash__pill--out">
+                خرج <b className="tabular-nums">{formatMoney(data.daily_cash.totals.out)}</b>
+              </span>
+              <span className={`db-cash__pill db-cash__pill--net ${data.daily_cash.totals.net >= 0 ? 'is-pos' : 'is-neg'}`}>
+                صافي <b className="tabular-nums">{formatMoney(data.daily_cash.totals.net)}</b>
+              </span>
+              <Link to="/accounts" className="db-cash__link">الحسابات</Link>
+              <Link to="/expenses" className="db-cash__link">المصروفات</Link>
+            </div>
+          </header>
+
+          {data.daily_cash.entries.length === 0 ? (
+            <div className="db-cash__empty" role="status">
+              <IconWallet size={22} />
+              <strong>لا حركات مالية اليوم</strong>
+              <span>المقبوضات والمدفوعات والمصروفات المسجّلة اليوم تظهر هنا</span>
+            </div>
+          ) : (
+            <ul className="db-cash__list">
+              {data.daily_cash.entries.map((row, i) => (
+                <motion.li
+                  key={row.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.02 * i, type: 'spring', stiffness: 380, damping: 28 }}
+                >
+                  <Link to={row.href} className={`db-cash-row db-cash-row--${row.direction}`}>
+                    <span className="db-cash-row__ico" aria-hidden>
+                      {row.direction === 'in' ? <IconCash size={16} /> : <IconWallet size={16} />}
+                    </span>
+                    <span className="db-cash-row__body">
+                      <strong>{row.title}</strong>
+                      <span className="db-cash-row__sub">{row.subtitle}</span>
+                    </span>
+                    <span className="db-cash-row__meta">
+                      <b className={`db-cash-row__amt tabular-nums db-cash-row__amt--${row.direction}`}>
+                        {row.direction === 'in' ? '+' : '−'}
+                        {formatMoney(row.amount)}
+                      </b>
+                      {row.at ? (
+                        <time className="tabular-nums" dateTime={row.at}>
+                          {formatTime(row.at)}
+                        </time>
+                      ) : null}
+                    </span>
+                  </Link>
+                </motion.li>
+              ))}
+            </ul>
+          )}
         </section>
       ) : null}
 

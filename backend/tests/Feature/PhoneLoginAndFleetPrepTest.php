@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Contract;
 use App\Models\Customer;
+use App\Models\Expense;
+use App\Models\Payment;
 use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -207,6 +209,32 @@ class PhoneLoginAndFleetPrepTest extends TestCase
             'next_service_on' => now()->addDays(2)->toDateString(),
         ]);
 
+        // أمر شغل قديم ما زال مفتوحاً — لازم يظهر في عمود «اليوم» حتى لو next_service بعيد.
+        $stuckVehicle = Vehicle::query()->create([
+            'code' => 'PREP-3',
+            'plate' => 'ت ج 44',
+            'brand' => 'تويوتا',
+            'model' => 'كورولا',
+            'year' => 2020,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 40000,
+            'daily_rate' => 650,
+            'default_deposit' => 2500,
+            'is_active' => true,
+        ]);
+        WorkOrder::query()->create([
+            'vehicle_id' => $stuckVehicle->id,
+            'workshop' => 'ورشة النور',
+            'opened_on' => now()->subDays(10)->toDateString(),
+            'odometer' => 40000,
+            'status' => 'open',
+            'puts_in_maintenance' => true,
+            'parts_cost' => 0,
+            'labor_cost' => 0,
+            'next_service_on' => now()->addMonths(2)->toDateString(),
+        ]);
+
         $prep = $this->getJson('/api/fleet/daily-prep?days=5')->assertOk();
         $prep->assertJsonPath('data.horizon_days', 5);
         $this->assertCount(5, $prep->json('data.days'));
@@ -214,10 +242,72 @@ class PhoneLoginAndFleetPrepTest extends TestCase
         $this->assertSame('غداً', $prep->json('data.days.1.label'));
         $this->assertGreaterThanOrEqual(1, (int) $prep->json('data.days.0.counts.returns'));
         $this->assertGreaterThanOrEqual(1, (int) $prep->json('data.days.1.counts.pickups'));
+        $this->assertGreaterThanOrEqual(2, (int) $prep->json('data.days.0.counts.maintenance'), 'اليوم يجب أن يعرض كل أوامر الشغل المفتوحة');
+        $this->assertGreaterThanOrEqual(1, (int) $prep->json('data.days.2.counts.maintenance'), 'اليوم+2 يحتفظ بالصيانة المجدولة');
         $this->assertGreaterThanOrEqual(1, (int) $prep->json('data.totals.maintenance'));
 
         $dash = $this->getJson('/api/dashboard')->assertOk();
-        $dash->assertJsonStructure(['fleet_prep' => ['days', 'totals', 'horizon_days']]);
+        $dash->assertJsonStructure([
+            'fleet_prep' => ['days', 'totals', 'horizon_days'],
+            'daily_cash' => ['date', 'totals', 'entries'],
+        ]);
         $this->assertCount(5, $dash->json('fleet_prep.days'));
+        $this->assertSame(now()->toDateString(), $dash->json('daily_cash.date'));
+    }
+
+    public function test_dashboard_daily_cash_lists_today_payments_and_expenses(): void
+    {
+        $adminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
+        Sanctum::actingAs(User::factory()->create([
+            'role_id' => $adminRole->id,
+            'is_active' => true,
+        ]));
+
+        Payment::query()->create([
+            'amount' => 1500,
+            'paid_at' => now(),
+            'method' => 'نقدي',
+            'direction' => 'in',
+            'reference' => 'TST-IN',
+            'link_type' => 'contract',
+            'link_id' => 1,
+            'notes' => 'قبض تجريبي',
+        ]);
+        Payment::query()->create([
+            'amount' => 200,
+            'paid_at' => now(),
+            'method' => 'نقدي',
+            'direction' => 'out',
+            'reference' => 'TST-OUT',
+            'link_type' => 'expense',
+            'link_id' => null,
+        ]);
+        Expense::query()->create([
+            'title' => 'بنزين اليوم',
+            'category' => 'تشغيل',
+            'amount' => 300,
+            'spent_on' => now()->toDateString(),
+            'payment_method' => 'نقدي',
+            'from_petty_cash' => false,
+        ]);
+        // خارج اليوم — لا يظهر
+        Expense::query()->create([
+            'title' => 'أمس',
+            'category' => 'تشغيل',
+            'amount' => 999,
+            'spent_on' => now()->subDay()->toDateString(),
+            'payment_method' => 'نقدي',
+            'from_petty_cash' => false,
+        ]);
+
+        $dash = $this->getJson('/api/dashboard')->assertOk();
+        $cash = $dash->json('daily_cash');
+        $this->assertSame(1500, $cash['totals']['in']);
+        $this->assertSame(500, $cash['totals']['out']);
+        $this->assertSame(1000, $cash['totals']['net']);
+        $this->assertSame(3, $cash['totals']['count']);
+        $ids = collect($cash['entries'])->pluck('id');
+        $this->assertTrue($ids->contains(fn ($id) => str_starts_with((string) $id, 'payment:')));
+        $this->assertTrue($ids->contains(fn ($id) => str_starts_with((string) $id, 'expense:')));
     }
 }

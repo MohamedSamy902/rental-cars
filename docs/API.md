@@ -113,9 +113,30 @@ Query شائع: `?per_page=50&page=1&search=...`
     }
   ],
   "fleet_prep": { "horizon_days": 5, "days": [], "totals": {} },
+  "daily_cash": {
+    "date": "2026-11-08",
+    "totals": { "in": 1500, "out": 500, "net": 1000, "count": 3 },
+    "entries": [
+      {
+        "id": "payment:1",
+        "source": "payment",
+        "direction": "in",
+        "amount": 1500,
+        "title": "قبض إيجار / دفعة عقد",
+        "subtitle": "…",
+        "method": "نقدي",
+        "at": "…",
+        "href": "/contracts/12"
+      }
+    ]
+  },
   "unread_notifications": 1
 }
 ```
+
+`fleet_prep.groups.maintenance` ليوم «اليوم» = كل أوامر الشغل المفتوحة/`in_progress`؛ للأيام التالية = المجدولة بـ `next_service_on`.
+
+`daily_cash` سجل حركة فلوس اليوم (دفعات + مصروفات) حسب صلاحيات `payments.view`/`accounting.view` و`expenses.view` — أو `null` إن لا صلاحية.
 
 `important_tasks` قائمة مهام تشغيلية للوحة اليوم (حد أقصى ٢٠)، مرتّبة بالحرج ثم التاريخ، ومفلترة بصلاحيات المستخدم الحالي:
 

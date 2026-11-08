@@ -13,6 +13,7 @@ use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Services\Accounting\ProfitabilityService;
 use App\Services\Contracts\RentalProgressService;
+use App\Services\Dashboard\HomeDailyCashService;
 use App\Services\Dashboard\HomeImportantTasksService;
 use App\Services\Fleet\FleetDailyPrepService;
 use App\Services\Fleet\OccupancyService;
@@ -29,6 +30,7 @@ class DashboardController extends Controller
         private readonly RentalProgressService $progress,
         private readonly FleetDailyPrepService $dailyPrep,
         private readonly HomeImportantTasksService $importantTasks,
+        private readonly HomeDailyCashService $dailyCash,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -137,6 +139,7 @@ class DashboardController extends Controller
                 ? $this->importantTasks->forUser($request->user())
                 : [],
             'fleet_prep' => $this->dailyPrep->summarize(now(), 5),
+            'daily_cash' => $this->dailyCash->forUser($request->user()),
             'recent_contracts' => Contract::query()
                 ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
                 ->latest('id')

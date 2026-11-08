@@ -266,6 +266,213 @@
   }
 }
 
+/* ── Daily cash movement ── */
+.db-cash {
+  display: grid;
+  gap: 1rem;
+  padding: 1.15rem 1.2rem 1.25rem;
+  border-radius: 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.db-cash__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.db-cash__head h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.db-cash__head p {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.db-cash__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.db-cash__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-block: 0.28rem;
+  padding-inline: 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-2, var(--bg));
+  border: 1px solid var(--border);
+}
+
+.db-cash__pill b {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.db-cash__pill--in {
+  color: var(--success-ink);
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+}
+
+.db-cash__pill--out {
+  color: var(--danger-ink, var(--warning-ink));
+  border-color: color-mix(in srgb, var(--danger, var(--warning)) 30%, var(--border));
+}
+
+.db-cash__pill--net.is-pos b { color: var(--success-ink); }
+.db-cash__pill--net.is-neg b { color: var(--danger-ink, #dc2626); }
+
+.db-cash__link {
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: var(--accent-solid);
+  text-decoration: none;
+  padding-inline: 0.35rem;
+}
+
+.db-cash__empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.db-cash__empty strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.db-cash__empty span {
+  font-size: 0.8rem;
+  max-width: 28rem;
+}
+
+.db-cash__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.db-cash-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.85rem;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface-2, var(--bg));
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.db-cash-row:hover {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.db-cash-row__ico {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.db-cash-row--in .db-cash-row__ico {
+  color: var(--success-ink);
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+}
+
+.db-cash-row--out .db-cash-row__ico {
+  color: var(--danger-ink, #dc2626);
+  border-color: color-mix(in srgb, var(--danger, #dc2626) 30%, var(--border));
+}
+
+.db-cash-row__body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.db-cash-row__body strong {
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.db-cash-row__sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-cash-row__meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.15rem;
+}
+
+.db-cash-row__amt {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.db-cash-row__amt--in { color: var(--success-ink); }
+.db-cash-row__amt--out { color: var(--danger-ink, #dc2626); }
+
+.db-cash-row__meta time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 560px) {
+  .db-cash-row {
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "ico body"
+      "ico meta";
+  }
+  .db-cash-row__ico { grid-area: ico; }
+  .db-cash-row__body { grid-area: body; }
+  .db-cash-row__meta {
+    grid-area: meta;
+    justify-items: start;
+    grid-auto-flow: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+}
+
 /* ── Hero ── */
 .db-hero {
   display: flex;

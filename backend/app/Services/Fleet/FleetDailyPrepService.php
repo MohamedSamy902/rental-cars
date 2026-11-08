@@ -10,6 +10,9 @@ use Carbon\CarbonPeriod;
 /**
  * تجهيز العربيات اليومي — ملخص تسليم / استلام / صيانة
  * لليوم وغداً والأيام الثلاثة التالية (أفق ٥ أيام افتراضياً).
+ *
+ * صيانة «اليوم»: كل أوامر الشغل المفتوحة / قيد التنفيذ (عربيات عليها صيانة الآن).
+ * صيانة الأيام التالية: أوامر مجدولة بـ next_service_on في ذلك اليوم.
  */
 class FleetDailyPrepService
 {
@@ -37,6 +40,7 @@ class FleetDailyPrepService
         $from = ($from ? $from->copy() : now())->timezone(config('app.timezone', 'Africa/Cairo'))->startOfDay();
         $horizonDays = max(1, min(14, $horizonDays));
         $to = $from->copy()->addDays($horizonDays - 1)->endOfDay();
+        $todayKey = $from->toDateString();
 
         $contracts = Contract::query()
             ->with([
@@ -53,13 +57,7 @@ class FleetDailyPrepService
         $workOrders = WorkOrder::query()
             ->with(['vehicle:id,brand,model,plate,code'])
             ->whereIn('status', ['open', 'in_progress'])
-            ->where(function ($q) use ($from, $to) {
-                $q->whereBetween('next_service_on', [$from->toDateString(), $to->toDateString()])
-                    ->orWhere(function ($qq) use ($from, $to) {
-                        $qq->whereNull('next_service_on')
-                            ->whereBetween('opened_on', [$from->toDateString(), $to->toDateString()]);
-                    });
-            })
+            ->orderBy('opened_on')
             ->limit(200)
             ->get();
 
@@ -70,6 +68,7 @@ class FleetDailyPrepService
         foreach ($period as $day) {
             /** @var Carbon $day */
             $dateKey = $day->toDateString();
+            $isToday = $dateKey === $todayKey;
             $pickups = [];
             $returns = [];
 
@@ -89,23 +88,11 @@ class FleetDailyPrepService
             $maintenance = [];
             foreach ($workOrders as $wo) {
                 $serviceOn = $wo->next_service_on?->toDateString();
-                $openedOn = $wo->opened_on?->toDateString();
-                $bucketDate = $serviceOn ?: $openedOn;
-                if ($bucketDate !== $dateKey) {
+                $include = $isToday || ($serviceOn !== null && $serviceOn === $dateKey);
+                if (! $include) {
                     continue;
                 }
-                $maintenance[] = [
-                    'id' => $wo->id,
-                    'kind' => 'maintenance',
-                    'title' => $wo->workshop ?: 'أمر شغل',
-                    'status' => $wo->status,
-                    'vehicle' => $wo->vehicle ? [
-                        'id' => $wo->vehicle->id,
-                        'label' => trim(($wo->vehicle->brand ?? '').' '.($wo->vehicle->model ?? '')),
-                        'plate' => $wo->vehicle->plate,
-                    ] : null,
-                    'at' => $bucketDate,
-                ];
+                $maintenance[] = $this->presentWorkOrder($wo, $isToday ? ($wo->opened_on?->toDateString() ?: $dateKey) : $serviceOn);
             }
 
             $counts = [
@@ -122,7 +109,7 @@ class FleetDailyPrepService
             $days[] = [
                 'date' => $dateKey,
                 'label' => $this->dayLabel($day, $from),
-                'is_today' => $day->isSameDay($from),
+                'is_today' => $isToday,
                 'is_tomorrow' => $day->isSameDay($from->copy()->addDay()),
                 'groups' => [
                     'pickups' => $pickups,
@@ -160,6 +147,27 @@ class FleetDailyPrepService
                 'plate' => $c->vehicle->plate,
             ] : null,
             'at' => ($kind === 'pickup' ? $c->starts_at : $c->planned_ends_at)?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentWorkOrder(WorkOrder $wo, ?string $atDate): array
+    {
+        return [
+            'id' => $wo->id,
+            'kind' => 'maintenance',
+            'title' => $wo->workshop ?: 'أمر شغل',
+            'status' => $wo->status,
+            'puts_in_maintenance' => (bool) $wo->puts_in_maintenance,
+            'vehicle' => $wo->vehicle ? [
+                'id' => $wo->vehicle->id,
+                'label' => trim(($wo->vehicle->brand ?? '').' '.($wo->vehicle->model ?? '')),
+                'plate' => $wo->vehicle->plate,
+            ] : null,
+            'at' => $atDate,
+            'href' => $wo->vehicle_id ? '/vehicles/'.$wo->vehicle_id : '/maintenance',
         ];
     }
 
