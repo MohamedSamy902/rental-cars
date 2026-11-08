@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api, type ApiError } from '@/shared/api/client'
+import { todayCivilIso } from '@/shared/lib/dates'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -181,7 +182,7 @@ export function StaffPage() {
     setUserForm({
       ...emptyUserForm,
       role_id: roles[0] ? String(roles[0].id) : '',
-      hired_on: new Date().toISOString().slice(0, 10),
+      hired_on: todayCivilIso(),
     })
     setUserErrors({})
     setUserSheet(true)

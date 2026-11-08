@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { currentCivilMonth } from '@/shared/lib/dates'
 import { formatMoney, formatDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -114,7 +115,7 @@ export function ExpensesPage() {
   }, [rows, search])
 
   const stats = useMemo(() => {
-    const ym = new Date().toISOString().slice(0, 7)
+    const ym = currentCivilMonth()
     const month = rows.filter((r) => r.spent_on?.startsWith(ym))
     const byCategory = new Map<string, number>()
     for (const r of rows) byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + Number(r.amount))

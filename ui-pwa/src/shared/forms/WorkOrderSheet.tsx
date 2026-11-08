@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { nowLocalDateTimeValue } from '@/shared/lib/dates'
 import { formatMoney } from '@/shared/lib/format'
 import {
   Button, Sheet, SelectField, NumberField, MoneyField, TextField, SwitchField,
@@ -20,12 +21,6 @@ type VehicleOption = { id: number; brand: string; model: string; plate: string; 
 type Item = { id: number; name: string; code: string; remaining?: number; unit_cost?: number | null }
 type EmployeeOption = { id: number; name: string }
 
-function nowLocal(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 const emptyForm = {
   vehicle_id: '',
   odometer: '',
@@ -34,7 +29,7 @@ const emptyForm = {
   inventory_item_id: '',
   quantity: '1',
   unit_price: '0',
-  opened_at: nowLocal(),
+  opened_at: nowLocalDateTimeValue(),
   funding: 'stock' as 'stock' | 'custody',
   employee_id: '',
   next_service_on: '',
@@ -56,7 +51,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
   const lockCustody = Boolean(custodyEmployee?.id)
 
   const stockItems = useMemo(
-    () => items.filter((i) => (i.remaining ?? 0) > 0),
+    () => items.filter((i) => Number(i.remaining ?? 0) > 0),
     [items],
   )
 
@@ -69,7 +64,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     if (!open) return
     setForm({
       ...emptyForm,
-      opened_at: nowLocal(),
+      opened_at: nowLocalDateTimeValue(),
       vehicle_id: lockedId ? String(lockedId) : '',
       odometer: lockedOdometer != null ? String(lockedOdometer) : '',
       funding: lockCustody ? 'custody' : 'stock',
@@ -78,7 +73,12 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     setFieldErrors({})
     setPutsInMaintenance(true)
     const requests: Promise<unknown>[] = [
-      api<{ data: Item[] }>('/inventory').then((r) => setItems(r.data)).catch(() => setItems([])),
+      api<{ data: Item[] }>('/inventory')
+        .then((r) => setItems(Array.isArray(r.data) ? r.data : []))
+        .catch((e) => {
+          setItems([])
+          toast.error((e as ApiError).message || 'تعذّر تحميل أصناف المخزون.')
+        }),
       api<{ data: EmployeeOption[] }>('/employees/lookup').then((r) => setEmployees(r.data || [])).catch(() => setEmployees([])),
     ]
     if (!lockedId) {

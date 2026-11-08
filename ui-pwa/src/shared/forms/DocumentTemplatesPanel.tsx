@@ -73,6 +73,8 @@ export function DocumentTemplatesPanel() {
   const [files, setFiles] = useState<Partial<Record<TemplateType, File | null>>>({})
   const [saving, setSaving] = useState<TemplateType | null>(null)
   const [previewing, setPreviewing] = useState<TemplateType | null>(null)
+  /** All template editors start collapsed — page was too long when fully open. */
+  const [expanded, setExpanded] = useState<Partial<Record<TemplateType, boolean>>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -227,16 +229,38 @@ export function DocumentTemplatesPanel() {
       {(['contract', 'handover_receipt', 'owner_agreement'] as TemplateType[]).map((type) => {
         const meta = TYPE_META[type]
         const row = active[type]
+        const isOpen = Boolean(expanded[type])
         return (
           <section key={type} className="rpm-panel">
             <div className="rpm-panel__head" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <h3 style={{ margin: 0 }}>{meta.title}</h3>
-                <p className="muted" style={{ margin: '0.25rem 0 0', fontSize: '0.82rem' }}>
+              <button
+                type="button"
+                onClick={() => setExpanded((prev) => ({ ...prev, [type]: !prev[type] }))}
+                aria-expanded={isOpen}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: '0.25rem',
+                  background: 'transparent',
+                  border: 0,
+                  padding: 0,
+                  cursor: 'pointer',
+                  textAlign: 'start',
+                  flex: '1 1 12rem',
+                  color: 'inherit',
+                  font: 'inherit',
+                }}
+              >
+                <h3 style={{ margin: 0 }}>
+                  <span aria-hidden style={{ marginInlineEnd: '0.4rem' }}>{isOpen ? '▾' : '▸'}</span>
+                  {meta.title}
+                </h3>
+                <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
                   {meta.hint}
                   {row ? ` · الإصدار النشط: ${row.version}` : ''}
                 </p>
-              </div>
+              </button>
               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <Button
                   size="sm"
@@ -249,7 +273,7 @@ export function DocumentTemplatesPanel() {
                 <Button
                   size="sm"
                   loading={saving === type}
-                  disabled={!canEdit}
+                  disabled={!canEdit || !isOpen}
                   onClick={() => void save(type)}
                 >
                   حفظ ونشر
@@ -257,36 +281,38 @@ export function DocumentTemplatesPanel() {
               </div>
             </div>
 
-            <div className="rpm-form-grid" style={{ marginBlockStart: '0.75rem' }}>
-              <TextField
-                label="عنوان القالب"
-                value={drafts[type].title}
-                disabled={!canEdit}
-                onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], title: e.target.value } }))}
-              />
-              <div className="rpm-field">
-                <span className="rpm-field__label">رفع ملف Word / HTML / Markdown (اختياري)</span>
-                <input
-                  type="file"
-                  accept=".docx,.html,.htm,.md,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/markdown,text/plain"
+            {isOpen ? (
+              <div className="rpm-form-grid" style={{ marginBlockStart: '0.75rem' }}>
+                <TextField
+                  label="عنوان القالب"
+                  value={drafts[type].title}
                   disabled={!canEdit}
-                  onChange={(e) => setFiles((prev) => ({ ...prev, [type]: e.target.files?.[0] || null }))}
-                  style={{ marginBlockStart: '0.35rem', width: '100%' }}
+                  onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], title: e.target.value } }))}
                 />
-                {files[type] ? (
-                  <p className="muted" style={{ marginBlockStart: '0.35rem', fontSize: '0.78rem' }}>
-                    سيتم استخراج المحتوى من: {files[type]?.name}
-                  </p>
-                ) : null}
+                <div className="rpm-field">
+                  <span className="rpm-field__label">رفع ملف Word / HTML / Markdown (اختياري)</span>
+                  <input
+                    type="file"
+                    accept=".docx,.html,.htm,.md,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/markdown,text/plain"
+                    disabled={!canEdit}
+                    onChange={(e) => setFiles((prev) => ({ ...prev, [type]: e.target.files?.[0] || null }))}
+                    style={{ marginBlockStart: '0.35rem', width: '100%' }}
+                  />
+                  {files[type] ? (
+                    <p className="muted" style={{ marginBlockStart: '0.35rem', fontSize: '0.78rem' }}>
+                      سيتم استخراج المحتوى من: {files[type]?.name}
+                    </p>
+                  ) : null}
+                </div>
+                <TextAreaField
+                  label="محتوى القالب (HTML / Markdown مع المتغيرات)"
+                  value={drafts[type].content}
+                  disabled={!canEdit}
+                  onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))}
+                  hint="اترك الحقول فارغة في المحتوى لتبقى كما هي؛ استخدم {{المتغير}} للإحلال الديناميكي."
+                />
               </div>
-              <TextAreaField
-                label="محتوى القالب (HTML / Markdown مع المتغيرات)"
-                value={drafts[type].content}
-                disabled={!canEdit}
-                onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))}
-                hint="اترك الحقول فارغة في المحتوى لتبقى كما هي؛ استخدم {{المتغير}} للإحلال الديناميكي."
-              />
-            </div>
+            ) : null}
           </section>
         )
       })}

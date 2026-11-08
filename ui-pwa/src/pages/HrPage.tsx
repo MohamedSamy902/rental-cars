@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
+import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -119,12 +120,12 @@ export function HrPage() {
   const [saving, setSaving] = useState(false)
   const [evalForm, setEvalForm] = useState({ employee_id: '', score: '4', period: '', notes: '' })
   const [advanceForm, setAdvanceForm] = useState({
-    employee_id: '', amount: '', advanced_on: now.toISOString().slice(0, 10), method: 'cash', notes: '',
+    employee_id: '', amount: '', advanced_on: todayCivilIso(), method: 'cash', notes: '',
   })
   const [assignForm, setAssignForm] = useState({
-    employee_id: '', title: 'تسليم عهدة', assignable_type: 'manual', notes: '', handed_on: new Date().toISOString().slice(0, 10),
+    employee_id: '', title: 'تسليم عهدة', assignable_type: 'manual', notes: '', handed_on: todayCivilIso(),
   })
-  const [payoutForm, setPayoutForm] = useState({ amount: '', paid_on: now.toISOString().slice(0, 10), method: 'cash', notes: '' })
+  const [payoutForm, setPayoutForm] = useState({ amount: '', paid_on: todayCivilIso(), method: 'cash', notes: '' })
   const [chip, setChip] = useQueryTab({ allowed: HrPageTabs, defaultValue: 'all' })
 
   async function load() {
@@ -263,7 +264,7 @@ export function HrPage() {
         toast.error('أدخل ملاحظات التسليم.')
         return
       }
-      const day = assignForm.handed_on || new Date().toISOString().slice(0, 10)
+      const day = assignForm.handed_on || todayCivilIso()
       await api('/employee-assignments', {
         method: 'POST',
         json: {
@@ -275,7 +276,7 @@ export function HrPage() {
       })
       toast.success('تم تسليم العهدة/الأصل — بانتظار تأكيد استلام الأدمن.')
       setAssignOpen(false)
-      setAssignForm({ employee_id: '', title: 'تسليم عهدة', assignable_type: 'manual', notes: '', handed_on: new Date().toISOString().slice(0, 10) })
+      setAssignForm({ employee_id: '', title: 'تسليم عهدة', assignable_type: 'manual', notes: '', handed_on: todayCivilIso() })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -299,7 +300,7 @@ export function HrPage() {
     setPayoutLine(line)
     setPayoutForm({
       amount: String(remaining),
-      paid_on: now.toISOString().slice(0, 10),
+      paid_on: todayCivilIso(),
       method: 'cash',
       notes: '',
     })
@@ -597,7 +598,7 @@ export function HrPage() {
         <div className="rpm-form-grid">
           <SelectField label="الموظف" required value={assignForm.employee_id} onChange={(e) => setAssignForm({ ...assignForm, employee_id: e.target.value })} options={employees.map((e) => ({ value: String(e.id), label: e.name }))} />
           <TextAreaField label="ملاحظات" value={assignForm.notes} required hint="وصف مختصر لما يُسلَّم (هاتف · لابتوب · ملف…)" onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value, title: e.target.value.slice(0, 120) || 'تسليم عهدة' })} />
-          <TextField label="تاريخ التسليم" type="date" value={assignForm.handed_on || new Date().toISOString().slice(0, 10)} onChange={(e) => setAssignForm({ ...assignForm, handed_on: e.target.value })} />
+          <TextField label="تاريخ التسليم" type="date" value={assignForm.handed_on || todayCivilIso()} onChange={(e) => setAssignForm({ ...assignForm, handed_on: e.target.value })} />
           <p className="muted">بعد الحفظ يبقى التسليم بانتظار «تأكيد استلام الأدمن».</p>
         </div>
       </Sheet>
