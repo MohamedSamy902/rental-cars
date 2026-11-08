@@ -3,6 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { Button, TextAreaField, TextField, useToast } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
+import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
 
 type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement'
 
@@ -34,12 +35,15 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
     hint: 'يُستخدم عند طباعة إيصال الاستلام والتأمين.',
   },
   owner_agreement: {
-    title: 'قالب عقد المالك',
-    hint: 'يُستخدم عند حفظ عربية مرتبطة بمالك — يُملأ ببيانات المالك والعربية تلقائياً ويمكن تعديله من هنا.',
+    title: 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
+    hint: 'عقد قانوني متعدد الصفحات يُملأ تلقائياً ببيانات المركز والمالك والعربية عند الحفظ/الطباعة، وقابل للتعديل هنا.',
   },
 }
 
-function shellPreview(title: string, body: string) {
+function shellPreview(type: TemplateType, title: string, body: string) {
+  if (type === 'owner_agreement') {
+    return shellOwnerAgreementHtml(body, title)
+  }
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${title}</title>
 <style>
   body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a}
@@ -158,7 +162,7 @@ export function DocumentTemplatesPanel() {
         const v = sampleMap[key]
         return v != null ? String(v).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch)) : `{{${key}}}`
       })
-      printHtmlDocument(shellPreview(TYPE_META[type].title, rendered))
+      printHtmlDocument(shellPreview(type, TYPE_META[type].title, rendered))
 
       // Also hit server preview for active published version (optional confirmation).
       await api('/document-templates/preview', {

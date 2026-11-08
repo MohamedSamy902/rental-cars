@@ -52,14 +52,24 @@ class DocumentTemplateService
             ['key' => 'template_version', 'aliases' => ['إصدار_القالب'], 'label' => 'رقم إصدار القالب', 'sample' => '1'],
             ['key' => 'owner_name', 'aliases' => ['اسم_المالك'], 'label' => 'اسم المالك', 'sample' => 'محمود علي'],
             ['key' => 'owner_phone', 'aliases' => ['هاتف_المالك'], 'label' => 'هاتف المالك', 'sample' => '01011112222'],
+            ['key' => 'owner_phone_alt', 'aliases' => ['هاتف_المالك_البديل'], 'label' => 'هاتف المالك البديل', 'sample' => '01122223333'],
             ['key' => 'owner_national_id', 'aliases' => ['قومي_المالك'], 'label' => 'الرقم القومي للمالك', 'sample' => '29001011234567'],
             ['key' => 'owner_monthly_amount', 'aliases' => ['المبلغ_الشهري_للمالك'], 'label' => 'المبلغ الشهري للمالك', 'sample' => '8000'],
             ['key' => 'owner_agreement_number', 'aliases' => ['رقم_عقد_المالك'], 'label' => 'رقم عقد المالك (تلقائي)', 'sample' => 'OWN-VEH-0001'],
             ['key' => 'owner_agreement_starts_on', 'aliases' => ['بداية_عقد_المالك'], 'label' => 'بداية عقد المالك', 'sample' => '2026-01-01'],
             ['key' => 'owner_agreement_ends_on', 'aliases' => ['نهاية_عقد_المالك'], 'label' => 'نهاية عقد المالك', 'sample' => '2026-12-31'],
+            ['key' => 'agreement_date', 'aliases' => ['تاريخ_تحرير_العقد'], 'label' => 'تاريخ تحرير العقد', 'sample' => '2026-11-08'],
             ['key' => 'vehicle_code', 'aliases' => ['كود_العربية'], 'label' => 'الكود الداخلي للعربية', 'sample' => 'VEH-0001'],
             ['key' => 'vehicle_year', 'aliases' => ['سنة_العربية'], 'label' => 'سنة الصنع', 'sample' => '2024'],
             ['key' => 'vehicle_category', 'aliases' => ['فئة_العربية'], 'label' => 'فئة العربية', 'sample' => 'اقتصادي'],
+            ['key' => 'vehicle_color', 'aliases' => ['لون_العربية'], 'label' => 'لون العربية', 'sample' => 'أبيض'],
+            ['key' => 'vehicle_fuel', 'aliases' => ['وقود_العربية'], 'label' => 'نوع الوقود', 'sample' => 'بنزين'],
+            ['key' => 'vehicle_transmission', 'aliases' => ['ناقل_الحركة'], 'label' => 'ناقل الحركة', 'sample' => 'أوتوماتيك'],
+            ['key' => 'vehicle_chassis', 'aliases' => ['رقم_الشاسيه'], 'label' => 'رقم الشاسيه', 'sample' => 'CHS-123456'],
+            ['key' => 'vehicle_engine', 'aliases' => ['رقم_المحرك'], 'label' => 'رقم المحرك', 'sample' => 'ENG-654321'],
+            ['key' => 'vehicle_odometer', 'aliases' => ['عداد_العربية'], 'label' => 'قراءة العداد عند التعاقد', 'sample' => '45000'],
+            ['key' => 'vehicle_daily_rate', 'aliases' => ['سعر_التأجير_اليومي'], 'label' => 'سعر التأجير اليومي المعتمد', 'sample' => '800'],
+            ['key' => 'vehicle_deposit', 'aliases' => ['تأمين_التأجير_الافتراضي'], 'label' => 'التأمين النقدي الافتراضي للتأجير', 'sample' => '5000'],
         ];
     }
 
@@ -88,7 +98,7 @@ class DocumentTemplateService
                 'content' => $this->defaultHandoverHtml(),
             ],
             DocumentTemplate::TYPE_OWNER_AGREEMENT => [
-                'title' => 'قالب عقد المالك',
+                'title' => 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
                 'content' => $this->defaultOwnerAgreementHtml(),
             ],
         ] as $type => $meta) {
@@ -122,6 +132,40 @@ class DocumentTemplateService
                 'title' => 'قالب إيصال الاستلام والتأمين',
                 'content' => $this->defaultHandoverHtml(),
             ]);
+
+        $this->upgradeStockOwnerAgreementTemplate($userId);
+    }
+
+    /**
+     * Replace the short stock owner-agreement template with the multi-page legal default
+     * when the active row still looks like the early one-page stub (or lacks legal articles).
+     */
+    private function upgradeStockOwnerAgreementTemplate(?int $userId = null): void
+    {
+        $active = DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_OWNER_AGREEMENT)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->first();
+
+        if (! $active) {
+            return;
+        }
+
+        $content = (string) $active->content;
+        $isShortStub = ! str_contains($content, 'المادة الأولى')
+            || mb_strlen(strip_tags($content)) < 1200;
+
+        if (! $isShortStub) {
+            return;
+        }
+
+        $this->publish([
+            'type' => DocumentTemplate::TYPE_OWNER_AGREEMENT,
+            'title' => 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
+            'content' => $this->defaultOwnerAgreementHtml(),
+            'format' => 'html',
+        ], null, $userId);
     }
 
     /**
@@ -467,6 +511,7 @@ class DocumentTemplateService
             'contract_terms' => (string) ($ops['owner_agreement_terms'] ?? $ops['contract_terms'] ?? ''),
             'owner_name' => (string) ($owner?->full_name ?: ''),
             'owner_phone' => (string) ($owner?->phone ?: ''),
+            'owner_phone_alt' => (string) ($owner?->phone_alt ?: ''),
             'owner_national_id' => (string) ($owner?->national_id ?: ''),
             'owner_monthly_amount' => (string) (int) ($vehicle->owner_monthly_amount ?? 0),
             'owner_agreement_number' => $number,
@@ -474,11 +519,20 @@ class DocumentTemplateService
                 ?? $vehicle->owner_since?->toDateString()
                 ?? '',
             'owner_agreement_ends_on' => $vehicle->owner_agreement_ends_on?->toDateString() ?? '',
+            'agreement_date' => now()->toDateString(),
             'vehicle_plate' => (string) ($vehicle->plate ?: ''),
             'vehicle_name' => trim(($vehicle->brand ?? '').' '.($vehicle->model ?? '')),
             'vehicle_code' => (string) ($vehicle->code ?: ''),
             'vehicle_year' => (string) ($vehicle->year ?: ''),
             'vehicle_category' => (string) ($vehicle->category ?: ''),
+            'vehicle_color' => (string) ($vehicle->color ?: ''),
+            'vehicle_fuel' => (string) ($vehicle->fuel_type ?: ''),
+            'vehicle_transmission' => (string) ($vehicle->transmission ?: ''),
+            'vehicle_chassis' => (string) ($vehicle->chassis_number ?: ''),
+            'vehicle_engine' => (string) ($vehicle->engine_number ?: ''),
+            'vehicle_odometer' => (string) (int) ($vehicle->odometer ?? 0),
+            'vehicle_daily_rate' => (string) (int) ($vehicle->daily_rate ?? 0),
+            'vehicle_deposit' => (string) (int) ($vehicle->default_deposit ?? 0),
             'template_version' => (string) ($template?->version ?? ''),
         ];
 
@@ -490,7 +544,7 @@ class DocumentTemplateService
         return match ($type) {
             DocumentTemplate::TYPE_CONTRACT => 'قالب العقد الأساسي',
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب إيصال الاستلام والتأمين',
-            DocumentTemplate::TYPE_OWNER_AGREEMENT => 'قالب عقد المالك',
+            DocumentTemplate::TYPE_OWNER_AGREEMENT => 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
             default => 'قالب مستند',
         };
     }
@@ -568,23 +622,183 @@ HTML;
   <div>
     <h1>{{company_name}}</h1>
     <p class="muted">{{company_phone}} · {{company_address}}</p>
+    <p class="muted">س.ت {{company_cr}} · بطاقة ضريبية {{company_tax}}</p>
   </div>
 </header>
-<h2>عقد تشغيل عربية مملوكة للغير · {{owner_agreement_number}}</h2>
-<p class="muted">إصدار القالب {{template_version}}</p>
+
+<p class="contract-title">عقد إدارة وتشغيل مركبة مملوكة للغير</p>
+<p class="contract-sub">رقم العقد {{owner_agreement_number}} · تاريخ التحرير {{agreement_date}} · إصدار القالب {{template_version}}</p>
+
+<p class="preamble">إنه في يوم {{agreement_date}}، وبمدينة مقر الطرف الثاني الموضّح أدناه، تحرر هذا العقد بين كلٍّ من:</p>
+
+<h2>أطراف العقد</h2>
 <table>
-  <tr><th>المالك</th><td>{{owner_name}} · <span dir="ltr">{{owner_phone}}</span></td></tr>
-  <tr><th>الرقم القومي</th><td><span dir="ltr">{{owner_national_id}}</span></td></tr>
-  <tr><th>العربية</th><td>{{vehicle_name}} · {{vehicle_plate}} · {{vehicle_year}}</td></tr>
-  <tr><th>الكود الداخلي</th><td>{{vehicle_code}}</td></tr>
-  <tr><th>الفئة</th><td>{{vehicle_category}}</td></tr>
-  <tr><th>بداية العقد</th><td>{{owner_agreement_starts_on}}</td></tr>
-  <tr><th>نهاية العقد</th><td>{{owner_agreement_ends_on}}</td></tr>
-  <tr><th>المبلغ الشهري</th><td>{{owner_monthly_amount}}</td></tr>
+  <tr><th>الطرف الأول (المالك)</th><td>
+    السيد/ة: {{owner_name}}<br>
+    الرقم القومي: <span dir="ltr">{{owner_national_id}}</span><br>
+    هاتف: <span dir="ltr">{{owner_phone}}</span>
+    <span class="muted"> · بديل: <span dir="ltr">{{owner_phone_alt}}</span></span>
+  </td></tr>
+  <tr><th>الطرف الثاني (مركز التشغيل)</th><td>
+    {{company_name}}<br>
+    العنوان: {{company_address}}<br>
+    هاتف: <span dir="ltr">{{company_phone}}</span><br>
+    السجل التجاري: {{company_cr}} · البطاقة الضريبية: {{company_tax}}
+  </td></tr>
 </table>
-<h2>بنود الاتفاق</h2>
-<div class="terms">{{contract_terms}}</div>
-<p class="foot">{{print_footer}}</p>
+<p class="preamble">ويُشار إلى الطرفين مجتمعين بـ«الطرفين»، ويقرّان بأهليتهما القانونية الكاملة للتعاقد والتصرف، واتفاقهما على الأحكام التالية.</p>
+
+<section class="article">
+  <h3>المادة الأولى — تعريفات</h3>
+  <ol>
+    <li><strong>المركبة:</strong> السيارة المبيّنة بياناتها في المادة الثانية من هذا العقد وملحقاتها من مفاتيح ومستندات ورخصة تسيير وإكسسوارات عند التسليم.</li>
+    <li><strong>التشغيل:</strong> إدارة المركبة وتأجيرها للغير عبر نشاط الطرف الثاني، بما يشمل التسليم والاستلام والصيانة الدورية والتحصيل وفق أنظمة المركز.</li>
+    <li><strong>المقابل الشهري:</strong> المبلغ المتفق عليه لصالح الطرف الأول مقابل تمكين الطرف الثاني من تشغيل المركبة خلال مدة العقد.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>المادة الثانية — محل العقد وبيانات المركبة</h3>
+  <p>يوكّل الطرف الأول الطرف الثاني — دون نقل ملكية — بإدارة وتشغيل المركبة الآتية، ويقرّ بأنه المالك الشرعي لها وأنها خالية من أي نزاع يحول دون تشغيلها:</p>
+  <table>
+    <tr><th>الماركة / الموديل</th><td>{{vehicle_name}}</td></tr>
+    <tr><th>سنة الصنع</th><td>{{vehicle_year}}</td></tr>
+    <tr><th>الفئة</th><td>{{vehicle_category}}</td></tr>
+    <tr><th>اللون</th><td>{{vehicle_color}}</td></tr>
+    <tr><th>الوقود / ناقل الحركة</th><td>{{vehicle_fuel}} · {{vehicle_transmission}}</td></tr>
+    <tr><th>رقم اللوحة</th><td>{{vehicle_plate}}</td></tr>
+    <tr><th>رقم الشاسيه</th><td><span dir="ltr">{{vehicle_chassis}}</span></td></tr>
+    <tr><th>رقم المحرك</th><td><span dir="ltr">{{vehicle_engine}}</span></td></tr>
+    <tr><th>قراءة العداد عند التعاقد</th><td>{{vehicle_odometer}} كم</td></tr>
+    <tr><th>الكود الداخلي لدى المركز</th><td>{{vehicle_code}}</td></tr>
+    <tr><th>سعر التأجير اليومي المعتمد</th><td>{{vehicle_daily_rate}} ج.م</td></tr>
+    <tr><th>التأمين النقدي الافتراضي للمستأجر</th><td>{{vehicle_deposit}} ج.م</td></tr>
+  </table>
+</section>
+
+<section class="article">
+  <h3>المادة الثالثة — مدة العقد</h3>
+  <ol>
+    <li>تبدأ مدة هذا العقد من {{owner_agreement_starts_on}} وتنتهي في {{owner_agreement_ends_on}}، ما لم يُفسخ أو يُجدد وفق أحكامه.</li>
+    <li>إذا انتهت المدة دون تجديد كتابي صريح، لا يُعدّ الاستمرار بعد انتهائها تجديداً تلقائياً إلا بموافقة الطرفين وتحديث بيانات التشغيل.</li>
+  </ol>
+</section>
+
+<div class="page-break"></div>
+
+<section class="article">
+  <h3>المادة الرابعة — المقابل المالي وطريقة السداد</h3>
+  <ol>
+    <li>يلتزم الطرف الثاني بأن يؤدي للطرف الأول مقابلاً شهرياً قدره <strong>{{owner_monthly_amount}} جنيهاً مصرياً</strong> عن تشغيل المركبة محل العقد.</li>
+    <li>يُسدَّد المقابل وفق دورة المستحقات المعتمدة لدى المركز (شهر ميلادي)، ويُثبت بأي إيصال أو تحويل أو قيد محاسبي صادر من أنظمة الطرف الثاني.</li>
+    <li>لا يشمل المقابل الشهري ما يتحمله الطرف الثاني من مصروفات تشغيل معتادة (وقود للمستأجرين، غسيل تشغيلي، عمولات تحصيل إلكترونية معتادة) ما لم يُتفق كتابةً على غير ذلك.</li>
+    <li>أي زيادة أو تخفيض في المقابل الشهري لا يسري إلا باتفاق كتابي لاحق يُلحق بهذا العقد.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>المادة الخامسة — التزامات الطرف الثاني (مركز التشغيل)</h3>
+  <ol>
+    <li>تشغيل المركبة في نشاط التأجير بحسن نية ووفق قانون المرور المصري واللوائح المعمول بها، وبما لا يخالف النظام العام.</li>
+    <li>إجراء الصيانة الدورية والوقائية اللازمة لسلامة التشغيل، وتوثيق أوامر الشغل والمصروفات ذات الصلة في سجلاته.</li>
+    <li>التأمين الإجباري ساري المفعول عن المسؤولية المدنية الناشئة عن حوادث المركبات، والسعي لتوفير تغطية إضافية حسب سياسة المركز المعلنة للمالك.</li>
+    <li>تحصيل أجرة التأجير من العملاء والتعامل معهم بموجب عقود/إيصالات المركز، دون أن يُنشئ ذلك علاقة تعاقدية مباشرة بين المالك والعميل المستأجر.</li>
+    <li>إخطار الطرف الأول دون تأخير غير مبرر بأي حادث جسيم أو سرقة أو حجز أو نزاع جوهري يمس المركبة.</li>
+    <li>إعادة المركبة عند انتهاء العقد أو فسخه بالحالة التي تقتضيها الاستعمال المألوف، مع مراعاة الاستهلاك الطبيعي.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>المادة السادسة — التزامات الطرف الأول (المالك)</h3>
+  <ol>
+    <li>تمكين الطرف الثاني من حيازة المركبة ومستنداتها اللازمة للتشغيل (رخصة التسيير، مفاتيح، أي أجهزة تتبع مثبتة إن وُجدت).</li>
+    <li>ضمان أن المركبة مملوكة له خالصة من أي حق للغير يمنع التشغيل المشروع، والإفصاح عن أي رهن أو حظر مروري معلوم وقت التعاقد.</li>
+    <li>تجديد رخصة التسيير والتوكيلات اللازمة على نفقته متى كانت مطلوبة قانوناً لاستمرار التشغيل، ما لم يُتفق على أن يتولاها المركز مقابل خصم متفق عليه.</li>
+    <li>عدم سحب المركبة أو تعطيل تشغيلها خلال مدة العقد دون سبب مشروع أو إخلال جسيم من الطرف الثاني وبعد إخطار كتابي يمهّل علاجاً معقولاً.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>المادة السابعة — الصيانة والحوادث والمخالفات</h3>
+  <ol>
+    <li>الصيانة الناتجة عن الاستعمال التشغيلي المعتاد يتحملها الطرف الثاني ضمن سياسة تشغيل الأسطول، ما لم يثبت أنها ناشئة عن عيب سابق أخفاه المالك.</li>
+    <li>التلفيات الناتجة عن خطأ عميل مستأجر تُعالَج وفق عقود التأجير والتأمين؛ ويُبلَّغ المالك بنتائج المطالبات الجوهرية.</li>
+    <li>المخالفات المرورية والغرامات التي تقع أثناء فترة التشغيل تُحمَّل على المتسبب وفق أنظمة المركز وعقود العملاء، دون إخلال بحق الرجوع القانوني.</li>
+    <li>في حال الحادث: يلتزم الطرف الثاني باتخاذ الإجراءات المعتادة (إبلاغ، معاينة، مطالبة تأمينية) والتعاون مع الجهات المختصة.</li>
+  </ol>
+</section>
+
+<div class="page-break"></div>
+
+<section class="article">
+  <h3>المادة الثامنة — الأجهزة والملحقات والبيانات</h3>
+  <ol>
+    <li>أجهزة التتبع أو الملحقات المملوكة للمركز تبقى ملكاً له وتُزال عند انتهاء العلاقة إن أمكن دون ضرر غير مألوف بالمركبة.</li>
+    <li>يقرّ الطرف الأول باطلاع الطرف الثاني على بيانات التشغيل اللازمة لإدارة الأسطول، مع التزام المركز بسرية البيانات الشخصية للمالك وفق سياسة الخصوصية المعمول بها.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>المادة التاسعة — التنازل والتعاقد من الباطن</h3>
+  <ol>
+    <li>لا يجوز للطرف الأول التنازل عن هذا العقد للغير دون موافقة كتابية مسبقة من الطرف الثاني.</li>
+    <li>تأجير المركبة لعملاء المركز جزء أصيل من غرض التشغيل ولا يُعدّ تنازلاً عن العقد، ولا ينشئ علاقة مباشرة بين المالك وهؤلاء العملاء.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>المادة العاشرة — الفسخ والإنهاء</h3>
+  <ol>
+    <li>يجوز لأي طرف طلب فسخ العقد عند إخلال الطرف الآخر إخلالاً جوهرياً بالتزاماته، بعد إخطار كتابي ومنح مهلة خمسة عشر (١٥) يوماً لإزالة المخالفة ما لم يكن الإخلال غير قابل للإزالة.</li>
+    <li>ينتهي العقد بانتهاء مدته أو بالاتفاق أو بهلاك المركبة كلياً أو بسحب ترخيص التشغيل المانع قانوناً للاستمرار.</li>
+    <li>عند الإنهاء تُسوَّى المستحقات المالية حتى تاريخ التسليم الفعلي، وتُعاد المركبة ومستنداتها وفق محضر تسليم.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>المادة الحادية عشرة — القوة القاهرة</h3>
+  <p>لا يُسأل أي طرف عن تأخير أو امتناع ناتج عن قوة قاهرة أو ظرف طارئ عام يخرج عن السيطرة المعقولة (ومن ذلك الكوارث والحظر الحكومي الشامل)، على أن يُخطر الطرف الآخر فور العلم ويبذل العناية لإزالة الأثر قدر الإمكان.</p>
+</section>
+
+<section class="article">
+  <h3>المادة الثانية عشرة — القانون الواجب التطبيق وتسوية المنازعات</h3>
+  <ol>
+    <li>يخضع هذا العقد لأحكام القانون المصري، وبخاصة القانون المدني وقانون المرور والتشريعات ذات الصلة.</li>
+    <li>تُختص محاكم جمهورية مصر العربية — دائرة مقر الطرف الثاني — بنظر أي نزاع ينشأ عن تفسير أو تنفيذ هذا العقد، ما لم يتفق الطرفان لاحقاً على التحكيم.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>المادة الثالثة عشرة — أحكام عامة</h3>
+  <ol>
+    <li>يمثّل هذا العقد الاتفاق الكامل بين الطرفين بشأن محله، ويلغي أي تفاهم شفهي سابق يتعارض معه.</li>
+    <li>أي تعديل لا يُعتدّ به إلا مكتوباً وموقّعاً من الطرفين أو مثبتاً في أنظمة المركز بموافقة صريحة.</li>
+    <li>بطلان بند لا يؤثر على بقية البنود متى أمكن فصلها.</li>
+    <li>حُرّر هذا العقد من نسختين أصليتين بيد كل طرف نسخة للعمل بموجبها.</li>
+  </ol>
+</section>
+
+<section class="article">
+  <h3>بنود إضافية متفق عليها</h3>
+  <div class="terms">{{contract_terms}}</div>
+</section>
+
+<div class="sign-grid">
+  <div class="sign-box">
+    <h4>الطرف الأول — المالك</h4>
+    <p>{{owner_name}}</p>
+    <p class="muted">قومي: <span dir="ltr">{{owner_national_id}}</span></p>
+    <div class="sign-line">التوقيع · بصمة · التاريخ</div>
+  </div>
+  <div class="sign-box">
+    <h4>الطرف الثاني — مركز التشغيل</h4>
+    <p>{{company_name}}</p>
+    <p class="muted">{{company_address}}</p>
+    <div class="sign-line">الختم · توقيع المسؤول · التاريخ</div>
+  </div>
+</div>
+
+<p class="foot">{{print_footer}} · عقد تشغيلي قابل للتعديل من إعدادات القوالب · يُنصح بمراجعة قانونية محلية قبل الاعتماد النهائي لدى الجهات الرسمية.</p>
 HTML;
     }
 }

@@ -21,6 +21,7 @@ import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { printContractDocument } from '@/shared/contracts/printContract'
 import type { Contract } from '@/shared/contracts/contractModel'
 import { printDomSubtree, printHtmlDocument } from '@/utils/printHtml'
+import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
@@ -1151,17 +1152,7 @@ export function VehicleDetailPage() {
               onClick={() => {
                 void api<{ data: { html: string } }>(`/vehicles/${v.id}/owner-agreement/print`)
                   .then((res) => {
-                    printHtmlDocument(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>عقد المالك</title>
-<style>
-  body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a}
-  h1{margin:0 0 4px;font-size:22px} h2{margin:20px 0 8px;font-size:16px}
-  .muted{color:#64748b} table{width:100%;border-collapse:collapse;margin-top:12px}
-  td,th{border:1px solid #cbd5e1;padding:8px;text-align:start} th{background:#f8fafc;width:32%}
-  .foot{margin-top:24px;color:#64748b;font-size:12px}
-  .terms{margin-top:20px;white-space:pre-wrap;font-size:13px;line-height:1.7}
-  .print-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
-  .print-logo{width:96px;height:auto;object-fit:contain}
-</style></head><body>${res.data.html}</body></html>`)
+                    printHtmlDocument(shellOwnerAgreementHtml(res.data.html))
                   })
                   .catch((e) => toast.error((e as ApiError).message || 'تعذّرت طباعة عقد المالك.'))
               }}

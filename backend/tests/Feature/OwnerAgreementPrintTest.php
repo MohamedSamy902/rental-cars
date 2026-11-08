@@ -7,7 +7,6 @@ use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleOwner;
 use App\Services\Accounting\AccountingService;
 use App\Services\Documents\DocumentTemplateService;
 use App\Support\PermissionCatalog;
@@ -63,14 +62,21 @@ class OwnerAgreementPrintTest extends TestCase
 
         $res->assertJsonPath('data.owner.full_name', 'مالك تجريبي');
         $this->assertArrayHasKey('owner_agreement', $res->json());
-        $this->assertNotEmpty($res->json('owner_agreement.html'));
-        $this->assertStringContainsString('مالك تجريبي', $res->json('owner_agreement.html'));
+        $html = (string) $res->json('owner_agreement.html');
+        $this->assertNotEmpty($html);
+        $this->assertStringContainsString('مالك تجريبي', $html);
         $this->assertStringContainsString('OWN-', $res->json('owner_agreement.number'));
+        $this->assertStringContainsString('المادة الأولى', $html);
+        $this->assertStringContainsString('مركز اختبار المالك', $html);
+        $this->assertStringContainsString('هيونداي', $html);
 
         $vehicleId = (int) $res->json('data.id');
         $print = $this->getJson("/api/vehicles/{$vehicleId}/owner-agreement/print")->assertOk();
         $print->assertJsonPath('data.template.type', DocumentTemplate::TYPE_OWNER_AGREEMENT);
-        $this->assertStringContainsString('مالك تجريبي', $print->json('data.html'));
+        $printHtml = (string) $print->json('data.html');
+        $this->assertStringContainsString('مالك تجريبي', $printHtml);
+        $this->assertStringContainsString('المادة الرابعة', $printHtml);
+        $this->assertStringContainsString('9000', $printHtml);
 
         $vehicle = Vehicle::query()->findOrFail($vehicleId);
         $this->assertFalse(isset($vehicle->target_monthly_income));

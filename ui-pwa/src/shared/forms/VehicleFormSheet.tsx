@@ -6,6 +6,7 @@ import {
   MediaUpload, PlateField, splitPlate, useToast,
 } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
+import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
 
 type OwnerOption = { id: number; full_name: string; phone?: string | null }
 type Brand = { id: number; name: string }
@@ -97,20 +98,6 @@ type FormState = {
   license_file_path_back: string
 }
 
-function shellOwnerPrint(body: string) {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>عقد المالك</title>
-<style>
-  body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a}
-  h1{margin:0 0 4px;font-size:22px} h2{margin:20px 0 8px;font-size:16px}
-  .muted{color:#64748b} table{width:100%;border-collapse:collapse;margin-top:12px}
-  td,th{border:1px solid #cbd5e1;padding:8px;text-align:start} th{background:#f8fafc;width:32%}
-  .foot{margin-top:24px;color:#64748b;font-size:12px}
-  .terms{margin-top:20px;white-space:pre-wrap;font-size:13px;line-height:1.7}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;color:#0f766e;font-size:12px}
-  .print-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
-  .print-logo{width:96px;height:auto;object-fit:contain}
-</style></head><body>${body}</body></html>`
-}
 
 function emptyForm(): FormState {
   return {
@@ -393,7 +380,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         toast.success(res.message || 'تم إضافة العربية.')
         if (res.owner_agreement?.html) {
           try {
-            printHtmlDocument(shellOwnerPrint(res.owner_agreement.html))
+            printHtmlDocument(shellOwnerAgreementHtml(res.owner_agreement.html))
           } catch {
             toast.error('تم الحفظ لكن تعذّرت طباعة عقد المالك.')
           }
@@ -421,7 +408,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         toast.success(res.message || 'تم تحديث العربية.')
         if (res.owner_agreement?.html) {
           try {
-            printHtmlDocument(shellOwnerPrint(res.owner_agreement.html))
+            printHtmlDocument(shellOwnerAgreementHtml(res.owner_agreement.html))
           } catch {
             toast.error('تم الحفظ لكن تعذّرت طباعة عقد المالك.')
           }
