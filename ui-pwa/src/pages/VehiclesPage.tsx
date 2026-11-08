@@ -24,6 +24,7 @@ const SIM_RECHARGE_PRESETS = [3, 7, 14, 30] as const
 const SIM_RECHARGE_DEFAULT_DAYS = 14
 const OWNER_AGREEMENT_PRESETS = [7, 14, 30] as const
 const OWNER_AGREEMENT_DEFAULT_DAYS = 30
+const LIST_PER_PAGE = 50
 
 function addDaysIso(base: string, days: number): string {
   return addCivilDays(base, days)
@@ -91,6 +92,10 @@ export function VehiclesPage() {
     license_expiring: 0, sim_recharge: 0, owner_agreement_expiring: 0,
   })
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState<{ current_page: number; last_page: number; total: number }>({
+    current_page: 1, last_page: 1, total: 0,
+  })
   const [chip, setChip] = useQueryTab({ allowed: VEHICLE_TABS, defaultValue: 'all' })
   const [withinDays, setWithinDays] = useState(2)
   const [licenseWithinDays, setLicenseWithinDays] = useState(LICENSE_EXPIRING_DEFAULT_DAYS)
@@ -165,19 +170,32 @@ export function VehiclesPage() {
     licenseDays = licenseWithinDays,
     simDays = simWithinDays,
     agreementDays = agreementWithinDays,
+    nextPage = page,
   ) {
     setLoading(true)
     setError('')
     try {
       const qs = new URLSearchParams()
+      qs.set('page', String(nextPage))
+      qs.set('per_page', String(LIST_PER_PAGE))
       if (nextSearch.trim()) qs.set('search', nextSearch.trim())
       if (nextChip !== 'all') qs.set('status', nextChip)
       if (nextChip === 'expiring') qs.set('within_days', String(days))
       if (nextChip === 'license_expiring') qs.set('within_days', String(licenseDays))
       if (nextChip === 'sim_recharge') qs.set('within_days', String(simDays))
       if (nextChip === 'owner_agreement_expiring') qs.set('within_days', String(agreementDays))
-      const res = await api<{ data: Vehicle[]; summary: typeof summary }>(`/vehicles?${qs}`)
+      const res = await api<{
+        data: Vehicle[]
+        summary: typeof summary
+        meta?: { current_page: number; last_page: number; total: number }
+      }>(`/vehicles?${qs}`)
       setRows(res.data)
+      setMeta({
+        current_page: res.meta?.current_page ?? nextPage,
+        last_page: res.meta?.last_page ?? 1,
+        total: res.meta?.total ?? res.data.length,
+      })
+      setPage(res.meta?.current_page ?? nextPage)
       const s = res.summary
       setSummary({
         total: s.total ?? 0,
@@ -197,9 +215,9 @@ export function VehiclesPage() {
   }
 
   useEffect(() => {
-    const t = window.setTimeout(() => load(), 250)
+    const t = window.setTimeout(() => void load(), 250)
     return () => window.clearTimeout(t)
-  }, [search, chip, withinDays, licenseWithinDays, simWithinDays, agreementWithinDays])
+  }, [search, chip, withinDays, licenseWithinDays, simWithinDays, agreementWithinDays, page])
 
   const columns: DataColumn<Vehicle>[] = useMemo(() => {
     if (chip === 'owner_agreement_expiring') {
@@ -510,10 +528,10 @@ export function VehiclesPage() {
 
       <FilterBar
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={(v) => { setSearch(v); setPage(1) }}
         chips={chips}
         activeChip={chip}
-        onChipChange={setChip}
+        onChipChange={(id) => { setChip(id); setPage(1) }}
         placeholder="بحث بالكود أو اللوحة أو الموديل…"
       />
 
@@ -662,7 +680,7 @@ export function VehiclesPage() {
       ) : null}
 
       {error ? (
-        <ErrorState title="تعذّر تحميل العربيات" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
+        <ErrorState title="تعذّر تحميل العربيات" description={error} action={<Button onClick={() => void load()}>إعادة المحاولة</Button>} />
       ) : (
         <DataTable
           label="العربيات"
@@ -675,6 +693,13 @@ export function VehiclesPage() {
           rowActions={vehicleMenu}
           emptyTitle="لا توجد عربيات مطابقة"
           emptyDescription="جرّب كلمة بحث أخرى أو غيّر فلتر الحالة."
+          serverPagination={{
+            page: meta.current_page,
+            lastPage: meta.last_page,
+            total: meta.total,
+            perPage: LIST_PER_PAGE,
+            onPageChange: setPage,
+          }}
         />
       )}
 

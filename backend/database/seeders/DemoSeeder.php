@@ -18,6 +18,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleAccessory;
 use App\Models\VehicleOwner;
 use App\Models\WorkOrder;
+use App\Models\WorkOrderLine;
 use App\Services\Accounting\AccountingService;
 use App\Services\Notifications\NotificationDispatchService;
 use App\Support\PermissionCatalog;
@@ -38,7 +39,7 @@ class DemoSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'phone' => '01000000000',
                 'role_id' => $adminRole->id,
-                'is_active' => true
+                'is_active' => true,
             ],
         );
 
@@ -50,7 +51,7 @@ class DemoSeeder extends Seeder
             'maintenance' => ['maint@rpm.local', 'يوسف علي', '01000000004'],
             'accounts' => ['accounts@rpm.local', 'أحمد محمد', '01000000005'],
             'hr' => ['hr@rpm.local', 'محمود إبراهيم', '01000000006'],
-            'viewer' => ['viewer@rpm.local', 'نور الدين', '01000000007']
+            'viewer' => ['viewer@rpm.local', 'نور الدين', '01000000007'],
         ];
         foreach ($roleUsers as $roleName => [$email, $name, $phone]) {
             $role = Role::query()->where('name', $roleName)->first();
@@ -89,7 +90,7 @@ class DemoSeeder extends Seeder
                         'accounting.lock_month',
                         'accounting.reopen_month',
                         'hr.custody',
-                        'staff.manage'
+                        'staff.manage',
                     ])
                     ->pluck('id');
                 $role->permissions()->detach($deny);
@@ -138,7 +139,7 @@ class DemoSeeder extends Seeder
                     'password' => Hash::make('password'),
                     'phone' => $phone,
                     'role_id' => $role->id,
-                    'is_active' => true
+                    'is_active' => true,
                 ],
             );
         }
@@ -151,7 +152,7 @@ class DemoSeeder extends Seeder
             'colors' => [
                 'nav' => '#0B1220',
                 'brand' => '#0D9488',
-                'bg' => '#F1F5F9'
+                'bg' => '#F1F5F9',
             ],
             'feature_flags' => [
                 'inventory' => true,
@@ -160,7 +161,7 @@ class DemoSeeder extends Seeder
                 'department_notice' => true,
                 'chat' => true,
                 'evaluations' => true,
-                'hr' => true
+                'hr' => true,
             ],
             'print_footer' => 'مركز آر بي إم للتأجير — نسخة داخلية',
             'operational' => [
@@ -170,8 +171,8 @@ class DemoSeeder extends Seeder
                 'block_expired_license' => true,
                 'block_expired_vehicle_docs' => true,
                 'require_handover_signature' => true,
-                'require_return_signature_always' => false
-            ]
+                'require_return_signature_always' => false,
+            ],
         ])->save();
 
         app(AccountingService::class)->ensureChartOfAccounts();
@@ -180,7 +181,7 @@ class DemoSeeder extends Seeder
             ['code' => 'C-101', 'plate' => 'أ ب ج 1234', 'brand' => 'هيونداي', 'model' => 'إلنترا', 'year' => 2023, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين', 'odometer' => 41200, 'daily_rate' => 900, 'default_deposit' => 3000],
             ['code' => 'C-214', 'plate' => 'س ص ع 7788', 'brand' => 'تويوتا', 'model' => 'كورولا', 'year' => 2022, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين', 'odometer' => 61500, 'daily_rate' => 950, 'default_deposit' => 3000],
             ['code' => 'S-012', 'plate' => 'ل م ن 4501', 'brand' => 'كيا', 'model' => 'سبورتاج', 'year' => 2024, 'category' => 'SUV', 'fuel_type' => 'بنزين', 'odometer' => 18200, 'daily_rate' => 1400, 'default_deposit' => 5000],
-            ['code' => 'C-088', 'plate' => 'ق ر ش 3320', 'brand' => 'نيسان', 'model' => 'صني', 'year' => 2021, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين', 'odometer' => 89000, 'daily_rate' => 750, 'default_deposit' => 2500, 'manual_status' => 'maintenance']
+            ['code' => 'C-088', 'plate' => 'ق ر ش 3320', 'brand' => 'نيسان', 'model' => 'صني', 'year' => 2021, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين', 'odometer' => 89000, 'daily_rate' => 750, 'default_deposit' => 2500, 'manual_status' => 'maintenance'],
         ];
 
         foreach ($vehicles as $row) {
@@ -201,7 +202,7 @@ class DemoSeeder extends Seeder
         $customers = [
             ['full_name' => 'أحمد محمود', 'phone' => '01011112222', 'birth_date' => '1990-05-12', 'license_number' => 'L-1001', 'license_expires_on' => '2028-01-01', 'national_id' => '29005121234567'],
             ['full_name' => 'منى حسين', 'phone' => '01022223333', 'birth_date' => '1993-08-20', 'license_number' => 'L-1002', 'license_expires_on' => '2027-06-01', 'national_id' => '29308201234567'],
-            ['full_name' => 'يوسف علي', 'phone' => '01033334444', 'birth_date' => '1988-01-03', 'license_number' => 'L-1003', 'license_expires_on' => '2029-03-15', 'national_id' => '28801031234567']
+            ['full_name' => 'يوسف علي', 'phone' => '01033334444', 'birth_date' => '1988-01-03', 'license_number' => 'L-1003', 'license_expires_on' => '2029-03-15', 'national_id' => '28801031234567'],
         ];
         foreach ($customers as $c) {
             Customer::query()->updateOrCreate(
@@ -230,7 +231,7 @@ class DemoSeeder extends Seeder
                 'frozen_excess_km_rate' => 5,
                 'frozen_agreed_deposit' => 3000,
                 'odometer_out' => 61000,
-                'sales_user_id' => $user->id
+                'sales_user_id' => $user->id,
             ],
         );
 
@@ -246,7 +247,7 @@ class DemoSeeder extends Seeder
                 'frozen_daily_km_allowance' => 200,
                 'frozen_excess_km_rate' => 5,
                 'frozen_agreed_deposit' => 5000,
-                'sales_user_id' => $user->id
+                'sales_user_id' => $user->id,
             ],
         );
 
@@ -262,7 +263,7 @@ class DemoSeeder extends Seeder
                 'frozen_daily_km_allowance' => 200,
                 'frozen_excess_km_rate' => 5,
                 'frozen_agreed_deposit' => 3000,
-                'sales_user_id' => $user->id
+                'sales_user_id' => $user->id,
             ],
         );
 
@@ -285,7 +286,7 @@ class DemoSeeder extends Seeder
         );
 
         $sunny = Vehicle::query()->where('code', 'C-088')->first();
-        WorkOrder::query()->updateOrCreate(
+        $demoWo = WorkOrder::query()->updateOrCreate(
             ['vehicle_id' => $sunny->id, 'status' => 'in_progress'],
             [
                 'workshop' => 'ورشة النور',
@@ -294,9 +295,20 @@ class DemoSeeder extends Seeder
                 'puts_in_maintenance' => true,
                 'parts_cost' => 850,
                 'labor_cost' => 300,
-                'notes' => 'صيانة دورية'
+                'notes' => 'صيانة دورية',
             ],
         );
+        if (! WorkOrderLine::query()->where('work_order_id', $demoWo->id)->exists()) {
+            WorkOrderLine::query()->create([
+                'work_order_id' => $demoWo->id,
+                'description' => 'قطع صيانة دورية — بذرة',
+                'part_source' => 'purchase',
+                'quantity' => 1,
+                'unit_price' => 850,
+                'from_petty_cash' => false,
+                'petty_cash_amount' => 0,
+            ]);
+        }
 
         $tech = Employee::query()->updateOrCreate(
             ['name' => 'محمود فني'],
@@ -304,7 +316,7 @@ class DemoSeeder extends Seeder
                 'job_title' => 'فني صيانة',
                 'hired_on' => '2024-01-01',
                 'base_salary' => 6000,
-                'status' => 'active'
+                'status' => 'active',
             ],
         );
 
@@ -313,7 +325,7 @@ class DemoSeeder extends Seeder
             [
                 'limit_amount' => 15000,
                 'balance' => 12000,
-                'is_active' => true
+                'is_active' => true,
             ],
         );
         if (! PettyCashMovement::query()->where('petty_cash_account_id', $petty->id)->where('type', 'topup')->exists()) {
@@ -323,7 +335,7 @@ class DemoSeeder extends Seeder
                 'amount' => 15000,
                 'moved_on' => now()->subDays(10)->toDateString(),
                 'performed_by' => $user->id,
-                'notes' => 'افتتاح عهدة نقدية للمعاينة'
+                'notes' => 'افتتاح عهدة نقدية للمعاينة',
             ]);
             if ((int) $petty->balance !== 12000) {
                 // spend sample already reflected in balance seed above
@@ -334,7 +346,7 @@ class DemoSeeder extends Seeder
                 'amount' => 3000,
                 'moved_on' => now()->subDays(7)->toDateString(),
                 'performed_by' => $user->id,
-                'notes' => 'مصروف تشغيلي سابق (بذرة)'
+                'notes' => 'مصروف تشغيلي سابق (بذرة)',
             ]);
         }
 
@@ -345,7 +357,7 @@ class DemoSeeder extends Seeder
                 'phone_alt' => '01155556666',
                 'national_id' => '28001011234567',
                 'notes' => 'مالك معاينة — عربيتين للسيناريو الشامل',
-                'is_active' => true
+                'is_active' => true,
             ],
         );
 
@@ -361,7 +373,7 @@ class DemoSeeder extends Seeder
                 'odometer' => 8500,
                 'daily_rate' => 1200,
                 'default_deposit' => 4000,
-                'owner_monthly_amount' => 9000
+                'owner_monthly_amount' => 9000,
             ],
             [
                 'code' => 'VEH-9002',
@@ -374,8 +386,8 @@ class DemoSeeder extends Seeder
                 'odometer' => 14200,
                 'daily_rate' => 1100,
                 'default_deposit' => 4000,
-                'owner_monthly_amount' => 8500
-            ]
+                'owner_monthly_amount' => 8500,
+            ],
         ];
         // اربط باقي الأسطول النشط بنفس المالك إن لم يكن له مالك — لشاشة استعلامات المخالفات
         Vehicle::query()
@@ -394,7 +406,7 @@ class DemoSeeder extends Seeder
                     'owner_id' => $owner->id,
                     'owner_since' => now()->subMonths(2)->toDateString(),
                     'odometer_source' => 'manual',
-                    'is_active' => true
+                    'is_active' => true,
                 ],
             );
             VehicleAccessory::query()->firstOrCreate(
@@ -423,7 +435,7 @@ class DemoSeeder extends Seeder
                     'frozen_excess_km_rate' => 5,
                     'frozen_agreed_deposit' => 4000,
                     'sales_user_id' => $user->id,
-                    'notes' => 'عقد بذرة سيناريو E2E — جاهز للتسليم والطباعة'
+                    'notes' => 'عقد بذرة سيناريو E2E — جاهز للتسليم والطباعة',
                 ],
             );
         }

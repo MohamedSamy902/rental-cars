@@ -7,21 +7,31 @@ use App\Http\Requests\StoreViolationRequest;
 use App\Http\Requests\UpdateViolationRequest;
 use App\Models\Contract;
 use App\Models\Violation;
+use App\Support\PaginationInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ViolationController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $perPage = PaginationInput::perPage($request, 50, 100);
+        $page = PaginationInput::page($request);
         $rows = Violation::query()
             ->with(['vehicle', 'customer', 'contract', 'creator:id,name'])
             ->latest('id')
-            ->paginate(50);
+            ->paginate($perPage, ['*'], 'page', $page);
 
         $data = collect($rows->items())->map(fn (Violation $v) => $this->serialize($v))->all();
 
-        return response()->json(['data' => $data, 'meta' => ['total' => $rows->total()]]);
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'total' => $rows->total(),
+            ],
+        ]);
     }
 
     public function store(StoreViolationRequest $request): JsonResponse

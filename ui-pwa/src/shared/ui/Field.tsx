@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
+import { civilDateOnly } from '@/shared/lib/dates'
 import './Field.css'
 
 export { SelectField } from './SelectField'
@@ -70,7 +71,7 @@ export function DateTimeField({
 }: TextProps) {
   const fieldId = id ?? name
   const raw = typeof value === 'string' ? value : ''
-  const datePart = raw.slice(0, 10)
+  const datePart = civilDateOnly(raw)
 
   function emit(nextDate: string) {
     if (!onChange) return

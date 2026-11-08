@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { todayCivilIso } from '@/shared/lib/dates'
+import { civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import {
   Button, Sheet, TextField, MoneyField, SelectField, TextAreaField, DateField, SwitchField, useToast,
 } from '@/shared/ui'
@@ -55,7 +55,7 @@ const emptyForm = () => ({
 
 function spentOnValue(raw: string | undefined): string {
   if (!raw) return today()
-  return raw.slice(0, 10)
+  return civilDateOnly(raw) || today()
 }
 
 export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee, initial }: Props) {

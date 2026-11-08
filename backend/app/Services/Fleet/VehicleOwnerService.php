@@ -246,10 +246,13 @@ class VehicleOwnerService
      *   vehicles_monthly_total: int
      * }
      */
+    /**
+     * Read-only balance from existing dues/payouts. Does NOT accrue missing months
+     * (V4-03 — GETs must not post). Use ensureAccruedThrough via payout / artisan.
+     */
     public function balance(VehicleOwner $owner, ?string $yearMonth = null): array
     {
         $ym = $yearMonth ?: now()->format('Y-m');
-        $this->ensureAccruedThrough($owner, $ym);
 
         $accruedTotal = (int) OwnerMonthDue::query()->where('owner_id', $owner->id)->sum('amount');
         $paidTotal = (int) OwnerPayout::query()->where('owner_id', $owner->id)->sum('amount');

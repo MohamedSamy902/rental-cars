@@ -40,11 +40,16 @@ const emptyForm = {
 }
 
 const OwnersPageTabs = ['all', 'due'] as const
+const LIST_PER_PAGE = 50
+
+type PageMeta = { current_page: number; last_page: number; total: number }
 
 export function OwnersPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Owner[]>([])
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -71,13 +76,21 @@ export function OwnersPage() {
     [rows, chip],
   )
 
-  async function load() {
+  async function load(nextPage = page) {
     setLoading(true)
     try {
       const qs = new URLSearchParams()
+      qs.set('page', String(nextPage))
+      qs.set('per_page', String(LIST_PER_PAGE))
       if (search.trim()) qs.set('search', search.trim())
-      const res = await api<{ data: Owner[] }>(`/owners?${qs}`)
+      const res = await api<{ data: Owner[]; meta?: PageMeta }>(`/owners?${qs}`)
       setRows(res.data)
+      setMeta({
+        current_page: res.meta?.current_page ?? nextPage,
+        last_page: res.meta?.last_page ?? 1,
+        total: res.meta?.total ?? res.data.length,
+      })
+      setPage(res.meta?.current_page ?? nextPage)
     } catch (e) {
       toast.error((e as ApiError).message)
     } finally {
@@ -86,9 +99,9 @@ export function OwnersPage() {
   }
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 250)
+    const t = window.setTimeout(() => void load(page), 250)
     return () => window.clearTimeout(t)
-  }, [search])
+  }, [search, page])
 
   function mapApiErrors(e: unknown) {
     const apiErr = e as ApiError
@@ -189,7 +202,14 @@ export function OwnersPage() {
         mobileFab
       />
       <Fab label="إضافة مالك" onClick={() => { setForm(emptyForm); setFieldErrors({}); setOpen(true) }} />
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="بحث بالاسم أو الهاتف…" chips={chips} activeChip={chip} onChipChange={setChip} />
+      <FilterBar
+        search={search}
+        onSearchChange={(v) => { setSearch(v); setPage(1) }}
+        placeholder="بحث بالاسم أو الهاتف…"
+        chips={chips}
+        activeChip={chip}
+        onChipChange={(id) => { setChip(id); setPage(1) }}
+      />
       <DataTable
         label="الملاك"
         rows={visible}
@@ -204,6 +224,13 @@ export function OwnersPage() {
         ]}
         emptyTitle="لا ملاك بعد"
         emptyDescription="أضف مالكاً ثم اربطه من شاشة العربيات مع المبلغ الشهري"
+        serverPagination={chip === 'all' ? {
+          page: meta.current_page,
+          lastPage: meta.last_page,
+          total: meta.total,
+          perPage: LIST_PER_PAGE,
+          onPageChange: setPage,
+        } : undefined}
       />
 
       <Sheet open={open} title="إضافة مالك" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>

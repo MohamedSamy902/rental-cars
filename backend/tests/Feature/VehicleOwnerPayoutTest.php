@@ -80,6 +80,9 @@ class VehicleOwnerPayoutTest extends TestCase
         $this->assertSame(5000, (int) $v1->fresh()->owner_monthly_amount);
         $this->assertSame(4000, (int) $v2->fresh()->owner_monthly_amount);
 
+        // Accrual is explicit (V4-03) — GET must not post; payout also accrues before paying.
+        $this->artisan('owners:accrue-dues', ['--owner' => $owner['id']])->assertSuccessful();
+
         $show = $this->getJson('/api/owners/'.$owner['id'])->assertOk()->json('data');
         $this->assertSame(2, count($show['vehicles']));
         $this->assertSame(9000, $show['balance']['month_accrued']);

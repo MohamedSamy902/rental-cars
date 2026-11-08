@@ -16,6 +16,7 @@ use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
 use App\Services\Contracts\RentalProgressService;
 use App\Services\Documents\DocumentTemplateService;
+use App\Support\PaginationInput;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,7 +58,9 @@ class ContractController extends Controller
             $q->where('vehicle_id', $vehicleId);
         }
 
-        $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $perPage = PaginationInput::perPage($request, 50, 200);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
         $contractIds = collect($rows->items())->pluck('id')->all();
         $openViolationTotals = $contractIds === []
             ? collect()

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { todayCivilIso } from '@/shared/lib/dates'
+import { civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, NumberField, SelectField, SwitchField,
@@ -121,7 +121,7 @@ export function EmployeeDetailPage() {
       setEditForm({
         name: e.name,
         job_title: e.job_title || '',
-        hired_on: e.hired_on ? String(e.hired_on).slice(0, 10) : '',
+        hired_on: e.hired_on ? civilDateOnly(String(e.hired_on)) : '',
         base_salary: String(e.base_salary ?? ''),
         status: e.status || 'active',
       })

@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\Customer;
 use App\Models\Violation;
 use App\Services\Customers\CustomerCreditService;
+use App\Support\PaginationInput;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +31,9 @@ class CustomerController extends Controller
             $q->where('status', $status);
         }
 
-        $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $perPage = PaginationInput::perPage($request, 50, 100);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
         $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
         return response()->json([

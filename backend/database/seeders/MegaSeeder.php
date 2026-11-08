@@ -235,11 +235,12 @@ class MegaSeeder extends Seeder
             ]);
 
             if ($emp->status === 'active' && $n % 2 === 0) {
+                $limit = 3000 + ($n % 5) * 1000;
                 $petty = PettyCashAccount::query()->firstOrCreate(
                     ['employee_id' => $emp->id],
                     [
-                        'limit_amount' => 3000 + ($n % 5) * 1000,
-                        'balance' => 1500 + ($n % 7) * 200,
+                        'limit_amount' => $limit,
+                        'balance' => $limit,
                         'is_active' => true,
                     ],
                 );
@@ -247,12 +248,12 @@ class MegaSeeder extends Seeder
                     PettyCashMovement::query()->create([
                         'petty_cash_account_id' => $petty->id,
                         'type' => 'topup',
-                        'amount' => (int) $petty->limit_amount,
+                        'amount' => $limit,
                         'moved_on' => now()->subDays(12)->toDateString(),
                         'performed_by' => $hrId,
                         'notes' => 'افتتاح عهدة — ميجا',
                     ]);
-                    $spend = min(800, (int) $petty->balance);
+                    $spend = min(800, $limit);
                     if ($spend > 0) {
                         PettyCashMovement::query()->create([
                             'petty_cash_account_id' => $petty->id,
@@ -262,8 +263,12 @@ class MegaSeeder extends Seeder
                             'performed_by' => $adminId,
                             'notes' => 'صرف تشغيلي — ميجا',
                         ]);
-                        $petty->update(['balance' => max(0, (int) $petty->balance - $spend)]);
                     }
+                    // Column must equal chronological movement math (V4-04).
+                    $petty->update([
+                        'limit_amount' => $limit,
+                        'balance' => max(0, $limit - $spend),
+                    ]);
                 }
             }
 
@@ -457,6 +462,12 @@ class MegaSeeder extends Seeder
             $workshop = $n % 2 === 0 ? 'ورشة المخزون — ميجا' : 'ورشة العهدة — ميجا';
             // Avoid colliding with DemoSeeder unique-ish open WO on same vehicle+status
             $opened = now()->subDays(2 + ($n % 40));
+            $fromStock = $n % 2 === 0;
+            $item = $fromStock ? ($oil ?: $pads) : null;
+            $unit = $fromStock ? 180 : 350 + ($n % 5) * 40;
+            $qty = 1 + ($n % 3);
+            $parts = $qty * $unit;
+
             $wo = WorkOrder::query()->create([
                 'vehicle_id' => $vehicleId,
                 'workshop' => $workshop.' #'.$n,
@@ -466,26 +477,23 @@ class MegaSeeder extends Seeder
                 'odometer' => 20000 + $n * 111,
                 'status' => $status,
                 'puts_in_maintenance' => $status !== 'closed' && $n % 4 === 0,
-                'parts_cost' => 200 + ($n % 10) * 80,
+                'parts_cost' => $parts,
                 'labor_cost' => 100 + ($n % 6) * 50,
                 'notes' => 'أمر شغل ميجا #'.$n,
                 'next_service_on' => now()->addDays(20 + ($n % 60))->toDateString(),
                 'next_service_odometer' => 25000 + $n * 120,
             ]);
 
-            $fromStock = $n % 2 === 0;
-            $item = $fromStock ? ($oil ?: $pads) : null;
-            $unit = $fromStock ? 180 : 350 + ($n % 5) * 40;
             WorkOrderLine::query()->create([
                 'work_order_id' => $wo->id,
                 'description' => $fromStock ? 'قطع من المخزون — ميجا' : 'شراء من العهدة — ميجا',
                 'part_source' => $fromStock ? 'stock' : 'purchase',
                 'inventory_item_id' => $fromStock && $item ? $item->id : null,
-                'quantity' => 1 + ($n % 3),
+                'quantity' => $qty,
                 'unit_price' => $unit,
                 'from_petty_cash' => ! $fromStock,
                 'petty_cash_employee_id' => ! $fromStock && $tech ? $tech->id : null,
-                'petty_cash_amount' => ! $fromStock ? $unit : 0,
+                'petty_cash_amount' => ! $fromStock ? $parts : 0,
             ]);
         }
     }

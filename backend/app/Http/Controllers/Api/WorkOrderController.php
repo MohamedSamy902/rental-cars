@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\WorkOrder;
 use App\Services\Maintenance\WorkOrderService;
+use App\Support\PaginationInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,7 +22,9 @@ class WorkOrderController extends Controller
         if ($vehicleId = $request->integer('vehicle_id')) {
             $q->where('vehicle_id', $vehicleId);
         }
-        $rows = $q->paginate(50);
+        $perPage = PaginationInput::perPage($request, 50, 100);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'data' => $rows->items(),
