@@ -269,12 +269,17 @@ class MonthLedgerService
 
     private function contractIdFromJournalSource(string $source): ?int
     {
+        if (str_starts_with($source, 'contract_close_rent_rev:')) {
+            $id = (int) substr($source, strlen('contract_close_rent_rev:'));
+
+            return $id > 0 ? $id : null;
+        }
         if (str_starts_with($source, 'contract_close:')) {
             $id = (int) substr($source, strlen('contract_close:'));
 
             return $id > 0 ? $id : null;
         }
-        if (preg_match('/^rent_recog:(\d+):\d{4}-\d{2}$/', $source, $m)) {
+        if (preg_match('/^rent_recog(?:_adj)?:(\d+):\d{4}-\d{2}$/', $source, $m)) {
             return (int) $m[1];
         }
 
