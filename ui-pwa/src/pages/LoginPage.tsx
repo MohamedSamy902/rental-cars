@@ -8,8 +8,22 @@ import type { ApiError } from '@/shared/api/client'
 import './LoginPage.css'
 
 const REMEMBER_KEY = 'rpm.login.identifier'
-const IS_DEV = import.meta.env.DEV
-const DEMO = { login: '01000000000', email: 'admin@rpm.local', password: 'password' }
+
+/**
+ * Local-only prefill. Production builds drop this because import.meta.env.DEV is false.
+ * It stays empty unless a developer opts in with VITE_ENABLE_DEMO_LOGIN and supplies
+ * both values in an uncommitted env file. Nothing here is a default credential.
+ */
+function devDemoPrefill(): { login: string; password: string } | null {
+  if (!import.meta.env.DEV) return null
+  if (import.meta.env.VITE_ENABLE_DEMO_LOGIN !== 'true') return null
+  const login = import.meta.env.VITE_DEMO_LOGIN
+  const secret = import.meta.env.VITE_DEMO_PASSWORD
+  if (typeof login !== 'string' || typeof secret !== 'string') return null
+  const trimmedLogin = login.trim()
+  if (trimmedLogin === '' || secret === '') return null
+  return { login: trimmedLogin, password: secret }
+}
 
 function readRememberedLogin() {
   try {
@@ -83,8 +97,9 @@ export function LoginPage() {
   const { user, loading, login } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
-  const [loginId, setLoginId] = useState(() => readRememberedLogin() || (IS_DEV ? DEMO.login : ''))
-  const [password, setPassword] = useState(() => (IS_DEV ? DEMO.password : ''))
+  const demo = devDemoPrefill()
+  const [loginId, setLoginId] = useState(() => readRememberedLogin() || demo?.login || '')
+  const [password, setPassword] = useState(() => demo?.password || '')
   const [remember, setRemember] = useState(() => readRememberedLogin() !== '')
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -194,12 +209,6 @@ export function LoginPage() {
           <Button type="submit" variant="accent" size="lg" loading={saving} className="auth-submit">
             دخول
           </Button>
-
-          {IS_DEV ? (
-            <p className="auth-demo" dir="ltr">
-              Demo: {DEMO.login} أو {DEMO.email} / {DEMO.password}
-            </p>
-          ) : null}
         </div>
       </motion.form>
     </div>
