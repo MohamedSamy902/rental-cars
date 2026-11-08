@@ -4,6 +4,7 @@ namespace App\Services\Fleet;
 
 use App\Models\Contract;
 use App\Models\WorkOrder;
+use App\Support\MaintenanceContractLabel;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 
@@ -100,7 +101,11 @@ class FleetDailyPrepService
                 if (! $include) {
                     continue;
                 }
-                $maintenance[] = $this->presentWorkOrder($wo, $isToday ? ($wo->opened_on?->toDateString() ?: $dateKey) : $serviceOn);
+                $maintenance[] = $this->presentWorkOrder(
+                    $wo,
+                    $isToday ? ($wo->opened_on?->toDateString() ?: $dateKey) : $serviceOn,
+                    $includeContracts,
+                );
             }
 
             $counts = [
@@ -161,12 +166,14 @@ class FleetDailyPrepService
     /**
      * @return array<string, mixed>
      */
-    private function presentWorkOrder(WorkOrder $wo, ?string $atDate): array
+    private function presentWorkOrder(WorkOrder $wo, ?string $atDate, bool $includeContracts): array
     {
+        $title = MaintenanceContractLabel::present($wo->workshop ?: 'أمر شغل', $includeContracts);
+
         return [
             'id' => $wo->id,
             'kind' => 'maintenance',
-            'title' => $wo->workshop ?: 'أمر شغل',
+            'title' => $title,
             'status' => $wo->status,
             'puts_in_maintenance' => (bool) $wo->puts_in_maintenance,
             'vehicle' => $wo->vehicle ? [

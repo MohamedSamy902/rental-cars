@@ -18,6 +18,7 @@ use App\Services\Contracts\RentalProgressService;
 use App\Services\Documents\DocumentTemplateService;
 use App\Support\NestedCustomerRedactor;
 use App\Support\PaginationInput;
+use App\Support\VehicleOwnerVisibility;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -87,7 +88,7 @@ class ContractController extends Controller
             $arr['open_violations_total'] = (int) ($agg->total_amount ?? 0);
             $arr['open_violations_count'] = (int) ($agg->cnt ?? 0);
 
-            return NestedCustomerRedactor::contract($arr, $user);
+            return VehicleOwnerVisibility::redactEmbedded(NestedCustomerRedactor::contract($arr, $user), $user);
         })->all();
 
         $today = now()->toDateString();
@@ -255,7 +256,10 @@ class ContractController extends Controller
             ->values()
             ->all();
 
-        $payload = NestedCustomerRedactor::contract($contract->toArray(), $request->user());
+        $payload = VehicleOwnerVisibility::redactEmbedded(
+            NestedCustomerRedactor::contract($contract->toArray(), $request->user()),
+            $request->user(),
+        );
         $payload['payments'] = $payments;
         // Ensure print consumers always see a stable document number.
         $payload['number'] = $contract->number ?: ('C-'.$contract->id);
@@ -457,6 +461,9 @@ class ContractController extends Controller
             $payload['customer'] = Customer::normalizeDateOnlyFields($payload['customer']);
         }
 
-        return NestedCustomerRedactor::contract($payload, request()->user());
+        return VehicleOwnerVisibility::redactEmbedded(
+            NestedCustomerRedactor::contract($payload, request()->user()),
+            request()->user(),
+        );
     }
 }

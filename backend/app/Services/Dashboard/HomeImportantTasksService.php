@@ -9,6 +9,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleDocument;
 use App\Models\Violation;
 use App\Models\WorkOrder;
+use App\Support\MaintenanceContractLabel;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -45,7 +46,7 @@ class HomeImportantTasksService
             $items = array_merge($items, $this->contractTasks($this->can($user, 'customers.view')));
         }
         if ($this->can($user, 'maintenance.view') || $this->can($user, 'vehicles.view')) {
-            $items = array_merge($items, $this->maintenanceTasks());
+            $items = array_merge($items, $this->maintenanceTasks($this->can($user, 'contracts.view')));
         }
         if ($this->can($user, 'vehicles.view')) {
             $items = array_merge($items, $this->licenseTasks());
@@ -174,7 +175,7 @@ class HomeImportantTasksService
     /**
      * @return list<array<string, mixed>>
      */
-    private function maintenanceTasks(): array
+    private function maintenanceTasks(bool $showContracts): array
     {
         $items = [];
 
@@ -193,7 +194,7 @@ class HomeImportantTasksService
                 'work_order_open',
                 $blocking ? 'critical' : 'warning',
                 ($blocking ? 'صيانة موقّفة للعربية · ' : 'أمر شغل مفتوح · ').$label,
-                trim(($wo->vehicle?->brand ?? '').' '.($wo->vehicle?->model ?? '').' · '.($wo->workshop ?: 'ورشة')),
+                trim(($wo->vehicle?->brand ?? '').' '.($wo->vehicle?->model ?? '').' · '.(MaintenanceContractLabel::present($wo->workshop, $showContracts) ?: 'ورشة')),
                 '/maintenance',
                 $wo->opened_on?->toDateString(),
             );
