@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\Customer;
+use App\Models\Violation;
 use App\Services\Customers\CustomerCreditService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -69,24 +70,34 @@ class CustomerController extends Controller
             'contracts' => fn ($q) => $q->with('vehicle:id,brand,model,plate,code')->latest('id')->limit(50),
         ]);
 
-        $violations = \App\Models\Violation::query()
-            ->with(['vehicle:id,brand,model,plate', 'contract:id,code'])
+        $violations = Violation::query()
+            ->with(['vehicle:id,brand,model,plate', 'contract:id,number'])
             ->where('customer_id', $customer->id)
             ->latest('id')
             ->limit(50)
-            ->get();
+            ->get()
+            ->map(function ($v) {
+                $row = $v->toArray();
+                if (isset($row['contract']) && is_array($row['contract'])) {
+                    $row['contract']['code'] = $row['contract']['number'] ?? null;
+                }
+
+                return $row;
+            })
+            ->values();
 
         $payload = $this->presentCustomer($customer, $canViewNid);
         $payload['contracts'] = $customer->contracts->map(function ($c) {
             return [
                 'id' => $c->id,
-                'code' => $c->code,
+                'code' => $c->number,
+                'number' => $c->number,
                 'status' => $c->status,
                 'starts_at' => optional($c->starts_at)?->toDateString(),
                 'planned_ends_at' => optional($c->planned_ends_at)?->toDateString(),
                 'actual_ends_at' => optional($c->actual_ends_at)?->toDateString(),
-                'daily_rate' => $c->daily_rate,
-                'deposit' => $c->deposit,
+                'daily_rate' => $c->frozen_daily_rate,
+                'deposit' => $c->frozen_agreed_deposit,
                 'vehicle' => $c->vehicle,
             ];
         })->values();
@@ -196,11 +207,18 @@ class CustomerController extends Controller
         }
 
         foreach (['birth_date', 'license_expires_on', 'national_id_expires_on', 'passport_expires_on'] as $dateKey) {
-            if (! empty($data[$dateKey]) && is_string($data[$dateKey])) {
-                $data[$dateKey] = substr($data[$dateKey], 0, 10);
-            } elseif (! empty($data[$dateKey])) {
-                $data[$dateKey] = optional($customer->{$dateKey})?->toDateString();
+            $value = $customer->{$dateKey};
+            if ($value === null || $value === '') {
+                $data[$dateKey] = $data[$dateKey] ?? null;
+                if (is_string($data[$dateKey] ?? null) && $data[$dateKey] !== '') {
+                    $data[$dateKey] = substr($data[$dateKey], 0, 10);
+                }
+
+                continue;
             }
+            $data[$dateKey] = $value instanceof \DateTimeInterface
+                ? $value->format('Y-m-d')
+                : substr((string) $value, 0, 10);
         }
 
         return $data;

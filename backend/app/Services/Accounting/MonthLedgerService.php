@@ -232,9 +232,7 @@ class MonthLedgerService
             ->get();
 
         $contractIds = $lines
-            ->map(fn (JournalLine $l) => str_starts_with((string) $l->entry?->source, 'contract_close:')
-                ? (int) substr((string) $l->entry->source, strlen('contract_close:'))
-                : null)
+            ->map(fn (JournalLine $l) => $this->contractIdFromJournalSource((string) $l->entry?->source))
             ->filter()
             ->unique()
             ->all();
@@ -247,7 +245,7 @@ class MonthLedgerService
         return $lines
             ->map(function (JournalLine $l) use ($contracts) {
                 $source = (string) $l->entry?->source;
-                $contractId = str_starts_with($source, 'contract_close:') ? (int) substr($source, strlen('contract_close:')) : null;
+                $contractId = $this->contractIdFromJournalSource($source);
                 $contract = $contractId ? $contracts->get($contractId) : null;
                 $code = (string) $l->account?->code;
 
@@ -267,6 +265,20 @@ class MonthLedgerService
             ->filter(fn (array $row) => $row['amount'] !== 0)
             ->sortBy('date')
             ->values();
+    }
+
+    private function contractIdFromJournalSource(string $source): ?int
+    {
+        if (str_starts_with($source, 'contract_close:')) {
+            $id = (int) substr($source, strlen('contract_close:'));
+
+            return $id > 0 ? $id : null;
+        }
+        if (preg_match('/^rent_recog:(\d+):\d{4}-\d{2}$/', $source, $m)) {
+            return (int) $m[1];
+        }
+
+        return null;
     }
 
     /**

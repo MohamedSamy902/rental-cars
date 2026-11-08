@@ -20,10 +20,10 @@ class Customer extends Model
     protected function casts(): array
     {
         return [
-            'birth_date' => 'date',
-            'national_id_expires_on' => 'date',
-            'passport_expires_on' => 'date',
-            'license_expires_on' => 'date',
+            'birth_date' => 'date:Y-m-d',
+            'national_id_expires_on' => 'date:Y-m-d',
+            'passport_expires_on' => 'date:Y-m-d',
+            'license_expires_on' => 'date:Y-m-d',
             'blacklisted_at' => 'datetime',
         ];
     }

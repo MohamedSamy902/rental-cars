@@ -3,6 +3,8 @@
 namespace App\Services\Maintenance;
 
 use App\Models\InventoryBatch;
+use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
 use App\Models\Vehicle;
@@ -71,7 +73,7 @@ class WorkOrderService
             $parts = 0;
             foreach ($lines as $line) {
                 $created = $this->addLine($order, $line, $userId);
-                $parts += $created->quantity * $created->unit_price;
+                $parts += $this->lineMoneyAmount($created);
             }
             $order->update(['parts_cost' => $parts]);
 
@@ -114,13 +116,13 @@ class WorkOrderService
                 ->all();
 
             $alloc = $this->fifo->consume($batches, (float) $qty, true);
-            $cost = 0.0;
+            $cost = $this->fifo->totalCost($alloc);
             foreach ($alloc as $a) {
                 InventoryBatch::query()->whereKey($a['batch_id'])->decrement('remaining', (int) $a['qty']);
-                $cost += $a['qty'] * $a['unit_cost'];
             }
-            $unitPrice = (int) round($cost / max(1, $qty));
+            // Exact FIFO total is authoritative; unit_price is display-only average.
             $total = (int) round($cost);
+            $unitPrice = (int) round($cost / max(1, $qty));
         } elseif ($fromPetty) {
             $lineTotal = $unitPrice * $qty;
             $spend = $pettyAmount > 0 ? $pettyAmount : $lineTotal;
@@ -141,7 +143,7 @@ class WorkOrderService
 
         // Post journals after the line exists so source keys stay unique + idempotent.
         if ($source === 'stock') {
-            $total = (int) ($created->quantity * $created->unit_price);
+            // Keep exact FIFO cost — do not recompute from rounded unit_price.
             if ($total > 0) {
                 $this->accounting->postInventoryUsage(
                     $total,
@@ -152,6 +154,7 @@ class WorkOrderService
                     'wol:'.$created->id,
                 );
             }
+            $created->setAttribute('line_total_override', $total);
         } elseif ($fromPetty) {
             $this->spendFromCustody(
                 $pettyEmployeeId,
@@ -171,10 +174,11 @@ class WorkOrderService
     public function close(WorkOrder $order): WorkOrder
     {
         return DB::transaction(function () use ($order) {
+            $order->loadMissing('lines');
             $order->update([
                 'status' => 'closed',
                 'closed_on' => now()->toDateString(),
-                'parts_cost' => $order->lines->sum(fn ($l) => $l->quantity * $l->unit_price),
+                'parts_cost' => $order->lines->sum(fn ($l) => $this->lineMoneyAmount($l)),
             ]);
 
             if ($order->puts_in_maintenance) {
@@ -191,6 +195,29 @@ class WorkOrderService
 
             return $order->fresh(['vehicle', 'lines']);
         });
+    }
+
+    /**
+     * Monetary amount for a work-order line. Stock lines use the posted FIFO
+     * journal total so rounded unit_price cannot destroy value.
+     */
+    private function lineMoneyAmount(WorkOrderLine $line): int
+    {
+        if ($line->part_source === 'stock') {
+            if ($line->getAttribute('line_total_override') !== null) {
+                return (int) $line->getAttribute('line_total_override');
+            }
+            $entry = JournalEntry::query()
+                ->where('source', 'inventory_usage:wol:'.$line->id)
+                ->first();
+            if ($entry) {
+                return (int) JournalLine::query()
+                    ->where('journal_entry_id', $entry->id)
+                    ->sum('credit');
+            }
+        }
+
+        return (int) $line->quantity * (int) $line->unit_price;
     }
 
     private function spendFromCustody(

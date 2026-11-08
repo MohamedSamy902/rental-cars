@@ -83,13 +83,20 @@ class ProfitabilityService
         $from = $monthStart->copy()->startOfMonth();
         $to = $monthStart->copy()->endOfMonth();
 
-        $revenue = (int) JournalLine::query()
+        $journalCredits = JournalLine::query()
             ->whereHas('account', fn ($q) => $q->whereIn('code', ['4000', '4100', '4200', '4300']))
             ->whereHas('entry', fn ($q) => $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month))
-            ->sum('credit');
+            ->get(['vehicle_id', 'credit']);
 
-        // Fallback: completed/active period rent for the month if journals empty
-        if ($revenue === 0) {
+        $useJournals = $journalCredits->isNotEmpty();
+        $revenueByVehicle = [];
+        if ($useJournals) {
+            foreach ($journalCredits as $line) {
+                $vid = (int) ($line->vehicle_id ?? 0);
+                $revenueByVehicle[$vid] = ($revenueByVehicle[$vid] ?? 0) + (int) $line->credit;
+            }
+            $revenue = (int) array_sum($revenueByVehicle);
+        } else {
             $revenue = (int) Contract::query()
                 ->whereIn('status', ['completed', 'active'])
                 ->where(function ($q) use ($from, $to) {
@@ -117,18 +124,22 @@ class ProfitabilityService
 
         $vehicles = [];
         foreach (Vehicle::query()->where('is_active', true)->get(['id', 'brand', 'model', 'plate']) as $v) {
-            $vRev = (int) Contract::query()
-                ->where('vehicle_id', $v->id)
-                ->whereIn('status', ['completed', 'active'])
-                ->where(function ($q) use ($from, $to) {
-                    $q->whereBetween('actual_ends_at', [$from, $to])
-                        ->orWhere(function ($qq) use ($from, $to) {
-                            $qq->whereNull('actual_ends_at')
-                                ->where('starts_at', '<=', $to)
-                                ->where('planned_ends_at', '>=', $from);
-                        });
-                })
-                ->sum('period_rent');
+            if ($useJournals) {
+                $vRev = (int) ($revenueByVehicle[$v->id] ?? 0);
+            } else {
+                $vRev = (int) Contract::query()
+                    ->where('vehicle_id', $v->id)
+                    ->whereIn('status', ['completed', 'active'])
+                    ->where(function ($q) use ($from, $to) {
+                        $q->whereBetween('actual_ends_at', [$from, $to])
+                            ->orWhere(function ($qq) use ($from, $to) {
+                                $qq->whereNull('actual_ends_at')
+                                    ->where('starts_at', '<=', $to)
+                                    ->where('planned_ends_at', '>=', $from);
+                            });
+                    })
+                    ->sum('period_rent');
+            }
             $vMaint = (int) WorkOrder::query()
                 ->where('vehicle_id', $v->id)
                 ->where(function ($q) use ($from, $to) {
@@ -149,6 +160,26 @@ class ProfitabilityService
                 'expenses' => $vExp,
                 'operating_profit' => $vRev - $vMaint - $vExp,
             ];
+        }
+
+        // Fleet revenue must equal the sum of included vehicle rows (same recognition basis).
+        if ($useJournals) {
+            $allocated = (int) collect($vehicles)->sum('revenue');
+            $journalTotal = (int) $journalCredits->sum('credit');
+            // Rare orphan lines without vehicle_id: keep them in fleet only via a synthetic bucket.
+            if ($journalTotal > $allocated) {
+                $orphan = $journalTotal - $allocated;
+                $vehicles[0] = [
+                    'vehicle_id' => 0,
+                    'label' => 'إيراد غير موزع على عربية',
+                    'revenue' => $orphan,
+                    'maintenance' => 0,
+                    'expenses' => 0,
+                    'operating_profit' => $orphan,
+                ];
+                $allocated = $journalTotal;
+            }
+            $revenue = $allocated;
         }
 
         return [

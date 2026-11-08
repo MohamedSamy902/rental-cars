@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\JournalLine;
 use App\Models\Payment;
 use App\Models\PettyCashAccount;
+use App\Services\Contracts\ContractLedgerMath;
 use App\Services\Customers\CustomerCreditService;
 use Carbon\Carbon;
 
@@ -15,6 +16,8 @@ class ReportQueryService
     public function __construct(
         private readonly AccountingService $accounting,
         private readonly CustomerCreditService $credit,
+        private readonly PaymentMethodNormalizer $methods,
+        private readonly ContractLedgerMath $ledgerMath,
     ) {}
 
     /**
@@ -98,24 +101,33 @@ class ReportQueryService
         if ($to) {
             $q->whereDate('paid_at', '<=', $to);
         }
-        $labels = [
-            'cash' => 'نقدي',
-            'transfer' => 'تحويل',
-            'card' => 'بطاقة',
-            'petty_cash' => 'عهدة',
-        ];
-        $grouped = $q->get()->groupBy('method');
+        $buckets = [];
+        foreach ($this->methods->reportOrder() as $method) {
+            $buckets[$method] = ['in' => 0, 'out' => 0];
+        }
+        foreach ($q->get() as $payment) {
+            $canonical = $this->methods->canonical((string) $payment->method);
+            if (! isset($buckets[$canonical])) {
+                $buckets[$canonical] = ['in' => 0, 'out' => 0];
+            }
+            if ($payment->direction === 'in') {
+                $buckets[$canonical]['in'] += (int) $payment->amount;
+            } else {
+                $buckets[$canonical]['out'] += (int) $payment->amount;
+            }
+        }
+
         $out = [];
-        foreach ($labels as $method => $label) {
-            $rows = $grouped->get($method, collect());
-            $in = (int) $rows->where('direction', 'in')->sum('amount');
-            $outAmt = (int) $rows->where('direction', 'out')->sum('amount');
+        foreach ($buckets as $method => $sums) {
+            if ($sums['in'] === 0 && $sums['out'] === 0 && ! in_array($method, ['cash', 'transfer', 'card', 'petty_cash'], true)) {
+                continue;
+            }
             $out[] = [
                 'method' => $method,
-                'label' => $label,
-                'in' => $in,
-                'out' => $outAmt,
-                'net' => $in - $outAmt,
+                'label' => $this->methods->label($method),
+                'in' => $sums['in'],
+                'out' => $sums['out'],
+                'net' => $sums['in'] - $sums['out'],
             ];
         }
 
@@ -154,18 +166,9 @@ class ReportQueryService
         $paidTotal = 0;
         $rows = [];
         foreach ($contracts as $c) {
-            $total = (int) ($c->final_total ?: $c->period_rent ?: 0);
-            $paidIn = (int) Payment::query()
-                ->where('link_type', 'contract')
-                ->where('link_id', $c->id)
-                ->where('direction', 'in')
-                ->sum('amount');
-            $paidOut = (int) Payment::query()
-                ->where('link_type', 'contract')
-                ->where('link_id', $c->id)
-                ->where('direction', 'out')
-                ->sum('amount');
-            $netPaid = max(0, $paidIn - $paidOut);
+            $ledger = $this->ledgerMath->forContract($c);
+            $total = $ledger['total'];
+            $netPaid = max(0, $ledger['paid']);
             $contractDebt += $total;
             $paidTotal += $netPaid;
             $rows[] = [
@@ -179,7 +182,7 @@ class ReportQueryService
                 'period_rent' => (int) ($c->period_rent ?: 0),
                 'total' => $total,
                 'paid' => $netPaid,
-                'remaining' => max(0, $total - $netPaid),
+                'remaining' => $ledger['balance'],
                 'vehicle' => $c->vehicle ? [
                     'id' => $c->vehicle->id,
                     'brand' => $c->vehicle->brand,

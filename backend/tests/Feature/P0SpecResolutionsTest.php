@@ -5,13 +5,11 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Contract;
 use App\Models\Customer;
-use App\Models\CustomerCreditMovement;
 use App\Models\Employee;
 use App\Models\InventoryBatch;
 use App\Models\InventoryItem;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
-use App\Models\Payment;
 use App\Models\PettyCashAccount;
 use App\Models\Role;
 use App\Models\TenantSetting;
@@ -173,14 +171,32 @@ class P0SpecResolutionsTest extends TestCase
             'contract_id' => $id,
         ]);
 
+        // Apply credit to a different unpaid contract (same customer) — not the
+        // already-settled early-termination contract whose surplus funded the credit.
+        $otherVehicle = Vehicle::query()->create([
+            'code' => 'V-CR', 'plate' => 'CR 9', 'brand' => 'هيونداي', 'model' => 'إلنترا',
+            'year' => 2022, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين', 'odometer' => 8000,
+            'daily_rate' => 900, 'default_deposit' => 1500, 'is_active' => true,
+        ]);
+        $otherId = $this->postJson('/api/contracts', [
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $otherVehicle->id,
+            'starts_at' => now()->addDays(20)->toIso8601String(),
+            'planned_ends_at' => now()->addDays(25)->toIso8601String(),
+            'daily_rate' => 900,
+            'deposit' => 1500,
+        ])->assertCreated()->json('data.id');
+        $this->postJson("/api/contracts/{$otherId}/approve")->assertOk();
+
+        $applyAmount = min(500, (int) $this->customer->credit_balance);
         $apply = $this->postJson("/api/customers/{$this->customer->id}/apply-credit", [
-            'contract_id' => $id,
-            'amount' => min(500, (int) $this->customer->credit_balance),
+            'contract_id' => $otherId,
+            'amount' => $applyAmount,
         ]);
         $apply->assertOk();
         $this->assertDatabaseHas('payments', [
             'link_type' => 'contract',
-            'link_id' => $id,
+            'link_id' => $otherId,
             'method' => 'credit',
             'direction' => 'in',
         ]);

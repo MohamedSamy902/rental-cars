@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Middleware\EnsureFeatureFlag;
+use App\Http\Middleware\EnsureIdempotency;
+use App\Http\Middleware\EnsureIntegrator;
+use App\Http\Middleware\EnsurePermission;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -7,11 +11,13 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,25 +29,25 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
         $middleware->alias([
-            'permission' => \App\Http\Middleware\EnsurePermission::class,
-            'feature' => \App\Http\Middleware\EnsureFeatureFlag::class,
-            'integrator' => \App\Http\Middleware\EnsureIntegrator::class,
-            'idempotency' => \App\Http\Middleware\EnsureIdempotency::class,
+            'permission' => EnsurePermission::class,
+            'feature' => EnsureFeatureFlag::class,
+            'integrator' => EnsureIntegrator::class,
+            'idempotency' => EnsureIdempotency::class,
         ]);
         $middleware->api(append: [
-            \App\Http\Middleware\EnsureIdempotency::class,
+            EnsureIdempotency::class,
         ]);
         $middleware->prependToPriorityList(
-            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            prepend: \App\Http\Middleware\EnsurePermission::class,
+            before: SubstituteBindings::class,
+            prepend: EnsurePermission::class,
         );
         $middleware->prependToPriorityList(
-            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            prepend: \App\Http\Middleware\EnsureFeatureFlag::class,
+            before: SubstituteBindings::class,
+            prepend: EnsureFeatureFlag::class,
         );
         $middleware->prependToPriorityList(
-            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            prepend: \App\Http\Middleware\EnsureIntegrator::class,
+            before: SubstituteBindings::class,
+            prepend: EnsureIntegrator::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -82,11 +88,13 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
+            // Always handle API auth failures as JSON 401 — including non-JSON Accept
+            // headers that would otherwise attempt a missing /login redirect and 500.
+            if ($request->is('api/*') || $request->expectsJson() || $request->is('*/api/*')) {
                 return response()->json(['message' => __('http.unauthenticated')], 401);
             }
 
-            return redirect()->guest('/login');
+            return response()->json(['message' => __('http.unauthenticated')], 401);
         });
 
         $exceptions->render(function (AccessDeniedHttpException $e, Request $request) {
@@ -119,12 +127,22 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
-        $exceptions->render(function (\Throwable $e, Request $request) {
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if ($e instanceof AuthenticationException) {
+                return response()->json(['message' => __('http.unauthenticated')], 401);
+            }
+
             if ($e instanceof HttpExceptionInterface) {
                 $status = $e->getStatusCode();
-                if (in_array($status, [403, 404, 419, 413, 429], true)) {
+                if (in_array($status, [401, 403, 404, 419, 413, 429], true)) {
                     return null; // handled above or by framework with our messages
                 }
+            }
+
+            // Missing named login route during guest redirect must never become a 500 on API.
+            if ($e instanceof RouteNotFoundException
+                && ($request->is('api/*') || $request->expectsJson())) {
+                return response()->json(['message' => __('http.unauthenticated')], 401);
             }
 
             if (! config('app.debug') && ($request->is('api/*') || $request->expectsJson())) {

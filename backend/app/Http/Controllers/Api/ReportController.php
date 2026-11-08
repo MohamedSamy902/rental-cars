@@ -9,9 +9,11 @@ use App\Models\JournalLine;
 use App\Models\Payment;
 use App\Models\Vehicle;
 use App\Models\Violation;
+use App\Models\WorkOrder;
 use App\Services\Accounting\ProfitabilityService;
 use App\Services\Accounting\ReportQueryService;
 use App\Services\Fleet\OccupancyService;
+use App\Services\Fleet\VehicleAvailabilityService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +24,7 @@ class ReportController extends Controller
         private readonly OccupancyService $occupancy,
         private readonly ProfitabilityService $profitability,
         private readonly ReportQueryService $reports,
+        private readonly VehicleAvailabilityService $availability,
     ) {}
 
     public function summary(): JsonResponse
@@ -43,13 +46,7 @@ class ReportController extends Controller
             ->take(6)
             ->values();
 
-        $fleet = [
-            'total' => Vehicle::query()->where('is_active', true)->count(),
-            'maintenance' => Vehicle::query()->where('manual_status', 'maintenance')->count(),
-            'rented' => Contract::query()->where('status', 'active')->count(),
-            'reserved' => Contract::query()->where('status', 'approved')->count(),
-        ];
-        $fleet['available'] = max(0, $fleet['total'] - $fleet['maintenance'] - $fleet['rented'] - $fleet['reserved']);
+        $fleet = $this->fleetStatusCounts();
 
         $from = now()->startOfMonth();
         $to = now();
@@ -86,6 +83,55 @@ class ReportController extends Controller
             : now()->startOfMonth();
 
         return response()->json(['data' => $this->profitability->monthOverMonth($anchor)]);
+    }
+
+    /**
+     * Unique-vehicle operational status buckets — same rules as the dashboard.
+     *
+     * @return array{total:int,available:int,reserved:int,rented:int,maintenance:int,out_of_service:int}
+     */
+    private function fleetStatusCounts(): array
+    {
+        $vehicles = Vehicle::query()->where('is_active', true)->get(['id', 'manual_status']);
+        $activeIds = Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip();
+        $reservedIds = Contract::query()
+            ->where('status', 'approved')
+            ->where('starts_at', '<=', now())
+            ->where('planned_ends_at', '>=', now())
+            ->pluck('vehicle_id')
+            ->flip();
+        $blockingWo = WorkOrder::query()
+            ->where('puts_in_maintenance', true)
+            ->whereIn('status', ['open', 'in_progress'])
+            ->pluck('vehicle_id')
+            ->flip();
+
+        $counts = [
+            'total' => $vehicles->count(),
+            'available' => 0,
+            'reserved' => 0,
+            'rented' => 0,
+            'maintenance' => 0,
+            'out_of_service' => 0,
+        ];
+
+        foreach ($vehicles as $v) {
+            $status = $this->availability->statusOnDate([
+                'manual_status' => $v->manual_status,
+                'has_active_handover' => $activeIds->has($v->id),
+                'has_approved_covering_date' => $reservedIds->has($v->id),
+                'open_work_order_blocks' => $v->manual_status === 'maintenance' || $blockingWo->has($v->id),
+            ]);
+            if ($status === VehicleAvailabilityService::STATUS_SOLD) {
+                // Sold vehicles are inactive in the active fleet query; ignore if present.
+                continue;
+            }
+            if (isset($counts[$status])) {
+                $counts[$status]++;
+            }
+        }
+
+        return $counts;
     }
 
     public function trialBalance(Request $request): JsonResponse

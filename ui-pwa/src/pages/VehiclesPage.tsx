@@ -388,11 +388,11 @@ export function VehiclesPage() {
     try {
       await api(`/vehicles/${v.id}`, {
         method: 'PUT',
-        body: JSON.stringify({
+        json: {
           tracker_sim_last_recharged_on: last,
           tracker_sim_next_recharge_on: next,
           tracker_sim_recharge_cycle_days: cycle,
-        }),
+        },
       })
       toast.success(`تم تسجيل الشحن · القادم ${formatDate(next)}`)
       void load()

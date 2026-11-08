@@ -106,7 +106,7 @@ export function EmployeeDetailPage() {
   const [passwordForm, setPasswordForm] = useState({ password: '', password_confirmation: '' })
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
   const [advanceForm, setAdvanceForm] = useState({ amount: '', advanced_on: new Date().toISOString().slice(0, 10), method: 'cash', notes: '' })
-  const [evalForm, setEvalForm] = useState({ score: '80', period: '', notes: '' })
+  const [evalForm, setEvalForm] = useState({ score: '5', period: '', notes: '' })
   const [assignForm, setAssignForm] = useState({ notes: '', handed_on: new Date().toISOString().slice(0, 10) })
 
   async function load() {
@@ -265,7 +265,7 @@ export function EmployeeDetailPage() {
       })
       toast.success('تم تسجيل التقييم.')
       setEvalOpen(false)
-      setEvalForm({ score: '80', period: '', notes: '' })
+      setEvalForm({ score: '5', period: '', notes: '' })
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
@@ -612,7 +612,7 @@ export function EmployeeDetailPage() {
         footer={<><Button loading={saving} onClick={() => void saveEval()}>حفظ</Button><Button variant="secondary" onClick={() => setEvalOpen(false)}>إلغاء</Button></>}
       >
         <div className="rpm-form-grid">
-          <NumberField label="الدرجة" required value={evalForm.score} onChange={(e) => setEvalForm({ ...evalForm, score: e.target.value })} />
+          <NumberField label="الدرجة (1-5)" required min={1} max={5} value={evalForm.score} onChange={(e) => setEvalForm({ ...evalForm, score: e.target.value })} />
           <TextField label="الفترة" value={evalForm.period} onChange={(e) => setEvalForm({ ...evalForm, period: e.target.value })} hint="مثال: Q1 2026" />
           <TextAreaField label="ملاحظات" value={evalForm.notes} onChange={(e) => setEvalForm({ ...evalForm, notes: e.target.value })} />
         </div>

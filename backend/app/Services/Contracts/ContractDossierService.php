@@ -7,8 +7,8 @@ use App\Models\Contract;
 use App\Models\Inspection;
 use App\Models\MediaFile;
 use App\Models\Payment;
-use App\Models\User;
 use App\Models\Violation;
+use App\Services\Operations\AuditNarrator;
 
 /**
  * Full read model for the contract page: parties, inspections, payment ledger,
@@ -16,7 +16,10 @@ use App\Models\Violation;
  */
 class ContractDossierService
 {
-    public function __construct(private readonly RentalProgressService $progress) {}
+    public function __construct(
+        private readonly RentalProgressService $progress,
+        private readonly ContractLedgerMath $ledgerMath,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -96,7 +99,7 @@ class ContractDossierService
             ->latest('id')
             ->limit(50)
             ->get();
-        $narrator = app(\App\Services\Operations\AuditNarrator::class);
+        $narrator = app(AuditNarrator::class);
         $actors = $narrator->resolveActors($logs);
         $timeline = $logs->map(function (AuditLog $log) use ($actors, $narrator) {
             $actor = $log->user_id ? ($actors[(int) $log->user_id] ?? null) : null;
@@ -114,18 +117,9 @@ class ContractDossierService
             ];
         })->values();
 
-        $in = (int) $payments->where('direction', 'in')->where('link_type', 'contract')->sum('amount');
-        $out = (int) $payments->where('direction', 'out')->where('link_type', 'contract')->sum('amount');
-        $total = (int) ($contract->final_total ?? 0);
-        if ($total <= 0) {
-            $days = max(1, (int) ($contract->approved_days ?? 0));
-            if ($days <= 0 && $contract->starts_at && $contract->planned_ends_at) {
-                $days = max(1, (int) $contract->starts_at->diffInDays($contract->planned_ends_at) + 1);
-            }
-            $total = $days * (int) $contract->frozen_daily_rate
-                + (int) $contract->other_fees
-                - (int) $contract->discount;
-        }
+        $ledgerTotals = $this->ledgerMath->forContract($contract);
+        $total = $ledgerTotals['total'];
+        $in = $ledgerTotals['paid'];
 
         $openViolations = Violation::query()
             ->with('creator:id,name')
@@ -158,8 +152,8 @@ class ContractDossierService
             'open_violations_total' => $openViolationsTotal,
             'ledger' => [
                 'contract_total' => $total,
-                'paid' => $in - $out,
-                'balance' => max(0, $total - ($in - $out)),
+                'paid' => $in,
+                'balance' => $ledgerTotals['balance'],
                 'deposit_held' => $contract->deposit && in_array($contract->deposit->status, ['received', 'partial'], true)
                     ? $contract->deposit->remaining()
                     : 0,

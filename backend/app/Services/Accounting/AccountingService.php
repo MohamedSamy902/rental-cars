@@ -10,12 +10,20 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\MonthLock;
 use App\Models\Payment;
+use App\Services\Contracts\ContractLedgerMath;
+use App\Services\Contracts\ContractPricingService;
+use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class AccountingService
 {
-    public function __construct(private readonly MonthAllocationService $allocation) {}
+    public function __construct(
+        private readonly MonthAllocationService $allocation,
+        private readonly ContractPricingService $pricing,
+        private readonly ContractLedgerMath $ledgerMath,
+        private readonly PaymentMethodNormalizer $methods,
+    ) {}
 
     /**
      * @return list<Account>
@@ -64,21 +72,166 @@ class AccountingService
         if ($lock->isLocked()) {
             throw new DomainException('الشهر مقفل مسبقاً.');
         }
-        $lock->fill([
-            'locked_by' => $userId,
-            'locked_at' => now(),
-            'reopen_reason' => null,
-        ])->save();
 
-        AuditLog::query()->create([
-            'user_id' => $userId,
-            'action' => 'month_locked',
-            'record_type' => MonthLock::class,
-            'record_id' => $lock->id,
-            'after' => compact('year', 'month'),
-        ]);
+        return DB::transaction(function () use ($lock, $year, $month, $userId) {
+            $this->recognizeRentForMonth($year, $month, $userId);
 
-        return $lock;
+            $lock->fill([
+                'locked_by' => $userId,
+                'locked_at' => now(),
+                'reopen_reason' => null,
+            ])->save();
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'month_locked',
+                'record_type' => MonthLock::class,
+                'record_id' => $lock->id,
+                'after' => compact('year', 'month'),
+            ]);
+
+            return $lock;
+        });
+    }
+
+    /**
+     * Accrue earned rent for every active/completed contract that overlaps the month.
+     * Idempotent via rent_recog:{contractId}:{YYYY-MM}; tops up when actual period grows.
+     */
+    public function recognizeRentForMonth(int $year, int $month, ?int $userId = null): void
+    {
+        $this->ensureChartOfAccounts();
+        $monthStart = CarbonImmutable::create($year, $month, 1, 0, 0, 0, config('app.timezone'));
+        $monthEndExclusive = $monthStart->addMonth();
+
+        $contracts = Contract::query()
+            ->whereIn('status', ['active', 'completed'])
+            ->where('starts_at', '<', $monthEndExclusive)
+            ->where(function ($q) use ($monthStart) {
+                $q->where(function ($qq) use ($monthStart) {
+                    $qq->whereNotNull('actual_ends_at')
+                        ->where('actual_ends_at', '>', $monthStart);
+                })->orWhere(function ($qq) use ($monthStart) {
+                    $qq->whereNull('actual_ends_at')
+                        ->where('planned_ends_at', '>', $monthStart);
+                });
+            })
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($contracts as $contract) {
+            $needed = $this->rentNeededForMonth($contract, $year, $month);
+            if ($needed <= 0) {
+                continue;
+            }
+            $this->postRentRecognition($contract, $year, $month, $needed, $userId);
+        }
+    }
+
+    /**
+     * Days × rate (or period allocation share) owed to this calendar month.
+     */
+    public function rentNeededForMonth(Contract $contract, int $year, int $month): int
+    {
+        $start = $contract->starts_at;
+        if (! $start) {
+            return 0;
+        }
+
+        $end = $contract->actual_ends_at ?? $contract->planned_ends_at;
+        if (! $end || $end <= $start) {
+            return 0;
+        }
+
+        $rate = (int) $contract->frozen_daily_rate;
+        if ($rate <= 0) {
+            return 0;
+        }
+
+        $periodRent = (int) ($contract->period_rent ?? 0);
+        if ($periodRent <= 0) {
+            $days = $this->pricing->countRentalDays($start, $end);
+            $periodRent = $days * $rate;
+        }
+        if ($periodRent <= 0) {
+            return 0;
+        }
+
+        foreach ($this->allocation->allocateRentByMonth($start, $end, $periodRent) as $slice) {
+            if ((int) $slice['year'] === $year && (int) $slice['month'] === $month) {
+                return (int) $slice['amount'];
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Post or top-up rent recognition for one contract/month. Balanced Dr 1200 / Cr 4000.
+     */
+    public function postRentRecognition(
+        Contract $contract,
+        int $year,
+        int $month,
+        int $neededAmount,
+        ?int $userId = null,
+    ): ?JournalEntry {
+        if ($neededAmount <= 0) {
+            return null;
+        }
+
+        $this->ensureChartOfAccounts();
+        $source = sprintf('rent_recog:%d:%04d-%02d', $contract->id, $year, $month);
+        $entryDate = CarbonImmutable::create($year, $month, 1, 0, 0, 0, config('app.timezone'))
+            ->endOfMonth()
+            ->toDateString();
+
+        return DB::transaction(function () use ($contract, $neededAmount, $userId, $source, $entryDate, $year, $month) {
+            $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+            $already = 0;
+            if ($existing) {
+                $rent = Account::query()->where('code', '4000')->firstOrFail();
+                $already = (int) JournalLine::query()
+                    ->where('journal_entry_id', $existing->id)
+                    ->where('account_id', $rent->id)
+                    ->sum('credit');
+                if ($already >= $neededAmount) {
+                    return $existing->load('lines.account');
+                }
+            }
+
+            $delta = $neededAmount - $already;
+            $ar = Account::query()->where('code', '1200')->firstOrFail();
+            $rent = Account::query()->where('code', '4000')->firstOrFail();
+
+            if (! $existing) {
+                $existing = JournalEntry::query()->create([
+                    'entry_date' => $entryDate,
+                    'narration' => sprintf('إثبات إيجار عقد %s — %04d-%02d', $contract->number, $year, $month),
+                    'source' => $source,
+                    'posted_by' => $userId,
+                ]);
+            }
+
+            JournalLine::query()->create([
+                'journal_entry_id' => $existing->id,
+                'account_id' => $ar->id,
+                'debit' => $delta,
+                'credit' => 0,
+                'vehicle_id' => $contract->vehicle_id,
+                'customer_id' => $contract->customer_id,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $existing->id,
+                'account_id' => $rent->id,
+                'debit' => 0,
+                'credit' => $delta,
+                'vehicle_id' => $contract->vehicle_id,
+                'customer_id' => $contract->customer_id,
+            ]);
+
+            return $existing->load('lines.account');
+        });
     }
 
     public function reopenMonth(int $year, int $month, string $reason, ?int $userId = null): MonthLock
@@ -109,7 +262,8 @@ class AccountingService
     }
 
     /**
-     * Post completed-contract revenue into monthly journal lines (no violation ledger).
+     * Post completed-contract revenue into monthly rent recognition + close-month extras.
+     * Rent is attributed to service months (entry_date = month end); fees stay on close month.
      */
     public function postContractClose(Contract $contract, ?int $userId = null): JournalEntry
     {
@@ -122,10 +276,8 @@ class AccountingService
         $end = $contract->actual_ends_at ?? $contract->planned_ends_at;
         $slices = $this->allocation->allocateRentByMonth($start, $end, (int) $contract->period_rent);
 
-        foreach ($slices as $slice) {
-            $this->assertMonthOpen($slice['year'], $slice['month']);
-        }
-
+        // Rent months may already be locked with accruals; close still tops up recognition.
+        // Extra fees always post into the close month, which must remain open.
         $closeYear = (int) $end->format('Y');
         $closeMonth = (int) $end->format('n');
         $this->assertMonthOpen($closeYear, $closeMonth);
@@ -135,6 +287,19 @@ class AccountingService
             $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
             if ($existing) {
                 return $existing->load('lines');
+            }
+
+            foreach ($slices as $slice) {
+                if ($slice['amount'] <= 0) {
+                    continue;
+                }
+                $this->postRentRecognition(
+                    $contract,
+                    (int) $slice['year'],
+                    (int) $slice['month'],
+                    (int) $slice['amount'],
+                    $userId,
+                );
             }
 
             $entry = JournalEntry::query()->create([
@@ -149,28 +314,6 @@ class AccountingService
             $excess = Account::query()->where('code', '4100')->firstOrFail();
             $damage = Account::query()->where('code', '4200')->firstOrFail();
             $fees = Account::query()->where('code', '4300')->firstOrFail();
-
-            foreach ($slices as $slice) {
-                if ($slice['amount'] <= 0) {
-                    continue;
-                }
-                JournalLine::query()->create([
-                    'journal_entry_id' => $entry->id,
-                    'account_id' => $ar->id,
-                    'debit' => $slice['amount'],
-                    'credit' => 0,
-                    'vehicle_id' => $contract->vehicle_id,
-                    'customer_id' => $contract->customer_id,
-                ]);
-                JournalLine::query()->create([
-                    'journal_entry_id' => $entry->id,
-                    'account_id' => $rent->id,
-                    'debit' => 0,
-                    'credit' => $slice['amount'],
-                    'vehicle_id' => $contract->vehicle_id,
-                    'customer_id' => $contract->customer_id,
-                ]);
-            }
 
             $extras = [
                 [(int) $contract->excess_km_amount, $excess->id],
@@ -358,17 +501,123 @@ class AccountingService
             throw new DomainException('اتجاه الحركة غير صالح.');
         }
 
-        return Payment::query()->create([
-            'amount' => (int) $data['amount'],
-            'paid_at' => $paidAt,
-            'method' => $data['method'],
-            'direction' => $data['direction'],
-            'reference' => $data['reference'] ?? null,
-            'link_type' => $data['link_type'],
-            'link_id' => $data['link_id'] ?? null,
-            'user_id' => $userId,
-            'notes' => $data['notes'] ?? null,
+        $amount = (int) $data['amount'];
+        if ($amount <= 0) {
+            throw new DomainException('المبلغ يجب أن يكون أكبر من صفر.');
+        }
+
+        return DB::transaction(function () use ($data, $userId, $paidAt, $amount) {
+            $linkType = (string) $data['link_type'];
+            $linkId = isset($data['link_id']) ? (int) $data['link_id'] : null;
+
+            if ($linkType === 'contract' && $linkId && $data['direction'] === 'in') {
+                $contract = Contract::query()->whereKey($linkId)->lockForUpdate()->first();
+                if (! $contract) {
+                    throw new DomainException('العقد غير موجود.');
+                }
+                // Lock existing receipt rows so concurrent posts cannot exceed remaining.
+                Payment::query()
+                    ->where('link_type', 'contract')
+                    ->where('link_id', $linkId)
+                    ->lockForUpdate()
+                    ->get(['id', 'amount', 'direction']);
+                $remaining = $this->ledgerMath->remainingCollectible($contract);
+                if ($amount > $remaining) {
+                    throw new DomainException(
+                        sprintf('المبلغ يتجاوز المتبقي على العقد (%d ج.م).', $remaining)
+                    );
+                }
+            }
+
+            $payment = Payment::query()->create([
+                'amount' => $amount,
+                'paid_at' => $paidAt,
+                'method' => $data['method'],
+                'direction' => $data['direction'],
+                'reference' => $data['reference'] ?? null,
+                'link_type' => $linkType,
+                'link_id' => $linkId,
+                'user_id' => $userId,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            // Credit-balance applications are memo allocations — not cash receipts.
+            if ($linkType === 'contract' && $linkId && $this->methods->canonical((string) $payment->method) !== 'credit') {
+                $this->postPaymentJournal($payment, $userId);
+            }
+
+            return $payment;
+        });
+    }
+
+    /**
+     * Cash/bank ↔ AR for contract-linked receipts (no rent recognition here).
+     */
+    public function postPaymentJournal(Payment $payment, ?int $userId = null): JournalEntry
+    {
+        $this->ensureChartOfAccounts();
+        $source = 'payment:'.$payment->id;
+        $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+        if ($existing) {
+            return $existing->load('lines.account');
+        }
+
+        $cashCode = $this->methods->cashAccountCode((string) $payment->method);
+        $cash = Account::query()->where('code', $cashCode)->firstOrFail();
+        $ar = Account::query()->where('code', '1200')->firstOrFail();
+        $amount = (int) $payment->amount;
+        $date = $payment->paid_at?->toDateString() ?? now()->toDateString();
+
+        $contract = $payment->link_type === 'contract' && $payment->link_id
+            ? Contract::query()->find($payment->link_id)
+            : null;
+
+        $entry = JournalEntry::query()->create([
+            'entry_date' => $date,
+            'narration' => $payment->direction === 'in'
+                ? 'تحصيل دفعة'.($contract ? ' عقد '.$contract->number : '')
+                : 'صرف دفعة'.($contract ? ' عقد '.$contract->number : ''),
+            'source' => $source,
+            'posted_by' => $userId,
         ]);
+
+        if ($payment->direction === 'in') {
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $cash->id,
+                'debit' => $amount,
+                'credit' => 0,
+                'vehicle_id' => $contract?->vehicle_id,
+                'customer_id' => $contract?->customer_id,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $ar->id,
+                'debit' => 0,
+                'credit' => $amount,
+                'vehicle_id' => $contract?->vehicle_id,
+                'customer_id' => $contract?->customer_id,
+            ]);
+        } else {
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $ar->id,
+                'debit' => $amount,
+                'credit' => 0,
+                'vehicle_id' => $contract?->vehicle_id,
+                'customer_id' => $contract?->customer_id,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $cash->id,
+                'debit' => 0,
+                'credit' => $amount,
+                'vehicle_id' => $contract?->vehicle_id,
+                'customer_id' => $contract?->customer_id,
+            ]);
+        }
+
+        return $entry->load('lines.account');
     }
 
     /**
