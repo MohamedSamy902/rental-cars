@@ -23,6 +23,15 @@ export type DataColumn<T> = {
 
 type SortState = { id: string; dir: 'asc' | 'desc' } | null
 
+/** Server-driven pager (API `meta` + `page` / `per_page`). When set, client-side slicing is disabled. */
+export type ServerPagination = {
+  page: number
+  lastPage: number
+  total: number
+  perPage: number
+  onPageChange: (page: number) => void
+}
+
 type Props<T> = {
   label: string
   rows: T[]
@@ -38,6 +47,7 @@ type Props<T> = {
   emptyAction?: ReactNode
   pageSize?: number
   defaultSort?: SortState
+  serverPagination?: ServerPagination
 }
 
 const collator = new Intl.Collator('ar', { numeric: true, sensitivity: 'base' })
@@ -71,6 +81,7 @@ export function DataTable<T>({
   emptyAction,
   pageSize = 10,
   defaultSort = null,
+  serverPagination,
 }: Props<T>) {
   const mobile = useIsMobile()
   const [sort, setSort] = useState<SortState>(defaultSort)
@@ -85,14 +96,38 @@ export function DataTable<T>({
     return sort.dir === 'desc' ? out.reverse() : out
   }, [rows, columns, sort])
 
-  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize))
-  const current = Math.min(page, pageCount - 1)
-  const visible = sorted.slice(current * pageSize, current * pageSize + pageSize)
-  const from = sorted.length === 0 ? 0 : current * pageSize + 1
-  const to = Math.min(sorted.length, (current + 1) * pageSize)
+  const server = serverPagination
+  const pageCount = server
+    ? Math.max(1, server.lastPage)
+    : Math.max(1, Math.ceil(sorted.length / pageSize))
+  const current = server
+    ? Math.max(0, Math.min(server.page - 1, pageCount - 1))
+    : Math.min(page, pageCount - 1)
+  const visible = server
+    ? sorted
+    : sorted.slice(current * pageSize, current * pageSize + pageSize)
+  const totalCount = server ? server.total : sorted.length
+  const from = totalCount === 0
+    ? 0
+    : server
+      ? (server.page - 1) * server.perPage + 1
+      : current * pageSize + 1
+  const to = totalCount === 0
+    ? 0
+    : server
+      ? Math.min(totalCount, (server.page - 1) * server.perPage + sorted.length)
+      : Math.min(sorted.length, (current + 1) * pageSize)
+
+  function goToPage(zeroBased: number) {
+    if (server) {
+      server.onPageChange(zeroBased + 1)
+      return
+    }
+    setPage(zeroBased)
+  }
 
   function toggleSort(id: string) {
-    setPage(0)
+    if (!server) setPage(0)
     setSort((prev) => {
       if (!prev || prev.id !== id) return { id, dir: 'asc' }
       if (prev.dir === 'asc') return { id, dir: 'desc' }
@@ -102,10 +137,10 @@ export function DataTable<T>({
 
   const hasActions = Boolean(rowActions)
   const footer =
-    !loading && sorted.length > 0 ? (
+    !loading && totalCount > 0 ? (
       <footer className="rpm-dt__foot">
         <span className="rpm-dt__count">
-          عرض <b>{from}</b>–<b>{to}</b> من <b>{sorted.length}</b>
+          عرض <b>{from}</b>–<b>{to}</b> من <b>{totalCount}</b>
         </span>
         {pageCount > 1 ? (
           <nav className="rpm-dt__pager" aria-label="التنقل بين الصفحات">
@@ -114,7 +149,7 @@ export function DataTable<T>({
               className="rpm-dt__page rpm-dt__page--nav"
               aria-label="الصفحة السابقة"
               disabled={current === 0}
-              onClick={() => setPage(current - 1)}
+              onClick={() => goToPage(current - 1)}
             >
               <IconChevron size={16} />
             </button>
@@ -124,7 +159,7 @@ export function DataTable<T>({
                 type="button"
                 className={`rpm-dt__page ${p === current ? 'is-current' : ''}`.trim()}
                 aria-current={p === current ? 'page' : undefined}
-                onClick={() => setPage(p)}
+                onClick={() => goToPage(p)}
               >
                 {p + 1}
               </button>
@@ -134,7 +169,7 @@ export function DataTable<T>({
               className="rpm-dt__page rpm-dt__page--nav is-next"
               aria-label="الصفحة التالية"
               disabled={current >= pageCount - 1}
-              onClick={() => setPage(current + 1)}
+              onClick={() => goToPage(current + 1)}
             >
               <IconChevron size={16} />
             </button>
@@ -144,7 +179,7 @@ export function DataTable<T>({
     ) : null
 
   const empty =
-    !loading && sorted.length === 0 ? (
+    !loading && sorted.length === 0 && totalCount === 0 ? (
       <div className="rpm-dt__empty">
         <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
       </div>

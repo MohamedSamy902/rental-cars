@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { api, type ApiError } from '@/shared/api/client'
-import { nowLocalDateTimeValue, todayCivilIso } from '@/shared/lib/dates'
+import { civilDateOnly, nowLocalDateTimeValue, todayCivilIso } from '@/shared/lib/dates'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -232,7 +232,7 @@ const emptyAcc = {
 
 function shortDate(value?: string | null) {
   if (!value) return '—'
-  return value.slice(0, 10)
+  return civilDateOnly(value) || '—'
 }
 
 function monthLabel(ym: string) {
@@ -1469,8 +1469,8 @@ export function VehicleDetailPage() {
                 { value: 'other', label: 'أخرى' },
               ]}
             />
-            <TextField label="بداية التوقف" type="date" value={downtimeForm.starts_at.slice(0, 10)} onChange={(e) => setDowntimeForm({ ...downtimeForm, starts_at: e.target.value })} />
-            <TextField label="نهاية التوقف" type="date" value={downtimeForm.ends_at.slice(0, 10)} onChange={(e) => setDowntimeForm({ ...downtimeForm, ends_at: e.target.value })} />
+            <TextField label="بداية التوقف" type="date" value={civilDateOnly(downtimeForm.starts_at)} onChange={(e) => setDowntimeForm({ ...downtimeForm, starts_at: e.target.value })} />
+            <TextField label="نهاية التوقف" type="date" value={civilDateOnly(downtimeForm.ends_at)} onChange={(e) => setDowntimeForm({ ...downtimeForm, ends_at: e.target.value })} />
           </div>
         ) : null}
       </Sheet>

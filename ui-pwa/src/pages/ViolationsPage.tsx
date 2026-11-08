@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { todayCivilIso } from '@/shared/lib/dates'
+import { civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney, toApiDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -184,7 +184,7 @@ export function ViolationsPage() {
     setEditing(row)
     setForm({
       contract_id: row.contract_id || row.contract?.id ? String(row.contract_id || row.contract?.id) : '',
-      occurred_at: (row.occurred_at || '').slice(0, 10) || todayDateOnly(),
+      occurred_at: civilDateOnly(row.occurred_at || '') || todayDateOnly(),
       amount: String(row.amount ?? ''),
       photo_paths: photosFromRow(row),
       status: row.status || 'new',

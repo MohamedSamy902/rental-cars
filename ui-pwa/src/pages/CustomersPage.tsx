@@ -10,6 +10,9 @@ import {
 } from '@/shared/ui'
 import './pages.css'
 
+type PageMeta = { current_page: number; last_page: number; total: number }
+const LIST_PER_PAGE = 50
+
 type Customer = {
   id: number
   full_name: string
@@ -40,6 +43,8 @@ export function CustomersPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Customer[]>([])
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: CustomersPageTabs, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
@@ -67,24 +72,32 @@ export function CustomersPage() {
     [attention.blacklisted_customers],
   )
 
-  async function load() {
+  async function load(nextPage = page) {
     setLoading(true)
     try {
       const qs = new URLSearchParams()
+      qs.set('page', String(nextPage))
+      qs.set('per_page', String(LIST_PER_PAGE))
       if (search.trim()) qs.set('search', search.trim())
       if (chip === 'blacklist') qs.set('status', 'blacklist')
       if (chip === 'active') qs.set('status', 'active')
-      const res = await api<{ data: Customer[] }>(`/customers?${qs}`)
+      const res = await api<{ data: Customer[]; meta?: PageMeta }>(`/customers?${qs}`)
       setRows(res.data)
+      setMeta({
+        current_page: res.meta?.current_page ?? nextPage,
+        last_page: res.meta?.last_page ?? 1,
+        total: res.meta?.total ?? res.data.length,
+      })
+      setPage(res.meta?.current_page ?? nextPage)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    const t = window.setTimeout(load, 250)
+    const t = window.setTimeout(() => void load(page), 250)
     return () => window.clearTimeout(t)
-  }, [search, chip])
+  }, [search, chip, page])
 
   async function openDetail(id: number) {
     navigate(`/customers/${id}`)
@@ -267,10 +280,10 @@ export function CustomersPage() {
       <Fab label="إضافة عميل" onClick={() => setOpen(true)} />
       <FilterBar
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={(v) => { setSearch(v); setPage(1) }}
         chips={chips}
         activeChip={chip}
-        onChipChange={setChip}
+        onChipChange={(id) => { setChip(id); setPage(1) }}
         placeholder="بحث بالاسم أو الهاتف…"
       />
       <DataTable
@@ -284,6 +297,13 @@ export function CustomersPage() {
         rowActions={customerMenu}
         emptyTitle="لا يوجد عملاء"
         emptyDescription="أضف أول عميل أو غيّر كلمة البحث."
+        serverPagination={{
+          page: meta.current_page,
+          lastPage: meta.last_page,
+          total: meta.total,
+          perPage: LIST_PER_PAGE,
+          onPageChange: setPage,
+        }}
       />
       <Sheet open={open} title="إضافة عميل" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         {formFields}

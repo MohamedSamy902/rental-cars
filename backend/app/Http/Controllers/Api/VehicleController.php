@@ -18,6 +18,7 @@ use App\Services\Fleet\VehicleAssetService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Fleet\VehicleRecommendationService;
 use App\Services\Fleet\VehicleService;
+use App\Support\PaginationInput;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
@@ -165,7 +166,9 @@ class VehicleController extends Controller
                 $this->constrainLicenseDocuments($d)->orderByDesc('id');
             },
         ]);
-        $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $perPage = PaginationInput::perPage($request, 50, 100);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
 
         $data = collect($rows->items())->map(function (Vehicle $v) {
             return $this->present($v);

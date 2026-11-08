@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
+use App\Support\PaginationInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +33,9 @@ class StaffController extends Controller
             $q->where('role_id', $roleId);
         }
 
-        $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $perPage = PaginationInput::perPage($request, 50, 100);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'data' => collect($rows->items())->map(fn (User $u) => $this->present($u))->values(),

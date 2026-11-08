@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { addCivilDays, todayCivilIso } from '@/shared/lib/dates'
+import { addCivilDays, civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import { BrandSelectField } from '@/shared/forms/BrandSelectField'
 import {
   Button, Sheet, TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
@@ -180,10 +180,10 @@ function fromInitial(initial?: VehicleFormInitial | null): FormState {
     tracker_device_number: str(initial.tracker_device_number),
     tracker_sim_number: str(initial.tracker_sim_number),
     tracker_sim_last_recharged_on: initial.tracker_sim_last_recharged_on
-      ? String(initial.tracker_sim_last_recharged_on).slice(0, 10)
+      ? civilDateOnly(String(initial.tracker_sim_last_recharged_on))
       : '',
     tracker_sim_next_recharge_on: initial.tracker_sim_next_recharge_on
-      ? String(initial.tracker_sim_next_recharge_on).slice(0, 10)
+      ? civilDateOnly(String(initial.tracker_sim_next_recharge_on))
       : '',
     tracker_sim_recharge_cycle_days: str(initial.tracker_sim_recharge_cycle_days, '30'),
     notes: str(initial.notes),
@@ -192,10 +192,10 @@ function fromInitial(initial?: VehicleFormInitial | null): FormState {
     owner_monthly_amount: str(initial.owner_monthly_amount),
     owner_mode: initial.owner_id ? 'existing' : 'none',
     owner_agreement_starts_on: initial.owner_agreement_starts_on
-      ? String(initial.owner_agreement_starts_on).slice(0, 10)
+      ? civilDateOnly(String(initial.owner_agreement_starts_on))
       : '',
     owner_agreement_ends_on: initial.owner_agreement_ends_on
-      ? String(initial.owner_agreement_ends_on).slice(0, 10)
+      ? civilDateOnly(String(initial.owner_agreement_ends_on))
       : '',
   }
 }
@@ -260,12 +260,12 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       }).documents || []
       const lic = docs.find((d) => /رخص|license/i.test(d.type || ''))
       if (lic) {
-        const exp = lic.expires_on ? String(lic.expires_on).slice(0, 10) : ''
+        const exp = lic.expires_on ? civilDateOnly(String(lic.expires_on)) : ''
         const expired = Boolean(exp && exp < todayCivilIso())
         next.has_license = true
         next.license_number = lic.document_number ? String(lic.document_number) : ''
         next.license_expires_on = exp
-        next.license_issued_on = lic.issued_on ? String(lic.issued_on).slice(0, 10) : ''
+        next.license_issued_on = lic.issued_on ? civilDateOnly(String(lic.issued_on)) : ''
         next.license_status = expired ? 'expired' : 'active'
         next.license_file_path = lic.file_path && !String(lic.file_path).startsWith('manual/')
           ? String(lic.file_path)

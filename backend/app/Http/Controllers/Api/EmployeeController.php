@@ -10,6 +10,7 @@ use App\Models\PayrollLine;
 use App\Models\PettyCashAccount;
 use App\Models\SalaryAdvance;
 use App\Models\User;
+use App\Support\PaginationInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,7 +31,9 @@ class EmployeeController extends Controller
             $q->where('status', $status);
         }
 
-        $rows = $q->paginate((int) $request->integer('per_page', 100));
+        $perPage = PaginationInput::perPage($request, 100, 100);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'data' => $rows->items(),

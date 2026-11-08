@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateVehicleOwnerRequest;
 use App\Models\OwnerPayout;
 use App\Models\VehicleOwner;
 use App\Services\Fleet\VehicleOwnerService;
+use App\Support\PaginationInput;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,9 @@ class VehicleOwnerController extends Controller
             $q->where('is_active', true);
         }
 
-        $rows = $q->paginate((int) $request->integer('per_page', 50));
+        $perPage = PaginationInput::perPage($request, 50, 100);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
         $data = collect($rows->items())->map(function (VehicleOwner $o) use ($canViewNid) {
             // قائمة خفيفة: رصيد من القيود الحالية دون إعادة استحقاق جماعي
             $accrued = (int) $o->monthDues()->sum('amount');

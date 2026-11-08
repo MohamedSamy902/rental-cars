@@ -12,6 +12,7 @@ use App\Models\Expense;
 use App\Models\Inspection;
 use App\Models\InventoryBatch;
 use App\Models\InventoryItem;
+use App\Models\Notification;
 use App\Models\OwnerMonthDue;
 use App\Models\OwnerPayout;
 use App\Models\Payment;
@@ -375,25 +376,40 @@ class E2EDataSeeder extends Seeder
             ['job_title' => 'فني صيانة', 'hired_on' => '2022-01-01', 'base_salary' => 5000, 'status' => 'ended'],
         );
 
-        $techPetty = PettyCashAccount::query()->updateOrCreate(
+        $techPetty = PettyCashAccount::query()->firstOrCreate(
             ['employee_id' => $tech->id],
-            ['limit_amount' => 15000, 'balance' => 10500, 'is_active' => true],
+            ['limit_amount' => 15000, 'balance' => 0, 'is_active' => true],
         );
-        if (! PettyCashMovement::query()->where('petty_cash_account_id', $techPetty->id)->where('notes', 'تعزيز عهدة — بذرة E2E')->exists()) {
+        $techPetty->update(['limit_amount' => 15000, 'is_active' => true]);
+        // Prefer an additional spend to reach a coherent story on top of Demo
+        // (15000 topup − 3000 spend) rather than forcing a mismatched balance column.
+        if (! PettyCashMovement::query()->where('petty_cash_account_id', $techPetty->id)->where('notes', 'صرف تشغيلي — بذرة E2E')->exists()) {
+            if ((int) PettyCashMovement::query()->where('petty_cash_account_id', $techPetty->id)->where('type', 'topup')->sum('amount') === 0) {
+                PettyCashMovement::query()->create([
+                    'petty_cash_account_id' => $techPetty->id,
+                    'type' => 'topup',
+                    'amount' => 15000,
+                    'moved_on' => now()->subDays(10)->toDateString(),
+                    'performed_by' => $actorId,
+                    'notes' => 'افتتاح عهدة — بذرة E2E',
+                ]);
+            }
             PettyCashMovement::query()->create([
                 'petty_cash_account_id' => $techPetty->id,
-                'type' => 'topup',
+                'type' => 'spend',
                 'amount' => 1500,
                 'moved_on' => now()->subDays(2)->toDateString(),
                 'performed_by' => $actorId,
-                'notes' => 'تعزيز عهدة — بذرة E2E',
+                'notes' => 'صرف تشغيلي — بذرة E2E',
             ]);
         }
+        $this->syncPettyBalance($techPetty);
 
-        $driverPetty = PettyCashAccount::query()->updateOrCreate(
+        $driverPetty = PettyCashAccount::query()->firstOrCreate(
             ['employee_id' => $driver->id],
-            ['limit_amount' => 5000, 'balance' => 3200, 'is_active' => true],
+            ['limit_amount' => 5000, 'balance' => 0, 'is_active' => true],
         );
+        $driverPetty->update(['limit_amount' => 5000, 'is_active' => true]);
         if (! PettyCashMovement::query()->where('petty_cash_account_id', $driverPetty->id)->exists()) {
             PettyCashMovement::query()->create([
                 'petty_cash_account_id' => $driverPetty->id,
@@ -412,6 +428,7 @@ class E2EDataSeeder extends Seeder
                 'notes' => 'وقود ورسوم طريق',
             ]);
         }
+        $this->syncPettyBalance($driverPetty);
 
         $pads = InventoryItem::query()->where('code', 'BRK-PAD')->first();
         if ($pads && ! EmployeeAssignment::query()->where('employee_id', $tech->id)->where('title', 'عهدة فحمات فرامل')->exists()) {
@@ -1235,7 +1252,7 @@ class E2EDataSeeder extends Seeder
             if (! $user) {
                 continue;
             }
-            if (! \App\Models\Notification::query()->where('user_id', $user->id)->where('title', 'تسليم اليوم — CNT-TODAY-01')->exists()) {
+            if (! Notification::query()->where('user_id', $user->id)->where('title', 'تسليم اليوم — CNT-TODAY-01')->exists()) {
                 $dispatcher->notify(
                     $user,
                     'تسليم اليوم — CNT-TODAY-01',
@@ -1244,7 +1261,7 @@ class E2EDataSeeder extends Seeder
                     (int) (Contract::query()->where('number', 'CNT-TODAY-01')->value('id') ?? 0) ?: null,
                 );
             }
-            if (! \App\Models\Notification::query()->where('user_id', $user->id)->where('title', 'مخزون منخفض — مياه ردّياتير')->exists()) {
+            if (! Notification::query()->where('user_id', $user->id)->where('title', 'مخزون منخفض — مياه ردّياتير')->exists()) {
                 $dispatcher->notify(
                     $user,
                     'مخزون منخفض — مياه ردّياتير',
@@ -1254,5 +1271,22 @@ class E2EDataSeeder extends Seeder
                 );
             }
         }
+    }
+
+    private function syncPettyBalance(PettyCashAccount $account): void
+    {
+        $topup = (int) PettyCashMovement::query()
+            ->where('petty_cash_account_id', $account->id)
+            ->where('type', 'topup')
+            ->sum('amount');
+        $spent = (int) PettyCashMovement::query()
+            ->where('petty_cash_account_id', $account->id)
+            ->where('type', 'spend')
+            ->sum('amount');
+        $returned = (int) PettyCashMovement::query()
+            ->where('petty_cash_account_id', $account->id)
+            ->where('type', 'return')
+            ->sum('amount');
+        $account->update(['balance' => max(0, $topup - $spent - $returned)]);
     }
 }

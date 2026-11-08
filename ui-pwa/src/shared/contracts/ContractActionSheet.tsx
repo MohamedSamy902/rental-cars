@@ -1,6 +1,7 @@
 import {
   Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, MediaUpload,
 } from '@/shared/ui'
+import { civilDateOnly } from '@/shared/lib/dates'
 import { formatMoney } from '@/shared/lib/format'
 import { actionTitle, type ActionKind, type Contract, type VehicleOption } from './contractModel'
 
@@ -157,7 +158,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             label="تاريخ نهاية التمديد"
             required
             type="date"
-            value={form.planned_ends_at.slice(0, 10)}
+            value={civilDateOnly(form.planned_ends_at)}
             onChange={(e) => {
               const date = e.target.value
               patch({ planned_ends_at: date ? `${date}T00:00` : '' })

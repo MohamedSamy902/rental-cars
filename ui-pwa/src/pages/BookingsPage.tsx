@@ -21,12 +21,17 @@ import './pages.css'
 
 const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed'] as const
 
+type PageMeta = { current_page: number; last_page: number; total: number }
+const LIST_PER_PAGE = 50
+
 export function BookingsPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Contract[]>([])
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
   const [summary, setSummary] = useState({
     total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0, handover_today: 0,
   })
@@ -35,7 +40,7 @@ export function BookingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { openNewContract, createdVersion } = useNewContract()
-  const life = useContractLifecycle(() => void load())
+  const life = useContractLifecycle(() => void load(page))
   const { counts: attention } = useAttentionSignals(true)
 
   const chips = useMemo(
@@ -81,19 +86,27 @@ export function BookingsPage() {
     [summary.pending, summary.upcoming, summary.handover_today, attention.pickups_today, attention.overdue_returns, attention.returning_today],
   )
 
-  async function load() {
+  async function load(nextPage = page) {
     setLoading(true)
     setError('')
     try {
       const qs = new URLSearchParams()
+      qs.set('page', String(nextPage))
+      qs.set('per_page', String(LIST_PER_PAGE))
       if (search.trim()) qs.set('search', search.trim())
       if (chip === 'upcoming' || chip === 'handover_today') {
         qs.set('tab', chip)
       } else if (chip !== 'all') {
         qs.set('status', chip)
       }
-      const res = await api<{ data: Contract[]; summary: typeof summary }>(`/contracts?${qs}`)
+      const res = await api<{ data: Contract[]; summary: typeof summary; meta?: PageMeta }>(`/contracts?${qs}`)
       setRows(res.data)
+      setMeta({
+        current_page: res.meta?.current_page ?? nextPage,
+        last_page: res.meta?.last_page ?? 1,
+        total: res.meta?.total ?? res.data.length,
+      })
+      setPage(res.meta?.current_page ?? nextPage)
       setSummary({
         total: res.summary.total ?? 0,
         pending: res.summary.pending ?? 0,
@@ -111,9 +124,9 @@ export function BookingsPage() {
   }
 
   useEffect(() => {
-    const t = window.setTimeout(() => load(), 250)
+    const t = window.setTimeout(() => void load(page), 250)
     return () => window.clearTimeout(t)
-  }, [search, chip, createdVersion])
+  }, [search, chip, createdVersion, page])
 
   const wantNew = searchParams.get('new') === '1'
   useEffect(() => {
@@ -221,10 +234,17 @@ export function BookingsPage() {
         ]}
       />
 
-      <FilterBar search={search} onSearchChange={setSearch} chips={chips} activeChip={chip} onChipChange={setChip} placeholder="بحث برقم العقد أو العميل…" />
+      <FilterBar
+        search={search}
+        onSearchChange={(v) => { setSearch(v); setPage(1) }}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={(id) => { setChip(id); setPage(1) }}
+        placeholder="بحث برقم العقد أو العميل…"
+      />
 
       {error ? (
-        <ErrorState title="تعذّر تحميل العقود" description={error} action={<Button onClick={() => load()}>إعادة المحاولة</Button>} />
+        <ErrorState title="تعذّر تحميل العقود" description={error} action={<Button onClick={() => void load(page)}>إعادة المحاولة</Button>} />
       ) : (
         <DataTable
           label="العقود"
@@ -245,6 +265,13 @@ export function BookingsPage() {
           }
           emptyTitle="لا توجد عقود مطابقة"
           emptyDescription="غيّر البحث أو الفلتر، أو أضف حجزاً جديداً."
+          serverPagination={{
+            page: meta.current_page,
+            lastPage: meta.last_page,
+            total: meta.total,
+            perPage: LIST_PER_PAGE,
+            onPageChange: setPage,
+          }}
         />
       )}
 
