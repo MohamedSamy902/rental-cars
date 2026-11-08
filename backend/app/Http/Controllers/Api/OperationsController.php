@@ -204,13 +204,16 @@ class OperationsController extends Controller
     public function estimatedOdometer(Request $request, Vehicle $vehicle): JsonResponse
     {
         $active = $vehicle->contracts()->where('status', 'active')->latest('id')->first();
-        if (! $active || ! $active->odometer_out || ! $active->starts_at) {
+        $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
+        if (! $canContracts || ! $active || ! $active->odometer_out || ! $active->starts_at) {
             return response()->json([
                 'data' => [
                     'vehicle_id' => $vehicle->id,
                     'estimated' => (int) $vehicle->odometer,
                     'basis' => 'recorded',
-                    'note' => 'لا عقد نشط — يُعرض العداد المسجّل.',
+                    'note' => $canContracts
+                        ? 'لا عقد نشط — يُعرض العداد المسجّل.'
+                        : 'العداد المسجّل.',
                 ],
             ]);
         }
@@ -657,6 +660,9 @@ class OperationsController extends Controller
         $id = (int) $request->input('id');
 
         if ($type === 'vehicle') {
+            if (! $request->user()?->hasPermission('vehicles.view')) {
+                return response()->json(['message' => 'ليست لديك صلاحية لتنفيذ هذا الإجراء.'], 403);
+            }
             $v = Vehicle::query()->findOrFail($id);
 
             return response()->json([
@@ -665,6 +671,10 @@ class OperationsController extends Controller
                     'label' => $v->brand.' '.$v->model.' · '.$v->plate,
                 ],
             ]);
+        }
+
+        if (! $request->user()?->hasPermission('customers.view')) {
+            return response()->json(['message' => 'ليست لديك صلاحية لتنفيذ هذا الإجراء.'], 403);
         }
 
         $c = Customer::query()->findOrFail($id);

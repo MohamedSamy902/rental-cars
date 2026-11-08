@@ -352,6 +352,32 @@ class VehicleController extends Controller
         $qr = url('/showroom?vehicle='.$vehicle->id);
         $qrLabel = trim($vehicle->brand.' '.$vehicle->model.' · '.$vehicle->plate);
 
+        $user = $request->user();
+        $canExpenses = (bool) ($user?->hasPermission('expenses.view') || $user?->hasPermission('hr.expenses'));
+        $canOwners = (bool) $user?->hasPermission('owners.view');
+        $canContracts = (bool) $user?->hasPermission('contracts.view');
+        $canCustomers = (bool) $user?->hasPermission('customers.view');
+        $canFinance = (bool) ($user?->hasPermission('reports.view') || $user?->hasPermission('accounting.view'));
+        $contractMoney = $contracts;
+        if (! $canCustomers) {
+            $contracts = $contracts->map(function (array $row) {
+                $row['customer'] = null;
+
+                return $row;
+            });
+            $violations = $violations->map(function (array $row) {
+                $row['customer'] = null;
+
+                return $row;
+            });
+        }
+        // Contract rows follow contracts.view. Per-contract amounts stay with that
+        // permission because GET /contracts/{id} already returns them. Revenue
+        // totals and charts stay behind reports.view or accounting.view.
+        if (! $canContracts) {
+            $contracts = collect();
+        }
+
         $contractStatus = $contracts->groupBy('status')->map(fn ($rows, $status) => [
             'status' => $status,
             'label' => $status,
@@ -374,8 +400,11 @@ class VehicleController extends Controller
             return ['month' => $ym, 'amount' => (int) $cost, 'count' => $rows->count()];
         });
 
-        $revenueByMonth = $months->map(function (string $ym) use ($contracts) {
-            $sum = $contracts->filter(function ($c) use ($ym) {
+        $revenueByMonth = $months->map(function (string $ym) use ($contractMoney, $canFinance) {
+            if (! $canFinance) {
+                return ['month' => $ym, 'amount' => 0];
+            }
+            $sum = $contractMoney->filter(function ($c) use ($ym) {
                 $start = is_string($c['starts_at'] ?? null) ? substr((string) $c['starts_at'], 0, 7) : null;
 
                 return $start === $ym && in_array($c['status'], ['active', 'completed', 'approved'], true);
@@ -385,9 +414,6 @@ class VehicleController extends Controller
         });
 
         $assetExtras = $this->assets->dossierExtras($vehicle);
-        $user = $request->user();
-        $canExpenses = (bool) ($user?->hasPermission('expenses.view') || $user?->hasPermission('hr.expenses'));
-        $canOwners = (bool) $user?->hasPermission('owners.view');
         if (! $canExpenses) {
             $expenses = collect();
             $expensesByMonth = $expensesByMonth->map(fn (array $row) => ['month' => $row['month'], 'amount' => 0]);
@@ -395,6 +421,14 @@ class VehicleController extends Controller
         if (! $canOwners) {
             $ownerDues = collect();
             $ownerPayouts = collect();
+        }
+        if (! $canFinance) {
+            $assetExtras['defaults']['lost_income_daily_basis'] = 0;
+            $assetExtras['downtime'] = $assetExtras['downtime']->map(function ($row) {
+                $row->lost_revenue_estimate = 0;
+
+                return $row;
+            });
         }
 
         return response()->json([
@@ -429,12 +463,14 @@ class VehicleController extends Controller
                     'violations' => $violations->count(),
                     'media' => $media->count(),
                     'maintenance_cost' => $workOrders->sum(fn ($w) => (int) ($w['parts_cost'] ?? 0) + (int) ($w['labor_cost'] ?? 0)),
-                    'revenue_amount' => $contracts
+                    'revenue_amount' => $canFinance ? $contractMoney
                         ->filter(fn ($c) => in_array($c['status'], ['active', 'completed', 'approved'], true))
-                        ->sum(fn ($c) => (int) ($c['final_total'] ?? $c['period_rent'] ?? 0)),
+                        ->sum(fn ($c) => (int) ($c['final_total'] ?? $c['period_rent'] ?? 0)) : 0,
                     'accessories' => $vehicle->accessories->count(),
                     'documents' => $vehicle->documents->count(),
-                    'lost_revenue' => collect($assetExtras['downtime'])->sum(fn ($d) => (int) ($d->lost_revenue_estimate ?? 0)),
+                    'lost_revenue' => $canFinance
+                        ? collect($assetExtras['downtime'])->sum(fn ($d) => (int) ($d->lost_revenue_estimate ?? 0))
+                        : 0,
                 ],
             ],
         ]);
