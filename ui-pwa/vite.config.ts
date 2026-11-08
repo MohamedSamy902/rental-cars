@@ -3,7 +3,24 @@ import { defineConfig } from 'vite'
 import path from 'node:path'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'block-dev-module-paths',
+      configurePreviewServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const url = req.url?.split('?')[0] ?? ''
+          if (url.startsWith('/src/') || url.startsWith('/@') || url.startsWith('/node_modules/')) {
+            res.statusCode = 404
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+            res.end('Not found')
+            return
+          }
+          next()
+        })
+      },
+    },
+  ],
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),
