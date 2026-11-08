@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
+import { statusLabel } from '@/shared/contracts/contractModel'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
   useToast, SkeletonBlock, ErrorState, StatusPill, PhoneActions,
@@ -216,7 +217,7 @@ export function CustomerDetailPage() {
               <article key={c.id} className="rpm-card">
                 <div className="rpm-card__row">
                   <strong><Link to={`/contracts/${c.id}`}>{c.code}</Link></strong>
-                  <StatusPill status={c.status} label={c.status} />
+                  <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
                 </div>
                 <p className="muted">
                   {c.vehicle ? `${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}` : '—'}

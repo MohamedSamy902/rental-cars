@@ -222,6 +222,7 @@ const statusLabel: Record<string, string> = {
   out_of_service: 'خارج الخدمة', pending: 'قيد الانتظار', approved: 'معتمدة',
   active: 'نشطة', completed: 'مكتملة', cancelled: 'ملغاة', open: 'مفتوحة',
   in_progress: 'قيد التنفيذ', closed: 'مغلقة',
+  new: 'جديدة', assigned: 'مسندة', confirmed: 'مؤكّد السداد', paid: 'مدفوعة للجهة',
 }
 
 const chartColors = ['#dc2626', '#64748b', '#f59e0b', '#059669', '#a1a1aa', '#b91c1c', '#475569']
@@ -947,7 +948,7 @@ export function VehicleDetailPage() {
                 <strong className="tabular-nums">{x.amount != null ? formatMoney(x.amount) : '—'}</strong>
               </div>
               <div className="rpm-card__actions">
-                <StatusPill status={x.status || 'open'} label={x.status || '—'} />
+                <StatusPill status={x.status || 'open'} label={statusLabel[x.status || ''] || x.status || '—'} />
                 {x.status && !['paid', 'confirmed'].includes(x.status) ? (
                   <Button size="sm" className="vd-no-print" onClick={() => void confirmViolation(x.id)}>تأكيد السداد</Button>
                 ) : null}
