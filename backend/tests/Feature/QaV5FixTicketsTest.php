@@ -67,7 +67,7 @@ class QaV5FixTicketsTest extends TestCase
         $this->assertSame(6000, (int) $dues->sum('amount'));
     }
 
-    public function test_v5_02_cycle_is_split_and_the_open_month_is_not_booked(): void
+    public function test_v5_02_full_calendar_month_is_exact_and_the_open_month_is_not_booked(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-11-08 12:00:00', 'Africa/Cairo'));
         $owner = $this->owner();
@@ -85,7 +85,7 @@ class QaV5FixTicketsTest extends TestCase
 
         $byMonth = OwnerMonthDue::query()->where('vehicle_id', $vehicle->id)->pluck('amount', 'year_month');
         $this->assertSame(1600, (int) $byMonth['2026-09']);
-        $this->assertSame(3045, (int) $byMonth['2026-10']);
+        $this->assertSame(3000, (int) $byMonth['2026-10']);
         $this->assertArrayNotHasKey('2026-11', $byMonth->all());
         $this->assertSame(2, JournalEntry::query()->where('source', 'like', 'owner_accrual:'.$vehicle->id.':%')->count());
     }

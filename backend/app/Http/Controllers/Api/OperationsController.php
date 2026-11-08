@@ -21,6 +21,7 @@ use App\Services\Fleet\VehicleService;
 use App\Services\Operations\AuditNarrator;
 use App\Services\Operations\PettyCashLedgerService;
 use App\Support\PaginationInput;
+use App\Support\PublicAppUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -667,7 +668,7 @@ class OperationsController extends Controller
 
             return response()->json([
                 'data' => [
-                    'qr' => url('/showroom?vehicle='.$v->id),
+                    'qr' => PublicAppUrl::to('/showroom?vehicle='.$v->id),
                     'label' => $v->brand.' '.$v->model.' · '.$v->plate,
                 ],
             ]);
@@ -681,7 +682,7 @@ class OperationsController extends Controller
 
         return response()->json([
             'data' => [
-                'qr' => url('/department-notice?customer_id='.$c->id),
+                'qr' => PublicAppUrl::to('/department-notice?customer_id='.$c->id),
                 'label' => $c->full_name,
             ],
         ]);

@@ -35,24 +35,32 @@ class FleetDailyPrepService
      *   totals: array{pickups:int,returns:int,maintenance:int,total:int}
      * }
      */
-    public function summarize(?Carbon $from = null, int $horizonDays = 5): array
-    {
+    public function summarize(
+        ?Carbon $from = null,
+        int $horizonDays = 5,
+        bool $includeContracts = true,
+        bool $includeCustomers = true,
+    ): array {
         $from = ($from ? $from->copy() : now())->timezone(config('app.timezone', 'Africa/Cairo'))->startOfDay();
         $horizonDays = max(1, min(14, $horizonDays));
         $to = $from->copy()->addDays($horizonDays - 1)->endOfDay();
         $todayKey = $from->toDateString();
 
-        $contracts = Contract::query()
-            ->with([
-                'customer:id,full_name,phone',
-                'vehicle:id,brand,model,plate,code',
-            ])
-            ->whereIn('status', ['pending', 'approved', 'active'])
-            ->where(function ($q) use ($from, $to) {
-                $q->whereBetween('starts_at', [$from, $to])
-                    ->orWhereBetween('planned_ends_at', [$from, $to]);
-            })
-            ->get();
+        $with = ['vehicle:id,brand,model,plate,code'];
+        if ($includeCustomers) {
+            $with[] = 'customer:id,full_name,phone';
+        }
+
+        $contracts = $includeContracts
+            ? Contract::query()
+                ->with($with)
+                ->whereIn('status', ['pending', 'approved', 'active'])
+                ->where(function ($q) use ($from, $to) {
+                    $q->whereBetween('starts_at', [$from, $to])
+                        ->orWhereBetween('planned_ends_at', [$from, $to]);
+                })
+                ->get()
+            : collect();
 
         $workOrders = WorkOrder::query()
             ->with(['vehicle:id,brand,model,plate,code'])
@@ -74,14 +82,14 @@ class FleetDailyPrepService
 
             foreach ($contracts as $c) {
                 if ($c->starts_at && $c->starts_at->toDateString() === $dateKey && in_array($c->status, ['pending', 'approved'], true)) {
-                    $pickups[] = $this->presentContract($c, 'pickup');
+                    $pickups[] = $this->presentContract($c, 'pickup', $includeCustomers);
                 }
                 if (
                     $c->status === 'active'
                     && $c->planned_ends_at
                     && $c->planned_ends_at->toDateString() === $dateKey
                 ) {
-                    $returns[] = $this->presentContract($c, 'return');
+                    $returns[] = $this->presentContract($c, 'return', $includeCustomers);
                 }
             }
 
@@ -131,7 +139,7 @@ class FleetDailyPrepService
     /**
      * @return array<string, mixed>
      */
-    private function presentContract(Contract $c, string $kind): array
+    private function presentContract(Contract $c, string $kind, bool $includeCustomers): array
     {
         return [
             'id' => $c->id,
@@ -139,8 +147,8 @@ class FleetDailyPrepService
             'contract_id' => $c->id,
             'number' => $c->number,
             'status' => $c->status,
-            'customer' => $c->customer?->full_name,
-            'customer_phone' => $c->customer?->phone,
+            'customer' => $includeCustomers ? $c->customer?->full_name : null,
+            'customer_phone' => $includeCustomers ? $c->customer?->phone : null,
             'vehicle' => $c->vehicle ? [
                 'id' => $c->vehicle->id,
                 'label' => trim(($c->vehicle->brand ?? '').' '.($c->vehicle->model ?? '')),

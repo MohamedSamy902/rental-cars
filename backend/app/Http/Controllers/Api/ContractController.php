@@ -16,6 +16,7 @@ use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
 use App\Services\Contracts\RentalProgressService;
 use App\Services\Documents\DocumentTemplateService;
+use App\Support\NestedCustomerRedactor;
 use App\Support\PaginationInput;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -72,7 +73,7 @@ class ContractController extends Controller
                 ->get()
                 ->keyBy('contract_id');
 
-        $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals) {
+        $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals, $user) {
             $arr = $c->toArray();
             if (isset($arr['customer']) && is_array($arr['customer'])) {
                 $arr['customer'] = Customer::normalizeDateOnlyFields($arr['customer']);
@@ -86,7 +87,7 @@ class ContractController extends Controller
             $arr['open_violations_total'] = (int) ($agg->total_amount ?? 0);
             $arr['open_violations_count'] = (int) ($agg->cnt ?? 0);
 
-            return $arr;
+            return NestedCustomerRedactor::contract($arr, $user);
         })->all();
 
         $today = now()->toDateString();
@@ -126,14 +127,14 @@ class ContractController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $contract, 'message' => 'تم إنشاء العقد.'], 201);
+        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم إنشاء العقد.'], 201);
     }
 
     public function show(Request $request, Contract $contract, ContractDossierService $dossier): JsonResponse
     {
         $this->authorize('view', $contract);
 
-        return response()->json(['data' => $dossier->build($contract)]);
+        return response()->json(['data' => $dossier->build($contract, $request->user())]);
     }
 
     public function approve(Request $request, Contract $contract): JsonResponse
@@ -144,7 +145,7 @@ class ContractController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $contract, 'message' => 'تم اعتماد العقد وتثبيت الأسعار.']);
+        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم اعتماد العقد وتثبيت الأسعار.']);
     }
 
     public function updatePricing(UpdateContractPricingRequest $request, Contract $contract): JsonResponse
@@ -155,7 +156,7 @@ class ContractController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $contract, 'message' => 'تم تعديل الأسعار مع تسجيل في سجل التدقيق.']);
+        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم تعديل الأسعار مع تسجيل في سجل التدقيق.']);
     }
 
     public function handover(Request $request, Contract $contract): JsonResponse
@@ -192,7 +193,7 @@ class ContractController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $contract, 'message' => 'تم التسليم وتفعيل العقد.']);
+        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم التسليم وتفعيل العقد.']);
     }
 
     public function returnVehicle(Request $request, Contract $contract): JsonResponse
@@ -228,10 +229,10 @@ class ContractController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $contract, 'message' => 'تم الاستلام وإقفال الإجمالي.']);
+        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم الاستلام وإقفال الإجمالي.']);
     }
 
-    public function printData(Contract $contract): JsonResponse
+    public function printData(Request $request, Contract $contract): JsonResponse
     {
         $contract->load(['customer', 'vehicle.documents', 'vehicle.accessories', 'deposit.deductions', 'inspections.damages']);
         $tenant = TenantSetting::query()->first();
@@ -254,7 +255,7 @@ class ContractController extends Controller
             ->values()
             ->all();
 
-        $payload = $contract->toArray();
+        $payload = NestedCustomerRedactor::contract($contract->toArray(), $request->user());
         $payload['payments'] = $payments;
         // Ensure print consumers always see a stable document number.
         $payload['number'] = $contract->number ?: ('C-'.$contract->id);
@@ -269,7 +270,10 @@ class ContractController extends Controller
             $contractTpl = $this->documentTemplates->getActive(DocumentTemplate::TYPE_CONTRACT);
             $handoverTpl = $this->documentTemplates->getActive(DocumentTemplate::TYPE_HANDOVER_RECEIPT);
             if ($contractTpl) {
-                $contractVars = $this->documentTemplates->variablesForContract($contract, $tenant, $contractTpl);
+                $contractVars = NestedCustomerRedactor::printVariables(
+                    $this->documentTemplates->variablesForContract($contract, $tenant, $contractTpl),
+                    $request->user(),
+                );
                 $templates['contract'] = [
                     ...$this->documentTemplates->present($contractTpl),
                     'rendered_html' => $this->documentTemplates->render(
@@ -281,7 +285,10 @@ class ContractController extends Controller
                 ];
             }
             if ($handoverTpl) {
-                $handoverVars = $this->documentTemplates->variablesForContract($contract, $tenant, $handoverTpl);
+                $handoverVars = NestedCustomerRedactor::printVariables(
+                    $this->documentTemplates->variablesForContract($contract, $tenant, $handoverTpl),
+                    $request->user(),
+                );
                 $templates['handover_receipt'] = [
                     ...$this->documentTemplates->present($handoverTpl),
                     'rendered_html' => $this->documentTemplates->render(
@@ -329,7 +336,7 @@ class ContractController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $contract, 'message' => 'تم إلغاء العقد.']);
+        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم إلغاء العقد.']);
     }
 
     public function extend(ExtendContractRequest $request, Contract $contract): JsonResponse
@@ -340,7 +347,7 @@ class ContractController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $created, 'message' => 'تم إنشاء عقد التمديد.'], 201);
+        return response()->json(['data' => $this->presentContract($created), 'message' => 'تم إنشاء عقد التمديد.'], 201);
     }
 
     public function swap(Request $request, Contract $contract): JsonResponse
@@ -372,7 +379,7 @@ class ContractController extends Controller
         }
 
         return response()->json([
-            'data' => $result,
+            'data' => $this->presentContract($result),
             'message' => 'تم التبديل بسبب عطل على نفس العقد مع فتح أمر صيانة للعربية السابقة.',
         ]);
     }
@@ -438,5 +445,18 @@ class ContractController extends Controller
         }
 
         return response()->json(['data' => $deposit, 'message' => 'تم رد متبقي التأمين النقدي.']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentContract(mixed $contract): array
+    {
+        $payload = $contract instanceof Contract ? $contract->toArray() : (array) $contract;
+        if (isset($payload['customer']) && is_array($payload['customer'])) {
+            $payload['customer'] = Customer::normalizeDateOnlyFields($payload['customer']);
+        }
+
+        return NestedCustomerRedactor::contract($payload, request()->user());
     }
 }

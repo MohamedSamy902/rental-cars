@@ -19,6 +19,7 @@ use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Fleet\VehicleRecommendationService;
 use App\Services\Fleet\VehicleService;
 use App\Support\PaginationInput;
+use App\Support\PublicAppUrl;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
@@ -349,7 +350,7 @@ class VehicleController extends Controller
                 'notes' => $p->notes,
             ]);
 
-        $qr = url('/showroom?vehicle='.$vehicle->id);
+        $qr = PublicAppUrl::to('/showroom?vehicle='.$vehicle->id);
         $qrLabel = trim($vehicle->brand.' '.$vehicle->model.' · '.$vehicle->plate);
 
         $user = $request->user();

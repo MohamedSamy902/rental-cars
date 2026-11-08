@@ -19,8 +19,15 @@ class FleetPrepController extends Controller
             ? Carbon::parse((string) $request->input('from'))
             : null;
 
+        $user = $request->user();
+
         return response()->json([
-            'data' => $this->prep->summarize($from, $days),
+            'data' => $this->prep->summarize(
+                $from,
+                $days,
+                (bool) $user?->hasPermission('contracts.view'),
+                (bool) $user?->hasPermission('customers.view'),
+            ),
         ]);
     }
 }
