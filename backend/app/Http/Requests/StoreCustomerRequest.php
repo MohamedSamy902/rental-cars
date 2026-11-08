@@ -106,18 +106,20 @@ class StoreCustomerRequest extends FormRequest
             'phone.unique' => 'رقم الهاتف مسجل لعميل آخر.',
             'license_number.unique' => 'رقم الرخصة مسجل لعميل آخر.',
             'national_id.unique' => 'الرقم القومي مسجل لعميل آخر.',
-            'birth_date.before_or_equal' => 'عمر العميل أقل من الحد الأدنى.',
+            'birth_date.before_or_equal' => 'عمر العميل أقل من '.$this->minimumAge().' سنة.',
         ];
+    }
+
+    private function minimumAge(): int
+    {
+        $ops = TenantSetting::query()->first()?->operational ?? [];
+        $years = (int) ($ops['min_customer_age'] ?? 21);
+
+        return $years < 1 ? 21 : $years;
     }
 
     private function minimumBirthDate(): string
     {
-        $ops = TenantSetting::query()->first()?->operational ?? [];
-        $years = (int) ($ops['min_customer_age'] ?? 21);
-        if ($years < 1) {
-            $years = 21;
-        }
-
-        return now()->subYears($years)->toDateString();
+        return now()->subYears($this->minimumAge())->toDateString();
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Services\Operations\ExpenseService;
+use App\Support\PaginationInput;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,16 +28,24 @@ class ExpenseController extends Controller
             }
         }
 
-        $rows = $q->limit(100)->get()->map(function (Expense $e) {
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
+        $data = collect($rows->items())->map(function (Expense $e) {
             $arr = $e->toArray();
             $arr['recorded_by_name'] = $e->recorder?->name;
             $arr['scope'] = $e->vehicle_id ? 'vehicle' : 'general';
 
             return $arr;
-        });
+        })->values();
 
         return response()->json([
-            'data' => $rows,
+            'data' => $data,
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'total' => $rows->total(),
+            ],
         ]);
     }
 

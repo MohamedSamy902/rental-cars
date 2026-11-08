@@ -52,6 +52,8 @@ export function InventoryPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [openBatch, setOpenBatch] = useState(false)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 })
   const [chip, setChip] = useQueryTab({ allowed: InventoryPageTabs, defaultValue: 'all' })
   const [itemForm, setItemForm] = useState(emptyItemForm)
   const [batchForm, setBatchForm] = useState({ inventory_item_id: '', received_on: todayCivilIso(), quantity: '', unit_cost: '', supplier: '' })
@@ -79,17 +81,23 @@ export function InventoryPage() {
     })
   }, [rows, chip, search])
 
-  async function load() {
+  async function load(nextPage = page) {
     setLoading(true)
     try {
-      const res = await api<{ data: Item[] }>('/inventory')
+      const res = await api<{ data: Item[]; meta?: { current_page: number; last_page: number; total: number } }>(`/inventory?page=${nextPage}&per_page=50`)
       setRows(res.data)
+      setMeta({
+        current_page: res.meta?.current_page ?? nextPage,
+        last_page: res.meta?.last_page ?? 1,
+        total: res.meta?.total ?? res.data.length,
+      })
+      setPage(res.meta?.current_page ?? nextPage)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => { void load(page) }, [page])
 
   function openCreateItem() {
     setEditingItem(null)
@@ -204,6 +212,13 @@ export function InventoryPage() {
         ]}
         emptyTitle="لا أصناف بعد"
         emptyDescription="أضف صنفاً ثم أدخل أول دفعة لبدء الصرف بالأقدم أولاً."
+        serverPagination={{
+          page: meta.current_page,
+          lastPage: meta.last_page,
+          total: meta.total,
+          perPage: 50,
+          onPageChange: setPage,
+        }}
       />
 
       <Sheet
