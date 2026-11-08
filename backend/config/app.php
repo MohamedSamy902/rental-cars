@@ -55,6 +55,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | Public browser origin for QR and other links opened outside this process.
+    | Never taken from the incoming Host or X-Forwarded-* headers.
+    */
+    'public_url' => env('PUBLIC_APP_URL'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

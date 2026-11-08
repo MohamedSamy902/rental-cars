@@ -8,8 +8,10 @@ use App\Models\Customer;
 use App\Models\Inspection;
 use App\Models\MediaFile;
 use App\Models\Payment;
+use App\Models\User;
 use App\Models\Violation;
 use App\Services\Operations\AuditNarrator;
+use App\Support\NestedCustomerRedactor;
 
 /**
  * Full read model for the contract page: parties, inspections, payment ledger,
@@ -25,7 +27,7 @@ class ContractDossierService
     /**
      * @return array<string, mixed>
      */
-    public function build(Contract $contract): array
+    public function build(Contract $contract, ?User $user = null): array
     {
         $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections.damages', 'salesUser:id,name']);
 
@@ -142,6 +144,8 @@ class ContractDossierService
         if (isset($payload['customer']) && is_array($payload['customer'])) {
             $payload['customer'] = Customer::normalizeDateOnlyFields($payload['customer']);
         }
+
+        $payload = NestedCustomerRedactor::contract($payload, $user);
 
         return [
             ...$payload,

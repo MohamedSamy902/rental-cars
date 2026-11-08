@@ -42,7 +42,7 @@ class HomeImportantTasksService
         $items = [];
 
         if ($this->can($user, 'contracts.view')) {
-            $items = array_merge($items, $this->contractTasks());
+            $items = array_merge($items, $this->contractTasks($this->can($user, 'customers.view')));
         }
         if ($this->can($user, 'maintenance.view') || $this->can($user, 'vehicles.view')) {
             $items = array_merge($items, $this->maintenanceTasks());
@@ -52,7 +52,7 @@ class HomeImportantTasksService
             $items = array_merge($items, $this->simRechargeTasks());
         }
         if ($this->can($user, 'vehicles.view') || $this->can($user, 'owners.view')) {
-            $items = array_merge($items, $this->ownerAgreementTasks());
+            $items = array_merge($items, $this->ownerAgreementTasks($this->can($user, 'owners.view')));
         }
         if ($this->can($user, 'violations.view')) {
             $items = array_merge($items, $this->violationTasks());
@@ -85,12 +85,15 @@ class HomeImportantTasksService
     /**
      * @return list<array<string, mixed>>
      */
-    private function contractTasks(): array
+    private function contractTasks(bool $showCustomer): array
     {
         $items = [];
+        $with = $showCustomer
+            ? ['customer:id,full_name', 'vehicle:id,brand,model,plate']
+            : ['vehicle:id,brand,model,plate'];
 
         $overdue = Contract::query()
-            ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
+            ->with($with)
             ->where('status', 'active')
             ->where('planned_ends_at', '<', now())
             ->orderBy('planned_ends_at')
@@ -102,14 +105,14 @@ class HomeImportantTasksService
                 'contract_overdue',
                 'critical',
                 'استلام متأخر · '.$c->number,
-                $this->contractSubtitle($c),
+                $this->contractSubtitle($c, $showCustomer),
                 '/contracts/'.$c->id,
                 $c->planned_ends_at?->toDateString(),
             );
         }
 
         $pending = Contract::query()
-            ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
+            ->with($with)
             ->where('status', 'pending')
             ->orderBy('starts_at')
             ->limit(6)
@@ -120,14 +123,14 @@ class HomeImportantTasksService
                 'contract_pending',
                 'critical',
                 'اعتماد حجز معلّق · '.$c->number,
-                $this->contractSubtitle($c),
+                $this->contractSubtitle($c, $showCustomer),
                 '/contracts/'.$c->id,
                 $c->starts_at?->toDateString(),
             );
         }
 
         $pickups = Contract::query()
-            ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
+            ->with($with)
             ->where('status', 'approved')
             ->whereDate('starts_at', today())
             ->orderBy('starts_at')
@@ -139,14 +142,14 @@ class HomeImportantTasksService
                 'contract_pickup',
                 'warning',
                 'تسليم اليوم · '.$c->number,
-                $this->contractSubtitle($c),
+                $this->contractSubtitle($c, $showCustomer),
                 '/contracts/'.$c->id,
                 $c->starts_at?->toDateString(),
             );
         }
 
         $returns = Contract::query()
-            ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
+            ->with($with)
             ->where('status', 'active')
             ->whereDate('planned_ends_at', today())
             ->where('planned_ends_at', '>=', now())
@@ -159,7 +162,7 @@ class HomeImportantTasksService
                 'contract_return',
                 'warning',
                 'استلام اليوم · '.$c->number,
-                $this->contractSubtitle($c),
+                $this->contractSubtitle($c, $showCustomer),
                 '/contracts/'.$c->id,
                 $c->planned_ends_at?->toDateString(),
             );
@@ -307,7 +310,7 @@ class HomeImportantTasksService
     /**
      * @return list<array<string, mixed>>
      */
-    private function ownerAgreementTasks(): array
+    private function ownerAgreementTasks(bool $showOwner): array
     {
         if (! Schema::hasColumn('vehicles', 'owner_agreement_ends_on')) {
             return [];
@@ -315,7 +318,7 @@ class HomeImportantTasksService
 
         $deadline = now()->addDays(self::OWNER_AGREEMENT_LEAD_DAYS)->toDateString();
         $vehicles = Vehicle::query()
-            ->with('owner:id,full_name')
+            ->when($showOwner, fn ($q) => $q->with('owner:id,full_name'))
             ->where('is_active', true)
             ->whereNotNull('owner_agreement_ends_on')
             ->whereDate('owner_agreement_ends_on', '<=', $deadline)
@@ -330,7 +333,7 @@ class HomeImportantTasksService
         foreach ($vehicles as $v) {
             $on = $v->owner_agreement_ends_on?->toDateString();
             $severity = $on && $on < now()->toDateString() ? 'critical' : 'warning';
-            $owner = $v->owner?->full_name ?: 'مالك';
+            $owner = $showOwner ? ($v->owner?->full_name ?: 'مالك') : 'مالك';
             $items[] = $this->item(
                 'owner_agreement:'.$v->id,
                 'owner_agreement_end',
@@ -409,10 +412,12 @@ class HomeImportantTasksService
         return $items;
     }
 
-    private function contractSubtitle(Contract $c): string
+    private function contractSubtitle(Contract $c, bool $showCustomer): string
     {
+        $who = $showCustomer ? ($c->customer?->full_name ?? 'عميل') : 'عميل';
+
         return trim(
-            ($c->customer?->full_name ?? 'عميل')
+            $who
             .' · '
             .trim(($c->vehicle?->brand ?? '').' '.($c->vehicle?->model ?? ''))
             .' · '

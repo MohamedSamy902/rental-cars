@@ -4,14 +4,17 @@ namespace App\Services\Fleet;
 
 use DateInterval;
 use DateTimeImmutable;
+use DateTimeZone;
 
 /**
- * Owner-vehicle rent shares by agreement cycle and Cairo civil days.
+ * Owner-vehicle rent by Africa/Cairo civil calendar month.
  *
- * A cycle runs from the anchor day to the day before the next anchor.
- * Each cycle's monthly amount is split across the calendar months it touches
- * (last month of the cycle absorbs rounding). A calendar month is posted only
- * after it has fully ended. Days after owner_agreement_ends_on are excluded.
+ * Each completed month is (inclusive civil days covered ÷ days in that month)
+ * × the monthly amount. A month the agreement covers from its first civil date
+ * through its last equals the monthly amount exactly. Counting uses date-only
+ * UTC instants so a Cairo DST transition cannot drop or duplicate a civil day.
+ * The unfinished current month is omitted. Days after owner_agreement_ends_on
+ * are omitted. Existing dues are not rewritten by this schedule.
  */
 final class OwnerRentSchedule
 {
@@ -24,123 +27,69 @@ final class OwnerRentSchedule
             return [];
         }
 
-        $start = DateTimeImmutable::createFromFormat('!Y-m-d', substr($startsOn, 0, 10));
-        $todayDate = DateTimeImmutable::createFromFormat('!Y-m-d', substr($today, 0, 10));
+        $start = $this->civil($startsOn);
+        $todayDate = $this->civil($today);
         if (! $start || ! $todayDate) {
             return [];
         }
 
         $endCap = null;
         if ($endsOn !== null && $endsOn !== '') {
-            $endCap = DateTimeImmutable::createFromFormat('!Y-m-d', substr($endsOn, 0, 10)) ?: null;
-            if ($endCap && $endCap < $start) {
+            $endCap = $this->civil($endsOn);
+            if (! $endCap || $endCap < $start) {
                 return [];
             }
         }
 
-        $anchorDay = (int) $start->format('j');
         $totals = [];
-        $cursor = $start;
+        $cursor = $start->modify('first day of this month');
         $guard = 0;
 
         while ($guard < 240) {
             $guard++;
-            $nextAnchor = $this->addMonths($cursor, 1, $anchorDay);
-            $cycleEnd = $nextAnchor->sub(new DateInterval('P1D'));
-            if ($endCap && $cursor > $endCap) {
-                break;
-            }
-            $includedEnd = $endCap && $endCap < $cycleEnd ? $endCap : $cycleEnd;
-            if ($includedEnd < $cursor) {
+            $monthStart = $cursor;
+            $monthEnd = $monthStart->modify('last day of this month');
+            if ($monthEnd >= $todayDate) {
                 break;
             }
 
-            $fullDays = $this->inclusiveDays($cursor, $cycleEnd);
-            $byMonth = $this->daysByMonth($cursor, $includedEnd);
-            $includedDays = array_sum($byMonth);
-            if ($fullDays < 1 || $includedDays < 1) {
-                break;
-            }
-
-            $target = intdiv($includedDays * $monthlyAmount, $fullDays);
-            $months = array_keys($byMonth);
-            $allocated = 0;
-            $lastIndex = count($months) - 1;
-            foreach ($months as $index => $ym) {
-                if ($index === $lastIndex) {
-                    $share = $target - $allocated;
-                } else {
-                    $share = intdiv($byMonth[$ym] * $monthlyAmount, $fullDays);
-                    $allocated += $share;
+            $coveredStart = $start > $monthStart ? $start : $monthStart;
+            $coveredEnd = $endCap !== null && $endCap < $monthEnd ? $endCap : $monthEnd;
+            if ($coveredStart <= $coveredEnd) {
+                $daysInMonth = (int) $monthStart->format('t');
+                $covered = $this->inclusiveDays($coveredStart, $coveredEnd);
+                $amount = $covered === $daysInMonth
+                    ? $monthlyAmount
+                    : intdiv($covered * $monthlyAmount, max(1, $daysInMonth));
+                if ($amount >= 1) {
+                    $totals[$monthStart->format('Y-m')] = $amount;
                 }
-                if ($share < 1 || ! $this->monthHasEnded($ym, $todayDate)) {
-                    continue;
-                }
-                $totals[$ym] = ($totals[$ym] ?? 0) + $share;
             }
 
-            if ($endCap && $includedEnd >= $endCap) {
+            if ($endCap !== null && $monthEnd >= $endCap) {
                 break;
             }
-            $cursor = $nextAnchor;
-            if ($cursor > $todayDate) {
-                break;
-            }
+
+            $cursor = $monthStart->add(new DateInterval('P1M'))->modify('first day of this month');
         }
-
-        ksort($totals);
 
         return $totals;
     }
 
-    private function monthHasEnded(string $yearMonth, DateTimeImmutable $today): bool
+    private function civil(string $value): ?DateTimeImmutable
     {
-        $first = DateTimeImmutable::createFromFormat('!Y-m-d', $yearMonth.'-01');
-        if (! $first) {
-            return false;
-        }
-        $last = $first->modify('last day of this month');
-
-        return $last < $today;
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    private function daysByMonth(DateTimeImmutable $from, DateTimeImmutable $to): array
-    {
-        $counts = [];
-        $cursor = $from;
-        while ($cursor <= $to) {
-            $ym = $cursor->format('Y-m');
-            $counts[$ym] = ($counts[$ym] ?? 0) + 1;
-            $cursor = $cursor->add(new DateInterval('P1D'));
+        $raw = substr($value, 0, 10);
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $raw, new DateTimeZone('UTC'));
+        $errors = DateTimeImmutable::getLastErrors();
+        if (! $date || ($errors && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0))) {
+            return null;
         }
 
-        return $counts;
+        return $date;
     }
 
     private function inclusiveDays(DateTimeImmutable $from, DateTimeImmutable $to): int
     {
         return (int) $from->diff($to)->days + 1;
-    }
-
-    private function addMonths(DateTimeImmutable $date, int $months, int $anchorDay): DateTimeImmutable
-    {
-        $year = (int) $date->format('Y');
-        $month = (int) $date->format('n') + $months;
-        while ($month > 12) {
-            $month -= 12;
-            $year++;
-        }
-        while ($month < 1) {
-            $month += 12;
-            $year--;
-        }
-        $first = new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
-        $lastDay = (int) $first->format('t');
-        $day = min($anchorDay, $lastDay);
-
-        return new DateTimeImmutable(sprintf('%04d-%02d-%02d', $year, $month, $day));
     }
 }

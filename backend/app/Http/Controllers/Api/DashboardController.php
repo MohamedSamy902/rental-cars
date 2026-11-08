@@ -81,28 +81,41 @@ class DashboardController extends Controller
                 return (int) $c->frozen_daily_rate * max(1, $c->starts_at->diffInDays($c->planned_ends_at));
             });
 
-        $tasks = Contract::query()
-            ->with(['customer:id,full_name', 'vehicle:id,brand,model'])
-            ->whereIn('status', ['pending', 'approved', 'active'])
-            ->orderBy('planned_ends_at')
-            ->limit(8)
-            ->get()
-            ->map(function (Contract $c) {
-                $label = match ($c->status) {
-                    'pending' => 'اعتماد حجز معلّق',
-                    'approved' => 'تسليم',
-                    'active' => 'استلام',
-                    default => $c->status,
-                };
+        $canFinance = (bool) ($request->user()?->hasPermission('reports.view') || $request->user()?->hasPermission('accounting.view'));
+        $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
+        $canCustomers = (bool) $request->user()?->hasPermission('customers.view');
 
-                return [
-                    'id' => $c->id,
-                    'title' => "{$label} {$c->number}",
-                    'subtitle' => trim(($c->customer?->full_name ?? '').' · '.($c->vehicle?->brand ?? '').' '.($c->vehicle?->model ?? '')),
-                    'status' => $c->status,
-                    'at' => $c->status === 'active' ? $c->planned_ends_at : $c->starts_at,
-                ];
-            });
+        $tasks = $canContracts
+            ? Contract::query()
+                ->with($canCustomers
+                    ? ['customer:id,full_name', 'vehicle:id,brand,model']
+                    : ['vehicle:id,brand,model'])
+                ->whereIn('status', ['pending', 'approved', 'active'])
+                ->orderBy('planned_ends_at')
+                ->limit(8)
+                ->get()
+                ->map(function (Contract $c) use ($canCustomers) {
+                    $label = match ($c->status) {
+                        'pending' => 'اعتماد حجز معلّق',
+                        'approved' => 'تسليم',
+                        'active' => 'استلام',
+                        default => $c->status,
+                    };
+
+                    $vehicleLabel = trim(($c->vehicle?->brand ?? '').' '.($c->vehicle?->model ?? ''));
+                    $subtitle = $canCustomers
+                        ? trim(($c->customer?->full_name ?? '').' · '.$vehicleLabel)
+                        : $vehicleLabel;
+
+                    return [
+                        'id' => $c->id,
+                        'title' => "{$label} {$c->number}",
+                        'subtitle' => $subtitle,
+                        'status' => $c->status,
+                        'at' => $c->status === 'active' ? $c->planned_ends_at : $c->starts_at,
+                    ];
+                })
+            : [];
 
         $lowStock = InventoryItem::query()->withSum('batches as remaining_sum', 'remaining')->get()
             ->filter(fn (InventoryItem $item) => (int) ($item->remaining_sum ?? 0) <= (int) $item->reorder_level)
@@ -111,10 +124,6 @@ class DashboardController extends Controller
         $center = TenantSetting::query()->value('center_name') ?: 'مركز التأجير';
 
         $occupancyPct = $this->occupancy->percent(now()->startOfMonth(), now());
-
-        $canFinance = (bool) ($request->user()?->hasPermission('reports.view') || $request->user()?->hasPermission('accounting.view'));
-        $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
-        $canCustomers = (bool) $request->user()?->hasPermission('customers.view');
 
         return response()->json([
             'center_name' => $center,
@@ -142,15 +151,20 @@ class DashboardController extends Controller
             'important_tasks' => $request->user()
                 ? $this->importantTasks->forUser($request->user())
                 : [],
-            'fleet_prep' => $this->dailyPrep->summarize(now(), 5),
+            'fleet_prep' => $this->dailyPrep->summarize(now(), 5, $canContracts, $canCustomers),
             'daily_cash' => $canFinance ? $this->dailyCash->forUser($request->user()) : null,
             'recent_contracts' => $canContracts ? Contract::query()
-                ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
+                ->with($canCustomers
+                    ? ['customer:id,full_name', 'vehicle:id,brand,model,plate']
+                    : ['vehicle:id,brand,model,plate'])
                 ->latest('id')
                 ->limit(5)
                 ->get()
-                ->map(function (Contract $c) {
+                ->map(function (Contract $c) use ($canCustomers) {
                     $arr = $c->toArray();
+                    if (! $canCustomers) {
+                        $arr['customer'] = null;
+                    }
                     $arr['progress'] = $this->progress->forContract($c);
 
                     return $arr;

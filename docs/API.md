@@ -136,6 +136,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 `fleet_prep.groups.maintenance` ليوم «اليوم» = كل أوامر الشغل المفتوحة/`in_progress`؛ للأيام التالية = المجدولة بـ `next_service_on`.
 
+صفوف `pickups` / `returns` وأعدادها تُحذف بلا `contracts.view`. `customer` و`customer_phone` يُصفَّران بلا `customers.view`. صلاحية العملاء وحدها لا تُظهر مواعيد العقود.
+
 `daily_cash` سجل حركة فلوس اليوم (دفعات + مصروفات) حسب صلاحيات `payments.view`/`accounting.view` و`expenses.view` — أو `null` إن لا صلاحية.
 
 `important_tasks` قائمة مهام تشغيلية للوحة اليوم (حد أقصى ٢٠)، مرتّبة بالحرج ثم التاريخ، ومفلترة بصلاحيات المستخدم الحالي:
@@ -278,6 +280,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 ```json
 { "data": { "qr": "https://.../showroom?vehicle=1", "label": "هيونداي إلنترا · أ ب ج 1234" } }
 ```
+
+أصل الرابط = `PUBLIC_APP_URL`، أو `APP_URL` إن لم يكن `localhost` / `127.0.0.1`. لا يُؤخذ من ترويسة الطلب. `type=customer` يبقى خلف `customers.view`.
 
 ---
 
@@ -723,7 +727,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/owners/{id}` | `owners.view` — عربيات + استحقاقات + سحوبات + رصيد |
 | PUT | `/owners/{id}` | `owners.update` |
 | GET | `/owners/{id}/balance?month=YYYY-MM` | `owners.view` — قراءة فقط، بلا ترحيل |
-| POST | `/owners/{id}/accruals` | `owners.accrue` أو `owners.payout` — `{ "through": "YYYY-MM" }` اختياري. Idempotent. شهر مقفل = 422 بلا كتابة |
+| POST | `/owners/{id}/accruals` | `owners.accrue` أو `owners.payout` — `{ "through": "YYYY-MM" }` اختياري. Idempotent. شهر مقفل = 422 بلا كتابة. المبلغ = أيام مدنية شاملة في الشهر ÷ أيام ذلك الشهر × الشهري؛ الشهر الكامل = الشهري تماماً. لا شهر جارٍ. لا إعادة كتابة لمستحق قائم |
 | POST | `/owners/{id}/payouts` | `owners.payout` (حسّاسة) |
 | GET | `/owner-payouts` | `owners.view` |
 
