@@ -15,6 +15,8 @@ class PaymentMethodNormalizer
         'نقدا' => 'cash',
         'نقداً' => 'cash',
         'transfer' => 'transfer',
+        'bank' => 'transfer',
+        'instapay' => 'transfer',
         'تحويل' => 'transfer',
         'card' => 'card',
         'بطاقة' => 'card',
@@ -24,6 +26,8 @@ class PaymentMethodNormalizer
         'wallet' => 'wallet',
         'محفظة' => 'wallet',
         'credit' => 'credit',
+        'deposit' => 'deposit',
+        'تأمين' => 'deposit',
         'رصيد' => 'credit',
         'رصيد دائن' => 'credit',
     ];

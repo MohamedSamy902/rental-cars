@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureFeatureFlag;
 use App\Http\Middleware\EnsureIdempotency;
 use App\Http\Middleware\EnsureIntegrator;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => EnsureFeatureFlag::class,
             'integrator' => EnsureIntegrator::class,
             'idempotency' => EnsureIdempotency::class,
+            'active' => EnsureActiveUser::class,
         ]);
         $middleware->api(append: [
             EnsureIdempotency::class,

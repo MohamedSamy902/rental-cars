@@ -15,9 +15,12 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleDocumentHistory;
 use App\Models\WorkOrder;
+use App\Services\Accounting\AccountingService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Fleet\VehicleService;
+use App\Services\Operations\AuditNarrator;
 use App\Services\Operations\PettyCashLedgerService;
+use App\Support\PaginationInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -230,8 +233,13 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function auditLogs(Request $request, \App\Services\Operations\AuditNarrator $narrator): JsonResponse
+    public function auditLogs(Request $request, AuditNarrator $narrator): JsonResponse
     {
+        if ($request->exists('per_page') || $request->exists('page')) {
+            PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+            PaginationInput::page($request);
+        }
+
         $validated = $request->validate([
             'limit' => ['nullable', 'integer', 'min:1', 'max:200'],
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -445,6 +453,10 @@ class OperationsController extends Controller
             $amount = (int) $data['amount'];
             $balance = (int) $account->balance;
             if ($data['type'] === 'topup') {
+                $limit = (int) $account->limit_amount;
+                if ($limit > 0 && $balance + $amount > $limit) {
+                    abort(422, 'التغذية تتجاوز حد العهدة ('.$limit.')');
+                }
                 $balance += $amount;
             } elseif ($data['type'] === 'spend' || $data['type'] === 'return') {
                 if ($amount > $balance) {
@@ -457,7 +469,7 @@ class OperationsController extends Controller
 
             $account->update(['balance' => $balance]);
 
-            return PettyCashMovement::query()->create([
+            $movement = PettyCashMovement::query()->create([
                 'petty_cash_account_id' => $account->id,
                 'type' => $data['type'],
                 'amount' => $amount,
@@ -465,6 +477,25 @@ class OperationsController extends Controller
                 'performed_by' => $request->user()?->id,
                 'notes' => $data['notes'] ?? null,
             ]);
+            if ($data['type'] === 'topup') {
+                app(AccountingService::class)->postCustodyMovement(
+                    'petty_topup:'.$movement->id,
+                    'in',
+                    $amount,
+                    $movement->moved_on->toDateString(),
+                    $request->user()?->id,
+                );
+            } elseif ($data['type'] === 'return') {
+                app(AccountingService::class)->postCustodyMovement(
+                    'petty_return:'.$movement->id,
+                    'out',
+                    $amount,
+                    $movement->moved_on->toDateString(),
+                    $request->user()?->id,
+                );
+            }
+
+            return $movement;
         });
 
         return response()->json(['data' => ['movement' => $row, 'account' => $account->fresh('employee')], 'message' => 'تم تسجيل حركة العهدة.']);
@@ -478,13 +509,17 @@ class OperationsController extends Controller
             'file_path' => ['nullable', 'string', 'max:500'],
             'file_path_back' => ['nullable', 'string', 'max:500'],
             'issued_on' => ['nullable', 'date'],
-            'expires_on' => ['nullable', 'date'],
+            'expires_on' => ['nullable', 'date', 'after_or_equal:issued_on'],
             'notes' => ['nullable', 'string'],
-        ], [], [
+        ], [
+            'expires_on.after_or_equal' => 'تاريخ الانتهاء لا يمكن أن يسبق تاريخ الإصدار.',
+        ], [
             'type' => 'نوع المستند',
             'document_number' => 'رقم المستند',
             'file_path' => 'وجه المستند',
             'file_path_back' => 'ظهر المستند',
+            'issued_on' => 'تاريخ الإصدار',
+            'expires_on' => 'تاريخ الانتهاء',
         ]);
 
         $doc = $vehicle->documents()->create([

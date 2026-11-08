@@ -26,7 +26,7 @@ class VehicleOwnerPayoutTest extends TestCase
     {
         parent::setUp();
         // Freeze calendar so owner accrual months are deterministic across CI timezones.
-        $frozen = CarbonImmutable::parse('2026-11-15 12:00:00', 'UTC');
+        $frozen = CarbonImmutable::parse('2026-12-01 12:00:00', 'Africa/Cairo');
         Carbon::setTestNow($frozen);
         CarbonImmutable::setTestNow($frozen);
         PermissionCatalog::ensureSeeded();
@@ -61,7 +61,7 @@ class VehicleOwnerPayoutTest extends TestCase
             'phone' => '01099998888',
         ])->assertCreated()->json('data');
 
-        $since = now()->startOfMonth()->toDateString();
+        $since = '2026-11-01';
         $v1 = Vehicle::query()->create([
             'code' => 'O-1', 'plate' => 'OWN 1', 'brand' => 'هيونداي', 'model' => 'إلينترا',
             'year' => 2021, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين',
@@ -85,14 +85,14 @@ class VehicleOwnerPayoutTest extends TestCase
 
         $show = $this->getJson('/api/owners/'.$owner['id'])->assertOk()->json('data');
         $this->assertSame(2, count($show['vehicles']));
-        $this->assertSame(9000, $show['balance']['month_accrued']);
+        $this->assertSame(9000, $show['balance']['accrued_total']);
         $this->assertSame(9000, $show['balance']['remaining']);
         $this->assertSame(9000, $show['balance']['vehicles_monthly_total']);
 
         $this->assertDatabaseHas('owner_month_dues', [
             'owner_id' => $owner['id'],
             'vehicle_id' => $v1->id,
-            'year_month' => now()->format('Y-m'),
+            'year_month' => '2026-11',
             'amount' => 5000,
         ]);
         $this->assertDatabaseHas('owner_month_dues', [

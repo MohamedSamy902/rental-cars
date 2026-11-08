@@ -3,10 +3,12 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
+use App\Models\TenantSetting;
 use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
 use App\Rules\MediaReference;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreCustomerRequest extends FormRequest
 {
@@ -41,16 +43,16 @@ class StoreCustomerRequest extends FormRequest
     {
         return [
             'full_name' => ['required', 'string', 'max:200'],
-            'phone' => ['required', 'string', 'max:30', new EgyptianPhone],
+            'phone' => ['required', 'string', 'max:30', new EgyptianPhone, Rule::unique('customers', 'phone')->whereNull('deleted_at')],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'email' => ['nullable', 'email', 'max:200'],
-            'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId],
+            'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId, Rule::unique('customers', 'national_id')->whereNull('deleted_at')],
             'national_id_expires_on' => ['nullable', 'date'],
             'passport_number' => ['nullable', 'string', 'max:50'],
             'passport_expires_on' => ['nullable', 'date'],
-            'birth_date' => ['required', 'date'],
+            'birth_date' => ['required', 'date', 'before_or_equal:'.$this->minimumBirthDate()],
             'address' => ['nullable', 'string'],
-            'license_number' => ['required', 'string', 'max:50'],
+            'license_number' => ['required', 'string', 'max:50', Rule::unique('customers', 'license_number')->whereNull('deleted_at')],
             'license_expires_on' => ['required', 'date', 'after_or_equal:today'],
             'national_id_image_path' => ['nullable', 'string', 'max:500', new MediaReference],
             'national_id_back_path' => ['nullable', 'string', 'max:500', new MediaReference],
@@ -101,6 +103,21 @@ class StoreCustomerRequest extends FormRequest
             'license_expires_on.required' => 'انتهاء الرخصة مطلوب.',
             'license_expires_on.after_or_equal' => 'رخصة العميل منتهية — حدّث تاريخ الانتهاء قبل التسجيل.',
             'email.email' => 'البريد الإلكتروني غير صالح.',
+            'phone.unique' => 'رقم الهاتف مسجل لعميل آخر.',
+            'license_number.unique' => 'رقم الرخصة مسجل لعميل آخر.',
+            'national_id.unique' => 'الرقم القومي مسجل لعميل آخر.',
+            'birth_date.before_or_equal' => 'عمر العميل أقل من الحد الأدنى.',
         ];
+    }
+
+    private function minimumBirthDate(): string
+    {
+        $ops = TenantSetting::query()->first()?->operational ?? [];
+        $years = (int) ($ops['min_customer_age'] ?? 21);
+        if ($years < 1) {
+            $years = 21;
+        }
+
+        return now()->subYears($years)->toDateString();
     }
 }

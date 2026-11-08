@@ -30,6 +30,12 @@ class Contract extends Model
             'starts_at' => 'datetime',
             'planned_ends_at' => 'datetime',
             'actual_ends_at' => 'datetime',
+            'customer_id' => 'integer',
+            'vehicle_id' => 'integer',
+            'guarantor_customer_id' => 'integer',
+            'sales_user_id' => 'integer',
+            'extended_from_contract_id' => 'integer',
+            'approved_days' => 'integer',
             'accessories_json' => 'array',
         ];
     }

@@ -14,11 +14,13 @@ use App\Models\TenantSetting;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleDocument;
+use App\Models\Violation;
 use App\Services\Accounting\AccountingService;
 use App\Services\Customers\CustomerCreditService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Maintenance\WorkOrderService;
 use App\Services\Notifications\NotificationDispatchService;
+use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -33,6 +35,7 @@ class ContractLifecycleService
         private readonly NotificationDispatchService $notifications,
         private readonly CustomerCreditService $credits,
         private readonly WorkOrderService $workOrders,
+        private readonly ContractLedgerMath $ledgerMath,
     ) {}
 
     private function fractionDayThreshold(): ?int
@@ -77,6 +80,10 @@ class ContractLifecycleService
                 (int) $data['vehicle_id'],
                 $data['starts_at'],
                 $data['planned_ends_at'],
+            );
+            $this->assertVehicleLicenseCoversRental(
+                (int) $vehicle->id,
+                Carbon::parse($data['planned_ends_at'])->toDateString(),
             );
 
             $number = $data['number'] ?? $this->nextNumber();
@@ -371,6 +378,11 @@ class ContractLifecycleService
                 ])->all();
             }
 
+            $handoverAt = now();
+            if ($locked->starts_at && $handoverAt->lt($locked->starts_at)) {
+                $locked->starts_at = $handoverAt;
+            }
+
             $this->inspections->record($locked->id, [
                 'type' => 'handover',
                 'odometer' => $odometerOut,
@@ -513,6 +525,14 @@ class ContractLifecycleService
 
             Vehicle::query()->whereKey($locked->vehicle_id)->update(['odometer' => $odometerIn]);
 
+            Contract::query()
+                ->where('extended_from_contract_id', $locked->id)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'cancelled',
+                    'cancel_reason' => 'أُلغي لارتباطه باستلام العقد '.$locked->number,
+                ]);
+
             $this->accounting->postContractClose($locked->fresh(), $userId);
 
             // Early termination surplus → client credit balance (P0 / 3.5 · 8.2).
@@ -564,6 +584,9 @@ class ContractLifecycleService
 
     public function cancel(Contract $contract, string $reason, ?int $userId = null): Contract
     {
+        if ($contract->status === 'cancelled') {
+            throw new DomainException('العقد ملغي مسبقاً.');
+        }
         if (! in_array($contract->status, ['pending', 'approved'], true)) {
             throw new DomainException('بعد التسليم يُستخدم إنهاء مبكر أو استلام — لا إلغاء.');
         }
@@ -625,7 +648,10 @@ class ContractLifecycleService
      */
     public function extend(Contract $source, array $data, ?int $userId = null): Contract
     {
-        if (! in_array($source->status, ['approved', 'active', 'completed'], true)) {
+        if ($source->status === 'completed') {
+            throw new DomainException('العقد مُقفل — لا يمكن التمديد.');
+        }
+        if (! in_array($source->status, ['approved', 'active'], true)) {
             throw new DomainException('لا يمكن التمديد من هذه الحالة.');
         }
 
@@ -830,9 +856,13 @@ class ContractLifecycleService
                 throw new DomainException('يوجد تأمين نقدي مسجّل لهذا العقد.');
             }
 
-            $amount = (int) ($data['amount'] ?? $contract->frozen_agreed_deposit);
+            $agreed = (int) $contract->frozen_agreed_deposit;
+            $amount = (int) ($data['amount'] ?? $agreed);
             if ($amount <= 0) {
                 throw new DomainException('مبلغ التأمين النقدي غير صالح.');
+            }
+            if ($agreed > 0 && $amount !== $agreed) {
+                throw new DomainException('مبلغ التأمين يجب أن يساوي التأمين المتفق ('.$agreed.').');
             }
 
             $deposit = Deposit::query()->create([
@@ -855,6 +885,7 @@ class ContractLifecycleService
                 'link_id' => $deposit->id,
                 'notes' => 'قبض تأمين نقدي للعقد '.$contract->number,
             ], $userId);
+            $this->accounting->postDepositHold($deposit->fresh(), $contract, $userId);
 
             return $deposit;
         });
@@ -869,11 +900,12 @@ class ContractLifecycleService
             throw new DomainException('لا يمكن الخصم من هذا التأمين.');
         }
         $amount = (int) $data['amount'];
-        if ($amount <= 0 || $amount > $deposit->remaining()) {
-            throw new DomainException('مبلغ الخصم غير صالح.');
+        $held = $deposit->remaining();
+        if ($amount <= 0 || $amount > $held) {
+            throw new DomainException('الخصم أكبر من التأمين المحتجز ('.$held.' ج.م).');
         }
 
-        DepositDeduction::query()->create([
+        $deduction = DepositDeduction::query()->create([
             'deposit_id' => $deposit->id,
             'reason' => $data['reason'],
             'amount' => $amount,
@@ -885,6 +917,22 @@ class ContractLifecycleService
         $deposit->status = $deposit->remaining() === 0 ? 'settled' : 'partial';
         $deposit->save();
 
+        $contract = Contract::query()->find($deposit->contract_id);
+        if ($contract) {
+            Payment::query()->create([
+                'amount' => $amount,
+                'paid_at' => now(),
+                'method' => 'deposit',
+                'direction' => 'in',
+                'reference' => 'DEP-DED-'.$deduction->id,
+                'link_type' => 'contract',
+                'link_id' => $contract->id,
+                'user_id' => $userId,
+                'notes' => 'تسوية تأمين على العقد '.$contract->number,
+            ]);
+            $this->accounting->postDepositApply($deposit, $contract, $amount, (int) $deduction->id, $userId);
+        }
+
         return $deposit->fresh('deductions');
     }
 
@@ -892,6 +940,18 @@ class ContractLifecycleService
     {
         if (! in_array($deposit->status, ['received', 'partial'], true)) {
             throw new DomainException('لا يمكن رد هذا التأمين.');
+        }
+
+        $contract = Contract::query()->find($deposit->contract_id);
+        if ($contract && in_array($contract->status, ['active', 'completed'], true)) {
+            $balance = $this->ledgerMath->forContract($contract)['balance'];
+            $violationsDue = (int) Violation::query()
+                ->where('contract_id', $contract->id)
+                ->whereNotIn('status', ['paid', 'confirmed'])
+                ->sum('amount');
+            if ($balance > 0 || $violationsDue > 0) {
+                throw new DomainException('لا يمكن رد التأمين قبل تسوية متبقي العقد أو المخالفات.');
+            }
         }
 
         $remaining = $deposit->remaining();
@@ -912,6 +972,7 @@ class ContractLifecycleService
                 'link_id' => $deposit->id,
                 'notes' => 'رد متبقي التأمين النقدي',
             ], $userId);
+            $this->accounting->postDepositReturn($deposit, $remaining, $userId);
         }
 
         return $deposit->fresh('deductions');
@@ -952,6 +1013,10 @@ class ContractLifecycleService
         }
 
         if ($blockExpiredVehicleDocs) {
+            $this->assertVehicleLicenseCoversRental(
+                (int) $contract->vehicle_id,
+                $contract->planned_ends_at->toDateString(),
+            );
             $expired = VehicleDocument::query()
                 ->where('vehicle_id', $contract->vehicle_id)
                 ->whereNotNull('expires_on')
@@ -969,6 +1034,33 @@ class ContractLifecycleService
             if ($endsBeforeContract) {
                 throw new DomainException('مستند العربية ('.$endsBeforeContract->type.') ينتهي قبل نهاية العقد المخططة.');
             }
+        }
+    }
+
+    private function assertVehicleLicenseCoversRental(int $vehicleId, string $plannedEndDate): void
+    {
+        $settings = TenantSetting::query()->first();
+        $block = (bool) (($settings?->operational ?? [])['block_expired_vehicle_docs'] ?? true);
+        if (! $block) {
+            return;
+        }
+
+        $doc = VehicleDocument::query()
+            ->where('vehicle_id', $vehicleId)
+            ->where(function ($q) {
+                $q->where('type', 'رخصة تسيير')
+                    ->orWhere('type', 'like', '%رخص%')
+                    ->orWhere('type', 'like', '%license%');
+            })
+            ->whereNotNull('expires_on')
+            ->orderByDesc('id')
+            ->first();
+        if (! $doc) {
+            return;
+        }
+        $expires = $doc->expires_on?->toDateString();
+        if ($expires && $expires < $plannedEndDate) {
+            throw new DomainException('رخصة العربية تنتهي قبل نهاية العقد المخططة.');
         }
     }
 

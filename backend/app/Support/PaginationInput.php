@@ -31,7 +31,7 @@ final class PaginationInput
         $value = (int) $raw;
         if ($value < 1) {
             throw ValidationException::withMessages([
-                'per_page' => ['حجم الصفحة يجب أن يكون ١ على الأقل.'],
+                'per_page' => ['حجم الصفحة يجب أن يكون 1 على الأقل.'],
             ]);
         }
         if ($value > $max) {
@@ -62,7 +62,7 @@ final class PaginationInput
         $value = (int) $raw;
         if ($value < 1) {
             throw ValidationException::withMessages([
-                'page' => ['رقم الصفحة يجب أن يكون ١ على الأقل.'],
+                'page' => ['رقم الصفحة يجب أن يكون 1 على الأقل.'],
             ]);
         }
 

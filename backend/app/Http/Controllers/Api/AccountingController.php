@@ -86,14 +86,18 @@ class AccountingController extends Controller
             'direction' => ['required', 'in:in,out'],
             'paid_at' => ['nullable', 'date'],
             'reference' => ['nullable', 'string'],
-            'link_type' => ['required', 'string'],
-            'link_id' => ['nullable', 'integer'],
+            'link_type' => ['required', 'string', 'in:contract,customer,deposit,vehicle'],
+            'link_id' => ['required', 'integer'],
             'notes' => ['nullable', 'string'],
-        ], [], [
+        ], [
+            'method.required' => 'الطريقة مطلوبة.',
+            'link_id.required' => 'معرّف الربط مطلوب.',
+        ], [
             'amount' => 'المبلغ',
             'method' => 'الطريقة',
             'direction' => 'الاتجاه',
             'link_type' => 'نوع الربط',
+            'link_id' => 'معرّف الربط',
         ]);
 
         try {

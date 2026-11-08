@@ -8,6 +8,7 @@ use App\Rules\EgyptianPhone;
 use App\Rules\MediaReference;
 use App\Support\DigitNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdateCustomerRequest extends FormRequest
@@ -56,16 +57,16 @@ class UpdateCustomerRequest extends FormRequest
     {
         return [
             'full_name' => ['sometimes', 'string', 'max:200'],
-            'phone' => ['sometimes', 'string', 'max:30', new EgyptianPhone],
+            'phone' => ['sometimes', 'string', 'max:30', new EgyptianPhone, Rule::unique('customers', 'phone')->ignore($this->customerId())->whereNull('deleted_at')],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'email' => ['nullable', 'email', 'max:200'],
-            'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId],
+            'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId, Rule::unique('customers', 'national_id')->ignore($this->customerId())->whereNull('deleted_at')],
             'national_id_expires_on' => ['nullable', 'date'],
             'passport_number' => ['nullable', 'string', 'max:50'],
             'passport_expires_on' => ['nullable', 'date'],
             'birth_date' => ['sometimes', 'date'],
             'address' => ['nullable', 'string'],
-            'license_number' => ['sometimes', 'string', 'max:50'],
+            'license_number' => ['sometimes', 'string', 'max:50', Rule::unique('customers', 'license_number')->ignore($this->customerId())->whereNull('deleted_at')],
             'license_expires_on' => ['sometimes', 'date'],
             'national_id_image_path' => ['nullable', 'string', 'max:500', new MediaReference],
             'national_id_back_path' => ['nullable', 'string', 'max:500', new MediaReference],
@@ -77,6 +78,13 @@ class UpdateCustomerRequest extends FormRequest
             'status' => ['sometimes', 'in:active,blacklist'],
             'blacklist_reason' => ['nullable', 'string', 'max:1000'],
         ];
+    }
+
+    private function customerId(): mixed
+    {
+        $customer = $this->route('customer');
+
+        return is_object($customer) ? $customer->id : $customer;
     }
 
     public function withValidator(Validator $validator): void
