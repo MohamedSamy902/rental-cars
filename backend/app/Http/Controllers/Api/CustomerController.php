@@ -206,21 +206,6 @@ class CustomerController extends Controller
             $data['national_id'] = str_repeat('*', max(0, $len - $visible)).mb_substr($nid, -$visible);
         }
 
-        foreach (['birth_date', 'license_expires_on', 'national_id_expires_on', 'passport_expires_on'] as $dateKey) {
-            $value = $customer->{$dateKey};
-            if ($value === null || $value === '') {
-                $data[$dateKey] = $data[$dateKey] ?? null;
-                if (is_string($data[$dateKey] ?? null) && $data[$dateKey] !== '') {
-                    $data[$dateKey] = substr($data[$dateKey], 0, 10);
-                }
-
-                continue;
-            }
-            $data[$dateKey] = $value instanceof \DateTimeInterface
-                ? $value->format('Y-m-d')
-                : substr((string) $value, 0, 10);
-        }
-
-        return $data;
+        return Customer::normalizeDateOnlyFields($data);
     }
 }

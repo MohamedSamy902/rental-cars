@@ -4,6 +4,7 @@ namespace App\Services\Contracts;
 
 use App\Models\AuditLog;
 use App\Models\Contract;
+use App\Models\Customer;
 use App\Models\Inspection;
 use App\Models\MediaFile;
 use App\Models\Payment;
@@ -137,8 +138,13 @@ class ContractDossierService
             ])->values();
         $openViolationsTotal = (int) $openViolations->sum('amount');
 
+        $payload = $contract->toArray();
+        if (isset($payload['customer']) && is_array($payload['customer'])) {
+            $payload['customer'] = Customer::normalizeDateOnlyFields($payload['customer']);
+        }
+
         return [
-            ...$contract->toArray(),
+            ...$payload,
             'created_by' => $contract->salesUser?->name,
             'sales_user' => $contract->salesUser
                 ? ['id' => $contract->salesUser->id, 'name' => $contract->salesUser->name]

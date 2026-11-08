@@ -76,11 +76,19 @@ class QaV2FixTicketsTest extends TestCase
         $this->assertSame(200, $feb['summary']['rent_revenue']);
 
         $this->postJson('/api/accounting/lock-month', ['year' => 2026, 'month' => 1])->assertStatus(422);
+        $rentRecogBefore = JournalEntry::query()->where('source', 'like', 'rent_recog:%')->count();
+        $this->assertGreaterThanOrEqual(2, $rentRecogBefore);
+
         $this->postJson('/api/accounting/reopen-month', [
             'year' => 2026, 'month' => 1, 'reason' => 'اختبار إعادة فتح',
         ])->assertOk();
         $this->postJson('/api/accounting/lock-month', ['year' => 2026, 'month' => 1])->assertOk();
         $this->assertSame(200, $this->getJson('/api/accounting/months/2026/1')->json('data.summary.rent_revenue'));
+        $this->assertSame(
+            $rentRecogBefore,
+            JournalEntry::query()->where('source', 'like', 'rent_recog:%')->count(),
+            'reopen/relock must not duplicate rent_recog journals',
+        );
     }
 
     public function test_b02_rejects_contract_overpayment(): void
@@ -123,7 +131,7 @@ class QaV2FixTicketsTest extends TestCase
 
     public function test_b03_customer_date_only_round_trip(): void
     {
-        [$customer] = $this->party('B03');
+        [$customer, $vehicle] = $this->party('B03');
 
         $this->putJson("/api/customers/{$customer->id}", [
             'full_name' => $customer->full_name,
@@ -139,6 +147,24 @@ class QaV2FixTicketsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.birth_date', '1990-01-01')
             ->assertJsonPath('data.license_expires_on', '2029-01-01');
+
+        $listRow = collect($this->getJson('/api/customers')->assertOk()->json('data'))
+            ->firstWhere('id', $customer->id);
+        $this->assertNotNull($listRow);
+        $this->assertSame('1990-01-01', $listRow['birth_date']);
+        $this->assertSame('2029-01-01', $listRow['license_expires_on']);
+
+        $contractId = $this->approvedContract(
+            $customer,
+            $vehicle,
+            50,
+            '2026-03-10T00:00:00+02:00',
+            '2026-03-12T00:00:00+02:00',
+        );
+        $embedded = $this->getJson("/api/contracts/{$contractId}")->assertOk()->json('data.customer');
+        $this->assertSame('1990-01-01', $embedded['birth_date']);
+        $this->assertSame('2029-01-01', $embedded['license_expires_on']);
+        $this->assertDoesNotMatchRegularExpression('/T|Z/', (string) $embedded['birth_date']);
     }
 
     public function test_b04_cash_receipt_posts_journal(): void
@@ -182,10 +208,27 @@ class QaV2FixTicketsTest extends TestCase
             'reference' => 'AR-CASH',
         ])->assertCreated();
 
+        $this->postJson('/api/accounting/payments', [
+            'amount' => 10,
+            'method' => 'محفظة',
+            'direction' => 'in',
+            'link_type' => 'contract',
+            'link_id' => $id,
+            'reference' => 'AR-WALLET',
+        ])->assertCreated();
+
         $methods = $this->getJson('/api/reports/payment-methods')->assertOk()->json('data');
         $cash = collect($methods)->firstWhere('method', 'cash');
         $this->assertNotNull($cash);
         $this->assertSame(25, (int) $cash['in']);
+
+        $wallet = collect($methods)->first(
+            fn ($row) => in_array($row['method'] ?? '', ['wallet', 'محفظة'], true)
+                || str_contains((string) ($row['label'] ?? ''), 'محفظة')
+                || str_contains((string) ($row['method'] ?? ''), 'wallet'),
+        );
+        $this->assertNotNull($wallet, 'Arabic محفظة must normalize into payment-methods report');
+        $this->assertSame(10, (int) $wallet['in']);
     }
 
     public function test_b06_fleet_summary_matches_dashboard_buckets(): void

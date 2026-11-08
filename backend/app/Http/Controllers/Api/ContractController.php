@@ -7,8 +7,11 @@ use App\Http\Requests\ExtendContractRequest;
 use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\UpdateContractPricingRequest;
 use App\Models\Contract;
+use App\Models\Customer;
 use App\Models\DocumentTemplate;
+use App\Models\Payment;
 use App\Models\TenantSetting;
+use App\Models\Violation;
 use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
 use App\Services\Contracts\RentalProgressService;
@@ -58,7 +61,7 @@ class ContractController extends Controller
         $contractIds = collect($rows->items())->pluck('id')->all();
         $openViolationTotals = $contractIds === []
             ? collect()
-            : \App\Models\Violation::query()
+            : Violation::query()
                 ->selectRaw('contract_id, SUM(amount) as total_amount, COUNT(*) as cnt')
                 ->whereIn('contract_id', $contractIds)
                 ->open()
@@ -68,6 +71,9 @@ class ContractController extends Controller
 
         $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals) {
             $arr = $c->toArray();
+            if (isset($arr['customer']) && is_array($arr['customer'])) {
+                $arr['customer'] = Customer::normalizeDateOnlyFields($arr['customer']);
+            }
             $arr['progress'] = $this->progress->forContract($c);
             $arr['created_by'] = $c->salesUser?->name;
             $arr['sales_user'] = $c->salesUser
@@ -228,7 +234,7 @@ class ContractController extends Controller
         $tenant = TenantSetting::query()->first();
         $ops = is_array($tenant?->operational) ? $tenant->operational : [];
 
-        $payments = \App\Models\Payment::query()
+        $payments = Payment::query()
             ->where('link_type', 'contract')
             ->where('link_id', $contract->id)
             ->orderBy('paid_at')
