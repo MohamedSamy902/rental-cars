@@ -648,7 +648,6 @@ class DueNotificationService
             ->get([
                 'id', 'plate', 'code', 'owner_id',
                 'owner_agreement_starts_on', 'owner_agreement_ends_on',
-                'owner_agreement_number', 'owner_agreement_notes',
             ]);
 
         foreach ($vehicles as $vehicle) {
@@ -656,18 +655,14 @@ class DueNotificationService
             $ownerName = $vehicle->owner?->full_name ?: 'مالك';
             $ends = $vehicle->owner_agreement_ends_on?->toDateString();
             $starts = $vehicle->owner_agreement_starts_on?->toDateString();
-            $number = $vehicle->owner_agreement_number ? " · عقد {$vehicle->owner_agreement_number}" : '';
             $range = $starts ? "من {$starts} إلى {$ends}" : "ينتهي {$ends}";
-            $notes = $vehicle->owner_agreement_notes
-                ? ' · '.mb_substr(trim((string) $vehicle->owner_agreement_notes), 0, 120)
-                : '';
 
             $alerts[] = new DueAlert(
                 ruleKey: 'owner_agreement_end',
                 subjectType: 'vehicle',
                 subjectId: (int) $vehicle->id,
                 title: "عقد مالك يقترب من الانتهاء: {$plate}",
-                body: "المالك {$ownerName}{$number} · {$range}{$notes}.",
+                body: "المالك {$ownerName} · {$range}.",
                 linkType: 'vehicle',
                 linkId: (int) $vehicle->id,
                 permissions: ['vehicles.view', 'owners.view'],

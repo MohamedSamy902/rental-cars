@@ -27,7 +27,6 @@ class UpdateVehicleRequest extends FormRequest
             'daily_rate',
             'default_deposit',
             'seats',
-            'target_monthly_income',
             'purchase_value_estimate',
             'owner_id',
             'owner_monthly_amount',
@@ -90,7 +89,6 @@ class UpdateVehicleRequest extends FormRequest
             'engine_number' => ['nullable', 'string', 'max:100'],
             'engine_capacity' => ['nullable', 'string', 'max:50'],
             'seats' => ['nullable', 'integer', 'min:1', 'max:60'],
-            'target_monthly_income' => ['nullable', 'integer', 'min:0'],
             'purchase_value_estimate' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
@@ -99,8 +97,6 @@ class UpdateVehicleRequest extends FormRequest
             'owner_since' => ['nullable', 'date'],
             'owner_agreement_starts_on' => ['nullable', 'date'],
             'owner_agreement_ends_on' => ['nullable', 'date', 'after_or_equal:owner_agreement_starts_on'],
-            'owner_agreement_number' => ['nullable', 'string', 'max:100'],
-            'owner_agreement_notes' => ['nullable', 'string', 'max:2000'],
             'addon_ids' => ['nullable', 'array'],
             'addon_ids.*' => ['integer', 'exists:vehicle_addon_catalog,id'],
             'license' => ['nullable', 'array'],
@@ -135,8 +131,6 @@ class UpdateVehicleRequest extends FormRequest
             'owner_since' => 'تاريخ بدء الملكية',
             'owner_agreement_starts_on' => 'بداية عقد المالك',
             'owner_agreement_ends_on' => 'نهاية عقد المالك',
-            'owner_agreement_number' => 'رقم عقد المالك',
-            'owner_agreement_notes' => 'تفاصيل عقد المالك',
             'notes' => 'الملاحظات',
         ];
     }

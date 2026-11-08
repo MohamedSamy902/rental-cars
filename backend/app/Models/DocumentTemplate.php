@@ -11,6 +11,8 @@ class DocumentTemplate extends Model
 
     public const TYPE_HANDOVER_RECEIPT = 'handover_receipt';
 
+    public const TYPE_OWNER_AGREEMENT = 'owner_agreement';
+
     protected $fillable = [
         'type',
         'title',
@@ -37,6 +39,6 @@ class DocumentTemplate extends Model
 
     public static function allowedTypes(): array
     {
-        return [self::TYPE_CONTRACT, self::TYPE_HANDOVER_RECEIPT];
+        return [self::TYPE_CONTRACT, self::TYPE_HANDOVER_RECEIPT, self::TYPE_OWNER_AGREEMENT];
     }
 }

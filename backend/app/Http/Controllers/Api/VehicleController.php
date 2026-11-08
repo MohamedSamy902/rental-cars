@@ -11,13 +11,17 @@ use App\Models\MediaFile;
 use App\Models\OwnerMonthDue;
 use App\Models\OwnerPayout;
 use App\Models\Vehicle;
+use App\Models\VehicleDocument;
 use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Services\Fleet\VehicleAssetService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Fleet\VehicleRecommendationService;
 use App\Services\Fleet\VehicleService;
+use Carbon\Carbon;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -66,8 +70,8 @@ class VehicleController extends Controller
     public function recommend(Request $request): JsonResponse
     {
         $category = $request->string('category')->toString() ?: null;
-        $from = $request->filled('from') ? \Carbon\Carbon::parse((string) $request->input('from')) : null;
-        $to = $request->filled('to') ? \Carbon\Carbon::parse((string) $request->input('to')) : null;
+        $from = $request->filled('from') ? Carbon::parse((string) $request->input('from')) : null;
+        $to = $request->filled('to') ? Carbon::parse((string) $request->input('to')) : null;
 
         return response()->json([
             'data' => $this->recommendation->rankAvailable($category ?: null, null, $from, $to),
@@ -92,10 +96,10 @@ class VehicleController extends Controller
                 $q->where('manual_status', 'maintenance');
             } elseif ($status === 'available') {
                 $periodFrom = $request->filled('from')
-                    ? \Carbon\Carbon::parse((string) $request->input('from'))
+                    ? Carbon::parse((string) $request->input('from'))
                     : null;
                 $periodTo = $request->filled('to')
-                    ? \Carbon\Carbon::parse((string) $request->input('to'))
+                    ? Carbon::parse((string) $request->input('to'))
                     : null;
                 $q->where(function ($qq) {
                     $qq->whereNull('manual_status')->orWhereNotIn('manual_status', ['maintenance', 'out_of_service', 'sold']);
@@ -191,7 +195,20 @@ class VehicleController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم إضافة العربية.'], 201);
+        $payload = [
+            'data' => $this->present($vehicle),
+            'message' => 'تم إضافة العربية.',
+        ];
+        if ($vehicle->owner_id) {
+            try {
+                $payload['owner_agreement'] = $this->vehicles->ownerAgreementPrintPayload($vehicle);
+                $payload['message'] = 'تم إضافة العربية وتسجيل عقد المالك للطباعة.';
+            } catch (DomainException) {
+                // القالب غير جاهز لا يمنع الحفظ
+            }
+        }
+
+        return response()->json($payload, 201);
     }
 
     public function show(Vehicle $vehicle): JsonResponse
@@ -442,7 +459,31 @@ class VehicleController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->present($vehicle), 'message' => 'تم تحديث العربية.']);
+        $payload = [
+            'data' => $this->present($vehicle),
+            'message' => 'تم تحديث العربية.',
+        ];
+        if ($vehicle->owner_id) {
+            try {
+                $payload['owner_agreement'] = $this->vehicles->ownerAgreementPrintPayload($vehicle);
+                $payload['message'] = 'تم تحديث العربية وتحديث عقد المالك للطباعة.';
+            } catch (DomainException) {
+                // القالب غير جاهز لا يمنع الحفظ
+            }
+        }
+
+        return response()->json($payload);
+    }
+
+    public function ownerAgreementPrint(Vehicle $vehicle): JsonResponse
+    {
+        try {
+            $payload = $this->vehicles->ownerAgreementPrintPayload($vehicle);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $payload]);
     }
 
     /**
@@ -485,7 +526,6 @@ class VehicleController extends Controller
             'odometer_source' => $v->odometer_source,
             'daily_rate' => $v->daily_rate,
             'default_deposit' => $v->default_deposit,
-            'target_monthly_income' => $v->target_monthly_income,
             'purchase_value_estimate' => $v->purchase_value_estimate,
             'tracker_device_number' => $v->tracker_device_number,
             'tracker_sim_number' => $v->tracker_sim_number,
@@ -502,8 +542,6 @@ class VehicleController extends Controller
             'owner_since' => $v->owner_since?->toDateString(),
             'owner_agreement_starts_on' => $v->owner_agreement_starts_on?->toDateString(),
             'owner_agreement_ends_on' => $v->owner_agreement_ends_on?->toDateString(),
-            'owner_agreement_number' => $v->owner_agreement_number,
-            'owner_agreement_notes' => $v->owner_agreement_notes,
             'owner' => $v->relationLoaded('owner') && $v->owner ? [
                 'id' => $v->owner->id,
                 'full_name' => $v->owner->full_name,
@@ -520,8 +558,8 @@ class VehicleController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\VehicleDocument>|\Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\VehicleDocument, \App\Models\Vehicle>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\VehicleDocument>|\Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\VehicleDocument, \App\Models\Vehicle>
+     * @param  Builder<VehicleDocument>|HasMany<VehicleDocument, Vehicle>  $query
+     * @return Builder<VehicleDocument>|HasMany<VehicleDocument, Vehicle>
      */
     private function constrainLicenseDocuments($query)
     {

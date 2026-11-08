@@ -124,6 +124,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:vehicles.view|contracts.view|maintenance.view');
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
     Route::get('/vehicles/{vehicle}/dossier', [VehicleController::class, 'dossier'])->middleware('permission:vehicles.view');
+    Route::get('/vehicles/{vehicle}/owner-agreement/print', [VehicleController::class, 'ownerAgreementPrint'])
+        ->middleware('permission:vehicles.view|vehicles.print|vehicles.update');
     Route::get('/vehicles/{vehicle}/document-history', [OperationsController::class, 'vehicleDocumentHistory'])
         ->middleware('permission:vehicles.view');
     Route::get('/vehicles/{vehicle}/assets', [VehicleAssetController::class, 'extras'])->middleware('permission:vehicles.view');

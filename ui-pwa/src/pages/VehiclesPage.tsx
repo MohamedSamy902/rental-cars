@@ -61,8 +61,6 @@ type Vehicle = {
   owner_since?: string | null
   owner_agreement_starts_on?: string | null
   owner_agreement_ends_on?: string | null
-  owner_agreement_number?: string | null
-  owner_agreement_notes?: string | null
   owner?: OwnerOption | null
   active_contract_ends_at?: string | null
   license_expires_on?: string | null
@@ -74,7 +72,6 @@ type Vehicle = {
   engine_number?: string | null
   engine_capacity?: string | null
   seats?: number | null
-  target_monthly_income?: number | null
 }
 
 const statusLabel: Record<string, string> = {
@@ -227,13 +224,6 @@ export function VehiclesPage() {
           sortValue: (v) => v.owner?.full_name || '',
         },
         {
-          id: 'agreement_number',
-          header: 'رقم العقد',
-          cell: (v) => v.owner_agreement_number || '—',
-          sortValue: (v) => v.owner_agreement_number || '',
-          mobile: 'hidden',
-        },
-        {
           id: 'agreement_start',
           header: 'البداية',
           cell: (v) => (v.owner_agreement_starts_on ? formatDate(v.owner_agreement_starts_on) : '—'),
@@ -242,14 +232,16 @@ export function VehiclesPage() {
         {
           id: 'agreement_end',
           header: 'النهاية',
-          cell: (v) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-              <strong>{v.owner_agreement_ends_on ? formatDate(v.owner_agreement_ends_on) : '—'}</strong>
-              {v.owner_agreement_notes ? <span className="rpm-table__sub">{v.owner_agreement_notes}</span> : null}
-            </div>
-          ),
+          cell: (v) => (v.owner_agreement_ends_on ? formatDate(v.owner_agreement_ends_on) : '—'),
           sortValue: (v) => v.owner_agreement_ends_on || '',
           mobile: 'badge',
+        },
+        {
+          id: 'owner_amount',
+          header: 'الشهري',
+          cell: (v) => (v.owner_monthly_amount != null ? formatMoney(v.owner_monthly_amount) : '—'),
+          sortValue: (v) => v.owner_monthly_amount ?? 0,
+          mobile: 'hidden',
         },
       ]
     }

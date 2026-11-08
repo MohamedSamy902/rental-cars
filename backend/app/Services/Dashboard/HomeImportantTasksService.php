@@ -324,7 +324,6 @@ class HomeImportantTasksService
             ->get([
                 'id', 'plate', 'brand', 'model', 'owner_id',
                 'owner_agreement_starts_on', 'owner_agreement_ends_on',
-                'owner_agreement_number',
             ]);
 
         $items = [];
@@ -332,13 +331,12 @@ class HomeImportantTasksService
             $on = $v->owner_agreement_ends_on?->toDateString();
             $severity = $on && $on < now()->toDateString() ? 'critical' : 'warning';
             $owner = $v->owner?->full_name ?: 'مالك';
-            $num = $v->owner_agreement_number ? ' · عقد '.$v->owner_agreement_number : '';
             $items[] = $this->item(
                 'owner_agreement:'.$v->id,
                 'owner_agreement_end',
                 $severity,
                 'عقد مالك ينتهي · '.$v->plate,
-                $owner.$num.' · نهاية '.($on ?: '—'),
+                $owner.' · نهاية '.($on ?: '—'),
                 '/vehicles?tab=owner_agreement_expiring',
                 $on,
             );

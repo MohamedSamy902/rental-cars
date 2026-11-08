@@ -8,9 +8,12 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleDocument;
 use App\Models\VehicleDocumentHistory;
+use App\Models\VehicleOwner;
+use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
 use App\Support\PermissionCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -78,7 +81,7 @@ class VehicleClientRefinementsTest extends TestCase
 
     public function test_owner_agreement_expiring_filter_and_fields(): void
     {
-        $owner = \App\Models\VehicleOwner::query()->create([
+        $owner = VehicleOwner::query()->create([
             'full_name' => 'مالك العقد',
             'phone' => '01001112223',
             'is_active' => true,
@@ -100,8 +103,6 @@ class VehicleClientRefinementsTest extends TestCase
             'owner_monthly_amount' => 8000,
             'owner_agreement_starts_on' => now()->subYear()->toDateString(),
             'owner_agreement_ends_on' => now()->addDays(20)->toDateString(),
-            'owner_agreement_number' => 'OWN-2025-01',
-            'owner_agreement_notes' => 'عقد سنوي قابل للتجديد',
         ]);
         $later = Vehicle::query()->create([
             'code' => 'VEH-OWN-2',
@@ -125,7 +126,6 @@ class VehicleClientRefinementsTest extends TestCase
         $this->assertContains($due->id, $ids);
         $this->assertNotContains($later->id, $ids);
         $row = collect($res->json('data'))->firstWhere('id', $due->id);
-        $this->assertSame('OWN-2025-01', $row['owner_agreement_number'] ?? null);
         $this->assertSame(now()->addDays(20)->toDateString(), $row['owner_agreement_ends_on'] ?? null);
         $this->assertGreaterThanOrEqual(1, (int) $res->json('summary.owner_agreement_expiring'));
     }
@@ -346,9 +346,9 @@ class VehicleClientRefinementsTest extends TestCase
 
     public function test_vehicle_license_stores_document_number_and_owner_has_no_license_fields(): void
     {
-        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('vehicle_owners', 'license_front_path'));
-        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('vehicle_owners', 'license_back_path'));
-        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('vehicle_documents', 'document_number'));
+        $this->assertFalse(Schema::hasColumn('vehicle_owners', 'license_front_path'));
+        $this->assertFalse(Schema::hasColumn('vehicle_owners', 'license_back_path'));
+        $this->assertTrue(Schema::hasColumn('vehicle_documents', 'document_number'));
 
         $owner = $this->postJson('/api/owners', [
             'full_name' => 'مالك بلا رخصة',
@@ -407,7 +407,7 @@ class VehicleClientRefinementsTest extends TestCase
             'is_active' => true,
         ]);
 
-        $wo = \App\Models\WorkOrder::query()->create([
+        $wo = WorkOrder::query()->create([
             'vehicle_id' => $vehicle->id,
             'workshop' => 'ورشة اختبار',
             'opened_on' => now()->toDateString(),

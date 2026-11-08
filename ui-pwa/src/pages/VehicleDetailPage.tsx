@@ -20,7 +20,7 @@ import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { printContractDocument } from '@/shared/contracts/printContract'
 import type { Contract } from '@/shared/contracts/contractModel'
-import { printDomSubtree } from '@/utils/printHtml'
+import { printDomSubtree, printHtmlDocument } from '@/utils/printHtml'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
@@ -68,7 +68,6 @@ type Vehicle = {
   odometer_source?: string | null
   daily_rate: number
   default_deposit: number
-  target_monthly_income?: number | null
   purchase_value_estimate?: number | null
   status: string
   manual_status?: string | null
@@ -79,8 +78,6 @@ type Vehicle = {
   tracker_sim_recharge_cycle_days?: number | null
   owner_agreement_starts_on?: string | null
   owner_agreement_ends_on?: string | null
-  owner_agreement_number?: string | null
-  owner_agreement_notes?: string | null
   notes?: string | null
   is_active?: boolean
   owner_id?: number | null
@@ -667,7 +664,6 @@ export function VehicleDetailPage() {
         <Fact label="مصدر العداد" value={v.odometer_source || '—'} />
         <Fact label="الإيجار اليومي" value={formatMoney(v.daily_rate)} />
         <Fact label="التأمين النقدي" value={formatMoney(v.default_deposit)} />
-        <Fact label="المستهدف الشهري" value={v.target_monthly_income != null ? formatMoney(v.target_monthly_income) : '—'} />
         <Fact label="الحالة التشغيلية" value={statusLabel[v.status] || v.status} />
         <Fact label="حالة يدوية" value={v.manual_status || '—'} />
         <Fact label="نشطة" value={v.is_active === false ? 'لا' : 'نعم'} />
@@ -1145,12 +1141,35 @@ export function VehicleDetailPage() {
             </div>
           </div>
           <div className="vd-facts" style={{ marginBlockStart: '0.75rem' }}>
-            <Fact label="رقم عقد المالك" value={v.owner_agreement_number || '—'} />
             <Fact label="بداية العقد" value={shortDate(v.owner_agreement_starts_on)} />
             <Fact label="نهاية العقد" value={shortDate(v.owner_agreement_ends_on)} />
-            <Fact label="تفاصيل العقد" value={v.owner_agreement_notes || '—'} wide />
           </div>
-          <Link className="vd-no-print rpm-link-btn" to={v.owner ? `/owners/${v.owner.id}` : '/owners'}>{v.owner ? 'ملف المالك' : 'صفحة الملاك'}</Link>
+          <div className="vd-no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBlockStart: '0.75rem' }}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                void api<{ data: { html: string } }>(`/vehicles/${v.id}/owner-agreement/print`)
+                  .then((res) => {
+                    printHtmlDocument(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>عقد المالك</title>
+<style>
+  body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a}
+  h1{margin:0 0 4px;font-size:22px} h2{margin:20px 0 8px;font-size:16px}
+  .muted{color:#64748b} table{width:100%;border-collapse:collapse;margin-top:12px}
+  td,th{border:1px solid #cbd5e1;padding:8px;text-align:start} th{background:#f8fafc;width:32%}
+  .foot{margin-top:24px;color:#64748b;font-size:12px}
+  .terms{margin-top:20px;white-space:pre-wrap;font-size:13px;line-height:1.7}
+  .print-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
+  .print-logo{width:96px;height:auto;object-fit:contain}
+</style></head><body>${res.data.html}</body></html>`)
+                  })
+                  .catch((e) => toast.error((e as ApiError).message || 'تعذّرت طباعة عقد المالك.'))
+              }}
+            >
+              طباعة عقد المالك
+            </Button>
+            <Link className="rpm-link-btn" to={v.owner ? `/owners/${v.owner.id}` : '/owners'}>{v.owner ? 'ملف المالك' : 'صفحة الملاك'}</Link>
+          </div>
         </div>
       ) : (
         <Empty>هذه العربية ملك المركز — لا يوجد مالك خارجي مرتبط.</Empty>

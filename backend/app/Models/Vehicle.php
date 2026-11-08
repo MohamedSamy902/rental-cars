@@ -14,13 +14,12 @@ class Vehicle extends Model
     protected $fillable = [
         'code', 'plate', 'chassis_number', 'engine_number', 'brand', 'model', 'year', 'color',
         'category', 'engine_capacity', 'transmission', 'fuel_type', 'seats', 'odometer',
-        'odometer_source', 'daily_rate', 'default_deposit', 'target_monthly_income',
+        'odometer_source', 'daily_rate', 'default_deposit',
         'purchase_value_estimate', 'tracker_device_number', 'tracker_sim_number',
         'tracker_sim_last_recharged_on', 'tracker_sim_next_recharge_on', 'tracker_sim_recharge_cycle_days',
         'notes', 'is_active', 'manual_status', 'branch_id',
         'owner_id', 'owner_monthly_amount', 'owner_since',
         'owner_agreement_starts_on', 'owner_agreement_ends_on',
-        'owner_agreement_number', 'owner_agreement_notes',
     ];
 
     protected function casts(): array
