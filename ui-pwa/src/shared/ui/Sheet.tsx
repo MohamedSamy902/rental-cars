@@ -50,65 +50,11 @@ function shouldRevealField(el: HTMLElement) {
   return true
 }
 
-// #region agent log
-function dbgSheet(hypothesisId: string, location: string, message: string, data: Record<string, unknown> = {}) {
-  try {
-    const payload = { hypothesisId, location, message, data, timestamp: Date.now() }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any
-    w.__rpmDbg = w.__rpmDbg || []
-    w.__rpmDbg.push(payload)
-    fetch('http://127.0.0.1:7242/ingest/3b8c0e2a-8f5d-4c1a-9e7b-dbg-sheet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'license-sheet' },
-      body: JSON.stringify(payload),
-    }).catch(() => {})
-    // Mirror to NDJSON file via beacon when available; also console for Playwright
-    console.info('[rpm-dbg]', JSON.stringify(payload))
-    const line = JSON.stringify(payload) + '\n'
-    // Best-effort local write through a custom hook the e2e script can scrape
-    if (typeof w.__rpmDbgWrite === 'function') w.__rpmDbgWrite(line)
-  } catch { /* ignore */ }
+function pinSheetScroll(sheet: HTMLElement | null | undefined) {
+  if (!sheet) return
+  if (sheet.scrollTop !== 0) sheet.scrollTop = 0
+  if (sheet.scrollLeft !== 0) sheet.scrollLeft = 0
 }
-
-function sheetGeom(root: HTMLElement | null, wrap: HTMLElement | null, body: HTMLElement | null) {
-  const sheet = root?.querySelector('.rpm-sheet') as HTMLElement | null
-  const head = root?.querySelector('.rpm-sheet__head') as HTMLElement | null
-  const foot = root?.querySelector('.rpm-sheet__foot') as HTMLElement | null
-  const title = root?.querySelector('.rpm-sheet__head h2') as HTMLElement | null
-  const form = body?.querySelector('.rpm-form-grid') as HTMLElement | null
-  const rect = (el: HTMLElement | null) => {
-    if (!el) return null
-    const r = el.getBoundingClientRect()
-    return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height), width: Math.round(r.width), opacity: getComputedStyle(el).opacity, transform: getComputedStyle(el).transform, visibility: getComputedStyle(el).visibility }
-  }
-  const vv = window.visualViewport
-  return {
-    bodyScrollTop: body?.scrollTop ?? null,
-    bodyScrollHeight: body?.scrollHeight ?? null,
-    bodyClientHeight: body?.clientHeight ?? null,
-    sheetScrollTop: sheet?.scrollTop ?? null,
-    docScrollTop: document.documentElement.scrollTop,
-    pageScrollY: window.scrollY,
-    bodyElScrollTop: document.body.scrollTop,
-    bodyPos: document.body.style.position,
-    bodyTop: document.body.style.top,
-    vv: vv ? { height: vv.height, offsetTop: vv.offsetTop, pageTop: vv.pageTop, width: vv.width } : null,
-    innerHeight: window.innerHeight,
-    cssVvHeight: root?.style.getPropertyValue('--vv-height') || null,
-    cssVvTop: root?.style.getPropertyValue('--vv-top') || null,
-    cssSheetMaxH: root?.style.getPropertyValue('--sheet-max-h') || null,
-    root: rect(root),
-    wrap: rect(wrap),
-    sheet: rect(sheet),
-    head: rect(head),
-    foot: rect(foot),
-    titleText: title?.textContent || null,
-    titleRect: rect(title),
-    form: rect(form),
-  }
-}
-// #endregion
 
 export function Sheet(props: Props) {
   return createPortal(
@@ -179,13 +125,6 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
       root.style.setProperty('--vv-height', `${height}px`)
       root.style.setProperty('--vv-top', `${offsetTop}px`)
       root.style.setProperty('--sheet-max-h', `${sheetMax}px`)
-      // #region agent log
-      dbgSheet('C', 'Sheet.tsx:sync', 'visualViewport sync', {
-        layoutH, rawVv, height, offsetTop, keyboardOpen, sheetMax,
-        pageTop: vv?.pageTop ?? null,
-        geom: sheetGeom(root, wrapRef.current, bodyRef.current),
-      })
-      // #endregion
       // Keep page scroll locked to the visual viewport origin on iOS.
       if (offsetTop > 0 || (vv && vv.pageTop > 0)) {
         window.scrollTo(0, 0)
@@ -216,22 +155,9 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
   // programmatically scrollable; native focus / scrollIntoView can shift
   // head+body+footer out of the clipped box → blank dark sheet.
   useEffect(() => {
-    const root = rootRef.current
-    const sheet = root?.querySelector('.rpm-sheet') as HTMLElement | null
+    const sheet = rootRef.current?.querySelector('.rpm-sheet') as HTMLElement | null
     if (!sheet) return
-    const pin = () => {
-      if (sheet.scrollTop !== 0 || sheet.scrollLeft !== 0) {
-        // #region agent log
-        dbgSheet('A', 'Sheet.tsx:pinSheet', 'reset sheet scroll', {
-          runId: 'post-fix',
-          wasTop: sheet.scrollTop,
-          wasLeft: sheet.scrollLeft,
-        })
-        // #endregion
-        sheet.scrollTop = 0
-        sheet.scrollLeft = 0
-      }
-    }
+    const pin = () => pinSheetScroll(sheet)
     pin()
     sheet.addEventListener('scroll', pin, { passive: true })
     return () => sheet.removeEventListener('scroll', pin)
@@ -242,83 +168,29 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
   useEffect(() => {
     const body = bodyRef.current
     if (!body) return
+    const sheetEl = () => rootRef.current?.querySelector('.rpm-sheet') as HTMLElement | null
     const reveal = (target: HTMLElement) => {
-      const run = (phase: string) => {
-        // Always re-pin sheet in case native focus scrolled it first.
-        const sheet = rootRef.current?.querySelector('.rpm-sheet') as HTMLElement | null
-        if (sheet && sheet.scrollTop !== 0) sheet.scrollTop = 0
-
-        // #region agent log
-        const before = sheetGeom(rootRef.current, wrapRef.current, body)
-        dbgSheet('A', 'Sheet.tsx:reveal', `reveal ${phase} BEFORE body-only`, {
-          runId: 'post-fix',
-          targetTag: target.tagName,
-          targetType: (target as HTMLInputElement).type || null,
-          targetClass: target.className,
-          targetId: target.id,
-          sheetScrollTop: sheet?.scrollTop ?? null,
-          targetRect: (() => { const r = target.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: Math.round(r.height), w: Math.round(r.width) } })(),
-          before,
-        })
-        // #endregion
-
+      const run = () => {
+        pinSheetScroll(sheetEl())
         const bodyRect = body.getBoundingClientRect()
         const targetRect = target.getBoundingClientRect()
         const pad = 20
-        let adjust: string = 'none'
-        // Keep the field in the visible body band by adjusting body.scrollTop only.
         if (targetRect.bottom > bodyRect.bottom - pad) {
           body.scrollTop += targetRect.bottom - bodyRect.bottom + pad
-          adjust = 'down'
         } else if (targetRect.top < bodyRect.top + pad) {
           body.scrollTop -= bodyRect.top + pad - targetRect.top
-          adjust = 'up'
         }
-        if (sheet && sheet.scrollTop !== 0) sheet.scrollTop = 0
-
-        // #region agent log
-        dbgSheet('A', 'Sheet.tsx:reveal', `reveal ${phase} AFTER body-only`, {
-          runId: 'post-fix',
-          adjust,
-          bodyScrollTop: body.scrollTop,
-          sheetScrollTop: sheet?.scrollTop ?? null,
-          after: sheetGeom(rootRef.current, wrapRef.current, body),
-        })
-        // #endregion
-        // #region agent log
-        window.setTimeout(() => {
-          if (sheet && sheet.scrollTop !== 0) sheet.scrollTop = 0
-          dbgSheet('B', 'Sheet.tsx:reveal', `reveal ${phase} +200ms settle`, {
-            runId: 'post-fix',
-            settle: sheetGeom(rootRef.current, wrapRef.current, body),
-            sheetScrollTop: sheet?.scrollTop ?? null,
-          })
-        }, 200)
-        // #endregion
+        pinSheetScroll(sheetEl())
       }
-      window.setTimeout(() => run('t50'), 50)
-      window.setTimeout(() => run('t320'), 320)
+      window.setTimeout(run, 50)
+      window.setTimeout(run, 320)
     }
     const onFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement | null
       if (!target || !body.contains(target) || !isField(target)) return
       // Immediate pin: browser may scroll `.rpm-sheet` synchronously on focus.
-      const sheet = rootRef.current?.querySelector('.rpm-sheet') as HTMLElement | null
-      if (sheet && sheet.scrollTop !== 0) sheet.scrollTop = 0
-      const revealable = shouldRevealField(target)
-      // #region agent log
-      dbgSheet('A', 'Sheet.tsx:focusin', revealable ? 'focusin field' : 'focusin skipped', {
-        runId: 'post-fix',
-        tag: target.tagName,
-        type: (target as HTMLInputElement).type || null,
-        className: String(target.className || ''),
-        isFile: (target as HTMLInputElement).type === 'file',
-        skipped: !revealable,
-        sheetScrollTop: sheet?.scrollTop ?? null,
-        isHiddenStyle: getComputedStyle(target).opacity === '0' || getComputedStyle(target).position === 'absolute',
-      })
-      // #endregion
-      if (!revealable) return
+      pinSheetScroll(sheetEl())
+      if (!shouldRevealField(target)) return
       reveal(target)
     }
     body.addEventListener('focusin', onFocusIn)
