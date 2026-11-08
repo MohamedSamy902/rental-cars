@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { api, type ApiError } from '@/shared/api/client'
+import { nowLocalDateTimeValue, todayCivilIso } from '@/shared/lib/dates'
 import { formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -279,13 +280,13 @@ export function VehicleDetailPage() {
   const [assetSheet, setAssetSheet] = useState<'tire' | 'battery' | 'downtime' | null>(null)
   const [assetSaving, setAssetSaving] = useState(false)
   const [tireForm, setTireForm] = useState({
-    position: 'front_right', brand: '', installed_on: new Date().toISOString().slice(0, 10), odometer_at_install: '', expected_life_km: '',
+    position: 'front_right', brand: '', installed_on: todayCivilIso(), odometer_at_install: '', expected_life_km: '',
   })
   const [batteryForm, setBatteryForm] = useState({
-    brand: '', installed_on: new Date().toISOString().slice(0, 10), odometer_at_install: '', expected_life_km: '',
+    brand: '', installed_on: todayCivilIso(), odometer_at_install: '', expected_life_km: '',
   })
   const [downtimeForm, setDowntimeForm] = useState({
-    reason: 'maintenance', starts_at: new Date().toISOString().slice(0, 16), ends_at: '',
+    reason: 'maintenance', starts_at: nowLocalDateTimeValue(), ends_at: '',
   })
 
   async function saveAsset() {
@@ -336,19 +337,19 @@ export function VehicleDetailPage() {
   }
 
   const revenueSeries = useMemo(
-    () => (dossier?.charts.revenue_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
+    () => (dossier?.charts?.revenue_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
     [dossier],
   )
   const expenseSeries = useMemo(
-    () => (dossier?.charts.expenses_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
+    () => (dossier?.charts?.expenses_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
     [dossier],
   )
   const maintenanceSeries = useMemo(
-    () => (dossier?.charts.maintenance_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
+    () => (dossier?.charts?.maintenance_by_month || []).map((p) => ({ ...p, label: monthLabel(p.month) })),
     [dossier],
   )
   const statusDonut = useMemo(
-    () => (dossier?.charts.contracts_by_status || [])
+    () => (dossier?.charts?.contracts_by_status || [])
       .filter((s) => s.count > 0)
       .map((s) => ({
         key: s.status,
