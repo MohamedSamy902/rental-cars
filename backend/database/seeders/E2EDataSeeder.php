@@ -809,6 +809,17 @@ class E2EDataSeeder extends Seeder
                     'petty_cash_amount' => 480,
                 ]);
             }
+            // Keep header in sync with authoritative lines (Demo line 850 + E2E lines).
+            $openWo->refresh()->load('lines');
+            $parts = 0;
+            foreach ($openWo->lines as $l) {
+                if ($l->from_petty_cash && (int) $l->petty_cash_amount > 0) {
+                    $parts += (int) $l->petty_cash_amount;
+                } else {
+                    $parts += (int) $l->quantity * (int) $l->unit_price;
+                }
+            }
+            $openWo->update(['parts_cost' => $parts]);
         }
 
         // Closed WO funded from stock — with next service triggers

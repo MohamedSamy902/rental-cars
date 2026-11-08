@@ -527,22 +527,32 @@ class MegaSeeder extends Seeder
             ]);
         }
 
+        $pettyEmployees = PettyCashAccount::query()
+            ->where('is_active', true)
+            ->pluck('employee_id')
+            ->filter()
+            ->values()
+            ->all();
         $eHave = Expense::query()->count();
         for ($i = 1; $i <= max(0, self::TARGET_EXPENSES - $eHave); $i++) {
             $n = $eHave + $i;
-            $fromPetty = $n % 3 === 0 && $tech;
+            $fromPetty = $n % 3 === 0 && $pettyEmployees !== [];
+            $pettyEmpId = $fromPetty ? (int) $pettyEmployees[$n % count($pettyEmployees)] : null;
+            $amount = 50 + ($n % 20) * 35;
+            $day = now()->subDays($n % 45)->toDateString();
             Expense::query()->create([
                 'title' => ['غسيل أسطول', 'وقود', 'رسوم بوابة', 'صيانة طارئة', 'مستلزمات مكتب'][$n % 5].' #'.$n,
                 'category' => ['تشغيل', 'وقود', 'طريق', 'صيانة', 'إدارية'][$n % 5],
-                'amount' => 50 + ($n % 20) * 35,
-                'spent_on' => now()->subDays($n % 45)->toDateString(),
+                'amount' => $amount,
+                'spent_on' => $day,
                 'payment_method' => $fromPetty ? 'petty_cash' : 'cash',
                 'vehicle_id' => $n % 2 === 0 ? $vehicles[$n % count($vehicles)] : null,
-                'employee_id' => $fromPetty ? $tech->id : null,
+                'employee_id' => $pettyEmpId,
                 'from_petty_cash' => (bool) $fromPetty,
                 'recorded_by' => $n % 2 === 0 ? $accountsId : $adminId,
                 'notes' => 'مصروف ميجا',
             ]);
+            // Movement is created in ReconcileSeedFinancialsSeeder so Demo/E2E stay untouched.
         }
     }
 

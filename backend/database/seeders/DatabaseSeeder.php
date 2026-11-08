@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             DemoSeeder::class,
             E2EDataSeeder::class,
             MegaSeeder::class,
+            ReconcileSeedFinancialsSeeder::class,
         ]);
     }
 }
