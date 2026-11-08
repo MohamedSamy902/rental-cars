@@ -4,7 +4,7 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import { Button, TextAreaField, TextField, useToast } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
 
-type TemplateType = 'contract' | 'handover_receipt'
+type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement'
 
 type Placeholder = {
   key: string
@@ -33,6 +33,10 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
     title: 'قالب إيصال الاستلام والتأمين',
     hint: 'يُستخدم عند طباعة إيصال الاستلام والتأمين.',
   },
+  owner_agreement: {
+    title: 'قالب عقد المالك',
+    hint: 'يُستخدم عند حفظ عربية مرتبطة بمالك — يُملأ ببيانات المالك والعربية تلقائياً ويمكن تعديله من هنا.',
+  },
 }
 
 function shellPreview(title: string, body: string) {
@@ -60,6 +64,7 @@ export function DocumentTemplatesPanel() {
   const [drafts, setDrafts] = useState<Record<TemplateType, { title: string; content: string }>>({
     contract: { title: '', content: '' },
     handover_receipt: { title: '', content: '' },
+    owner_agreement: { title: '', content: '' },
   })
   const [files, setFiles] = useState<Partial<Record<TemplateType, File | null>>>({})
   const [saving, setSaving] = useState<TemplateType | null>(null)
@@ -76,9 +81,10 @@ export function DocumentTemplatesPanel() {
         const nextDrafts: Record<TemplateType, { title: string; content: string }> = {
           contract: { title: TYPE_META.contract.title, content: '' },
           handover_receipt: { title: TYPE_META.handover_receipt.title, content: '' },
+          owner_agreement: { title: TYPE_META.owner_agreement.title, content: '' },
         }
         for (const row of res.data || []) {
-          if (row.type !== 'contract' && row.type !== 'handover_receipt') continue
+          if (row.type !== 'contract' && row.type !== 'handover_receipt' && row.type !== 'owner_agreement') continue
           nextActive[row.type] = row
           nextDrafts[row.type] = { title: row.title, content: row.content }
         }
@@ -214,7 +220,7 @@ export function DocumentTemplatesPanel() {
         </div>
       </div>
 
-      {(['contract', 'handover_receipt'] as TemplateType[]).map((type) => {
+      {(['contract', 'handover_receipt', 'owner_agreement'] as TemplateType[]).map((type) => {
         const meta = TYPE_META[type]
         const row = active[type]
         return (

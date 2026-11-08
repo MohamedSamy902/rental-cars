@@ -87,14 +87,17 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
     if (!root) return
 
     const sync = () => {
-      const layoutH = window.innerHeight
-      const height = Math.round(vv?.height ?? layoutH)
-      const offsetTop = Math.round(vv?.offsetTop ?? 0)
+      const layoutH = Math.max(320, window.innerHeight || 320)
+      // After native file pickers some WebViews briefly report a tiny/zero vv height
+      // which collapsed the sheet into a blank dark panel — clamp aggressively.
+      const rawVv = Math.round(vv?.height ?? layoutH)
+      const height = Math.max(280, rawVv > 80 ? rawVv : layoutH)
+      const offsetTop = Math.max(0, Math.round(vv?.offsetTop ?? 0))
       // dvh does not shrink with interactive-widget=overlays-content, so cap
       // the sheet against the visual viewport explicitly. Use full vv height
       // when the keyboard is open; 90% when closed (classic bottom-sheet gap).
       const keyboardOpen = height < layoutH - 40
-      const sheetMax = Math.round(height * (keyboardOpen ? 1 : 0.9))
+      const sheetMax = Math.max(240, Math.round(height * (keyboardOpen ? 1 : 0.9)))
       root.style.setProperty('--vv-height', `${height}px`)
       root.style.setProperty('--vv-top', `${offsetTop}px`)
       root.style.setProperty('--sheet-max-h', `${sheetMax}px`)
@@ -109,11 +112,15 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
     vv?.addEventListener('scroll', sync)
     window.addEventListener('resize', sync)
     window.addEventListener('orientationchange', sync)
+    window.addEventListener('focus', sync)
+    document.addEventListener('visibilitychange', sync)
     return () => {
       vv?.removeEventListener('resize', sync)
       vv?.removeEventListener('scroll', sync)
       window.removeEventListener('resize', sync)
       window.removeEventListener('orientationchange', sync)
+      window.removeEventListener('focus', sync)
+      document.removeEventListener('visibilitychange', sync)
       root.style.removeProperty('--vv-height')
       root.style.removeProperty('--vv-top')
       root.style.removeProperty('--sheet-max-h')

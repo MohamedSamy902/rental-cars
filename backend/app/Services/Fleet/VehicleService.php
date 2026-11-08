@@ -2,17 +2,24 @@
 
 namespace App\Services\Fleet;
 
+use App\Models\DocumentTemplate;
+use App\Models\PrintSnapshot;
 use App\Models\Vehicle;
 use App\Models\VehicleAddonCatalog;
 use App\Models\VehicleBrand;
 use App\Models\VehicleDocument;
 use App\Models\VehicleDocumentHistory;
 use App\Models\VehicleOwner;
+use App\Services\Documents\DocumentTemplateService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class VehicleService
 {
+    public function __construct(
+        private readonly DocumentTemplateService $templates,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>|null  $ownerInline
@@ -71,7 +78,10 @@ class VehicleService
             $this->attachAddons($vehicle, $addonIds);
             $this->syncLicenseDocument($vehicle, is_array($license) ? $license : null);
 
-            return $vehicle->load(['owner', 'accessories', 'documents']);
+            $vehicle = $vehicle->load(['owner', 'accessories', 'documents']);
+            $this->syncOwnerAgreementSnapshot($vehicle);
+
+            return $vehicle;
         });
     }
 
@@ -96,8 +106,6 @@ class VehicleService
                 $data['owner_monthly_amount'] = null;
                 $data['owner_agreement_starts_on'] = null;
                 $data['owner_agreement_ends_on'] = null;
-                $data['owner_agreement_number'] = null;
-                $data['owner_agreement_notes'] = null;
             }
             if (! empty($data['owner_id']) && empty($data['owner_since']) && ! $vehicle->owner_since) {
                 $data['owner_since'] = now()->toDateString();
@@ -132,8 +140,79 @@ class VehicleService
                 $this->syncLicenseDocument($vehicle, $license);
             }
 
-            return $vehicle->fresh(['owner', 'accessories', 'documents']);
+            $vehicle = $vehicle->fresh(['owner', 'accessories', 'documents']);
+            $this->syncOwnerAgreementSnapshot($vehicle);
+
+            return $vehicle;
         });
+    }
+
+    /**
+     * عند ربط مالك بالعربية: يُنشأ/يُحدَّث سجل عقد قابل للطباعة من قالب الإعدادات.
+     */
+    public function syncOwnerAgreementSnapshot(Vehicle $vehicle, ?int $userId = null): ?PrintSnapshot
+    {
+        if (! $vehicle->owner_id) {
+            return null;
+        }
+
+        $this->templates->ensureDefaults($userId);
+        $template = $this->templates->getActive(DocumentTemplate::TYPE_OWNER_AGREEMENT);
+        if (! $template) {
+            return null;
+        }
+
+        $variables = $this->templates->variablesForOwnerAgreement($vehicle, null, $template);
+        $html = $this->templates->render($template->content, $template->format, $variables);
+
+        return PrintSnapshot::query()->create([
+            'type' => DocumentTemplate::TYPE_OWNER_AGREEMENT,
+            'record_type' => 'vehicle',
+            'record_id' => $vehicle->id,
+            'payload' => [
+                'html' => $html,
+                'variables' => $variables,
+                'template_id' => $template->id,
+                'template_version' => $template->version,
+                'title' => $template->title,
+                'number' => $variables['owner_agreement_number'] ?? null,
+            ],
+            'printed_by' => $userId,
+            'printed_at' => now(),
+        ]);
+    }
+
+    /**
+     * @return array{html:string,variables:array<string,string>,template:array<string,mixed>,snapshot_id:?int,number:string}
+     */
+    public function ownerAgreementPrintPayload(Vehicle $vehicle): array
+    {
+        if (! $vehicle->owner_id) {
+            throw new DomainException('لا يوجد مالك مرتبط بهذه العربية لطباعة عقد المالك.');
+        }
+
+        $this->templates->ensureDefaults();
+        $template = $this->templates->getActive(DocumentTemplate::TYPE_OWNER_AGREEMENT);
+        if (! $template) {
+            throw new DomainException('لا يوجد قالب نشط لعقد المالك. راجع الإعدادات.');
+        }
+
+        $variables = $this->templates->variablesForOwnerAgreement($vehicle->loadMissing('owner'), null, $template);
+        $html = $this->templates->render($template->content, $template->format, $variables);
+        $latest = PrintSnapshot::query()
+            ->where('type', DocumentTemplate::TYPE_OWNER_AGREEMENT)
+            ->where('record_type', 'vehicle')
+            ->where('record_id', $vehicle->id)
+            ->latest('id')
+            ->first();
+
+        return [
+            'html' => $html,
+            'variables' => $variables,
+            'template' => $this->templates->present($template),
+            'snapshot_id' => $latest?->id,
+            'number' => (string) ($variables['owner_agreement_number'] ?? ''),
+        ];
     }
 
     /**
@@ -417,6 +496,7 @@ class VehicleService
                         'default_qty' => $catalog->default_qty,
                         'required_each_rental' => $catalog->required_each_rental,
                     ]);
+
                 continue;
             }
             $vehicle->accessories()->create([

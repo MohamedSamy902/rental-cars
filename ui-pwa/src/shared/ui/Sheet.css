@@ -242,6 +242,21 @@
   width: 100%;
 }
 
+.rpm-license-uploads {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .rpm-license-uploads {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .rpm-form-grid .rpm-switch {
   width: 100%;
   justify-content: space-between;

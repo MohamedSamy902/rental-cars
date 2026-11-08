@@ -5,6 +5,7 @@ namespace App\Services\Documents;
 use App\Models\Contract;
 use App\Models\DocumentTemplate;
 use App\Models\TenantSetting;
+use App\Models\Vehicle;
 use DomainException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -49,6 +50,16 @@ class DocumentTemplateService
             ['key' => 'handover_at', 'aliases' => ['وقت_التسليم'], 'label' => 'وقت التسليم', 'sample' => '2026-11-01 10:00'],
             ['key' => 'return_at', 'aliases' => ['وقت_الاستلام'], 'label' => 'وقت الاستلام', 'sample' => '2026-11-05 18:00'],
             ['key' => 'template_version', 'aliases' => ['إصدار_القالب'], 'label' => 'رقم إصدار القالب', 'sample' => '1'],
+            ['key' => 'owner_name', 'aliases' => ['اسم_المالك'], 'label' => 'اسم المالك', 'sample' => 'محمود علي'],
+            ['key' => 'owner_phone', 'aliases' => ['هاتف_المالك'], 'label' => 'هاتف المالك', 'sample' => '01011112222'],
+            ['key' => 'owner_national_id', 'aliases' => ['قومي_المالك'], 'label' => 'الرقم القومي للمالك', 'sample' => '29001011234567'],
+            ['key' => 'owner_monthly_amount', 'aliases' => ['المبلغ_الشهري_للمالك'], 'label' => 'المبلغ الشهري للمالك', 'sample' => '8000'],
+            ['key' => 'owner_agreement_number', 'aliases' => ['رقم_عقد_المالك'], 'label' => 'رقم عقد المالك (تلقائي)', 'sample' => 'OWN-VEH-0001'],
+            ['key' => 'owner_agreement_starts_on', 'aliases' => ['بداية_عقد_المالك'], 'label' => 'بداية عقد المالك', 'sample' => '2026-01-01'],
+            ['key' => 'owner_agreement_ends_on', 'aliases' => ['نهاية_عقد_المالك'], 'label' => 'نهاية عقد المالك', 'sample' => '2026-12-31'],
+            ['key' => 'vehicle_code', 'aliases' => ['كود_العربية'], 'label' => 'الكود الداخلي للعربية', 'sample' => 'VEH-0001'],
+            ['key' => 'vehicle_year', 'aliases' => ['سنة_العربية'], 'label' => 'سنة الصنع', 'sample' => '2024'],
+            ['key' => 'vehicle_category', 'aliases' => ['فئة_العربية'], 'label' => 'فئة العربية', 'sample' => 'اقتصادي'],
         ];
     }
 
@@ -75,6 +86,10 @@ class DocumentTemplateService
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => [
                 'title' => 'قالب إيصال الاستلام والتأمين',
                 'content' => $this->defaultHandoverHtml(),
+            ],
+            DocumentTemplate::TYPE_OWNER_AGREEMENT => [
+                'title' => 'قالب عقد المالك',
+                'content' => $this->defaultOwnerAgreementHtml(),
             ],
         ] as $type => $meta) {
             $exists = DocumentTemplate::query()->where('type', $type)->where('is_active', true)->exists();
@@ -430,11 +445,52 @@ class DocumentTemplateService
         }
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function variablesForOwnerAgreement(Vehicle $vehicle, ?TenantSetting $tenant = null, ?DocumentTemplate $template = null): array
+    {
+        $tenant ??= TenantSetting::query()->first();
+        $ops = is_array($tenant?->operational) ? $tenant->operational : [];
+        $vehicle->loadMissing('owner');
+        $owner = $vehicle->owner;
+        $number = 'OWN-'.($vehicle->code ?: ('V'.$vehicle->id));
+
+        $map = [
+            'company_name' => (string) ($tenant?->center_name ?: 'مركز التأجير'),
+            'company_phone' => (string) ($ops['print_phone'] ?? ''),
+            'company_address' => (string) ($ops['print_address'] ?? ''),
+            'company_cr' => (string) ($ops['print_commercial_register'] ?? ''),
+            'company_tax' => (string) ($ops['print_tax_info'] ?? ''),
+            'logo_src' => (string) ($tenant?->logo_path ?: '/brand/rpm-logo.webp'),
+            'print_footer' => (string) ($tenant?->print_footer ?: ''),
+            'contract_terms' => (string) ($ops['owner_agreement_terms'] ?? $ops['contract_terms'] ?? ''),
+            'owner_name' => (string) ($owner?->full_name ?: ''),
+            'owner_phone' => (string) ($owner?->phone ?: ''),
+            'owner_national_id' => (string) ($owner?->national_id ?: ''),
+            'owner_monthly_amount' => (string) (int) ($vehicle->owner_monthly_amount ?? 0),
+            'owner_agreement_number' => $number,
+            'owner_agreement_starts_on' => $vehicle->owner_agreement_starts_on?->toDateString()
+                ?? $vehicle->owner_since?->toDateString()
+                ?? '',
+            'owner_agreement_ends_on' => $vehicle->owner_agreement_ends_on?->toDateString() ?? '',
+            'vehicle_plate' => (string) ($vehicle->plate ?: ''),
+            'vehicle_name' => trim(($vehicle->brand ?? '').' '.($vehicle->model ?? '')),
+            'vehicle_code' => (string) ($vehicle->code ?: ''),
+            'vehicle_year' => (string) ($vehicle->year ?: ''),
+            'vehicle_category' => (string) ($vehicle->category ?: ''),
+            'template_version' => (string) ($template?->version ?? ''),
+        ];
+
+        return $this->withAliases($map);
+    }
+
     private function defaultTitle(string $type): string
     {
         return match ($type) {
             DocumentTemplate::TYPE_CONTRACT => 'قالب العقد الأساسي',
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب إيصال الاستلام والتأمين',
+            DocumentTemplate::TYPE_OWNER_AGREEMENT => 'قالب عقد المالك',
             default => 'قالب مستند',
         };
     }
@@ -500,6 +556,34 @@ HTML;
   <tr><th>عداد العودة</th><td>{{odometer_in}}</td></tr>
   <tr><th>وقت الاستلام</th><td>{{return_at}}</td></tr>
 </table>
+<p class="foot">{{print_footer}}</p>
+HTML;
+    }
+
+    private function defaultOwnerAgreementHtml(): string
+    {
+        return <<<'HTML'
+<header class="print-head">
+  <img class="print-logo" src="{{logo_src}}" alt="شعار الشركة" />
+  <div>
+    <h1>{{company_name}}</h1>
+    <p class="muted">{{company_phone}} · {{company_address}}</p>
+  </div>
+</header>
+<h2>عقد تشغيل عربية مملوكة للغير · {{owner_agreement_number}}</h2>
+<p class="muted">إصدار القالب {{template_version}}</p>
+<table>
+  <tr><th>المالك</th><td>{{owner_name}} · <span dir="ltr">{{owner_phone}}</span></td></tr>
+  <tr><th>الرقم القومي</th><td><span dir="ltr">{{owner_national_id}}</span></td></tr>
+  <tr><th>العربية</th><td>{{vehicle_name}} · {{vehicle_plate}} · {{vehicle_year}}</td></tr>
+  <tr><th>الكود الداخلي</th><td>{{vehicle_code}}</td></tr>
+  <tr><th>الفئة</th><td>{{vehicle_category}}</td></tr>
+  <tr><th>بداية العقد</th><td>{{owner_agreement_starts_on}}</td></tr>
+  <tr><th>نهاية العقد</th><td>{{owner_agreement_ends_on}}</td></tr>
+  <tr><th>المبلغ الشهري</th><td>{{owner_monthly_amount}}</td></tr>
+</table>
+<h2>بنود الاتفاق</h2>
+<div class="terms">{{contract_terms}}</div>
 <p class="foot">{{print_footer}}</p>
 HTML;
     }

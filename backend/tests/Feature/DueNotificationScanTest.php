@@ -296,8 +296,6 @@ class DueNotificationScanTest extends TestCase
             'tracker_sim_recharge_cycle_days' => 30,
             'owner_agreement_starts_on' => now()->subMonths(11)->toDateString(),
             'owner_agreement_ends_on' => now()->addDays(10)->toDateString(),
-            'owner_agreement_number' => 'OWN-SCAN-1',
-            'owner_agreement_notes' => 'عقد سنوي',
         ]);
 
         app(DueNotificationService::class)->scan();
@@ -320,7 +318,6 @@ class DueNotificationScanTest extends TestCase
         $this->assertSame(1, $this->titlesLike('عقد مالك يقترب من الانتهاء'));
         $this->assertSame(1, NotificationReminder::query()->where('rule_key', 'owner_agreement_end')->count());
         $this->assertSame(0, $this->titlesLike('سيارة متاحة لطلب انتظار'));
-
 
         Evaluation::query()->create([
             'employee_id' => $unpaidEmployee->id,

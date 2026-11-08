@@ -1,8 +1,10 @@
 .rpm-media {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
   width: 100%;
+  min-width: 0;
 }
 
 .rpm-media.is-disabled {
