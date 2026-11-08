@@ -258,6 +258,33 @@ class PettyCashLedgerService
             return strcmp((string) $a['id'], (string) $b['id']);
         });
 
+        $movementNet = 0;
+        foreach ($ledger as $row) {
+            $movementNet += (int) $row['signed_amount'];
+        }
+        $storedBalance = (int) $account->balance;
+        $opening = $storedBalance - $movementNet;
+        if ($opening !== 0) {
+            $openingDay = $ledger[0]['occurred_on'] ?? $account->created_at?->toDateString() ?? now()->toDateString();
+            array_unshift($ledger, [
+                'id' => 'opening',
+                'movement_id' => null,
+                'occurred_on' => $openingDay,
+                'category' => 'opening',
+                'direction' => $opening >= 0 ? 'in' : 'out',
+                'label' => 'رصيد افتتاحي (فرق غير مُسجَّل كحركة)',
+                'amount' => abs($opening),
+                'signed_amount' => $opening,
+                'running_balance' => 0,
+                'is_computed' => true,
+                'notes' => 'يوضّح الفرق بين رصيد الحساب ومجموع الحركات دون إنشاء حركة أو تعديل الرصيد.',
+                'expense' => null,
+                'work_order' => null,
+                'vehicle' => null,
+                'parts' => [],
+            ]);
+        }
+
         // Recompute running balance after full chronological sort.
         $running = 0;
         foreach ($ledger as &$row) {
@@ -272,10 +299,11 @@ class PettyCashLedgerService
                 'employee_name' => $account->employee?->name,
                 'employee_role' => $account->employee?->job_title,
                 'limit_amount' => (int) $account->limit_amount,
+                'opening_balance' => $opening,
                 'total_topup' => $totalTopup,
                 'total_spent' => $totalSpent,
                 'total_returned' => $totalReturned,
-                'balance' => (int) $account->balance,
+                'balance' => $storedBalance,
                 'is_active' => (bool) $account->is_active,
                 'ledger_count' => count($ledger),
             ],

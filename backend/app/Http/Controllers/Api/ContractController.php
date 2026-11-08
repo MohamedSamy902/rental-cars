@@ -58,7 +58,7 @@ class ContractController extends Controller
             $q->where('vehicle_id', $vehicleId);
         }
 
-        $perPage = PaginationInput::perPage($request, 50, 200);
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
         $contractIds = collect($rows->items())->pluck('id')->all();

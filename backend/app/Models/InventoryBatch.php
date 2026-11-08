@@ -15,7 +15,7 @@ class InventoryBatch extends Model
     protected function casts(): array
     {
         return [
-            'received_on' => 'date',
+            'received_on' => 'date:Y-m-d',
             'from_petty_cash' => 'boolean',
         ];
     }

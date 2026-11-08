@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { civilDateOnly } from '@/shared/lib/dates'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
+import { useLatestRequest } from '@/shared/lib/useLatestRequest'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
-  MediaUpload, useToast, SkeletonBlock, IconEye, IconEdit, IconClipboard, PhoneActions,
+  MediaUpload, useToast, SkeletonBlock, ErrorState, IconEye, IconEdit, IconClipboard, PhoneActions,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
@@ -48,6 +50,8 @@ export function CustomersPage() {
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: CustomersPageTabs, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const beginRequest = useLatestRequest()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<Customer | null>(null)
@@ -73,7 +77,9 @@ export function CustomersPage() {
   )
 
   async function load(nextPage = page) {
+    const isCurrent = beginRequest()
     setLoading(true)
+    setError('')
     try {
       const qs = new URLSearchParams()
       qs.set('page', String(nextPage))
@@ -82,6 +88,7 @@ export function CustomersPage() {
       if (chip === 'blacklist') qs.set('status', 'blacklist')
       if (chip === 'active') qs.set('status', 'active')
       const res = await api<{ data: Customer[]; meta?: PageMeta }>(`/customers?${qs}`)
+      if (!isCurrent()) return
       setRows(res.data)
       setMeta({
         current_page: res.meta?.current_page ?? nextPage,
@@ -89,8 +96,11 @@ export function CustomersPage() {
         total: res.meta?.total ?? res.data.length,
       })
       setPage(res.meta?.current_page ?? nextPage)
+    } catch (e) {
+      if (!isCurrent()) return
+      setError((e as ApiError).message)
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }
 
@@ -198,7 +208,7 @@ export function CustomersPage() {
       mobile: 'subtitle',
     },
     { id: 'license', header: 'رقم الرخصة', cell: (c) => c.license_number, sortValue: (c) => c.license_number },
-    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => (c.license_expires_on || '').slice(0, 10), sortValue: (c) => c.license_expires_on },
+    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => civilDateOnly(c.license_expires_on) || '—', sortValue: (c) => c.license_expires_on },
     { id: 'status', header: 'الحالة', cell: statusPill, sortValue: (c) => c.status, mobile: 'badge' },
   ]
 
@@ -286,6 +296,13 @@ export function CustomersPage() {
         onChipChange={(id) => { setChip(id); setPage(1) }}
         placeholder="بحث بالاسم أو الهاتف…"
       />
+      {error && rows.length === 0 ? (
+        <ErrorState title="تعذّر تحميل العملاء" description={error} action={<Button onClick={() => void load(page)}>إعادة المحاولة</Button>} />
+      ) : (
+        <>
+      {error ? (
+        <ErrorState title="تعذّر تحديث العملاء" description={error} action={<Button onClick={() => void load(page)}>إعادة المحاولة</Button>} />
+      ) : null}
       <DataTable
         label="العملاء"
         rows={rows}
@@ -305,6 +322,8 @@ export function CustomersPage() {
           onPageChange: setPage,
         }}
       />
+        </>
+      )}
       <Sheet open={open} title="إضافة عميل" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={onSave}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>
         {formFields}
       </Sheet>

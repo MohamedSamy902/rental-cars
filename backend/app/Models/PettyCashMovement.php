@@ -13,7 +13,7 @@ class PettyCashMovement extends Model
 
     protected function casts(): array
     {
-        return ['moved_on' => 'date'];
+        return ['moved_on' => 'date:Y-m-d'];
     }
 
     public function account(): BelongsTo

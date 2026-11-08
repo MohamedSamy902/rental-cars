@@ -18,7 +18,7 @@ class Expense extends Model
     protected function casts(): array
     {
         return [
-            'spent_on' => 'date',
+            'spent_on' => 'date:Y-m-d',
             'from_petty_cash' => 'boolean',
         ];
     }

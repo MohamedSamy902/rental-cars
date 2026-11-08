@@ -13,6 +13,6 @@ class Employee extends Model
 
     protected function casts(): array
     {
-        return ['hired_on' => 'date'];
+        return ['hired_on' => 'date:Y-m-d'];
     }
 }

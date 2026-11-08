@@ -10,6 +10,7 @@ use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
 use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
+use App\Support\CivilDate;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -22,9 +23,9 @@ class ExpenseService
      */
     public function create(array $data, ?int $userId = null): Expense
     {
-        $spentOn = $data['spent_on'] ?? now()->toDateString();
-        $date = new \DateTimeImmutable((string) $spentOn);
-        $this->accounting->assertMonthOpen((int) $date->format('Y'), (int) $date->format('n'));
+        $spentOn = CivilDate::toDateString($data['spent_on'] ?? null);
+        [$year, $month] = CivilDate::yearAndMonth($spentOn);
+        $this->accounting->assertMonthOpen($year, $month);
         $this->accounting->ensureChartOfAccounts();
 
         return DB::transaction(function () use ($data, $userId, $spentOn) {
@@ -67,11 +68,11 @@ class ExpenseService
      */
     public function update(Expense $expense, array $data, ?int $userId = null): Expense
     {
-        $spentOn = (string) ($data['spent_on'] ?? $expense->spent_on?->toDateString() ?? now()->toDateString());
-        $oldSpentOn = $expense->spent_on?->toDateString() ?? $spentOn;
+        $spentOn = CivilDate::toDateString($data['spent_on'] ?? $expense->spent_on?->toDateString());
+        $oldSpentOn = CivilDate::toDateString($expense->spent_on?->toDateString() ?? $spentOn);
         foreach ([$oldSpentOn, $spentOn] as $day) {
-            $date = new \DateTimeImmutable((string) $day);
-            $this->accounting->assertMonthOpen((int) $date->format('Y'), (int) $date->format('n'));
+            [$year, $month] = CivilDate::yearAndMonth($day);
+            $this->accounting->assertMonthOpen($year, $month);
         }
         $this->accounting->ensureChartOfAccounts();
 

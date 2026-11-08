@@ -35,6 +35,7 @@ export function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat('ar-EG', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: 'Africa/Cairo',
     ...latn,
   }).format(d)
 }

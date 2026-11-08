@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
+import { useLatestRequest } from '@/shared/lib/useLatestRequest'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import { useAuth } from '@/shared/auth/AuthContext'
@@ -39,6 +40,7 @@ export function BookingsPage() {
   const [chip, setChip] = useQueryTab({ allowed: BookingsPageTabs, defaultValue: 'all' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const beginRequest = useLatestRequest()
   const { openNewContract, createdVersion } = useNewContract()
   const life = useContractLifecycle(() => void load(page))
   const { counts: attention } = useAttentionSignals(true)
@@ -87,6 +89,7 @@ export function BookingsPage() {
   )
 
   async function load(nextPage = page) {
+    const isCurrent = beginRequest()
     setLoading(true)
     setError('')
     try {
@@ -100,6 +103,7 @@ export function BookingsPage() {
         qs.set('status', chip)
       }
       const res = await api<{ data: Contract[]; summary: typeof summary; meta?: PageMeta }>(`/contracts?${qs}`)
+      if (!isCurrent()) return
       setRows(res.data)
       setMeta({
         current_page: res.meta?.current_page ?? nextPage,
@@ -117,9 +121,10 @@ export function BookingsPage() {
         handover_today: res.summary.handover_today ?? 0,
       })
     } catch (e) {
+      if (!isCurrent()) return
       setError((e as ApiError).message)
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }
 
@@ -243,9 +248,13 @@ export function BookingsPage() {
         placeholder="بحث برقم العقد أو العميل…"
       />
 
-      {error ? (
+      {error && rows.length === 0 ? (
         <ErrorState title="تعذّر تحميل العقود" description={error} action={<Button onClick={() => void load(page)}>إعادة المحاولة</Button>} />
       ) : (
+        <>
+      {error ? (
+        <ErrorState title="تعذّر تحديث العقود" description={error} action={<Button onClick={() => void load(page)}>إعادة المحاولة</Button>} />
+      ) : null}
         <DataTable
           label="العقود"
           rows={rows}
@@ -273,6 +282,7 @@ export function BookingsPage() {
             onPageChange: setPage,
           }}
         />
+        </>
       )}
 
       <ContractActionSheet

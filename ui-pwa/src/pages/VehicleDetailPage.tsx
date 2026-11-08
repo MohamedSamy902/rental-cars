@@ -1011,14 +1011,18 @@ export function VehicleDetailPage() {
                 <div>
                   <span>
                     {d.document_number ? `رقم ${d.document_number} · ` : ''}
-                    صدر {d.issued_on || '—'} · ينتهي {d.expires_on || '—'}
+                    صدر {d.issued_on ? civilDateOnly(d.issued_on) : '—'} · ينتهي {d.expires_on ? civilDateOnly(d.expires_on) : '—'}
                     {d.file_path ? ' · وجه' : ''}
                     {d.file_path_back ? ' · ظهر' : ''}
                   </span>
                 </div>
               </div>
               <div className="rpm-actions-row vd-no-print">
-                <Button size="sm" variant="ghost" onClick={() => setDocEdit({ ...d })}>تعديل</Button>
+                <Button size="sm" variant="ghost" onClick={() => setDocEdit({
+                  ...d,
+                  issued_on: d.issued_on ? civilDateOnly(d.issued_on) : '',
+                  expires_on: d.expires_on ? civilDateOnly(d.expires_on) : '',
+                })}>تعديل</Button>
                 <Button size="sm" variant="danger" loading={saving} onClick={() => deleteDocument(d)}>حذف</Button>
               </div>
             </div>

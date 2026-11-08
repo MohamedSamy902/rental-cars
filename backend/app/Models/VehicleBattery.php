@@ -15,8 +15,8 @@ class VehicleBattery extends Model
     protected function casts(): array
     {
         return [
-            'installed_on' => 'date',
-            'replaced_on' => 'date',
+            'installed_on' => 'date:Y-m-d',
+            'replaced_on' => 'date:Y-m-d',
         ];
     }
 

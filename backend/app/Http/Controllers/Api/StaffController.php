@@ -33,7 +33,7 @@ class StaffController extends Controller
             $q->where('role_id', $roleId);
         }
 
-        $perPage = PaginationInput::perPage($request, 50, 100);
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
 

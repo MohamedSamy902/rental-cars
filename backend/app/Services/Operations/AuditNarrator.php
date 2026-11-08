@@ -15,6 +15,7 @@ use App\Models\SalaryAdvance;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\WorkOrder;
+use Illuminate\Support\Collection;
 
 /**
  * Converts audit trail rows into short natural Arabic sentences for staff.
@@ -45,6 +46,7 @@ class AuditNarrator
             'payment_recorded' => "قام {$who} بتسجيل دفعة".$this->moneyRef($after),
             'month_locked' => "قام {$who} بإقفال شهر محاسبي".$this->monthRef($after),
             'month_reopened' => "قام {$who} بإعادة فتح شهر محاسبي".$this->monthRef($after),
+            'owner_month_accrued' => "قام {$who} بترحيل استحقاق مالك".$this->moneyRef($after).$this->monthRef($after),
             'salary_advance_recorded' => "قام {$who} بتسجيل سلفة للموظف".$this->employeeRef($after),
             'salary_advance_deleted' => "قام {$who} بحذف سلفة موظف".$this->employeeRef($before ?: $after),
             'payroll_payout' => "قام {$who} بصرف راتب جزئي أو كامل".$this->moneyRef($after),
@@ -302,6 +304,7 @@ class AuditNarrator
             'payment_recorded' => 'تسجيل دفعة',
             'month_locked' => 'إقفال شهر',
             'month_reopened' => 'إعادة فتح شهر',
+            'owner_month_accrued' => 'ترحيل استحقاق مالك',
             'salary_advance_recorded' => 'سلفة موظف',
             'salary_advance_deleted' => 'حذف سلفة',
             'payroll_payout' => 'صرف راتب',
@@ -315,7 +318,7 @@ class AuditNarrator
     }
 
     /**
-     * @param  list<AuditLog>|\Illuminate\Support\Collection<int, AuditLog>  $logs
+     * @param  list<AuditLog>|Collection<int, AuditLog>  $logs
      * @return array<int, array{name: string, role_title: string|null, phrase: string}>
      */
     public function resolveActors($logs): array
@@ -350,7 +353,7 @@ class AuditNarrator
     }
 
     /**
-     * @param  list<AuditLog>|\Illuminate\Support\Collection<int, AuditLog>  $logs
+     * @param  list<AuditLog>|Collection<int, AuditLog>  $logs
      * @return array<int, string> keyed by user id
      *
      * @deprecated Prefer resolveActors(); kept for call-site compatibility.

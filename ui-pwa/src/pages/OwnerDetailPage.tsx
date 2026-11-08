@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAuth } from '@/shared/auth/AuthContext'
 import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -70,6 +71,8 @@ const emptyForm = {
 
 export function OwnerDetailPage() {
   const { id } = useParams()
+  const { can } = useAuth()
+  const canAccrue = can('owners.accrue') || can('owners.payout')
   const [searchParams, setSearchParams] = useSearchParams()
   const toast = useToast()
   const { openNewContract } = useNewContract()
@@ -136,6 +139,20 @@ export function OwnerDetailPage() {
     }
   }
 
+  async function onAccrue() {
+    if (!owner) return
+    setSaving(true)
+    try {
+      await api(`/owners/${owner.id}/accruals`, { method: 'POST', json: {} })
+      toast.success('تم ترحيل الاستحقاق حتى الشهر الحالي.')
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function onPayout() {
     if (!owner) return
     setSaving(true)
@@ -180,6 +197,7 @@ export function OwnerDetailPage() {
           <>
             <BackNavButton to="/owners" label="رجوع للملاك" />
             <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
+            {canAccrue ? <Button variant="secondary" loading={saving} onClick={() => void onAccrue()}>ترحيل الاستحقاق</Button> : null}
             <Button onClick={() => setPayoutOpen(true)}>صرف مستحقات</Button>
           </>
         }

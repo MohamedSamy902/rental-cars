@@ -16,7 +16,7 @@ class OwnerPayout extends Model
     {
         return [
             'amount' => 'integer',
-            'paid_on' => 'date',
+            'paid_on' => 'date:Y-m-d',
         ];
     }
 
