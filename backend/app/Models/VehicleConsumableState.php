@@ -15,8 +15,8 @@ class VehicleConsumableState extends Model
     protected function casts(): array
     {
         return [
-            'installed_on' => 'date',
-            'due_on' => 'date',
+            'installed_on' => 'date:Y-m-d',
+            'due_on' => 'date:Y-m-d',
         ];
     }
 

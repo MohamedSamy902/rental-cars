@@ -32,7 +32,7 @@ class VehicleOwnerController extends Controller
             $q->where('is_active', true);
         }
 
-        $perPage = PaginationInput::perPage($request, 50, 100);
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
         $data = collect($rows->items())->map(function (VehicleOwner $o) use ($canViewNid) {
@@ -114,6 +114,30 @@ class VehicleOwnerController extends Controller
         $ym = $request->string('month')->toString() ?: now()->format('Y-m');
 
         return response()->json(['data' => $this->owners->balance($owner, $ym)]);
+    }
+
+    public function accrue(Request $request, VehicleOwner $owner): JsonResponse
+    {
+        $data = $request->validate([
+            'through' => ['nullable', 'regex:/^\d{4}-\d{2}$/'],
+        ], [], [
+            'through' => 'الشهر',
+        ]);
+
+        try {
+            $this->owners->ensureAccruedThrough(
+                $owner,
+                (string) ($data['through'] ?? now()->format('Y-m')),
+                $request->user()?->id,
+            );
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => $this->owners->balance($owner),
+            'message' => 'تم ترحيل الاستحقاق.',
+        ]);
     }
 
     public function payout(Request $request, VehicleOwner $owner): JsonResponse

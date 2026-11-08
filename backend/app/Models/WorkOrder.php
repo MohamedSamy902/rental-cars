@@ -20,10 +20,10 @@ class WorkOrder extends Model
     protected function casts(): array
     {
         return [
-            'opened_on' => 'date',
+            'opened_on' => 'date:Y-m-d',
             'opened_at' => 'datetime',
-            'closed_on' => 'date',
-            'next_service_on' => 'date',
+            'closed_on' => 'date:Y-m-d',
+            'next_service_on' => 'date:Y-m-d',
             'puts_in_maintenance' => 'boolean',
             'next_service_odometer' => 'integer',
         ];
@@ -37,5 +37,25 @@ class WorkOrder extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(WorkOrderLine::class);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        $array = parent::toArray();
+        if (! $this->relationLoaded('lines')) {
+            return $array;
+        }
+
+        $linesTotal = (int) $this->lines->sum(
+            fn ($line) => (int) $line->quantity * (int) $line->unit_price
+        );
+        $stored = (int) $this->parts_cost;
+        $array['lines_parts_total'] = $linesTotal;
+        $array['parts_cost_other'] = $stored - $linesTotal;
+
+        return $array;
     }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
-import { nowLocalDateTimeValue } from '@/shared/lib/dates'
+import { civilDateOnly, nowLocalDateTimeValue } from '@/shared/lib/dates'
 import { formatMoney } from '@/shared/lib/format'
 import {
   Button, Sheet, SelectField, NumberField, MoneyField, TextField, SwitchField,
@@ -125,7 +125,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           puts_in_maintenance: putsInMaintenance,
           force_after_resolution: true,
           opened_at: form.opened_at || undefined,
-          opened_on: form.opened_at ? form.opened_at.slice(0, 10) : undefined,
+          opened_on: form.opened_at ? civilDateOnly(form.opened_at) : undefined,
           next_service_on: form.next_service_on || undefined,
           next_service_odometer: form.next_service_odometer !== '' ? Number(form.next_service_odometer) : undefined,
           lines: [

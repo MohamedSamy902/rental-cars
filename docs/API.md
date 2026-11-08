@@ -722,7 +722,8 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/owners` | `owners.create` |
 | GET | `/owners/{id}` | `owners.view` — عربيات + استحقاقات + سحوبات + رصيد |
 | PUT | `/owners/{id}` | `owners.update` |
-| GET | `/owners/{id}/balance?month=YYYY-MM` | `owners.view` |
+| GET | `/owners/{id}/balance?month=YYYY-MM` | `owners.view` — قراءة فقط، بلا ترحيل |
+| POST | `/owners/{id}/accruals` | `owners.accrue` أو `owners.payout` — `{ "through": "YYYY-MM" }` اختياري. Idempotent. شهر مقفل = 422 بلا كتابة |
 | POST | `/owners/{id}/payouts` | `owners.payout` (حسّاسة) |
 | GET | `/owner-payouts` | `owners.view` |
 
@@ -738,7 +739,9 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 ```json
 { "amount": 3000, "paid_on": "2026-10-15", "payment_method": "cash", "vehicle_id": 12, "notes": "دفعة جزئية" }
 ```
-يرفض إن تجاوز المتبقي.
+يرفض إن تجاوز المتبقي. فتح الملف أو أي GET لا ينشئ استحقاقاً ولا قيد يومية.
+
+`per_page` على القوائم المرقّمة: عدد صحيح من ١ إلى ٢٠٠. صفر أو سالب أو غير رقمي أو أكبر من ٢٠٠ = 422. `page` أقل من ١ أو غير رقمي = 422.
 
 ---
 

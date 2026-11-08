@@ -10,14 +10,19 @@ use Illuminate\Validation\ValidationException;
  */
 final class PaginationInput
 {
-    public static function perPage(Request $request, int $default = 50, int $max = 100): int
+    public const MAX_PER_PAGE = 200;
+
+    public static function perPage(Request $request, int $default = 50, int $max = self::MAX_PER_PAGE): int
     {
         if (! $request->exists('per_page') && ! $request->exists('perPage')) {
             return $default;
         }
 
         $raw = $request->input('per_page', $request->input('perPage'));
-        if (! is_numeric($raw) || (int) $raw != $raw) {
+        if (is_string($raw)) {
+            $raw = trim($raw);
+        }
+        if (! is_scalar($raw) || ! preg_match('/^-?\d+$/', (string) $raw)) {
             throw ValidationException::withMessages([
                 'per_page' => ['حجم الصفحة يجب أن يكون رقماً صحيحاً.'],
             ]);
@@ -29,8 +34,13 @@ final class PaginationInput
                 'per_page' => ['حجم الصفحة يجب أن يكون ١ على الأقل.'],
             ]);
         }
+        if ($value > $max) {
+            throw ValidationException::withMessages([
+                'per_page' => ["حجم الصفحة يجب ألا يتجاوز {$max}."],
+            ]);
+        }
 
-        return min($value, $max);
+        return $value;
     }
 
     public static function page(Request $request): int
@@ -40,7 +50,10 @@ final class PaginationInput
         }
 
         $raw = $request->input('page');
-        if (! is_numeric($raw) || (int) $raw != $raw) {
+        if (is_string($raw)) {
+            $raw = trim($raw);
+        }
+        if (! is_scalar($raw) || ! preg_match('/^-?\d+$/', (string) $raw)) {
             throw ValidationException::withMessages([
                 'page' => ['رقم الصفحة يجب أن يكون رقماً صحيحاً.'],
             ]);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLatestRequest } from '@/shared/lib/useLatestRequest'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { addCivilDays, todayCivilIso } from '@/shared/lib/dates'
@@ -107,6 +108,7 @@ export function VehiclesPage() {
   const [agreementCustomDays, setAgreementCustomDays] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const beginRequest = useLatestRequest()
   const [open, setOpen] = useState(false)
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null)
 
@@ -172,6 +174,7 @@ export function VehiclesPage() {
     agreementDays = agreementWithinDays,
     nextPage = page,
   ) {
+    const isCurrent = beginRequest()
     setLoading(true)
     setError('')
     try {
@@ -189,6 +192,7 @@ export function VehiclesPage() {
         summary: typeof summary
         meta?: { current_page: number; last_page: number; total: number }
       }>(`/vehicles?${qs}`)
+      if (!isCurrent()) return
       setRows(res.data)
       setMeta({
         current_page: res.meta?.current_page ?? nextPage,
@@ -208,9 +212,10 @@ export function VehiclesPage() {
         owner_agreement_expiring: s.owner_agreement_expiring ?? 0,
       })
     } catch (e) {
+      if (!isCurrent()) return
       setError((e as ApiError).message)
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }
 
@@ -470,6 +475,7 @@ export function VehiclesPage() {
       return
     }
     setWithinDays(Math.round(n))
+    setPage(1)
   }
 
   function applyLicenseCustomDays() {
@@ -479,6 +485,7 @@ export function VehiclesPage() {
       return
     }
     setLicenseWithinDays(Math.round(n))
+    setPage(1)
   }
 
   function applySimCustomDays() {
@@ -488,6 +495,7 @@ export function VehiclesPage() {
       return
     }
     setSimWithinDays(Math.round(n))
+    setPage(1)
   }
 
   function applyAgreementCustomDays() {
@@ -497,6 +505,7 @@ export function VehiclesPage() {
       return
     }
     setAgreementWithinDays(Math.round(n))
+    setPage(1)
   }
 
   return (
@@ -545,7 +554,7 @@ export function VehiclesPage() {
                 type="button"
                 size="sm"
                 variant={withinDays === d && customDays === '' ? 'accent' : 'secondary'}
-                onClick={() => { setWithinDays(d); setCustomDays('') }}
+                onClick={() => { setWithinDays(d); setCustomDays(''); setPage(1) }}
               >
                 {d === 1 ? '1 يوم' : d === 2 ? '2 يوم' : `${d} أيام`}
               </Button>
@@ -581,7 +590,7 @@ export function VehiclesPage() {
                 type="button"
                 size="sm"
                 variant={licenseWithinDays === d && licenseCustomDays === '' ? 'accent' : 'secondary'}
-                onClick={() => { setLicenseWithinDays(d); setLicenseCustomDays('') }}
+                onClick={() => { setLicenseWithinDays(d); setLicenseCustomDays(''); setPage(1) }}
               >
                 {d} يوماً
               </Button>
@@ -617,7 +626,7 @@ export function VehiclesPage() {
                 type="button"
                 size="sm"
                 variant={simWithinDays === d && simCustomDays === '' ? 'accent' : 'secondary'}
-                onClick={() => { setSimWithinDays(d); setSimCustomDays('') }}
+                onClick={() => { setSimWithinDays(d); setSimCustomDays(''); setPage(1) }}
               >
                 {d} يوماً
               </Button>
@@ -653,7 +662,7 @@ export function VehiclesPage() {
                 type="button"
                 size="sm"
                 variant={agreementWithinDays === d && agreementCustomDays === '' ? 'accent' : 'secondary'}
-                onClick={() => { setAgreementWithinDays(d); setAgreementCustomDays('') }}
+                onClick={() => { setAgreementWithinDays(d); setAgreementCustomDays(''); setPage(1) }}
               >
                 {d} يوماً
               </Button>
@@ -679,9 +688,13 @@ export function VehiclesPage() {
         </div>
       ) : null}
 
-      {error ? (
+      {error && rows.length === 0 ? (
         <ErrorState title="تعذّر تحميل العربيات" description={error} action={<Button onClick={() => void load()}>إعادة المحاولة</Button>} />
       ) : (
+        <>
+      {error ? (
+        <ErrorState title="تعذّر تحديث العربيات" description={error} action={<Button onClick={() => void load()}>إعادة المحاولة</Button>} />
+      ) : null}
         <DataTable
           label="العربيات"
           rows={rows}
@@ -701,6 +714,7 @@ export function VehiclesPage() {
             onPageChange: setPage,
           }}
         />
+        </>
       )}
 
       <VehicleFormSheet

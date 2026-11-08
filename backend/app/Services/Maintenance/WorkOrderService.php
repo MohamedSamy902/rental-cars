@@ -173,7 +173,16 @@ class WorkOrderService
 
     public function close(WorkOrder $order): WorkOrder
     {
+        if ($order->status === 'closed') {
+            return $order->fresh(['vehicle', 'lines']);
+        }
+
         return DB::transaction(function () use ($order) {
+            $locked = WorkOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status === 'closed') {
+                return $locked->fresh(['vehicle', 'lines']);
+            }
+            $order = $locked;
             $order->loadMissing('lines');
             $order->update([
                 'status' => 'closed',

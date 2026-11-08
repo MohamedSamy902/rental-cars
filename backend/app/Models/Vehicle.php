@@ -31,11 +31,11 @@ class Vehicle extends Model
             'daily_rate' => 'integer',
             'default_deposit' => 'integer',
             'owner_monthly_amount' => 'integer',
-            'owner_since' => 'date',
-            'owner_agreement_starts_on' => 'date',
-            'owner_agreement_ends_on' => 'date',
-            'tracker_sim_last_recharged_on' => 'date',
-            'tracker_sim_next_recharge_on' => 'date',
+            'owner_since' => 'date:Y-m-d',
+            'owner_agreement_starts_on' => 'date:Y-m-d',
+            'owner_agreement_ends_on' => 'date:Y-m-d',
+            'tracker_sim_last_recharged_on' => 'date:Y-m-d',
+            'tracker_sim_next_recharge_on' => 'date:Y-m-d',
             'tracker_sim_recharge_cycle_days' => 'integer',
         ];
     }

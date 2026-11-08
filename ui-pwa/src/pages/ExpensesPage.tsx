@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { currentCivilMonth } from '@/shared/lib/dates'
-import { formatMoney, formatDateTime } from '@/shared/lib/format'
+import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, Button, Fab, FilterBar, MetricCardGrid, useToast, DataTable, Badge,
@@ -34,7 +34,7 @@ const columns: DataColumn<Expense>[] = [
     sortValue: (r) => r.title,
     mobile: 'title',
   },
-  { id: 'date', header: 'التاريخ', cell: (r) => formatDateTime(r.spent_on).split('،')[0] || r.spent_on.slice(0, 10), sortValue: (r) => r.spent_on, mobile: 'subtitle' },
+  { id: 'date', header: 'التاريخ', cell: (r) => formatDate(r.spent_on), sortValue: (r) => r.spent_on, mobile: 'subtitle' },
   {
     id: 'scope',
     header: 'النطاق',

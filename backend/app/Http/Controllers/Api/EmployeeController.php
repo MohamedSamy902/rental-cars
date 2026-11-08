@@ -31,7 +31,7 @@ class EmployeeController extends Controller
             $q->where('status', $status);
         }
 
-        $perPage = PaginationInput::perPage($request, 100, 100);
+        $perPage = PaginationInput::perPage($request, 100, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
 

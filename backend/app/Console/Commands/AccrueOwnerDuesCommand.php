@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\VehicleOwner;
 use App\Services\Fleet\VehicleOwnerService;
+use DomainException;
 use Illuminate\Console\Command;
 
 class AccrueOwnerDuesCommand extends Command
@@ -29,13 +30,19 @@ class AccrueOwnerDuesCommand extends Command
         }
 
         $count = 0;
+        $failed = 0;
         foreach ($query->cursor() as $owner) {
-            $owners->ensureAccruedThrough($owner, $through);
-            $count++;
-            $this->line("· مالك #{$owner->id} {$owner->full_name}");
+            try {
+                $owners->ensureAccruedThrough($owner, $through);
+                $count++;
+                $this->line("· مالك #{$owner->id} {$owner->full_name}");
+            } catch (DomainException $e) {
+                $failed++;
+                $this->error("مالك #{$owner->id}: {$e->getMessage()}");
+            }
         }
         $this->info("تم ترحيل الاستحقاق حتى {$through} لـ {$count} مالك.");
 
-        return self::SUCCESS;
+        return $failed > 0 ? self::FAILURE : self::SUCCESS;
     }
 }

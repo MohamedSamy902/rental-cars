@@ -17,7 +17,7 @@ class VehicleViolationInquiry extends Model
     protected function casts(): array
     {
         return [
-            'inquired_on' => 'date',
+            'inquired_on' => 'date:Y-m-d',
         ];
     }
 

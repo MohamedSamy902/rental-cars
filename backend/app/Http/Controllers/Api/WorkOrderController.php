@@ -22,7 +22,7 @@ class WorkOrderController extends Controller
         if ($vehicleId = $request->integer('vehicle_id')) {
             $q->where('vehicle_id', $vehicleId);
         }
-        $perPage = PaginationInput::perPage($request, 50, 100);
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
 

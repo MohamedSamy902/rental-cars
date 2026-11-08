@@ -3,6 +3,7 @@
 namespace App\Services\Fleet;
 
 use App\Models\Account;
+use App\Models\AuditLog;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\MonthLock;
@@ -70,6 +71,7 @@ class VehicleOwnerService
             ->where('owner_monthly_amount', '>', 0)
             ->get();
 
+        $pending = [];
         foreach ($vehicles as $vehicle) {
             $startRaw = $vehicle->owner_since?->format('Y-m-d')
                 ?? $vehicle->created_at?->format('Y-m-01')
@@ -79,9 +81,21 @@ class VehicleOwnerService
 
             while ($cursor <= $through) {
                 $ym = $cursor->format('Y-m');
-                $this->accrueVehicleMonth($owner, $vehicle, $ym, $userId);
+                $exists = OwnerMonthDue::query()
+                    ->where('owner_id', $owner->id)
+                    ->where('vehicle_id', $vehicle->id)
+                    ->where('year_month', $ym)
+                    ->exists();
+                if (! $exists) {
+                    $this->assertMonthOpenForAccrual($ym);
+                    $pending[] = [$vehicle, $ym];
+                }
                 $cursor = $cursor->add(new DateInterval('P1M'));
             }
+        }
+
+        foreach ($pending as [$vehicle, $ym]) {
+            $this->accrueVehicleMonth($owner, $vehicle, $ym, $userId);
         }
     }
 
@@ -101,52 +115,51 @@ class VehicleOwnerService
             throw new DomainException('لا يوجد مبلغ شهري لهذه العربية.');
         }
 
-        [$year, $month] = array_map('intval', explode('-', $yearMonth));
-        $locked = MonthLock::query()->where(compact('year', 'month'))->first();
-        $isLocked = $locked && $locked->isLocked();
-
-        // شهر مقفل: نثبّت الاستحقاق للرصيد بلا قيد يومية جديد
-        if ($isLocked) {
-            return OwnerMonthDue::query()->create([
-                'owner_id' => $owner->id,
-                'vehicle_id' => $vehicle->id,
-                'year_month' => $yearMonth,
-                'amount' => $amount,
-                'journal_entry_id' => null,
-                'created_by' => $userId,
-            ]);
-        }
+        $this->assertMonthOpenForAccrual($yearMonth);
 
         $this->accounting->ensureChartOfAccounts();
         $this->ensureOwnerAccounts();
 
         return DB::transaction(function () use ($owner, $vehicle, $yearMonth, $amount, $userId) {
+            $again = OwnerMonthDue::query()
+                ->where('owner_id', $owner->id)
+                ->where('vehicle_id', $vehicle->id)
+                ->where('year_month', $yearMonth)
+                ->lockForUpdate()
+                ->first();
+            if ($again) {
+                return $again;
+            }
+
             $payable = Account::query()->where('code', '2100')->firstOrFail();
             $expense = Account::query()->where('code', '5200')->firstOrFail();
             $entryDate = $yearMonth.'-01';
+            $source = "owner_accrual:{$vehicle->id}:{$yearMonth}";
+            $entry = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+            if (! $entry) {
+                $entry = JournalEntry::query()->create([
+                    'entry_date' => $entryDate,
+                    'narration' => "استحقاق مالك {$owner->full_name} · {$vehicle->code} · {$yearMonth}",
+                    'source' => $source,
+                    'posted_by' => $userId,
+                ]);
+                JournalLine::query()->create([
+                    'journal_entry_id' => $entry->id,
+                    'account_id' => $expense->id,
+                    'debit' => $amount,
+                    'credit' => 0,
+                    'vehicle_id' => $vehicle->id,
+                ]);
+                JournalLine::query()->create([
+                    'journal_entry_id' => $entry->id,
+                    'account_id' => $payable->id,
+                    'debit' => 0,
+                    'credit' => $amount,
+                    'vehicle_id' => $vehicle->id,
+                ]);
+            }
 
-            $entry = JournalEntry::query()->create([
-                'entry_date' => $entryDate,
-                'narration' => "استحقاق مالك {$owner->full_name} · {$vehicle->code} · {$yearMonth}",
-                'source' => "owner_accrual:{$vehicle->id}:{$yearMonth}",
-                'posted_by' => $userId,
-            ]);
-            JournalLine::query()->create([
-                'journal_entry_id' => $entry->id,
-                'account_id' => $expense->id,
-                'debit' => $amount,
-                'credit' => 0,
-                'vehicle_id' => $vehicle->id,
-            ]);
-            JournalLine::query()->create([
-                'journal_entry_id' => $entry->id,
-                'account_id' => $payable->id,
-                'debit' => 0,
-                'credit' => $amount,
-                'vehicle_id' => $vehicle->id,
-            ]);
-
-            return OwnerMonthDue::query()->create([
+            $due = OwnerMonthDue::query()->create([
                 'owner_id' => $owner->id,
                 'vehicle_id' => $vehicle->id,
                 'year_month' => $yearMonth,
@@ -154,7 +167,39 @@ class VehicleOwnerService
                 'journal_entry_id' => $entry->id,
                 'created_by' => $userId,
             ]);
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'owner_month_accrued',
+                'record_type' => OwnerMonthDue::class,
+                'record_id' => $due->id,
+                'after' => [
+                    'owner_id' => $owner->id,
+                    'owner_name' => $owner->full_name,
+                    'vehicle_id' => $vehicle->id,
+                    'vehicle_code' => $vehicle->code,
+                    'year_month' => $yearMonth,
+                    'year' => (int) substr($yearMonth, 0, 4),
+                    'month' => (int) substr($yearMonth, 5, 2),
+                    'amount' => $amount,
+                    'journal_entry_id' => $entry->id,
+                ],
+            ]);
+
+            return $due;
         });
+    }
+
+    /**
+     * Locked months are rejected before any due or journal is written.
+     */
+    private function assertMonthOpenForAccrual(string $yearMonth): void
+    {
+        [$year, $month] = array_map('intval', explode('-', $yearMonth));
+        $locked = MonthLock::query()->where(compact('year', 'month'))->first();
+        if ($locked && $locked->isLocked()) {
+            throw new DomainException(sprintf('الشهر %s مقفل ولا يُرحَّل إليه استحقاق مالك.', $yearMonth));
+        }
     }
 
     /**

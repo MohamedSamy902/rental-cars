@@ -15,7 +15,7 @@ class ViolationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = PaginationInput::perPage($request, 50, 100);
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = Violation::query()
             ->with(['vehicle', 'customer', 'contract', 'creator:id,name'])
