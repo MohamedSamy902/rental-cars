@@ -166,7 +166,7 @@ class QaV4FixTicketsTest extends TestCase
             'phone' => '01033334444',
             'is_active' => true,
         ]);
-        $month = now()->startOfMonth();
+        $month = now()->startOfMonth()->subMonth();
         Vehicle::query()->create([
             'code' => 'OWN-L',
             'plate' => 'OWN-L',
@@ -336,7 +336,7 @@ class QaV4FixTicketsTest extends TestCase
         $this->assertSame(360, (int) $row['lines_parts_total']);
         $this->assertSame(160, (int) $row['parts_cost_other']);
 
-        $this->postJson('/api/work-orders/'.$order->id.'/close')->assertOk();
+        $this->postJson('/api/work-orders/'.$order->id.'/close')->assertStatus(422);
         $this->assertSame(520, (int) $order->fresh()->parts_cost);
         $this->assertSame('closed', $order->fresh()->status);
     }

@@ -125,9 +125,9 @@ class VehicleOwnerController extends Controller
         ]);
 
         try {
-            $this->owners->ensureAccruedThrough(
+            $created = $this->owners->ensureAccruedThrough(
                 $owner,
-                (string) ($data['through'] ?? now()->format('Y-m')),
+                (string) ($data['through'] ?? now()->timezone(config('app.timezone', 'Africa/Cairo'))->format('Y-m')),
                 $request->user()?->id,
             );
         } catch (DomainException $e) {
@@ -136,7 +136,8 @@ class VehicleOwnerController extends Controller
 
         return response()->json([
             'data' => $this->owners->balance($owner),
-            'message' => 'تم ترحيل الاستحقاق.',
+            'created' => $created,
+            'message' => $created > 0 ? 'تم ترحيل الاستحقاق.' : 'لا يوجد استحقاق جديد.',
         ]);
     }
 

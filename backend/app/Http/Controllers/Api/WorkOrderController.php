@@ -72,6 +72,8 @@ class WorkOrderController extends Controller
             'lines.*.inventory_item_id.exists' => 'صنف المخزون المحدد غير موجود.',
             'lines.*.inventory_item_id.min' => 'اختر صنف المخزون.',
             'lines.*.inventory_item_id.integer' => 'اختر صنف المخزون.',
+            'vehicle_id.required' => 'العربية مطلوبة.',
+            'lines.*.quantity.required' => 'الكمية مطلوبة.',
         ], [
             'vehicle_id' => 'العربية',
             'odometer' => 'العداد',
@@ -84,6 +86,11 @@ class WorkOrderController extends Controller
             'lines.*.quantity' => 'الكمية',
         ]);
 
+        $usesPetty = collect($data['lines'] ?? [])->contains(fn ($line) => ! empty($line['from_petty_cash']));
+        if ($usesPetty && ! $request->user()?->hasPermission('petty_cash.manage') && ! $request->user()?->hasPermission('hr.custody')) {
+            return response()->json(['message' => 'صرف العهدة يتطلب صلاحية إدارة العهدة.'], 403);
+        }
+
         try {
             $order = $this->service->open($data, $data['lines'] ?? [], $request->user()?->id);
         } catch (\DomainException $e) {
@@ -95,6 +102,9 @@ class WorkOrderController extends Controller
 
     public function close(WorkOrder $workOrder): JsonResponse
     {
+        if ($workOrder->status === 'closed') {
+            return response()->json(['message' => 'مغلق مسبقاً.'], 422);
+        }
         $order = $this->service->close($workOrder->load('lines'));
 
         return response()->json(['data' => $order, 'message' => 'تم إغلاق أمر الشغل.']);

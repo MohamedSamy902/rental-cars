@@ -5,11 +5,14 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\Contract;
+use App\Models\Customer;
+use App\Models\Deposit;
 use App\Models\Expense;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\MonthLock;
 use App\Models\Payment;
+use App\Models\Vehicle;
 use App\Services\Contracts\ContractLedgerMath;
 use App\Services\Contracts\ContractPricingService;
 use Carbon\CarbonImmutable;
@@ -506,9 +509,27 @@ class AccountingService
             throw new DomainException('المبلغ يجب أن يكون أكبر من صفر.');
         }
 
+        $canonical = $this->methods->canonical((string) ($data['method'] ?? ''));
+        if ($canonical === 'other') {
+            throw new DomainException('طريقة الدفع غير مدعومة.');
+        }
+
         return DB::transaction(function () use ($data, $userId, $paidAt, $amount) {
             $linkType = (string) $data['link_type'];
             $linkId = isset($data['link_id']) ? (int) $data['link_id'] : null;
+            if (! $linkId) {
+                throw new DomainException('معرّف الربط مطلوب.');
+            }
+            $linked = match ($linkType) {
+                'contract' => Contract::query()->whereKey($linkId)->exists(),
+                'customer' => Customer::query()->whereKey($linkId)->exists(),
+                'deposit' => Deposit::query()->whereKey($linkId)->exists(),
+                'vehicle' => Vehicle::query()->whereKey($linkId)->exists(),
+                default => false,
+            };
+            if (! $linked) {
+                throw new DomainException('الربط غير موجود.');
+            }
 
             if ($linkType === 'contract' && $linkId && $data['direction'] === 'in') {
                 $contract = Contract::query()->whereKey($linkId)->lockForUpdate()->first();
@@ -542,11 +563,136 @@ class AccountingService
             ]);
 
             // Credit-balance applications are memo allocations — not cash receipts.
-            if ($linkType === 'contract' && $linkId && $this->methods->canonical((string) $payment->method) !== 'credit') {
+            $methodKey = $this->methods->canonical((string) $payment->method);
+            if ($linkType === 'contract' && $linkId && ! in_array($methodKey, ['credit', 'deposit'], true)) {
                 $this->postPaymentJournal($payment, $userId);
             }
 
             return $payment;
+        });
+    }
+
+    public function postDepositHold(Deposit $deposit, Contract $contract, ?int $userId = null): JournalEntry
+    {
+        return $this->postTransfer(
+            'deposit_hold:'.$deposit->id,
+            now()->toDateString(),
+            'قبض تأمين نقدي للعقد '.$contract->number,
+            '1000',
+            '1300',
+            (int) $deposit->original_amount,
+            $userId,
+            (int) $contract->vehicle_id,
+            (int) $contract->customer_id,
+        );
+    }
+
+    public function postDepositReturn(Deposit $deposit, int $amount, ?int $userId = null): ?JournalEntry
+    {
+        if ($amount < 1) {
+            return null;
+        }
+        $contract = Contract::query()->find($deposit->contract_id);
+
+        return $this->postTransfer(
+            'deposit_return:'.$deposit->id,
+            now()->toDateString(),
+            'رد تأمين نقدي',
+            '1300',
+            '1000',
+            $amount,
+            $userId,
+            $contract ? (int) $contract->vehicle_id : null,
+            $contract ? (int) $contract->customer_id : null,
+        );
+    }
+
+    public function postDepositApply(Deposit $deposit, Contract $contract, int $amount, int $deductionId, ?int $userId = null): JournalEntry
+    {
+        return $this->postTransfer(
+            'deposit_apply:'.$deductionId,
+            now()->toDateString(),
+            'تسوية تأمين على العقد '.$contract->number,
+            '1300',
+            '1200',
+            $amount,
+            $userId,
+            (int) $contract->vehicle_id,
+            (int) $contract->customer_id,
+        );
+    }
+
+    public function postCustodyMovement(string $source, string $direction, int $amount, string $date, ?int $userId = null): JournalEntry
+    {
+        if ($direction === 'in') {
+            return $this->postTransfer($source, $date, 'تغذية عهدة', '1500', '1000', $amount, $userId);
+        }
+
+        return $this->postTransfer($source, $date, 'رد عهدة', '1000', '1500', $amount, $userId);
+    }
+
+    public function postInventoryReceipt(string $source, int $amount, string $date, ?int $userId = null, bool $fromCustody = false): JournalEntry
+    {
+        return $this->postTransfer(
+            $source,
+            $date,
+            'استلام مخزون',
+            '1400',
+            $fromCustody ? '1500' : '1000',
+            $amount,
+            $userId,
+        );
+    }
+
+    private function postTransfer(
+        string $source,
+        string $date,
+        string $narration,
+        string $debitCode,
+        string $creditCode,
+        int $amount,
+        ?int $userId = null,
+        ?int $vehicleId = null,
+        ?int $customerId = null,
+    ): JournalEntry {
+        if ($amount < 1) {
+            throw new DomainException('مبلغ القيد غير صالح.');
+        }
+        $this->ensureChartOfAccounts();
+        $dt = new \DateTimeImmutable($date);
+        $this->assertMonthOpen((int) $dt->format('Y'), (int) $dt->format('n'));
+
+        return DB::transaction(function () use ($source, $date, $narration, $debitCode, $creditCode, $amount, $userId, $vehicleId, $customerId) {
+            $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
+            if ($existing) {
+                return $existing;
+            }
+            $debit = Account::query()->where('code', $debitCode)->firstOrFail();
+            $credit = Account::query()->where('code', $creditCode)->firstOrFail();
+            $entry = JournalEntry::query()->create([
+                'entry_date' => $date,
+                'narration' => $narration,
+                'source' => $source,
+                'posted_by' => $userId,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $debit->id,
+                'debit' => $amount,
+                'credit' => 0,
+                'vehicle_id' => $vehicleId,
+                'customer_id' => $customerId,
+            ]);
+            JournalLine::query()->create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $credit->id,
+                'debit' => 0,
+                'credit' => $amount,
+                'vehicle_id' => $vehicleId,
+                'customer_id' => $customerId,
+            ]);
+
+            return $entry;
         });
     }
 

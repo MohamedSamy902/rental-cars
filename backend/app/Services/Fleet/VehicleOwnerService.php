@@ -12,14 +12,16 @@ use App\Models\OwnerPayout;
 use App\Models\Vehicle;
 use App\Models\VehicleOwner;
 use App\Services\Accounting\AccountingService;
-use DateInterval;
 use DateTimeImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class VehicleOwnerService
 {
-    public function __construct(private readonly AccountingService $accounting) {}
+    public function __construct(
+        private readonly AccountingService $accounting,
+        private readonly OwnerRentSchedule $rentSchedule,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -55,15 +57,19 @@ class VehicleOwnerService
     }
 
     /**
-     * يستحق المبلغ الشهري لكل سيارة من تاريخ الربط حتى الشهر المطلوب (شامل).
+     * يرحّل أشهر المالك المنتهية فقط، حتى شهر الاتفاق، وبمبالغ مقسّمة على أيام القاهرة.
+     *
+     * @return int عدد الاستحقاقات الجديدة
      */
-    public function ensureAccruedThrough(VehicleOwner $owner, string $throughYearMonth, ?int $userId = null): void
+    public function ensureAccruedThrough(VehicleOwner $owner, string $throughYearMonth, ?int $userId = null): int
     {
-        $through = DateTimeImmutable::createFromFormat('Y-m-d', $throughYearMonth.'-01')
-            ?: throw new DomainException('صيغة الشهر غير صحيحة.');
+        if (! preg_match('/^\d{4}-\d{2}$/', $throughYearMonth)) {
+            throw new DomainException('صيغة الشهر غير صحيحة.');
+        }
         $this->accounting->ensureChartOfAccounts();
         $this->ensureOwnerAccounts();
 
+        $today = now()->timezone(config('app.timezone', 'Africa/Cairo'))->toDateString();
         $vehicles = Vehicle::query()
             ->where('owner_id', $owner->id)
             ->where('is_active', true)
@@ -73,33 +79,35 @@ class VehicleOwnerService
 
         $pending = [];
         foreach ($vehicles as $vehicle) {
-            $startRaw = $vehicle->owner_since?->format('Y-m-d')
-                ?? $vehicle->created_at?->format('Y-m-01')
-                ?? $through->format('Y-m-01');
-            $cursor = DateTimeImmutable::createFromFormat('Y-m-d', substr($startRaw, 0, 7).'-01')
-                ?: $through;
-
-            while ($cursor <= $through) {
-                $ym = $cursor->format('Y-m');
+            $start = $vehicle->owner_agreement_starts_on?->toDateString()
+                ?? $vehicle->owner_since?->toDateString();
+            $end = $vehicle->owner_agreement_ends_on?->toDateString();
+            $shares = $this->rentSchedule->shares($start, $end, (int) $vehicle->owner_monthly_amount, $today);
+            foreach ($shares as $ym => $amount) {
+                if ($ym > $throughYearMonth || $amount < 1) {
+                    continue;
+                }
                 $exists = OwnerMonthDue::query()
                     ->where('owner_id', $owner->id)
                     ->where('vehicle_id', $vehicle->id)
                     ->where('year_month', $ym)
                     ->exists();
-                if (! $exists) {
-                    $this->assertMonthOpenForAccrual($ym);
-                    $pending[] = [$vehicle, $ym];
+                if ($exists) {
+                    continue;
                 }
-                $cursor = $cursor->add(new DateInterval('P1M'));
+                $this->assertMonthOpenForAccrual($ym);
+                $pending[] = [$vehicle, $ym, $amount];
             }
         }
 
-        foreach ($pending as [$vehicle, $ym]) {
-            $this->accrueVehicleMonth($owner, $vehicle, $ym, $userId);
+        foreach ($pending as [$vehicle, $ym, $amount]) {
+            $this->accrueVehicleMonth($owner, $vehicle, $ym, $userId, $amount);
         }
+
+        return count($pending);
     }
 
-    public function accrueVehicleMonth(VehicleOwner $owner, Vehicle $vehicle, string $yearMonth, ?int $userId = null): OwnerMonthDue
+    public function accrueVehicleMonth(VehicleOwner $owner, Vehicle $vehicle, string $yearMonth, ?int $userId = null, ?int $amount = null): OwnerMonthDue
     {
         $existing = OwnerMonthDue::query()
             ->where('owner_id', $owner->id)
@@ -110,9 +118,12 @@ class VehicleOwnerService
             return $existing;
         }
 
-        $amount = (int) ($vehicle->owner_monthly_amount ?? 0);
+        $amount = $amount ?? (int) ($vehicle->owner_monthly_amount ?? 0);
         if ($amount < 1) {
             throw new DomainException('لا يوجد مبلغ شهري لهذه العربية.');
+        }
+        if (! $vehicle->is_active) {
+            throw new DomainException('العربية غير نشطة ولا يُرحَّل لها استحقاق.');
         }
 
         $this->assertMonthOpenForAccrual($yearMonth);

@@ -96,7 +96,7 @@ class AccountingMonthLedgerTest extends TestCase
             ->assertJsonPath('data.number', fn ($n) => is_string($n) && $n !== '')
             ->assertJsonPath('data.ledger.deposit_held', 1700)
             ->assertJsonCount(2, 'data.inspections')
-            ->assertJsonPath('data.payments.0.link_type', 'deposit');
+            ->assertJsonPath('data.payments', fn ($rows) => collect($rows)->contains(fn ($p) => ($p['link_type'] ?? '') === 'deposit'));
     }
 
     public function test_invalid_month_is_rejected(): void

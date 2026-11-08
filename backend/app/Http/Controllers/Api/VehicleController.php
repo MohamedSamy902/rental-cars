@@ -222,7 +222,7 @@ class VehicleController extends Controller
     }
 
     /** ملف العربية الكامل: حجوزات · صيانة · مصروفات · مرفقات · مالك · QR */
-    public function dossier(Vehicle $vehicle): JsonResponse
+    public function dossier(Request $request, Vehicle $vehicle): JsonResponse
     {
         $vehicle->load(['accessories', 'documents', 'owner']);
 
@@ -385,6 +385,17 @@ class VehicleController extends Controller
         });
 
         $assetExtras = $this->assets->dossierExtras($vehicle);
+        $user = $request->user();
+        $canExpenses = (bool) ($user?->hasPermission('expenses.view') || $user?->hasPermission('hr.expenses'));
+        $canOwners = (bool) $user?->hasPermission('owners.view');
+        if (! $canExpenses) {
+            $expenses = collect();
+            $expensesByMonth = $expensesByMonth->map(fn (array $row) => ['month' => $row['month'], 'amount' => 0]);
+        }
+        if (! $canOwners) {
+            $ownerDues = collect();
+            $ownerPayouts = collect();
+        }
 
         return response()->json([
             'data' => [

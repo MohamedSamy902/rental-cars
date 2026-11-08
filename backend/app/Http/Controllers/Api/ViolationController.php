@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateViolationRequest;
 use App\Models\Contract;
 use App\Models\Violation;
 use App\Support\PaginationInput;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -41,6 +42,9 @@ class ViolationController extends Controller
         unset($data['photo_paths']);
 
         [$contractId, $customerId, $vehicleId] = $this->resolveContractLink($data);
+        if ($contractId) {
+            $this->assertOccurredDuringContract($contractId, (string) $data['occurred_at']);
+        }
 
         $violation = Violation::query()->create([
             ...$data,
@@ -61,6 +65,9 @@ class ViolationController extends Controller
 
     public function update(UpdateViolationRequest $request, Violation $violation): JsonResponse
     {
+        if (in_array($violation->status, ['confirmed', 'paid'], true)) {
+            return response()->json(['message' => 'المخالفة مؤكَّدة ولا تُعدَّل.'], 422);
+        }
         $data = $request->validated();
         $photos = array_key_exists('photo_paths', $data) || array_key_exists('photo_path', $data)
             ? $this->normalizePhotos($data)
@@ -118,6 +125,9 @@ class ViolationController extends Controller
 
     public function confirmPayment(Request $request, Violation $violation): JsonResponse
     {
+        if (in_array($violation->status, ['confirmed', 'paid'], true)) {
+            return response()->json(['message' => 'مؤكدة مسبقاً.'], 422);
+        }
         $data = $request->validate([
             'collection_note' => ['nullable', 'string'],
         ]);
@@ -139,6 +149,19 @@ class ViolationController extends Controller
      * @param  array<string, mixed>  $data
      * @return array{0: int|null, 1: int|null, 2: int}
      */
+    private function assertOccurredDuringContract(int $contractId, string $occurredAt): void
+    {
+        $contract = Contract::query()->find($contractId);
+        if (! $contract || ! $contract->starts_at) {
+            return;
+        }
+        $at = Carbon::parse($occurredAt);
+        $end = $contract->actual_ends_at ?? $contract->planned_ends_at;
+        if ($at->lt($contract->starts_at) || ($end && $at->gt($end))) {
+            abort(422, 'تاريخ المخالفة خارج فترة العقد.');
+        }
+    }
+
     private function resolveContractLink(array $data): array
     {
         $contractId = isset($data['contract_id']) && $data['contract_id'] ? (int) $data['contract_id'] : null;

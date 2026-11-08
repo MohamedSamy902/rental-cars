@@ -39,7 +39,11 @@ class ViolationInquiryController extends Controller
         $user = $request->user();
         abort_unless($user !== null, 401);
 
-        $row = $this->inquiries->mark($vehicle, $user, $data['notes'] ?? null);
+        try {
+            $row = $this->inquiries->mark($vehicle, $user, $data['notes'] ?? null);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'data' => $row,

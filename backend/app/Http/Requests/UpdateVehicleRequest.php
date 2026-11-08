@@ -145,4 +145,15 @@ class UpdateVehicleRequest extends FormRequest
             'plate.unique' => 'رقم اللوحة مستخدم مسبقاً.',
         ];
     }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            $last = $this->input('tracker_sim_last_recharged_on');
+            $next = $this->input('tracker_sim_next_recharge_on');
+            if (is_string($last) && $last !== '' && is_string($next) && $next !== '' && $next < substr($last, 0, 10)) {
+                $validator->errors()->add('tracker_sim_next_recharge_on', 'موعد الشحن القادم لا يمكن أن يسبق آخر شحن.');
+            }
+        });
+    }
 }

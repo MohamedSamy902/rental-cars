@@ -112,18 +112,20 @@ class DashboardController extends Controller
 
         $occupancyPct = $this->occupancy->percent(now()->startOfMonth(), now());
 
+        $canFinance = (bool) ($request->user()?->hasPermission('reports.view') || $request->user()?->hasPermission('accounting.view'));
+
         return response()->json([
             'center_name' => $center,
             'occupancy_pct' => (int) round($occupancyPct),
             'occupancy_pct_precise' => $occupancyPct,
             'fleet_total' => $vehicles->count(),
             'fleet_status' => $statusCounts,
-            'profitability_compare' => $this->profitability->monthOverMonth(),
+            'profitability_compare' => $canFinance ? $this->profitability->monthOverMonth() : null,
             'kpis' => [
                 'available' => $statusCounts['available'],
                 'rented' => $statusCounts['rented'],
                 'returning_today' => $returningToday,
-                'expected_revenue' => $expectedRevenue,
+                'expected_revenue' => $canFinance ? $expectedRevenue : null,
                 'customers' => Customer::query()->count(),
                 'active_contracts' => $active,
                 'open_work_orders' => WorkOrder::query()->whereIn('status', ['open', 'in_progress'])->count(),
@@ -139,7 +141,7 @@ class DashboardController extends Controller
                 ? $this->importantTasks->forUser($request->user())
                 : [],
             'fleet_prep' => $this->dailyPrep->summarize(now(), 5),
-            'daily_cash' => $this->dailyCash->forUser($request->user()),
+            'daily_cash' => $canFinance ? $this->dailyCash->forUser($request->user()) : null,
             'recent_contracts' => Contract::query()
                 ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
                 ->latest('id')

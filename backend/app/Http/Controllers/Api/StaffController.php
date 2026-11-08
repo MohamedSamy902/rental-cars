@@ -161,7 +161,12 @@ class StaffController extends Controller
             $data['phone'] = trim((string) $data['phone']);
         }
 
+        $wasActive = (bool) $user->is_active;
         $user->update($data);
+        $user->refresh();
+        if ($wasActive && ! $user->is_active) {
+            $user->tokens()->delete();
+        }
 
         return response()->json([
             'data' => $this->present($user->fresh()->load('role:id,name,label')),

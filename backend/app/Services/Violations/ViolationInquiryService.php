@@ -117,6 +117,13 @@ class ViolationInquiryService
     public function mark(Vehicle $vehicle, User $user, ?string $notes = null, ?Carbon $on = null): array
     {
         $day = ($on ?? now())->toDateString();
+        $already = VehicleViolationInquiry::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->whereDate('inquired_on', $day)
+            ->exists();
+        if ($already) {
+            throw new \DomainException('تم تسجيل الاستعلام مسبقاً.');
+        }
 
         $row = VehicleViolationInquiry::query()->updateOrCreate(
             [

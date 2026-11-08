@@ -24,6 +24,7 @@ class ExpenseService
     public function create(array $data, ?int $userId = null): Expense
     {
         $spentOn = CivilDate::toDateString($data['spent_on'] ?? null);
+        $this->assertSpentOnNotFuture($spentOn);
         [$year, $month] = CivilDate::yearAndMonth($spentOn);
         $this->accounting->assertMonthOpen($year, $month);
         $this->accounting->ensureChartOfAccounts();
@@ -69,6 +70,7 @@ class ExpenseService
     public function update(Expense $expense, array $data, ?int $userId = null): Expense
     {
         $spentOn = CivilDate::toDateString($data['spent_on'] ?? $expense->spent_on?->toDateString());
+        $this->assertSpentOnNotFuture($spentOn);
         $oldSpentOn = CivilDate::toDateString($expense->spent_on?->toDateString() ?? $spentOn);
         foreach ([$oldSpentOn, $spentOn] as $day) {
             [$year, $month] = CivilDate::yearAndMonth($day);
@@ -117,6 +119,14 @@ class ExpenseService
     /**
      * @param  array<string, mixed>  $data
      */
+    private function assertSpentOnNotFuture(string $spentOn): void
+    {
+        $today = now()->timezone(config('app.timezone', 'Africa/Cairo'))->toDateString();
+        if ($spentOn > $today) {
+            throw new DomainException('لا يمكن تسجيل مصروف بتاريخ مستقبلي.');
+        }
+    }
+
     private function assertCategoryLinks(array $data): void
     {
         $category = (string) ($data['category'] ?? 'تشغيل');
