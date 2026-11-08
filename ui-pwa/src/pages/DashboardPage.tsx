@@ -724,19 +724,22 @@ export function DashboardPage() {
           <div className="db-prep__timeline" role="list">
             {data.fleet_prep.days.map((day) => {
               const dayTitle = day.is_today ? 'اليوم' : day.is_tomorrow ? 'غداً' : day.label
-              const               lanes: Array<{
+              // الصيانة أولاً في «اليوم» حتى لا تُدفَن تحت قائمة التسليم الطويلة
+              const maintLane = {
+                key: 'maintenance' as const,
+                verb: 'صيانة',
+                href: (item: FleetPrepItem) =>
+                  item.href || (item.vehicle?.id ? `/vehicles/${item.vehicle.id}` : '/maintenance'),
+              }
+              const contractLanes: Array<{
                 key: 'pickups' | 'returns' | 'maintenance'
                 verb: string
                 href: (item: FleetPrepItem) => string
               }> = [
                 { key: 'pickups', verb: 'تسليم', href: (item) => `/contracts/${item.id}` },
                 { key: 'returns', verb: 'استلام', href: (item) => `/contracts/${item.id}` },
-                {
-                  key: 'maintenance',
-                  verb: 'صيانة',
-                  href: (item) => item.href || (item.vehicle?.id ? `/vehicles/${item.vehicle.id}` : '/maintenance'),
-                },
               ]
+              const lanes = day.is_today ? [maintLane, ...contractLanes] : [...contractLanes, maintLane]
               return (
                 <article
                   key={day.date}
@@ -782,8 +785,16 @@ export function DashboardPage() {
                             <ul className="db-prep-block__list">
                               {items.map((item) => {
                                 const plate = item.vehicle?.plate || item.number || `#${item.id}`
-                                const who = item.customer || item.vehicle?.label || item.title || '—'
-                                const when = item.at ? formatTime(item.at) : null
+                                const who =
+                                  lane.key === 'maintenance'
+                                    ? item.title || item.vehicle?.label || 'أمر شغل'
+                                    : item.customer || item.vehicle?.label || item.title || '—'
+                                const when =
+                                  lane.key === 'maintenance'
+                                    ? null
+                                    : item.at
+                                      ? formatTime(item.at)
+                                      : null
                                 return (
                                   <li key={`${lane.key}-${item.id}`}>
                                     <Link to={lane.href(item)} className="db-prep-row">
