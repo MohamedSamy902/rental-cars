@@ -2,10 +2,12 @@
 
 namespace App\Services\Dashboard;
 
+use App\Models\Deposit;
 use App\Models\Expense;
 use App\Models\Payment;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * سجل حركة الفلوس ليوم واحد على لوحة اليوم — مقبوضات/مدفوعات + مصروفات.
@@ -30,6 +32,7 @@ class HomeDailyCashService
 
         $canPayments = $this->can($user, 'payments.view') || $this->can($user, 'accounting.view');
         $canExpenses = $this->can($user, 'expenses.view');
+        $canContracts = $this->can($user, 'contracts.view');
         if (! $canPayments && ! $canExpenses) {
             return null;
         }
@@ -46,18 +49,24 @@ class HomeDailyCashService
                 ->limit(self::LIMIT)
                 ->get();
 
+            $depositIds = $payments->where('link_type', 'deposit')->pluck('link_id')->filter()->map(fn ($id) => (int) $id)->all();
+            $contractByDeposit = $depositIds === []
+                ? collect()
+                : Deposit::query()->whereIn('id', $depositIds)->pluck('contract_id', 'id');
+
             foreach ($payments as $p) {
                 $direction = $p->direction === 'in' ? 'in' : 'out';
+                $contractId = $this->contractId($p, $contractByDeposit);
                 $entries[] = [
                     'id' => 'payment:'.$p->id,
                     'source' => 'payment',
                     'direction' => $direction,
                     'amount' => (int) $p->amount,
                     'title' => $this->paymentTitle($p),
-                    'subtitle' => $this->paymentSubtitle($p),
+                    'subtitle' => $this->paymentSubtitle($p, $canContracts),
                     'method' => $p->method,
                     'at' => $p->paid_at?->toIso8601String(),
-                    'href' => $this->paymentHref($p),
+                    'href' => $this->paymentHref($p, $canContracts, $contractId),
                 ];
             }
         }
@@ -135,11 +144,11 @@ class HomeDailyCashService
         };
     }
 
-    private function paymentSubtitle(Payment $p): string
+    private function paymentSubtitle(Payment $p, bool $canContracts): string
     {
         $parts = [];
         if ($p->reference) {
-            $parts[] = (string) $p->reference;
+            $parts[] = $this->visibleText((string) $p->reference, $canContracts);
         }
         if ($p->link_type) {
             $parts[] = $this->linkTypeLabel($p->link_type).($p->link_id ? ' #'.$p->link_id : '');
@@ -148,20 +157,61 @@ class HomeDailyCashService
             $parts[] = (string) $p->method;
         }
         if ($p->notes) {
-            $parts[] = (string) $p->notes;
+            $notes = $this->visibleText((string) $p->notes, $canContracts);
+            if ($notes !== '') {
+                $parts[] = $notes;
+            }
         }
+
+        $parts = array_values(array_filter($parts, fn ($part) => $part !== ''));
 
         return $parts !== [] ? implode(' · ', $parts) : '—';
     }
 
-    private function paymentHref(Payment $p): string
+    /**
+     * @param  Collection<int, int|string|null>  $contractByDeposit
+     */
+    private function contractId(Payment $p, $contractByDeposit): ?int
     {
+        if ($p->link_type === 'contract' && $p->link_id) {
+            return (int) $p->link_id;
+        }
+        if ($p->link_type === 'deposit' && $p->link_id) {
+            $id = $contractByDeposit[(int) $p->link_id] ?? null;
+
+            return $id ? (int) $id : null;
+        }
+
+        return null;
+    }
+
+    private function paymentHref(Payment $p, bool $canContracts, ?int $contractId): ?string
+    {
+        if (in_array($p->link_type, ['contract', 'deposit'], true)) {
+            if (! $canContracts || ! $contractId) {
+                return null;
+            }
+
+            return '/contracts/'.$contractId;
+        }
+
         return match ($p->link_type) {
-            'contract' => $p->link_id ? '/contracts/'.$p->link_id : '/accounts',
-            'deposit' => $p->link_id ? '/contracts/'.$p->link_id : '/accounts',
             'expense' => '/expenses',
             default => '/accounts',
         };
+    }
+
+    private function visibleText(string $text, bool $canContracts): string
+    {
+        if ($canContracts) {
+            return $text;
+        }
+
+        $text = preg_replace('/\s*(?:للعقد|على العقد|من العقد)\s+CNT-\d+/u', '', $text) ?? $text;
+        $text = preg_replace('/CNT-\d+/', '', $text) ?? $text;
+        $text = preg_replace('/\s{2,}/u', ' ', $text) ?? $text;
+
+        return trim($text, " \t·");
     }
 
     private function linkTypeLabel(string $type): string

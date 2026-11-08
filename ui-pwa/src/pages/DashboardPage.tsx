@@ -83,7 +83,7 @@ type DailyCashEntry = {
   subtitle: string
   method?: string | null
   at?: string | null
-  href: string
+  href?: string | null
 }
 
 type DailyCash = {
@@ -858,26 +858,34 @@ export function DashboardPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.02 * i, type: 'spring', stiffness: 380, damping: 28 }}
                 >
-                  <Link to={row.href} className={`db-cash-row db-cash-row--${row.direction}`}>
-                    <span className="db-cash-row__ico" aria-hidden>
-                      {row.direction === 'in' ? <IconCash size={16} /> : <IconWallet size={16} />}
-                    </span>
-                    <span className="db-cash-row__body">
-                      <strong>{row.title}</strong>
-                      <span className="db-cash-row__sub">{row.subtitle}</span>
-                    </span>
-                    <span className="db-cash-row__meta">
-                      <b className={`db-cash-row__amt tabular-nums db-cash-row__amt--${row.direction}`}>
-                        {row.direction === 'in' ? '+' : '−'}
-                        {formatMoney(row.amount)}
-                      </b>
-                      {row.at ? (
-                        <time className="tabular-nums" dateTime={row.at}>
-                          {formatTime(row.at)}
-                        </time>
-                      ) : null}
-                    </span>
-                  </Link>
+                  {(() => {
+                    const className = `db-cash-row db-cash-row--${row.direction}`
+                    const inner = (
+                      <>
+                        <span className="db-cash-row__ico" aria-hidden>
+                          {row.direction === 'in' ? <IconCash size={16} /> : <IconWallet size={16} />}
+                        </span>
+                        <span className="db-cash-row__body">
+                          <strong>{row.title}</strong>
+                          <span className="db-cash-row__sub">{row.subtitle}</span>
+                        </span>
+                        <span className="db-cash-row__meta">
+                          <b className={`db-cash-row__amt tabular-nums db-cash-row__amt--${row.direction}`}>
+                            {row.direction === 'in' ? '+' : '−'}
+                            {formatMoney(row.amount)}
+                          </b>
+                          {row.at ? (
+                            <time className="tabular-nums" dateTime={row.at}>
+                              {formatTime(row.at)}
+                            </time>
+                          ) : null}
+                        </span>
+                      </>
+                    )
+                    return row.href
+                      ? <Link to={row.href} className={className}>{inner}</Link>
+                      : <div className={className}>{inner}</div>
+                  })()}
                 </motion.li>
               ))}
             </ul>
