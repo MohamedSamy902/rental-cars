@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\WorkOrder;
 use App\Services\Maintenance\WorkOrderService;
+use App\Support\MaintenanceContractLabel;
 use App\Support\PaginationInput;
+use App\Support\VehicleOwnerVisibility;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,7 +29,7 @@ class WorkOrderController extends Controller
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
-            'data' => $rows->items(),
+            'data' => collect($rows->items())->map(fn (WorkOrder $order) => $this->present($order, $request))->values(),
             'meta' => ['total' => $rows->total()],
             'summary' => [
                 'open' => WorkOrder::query()->whereIn('status', ['open', 'in_progress'])->count(),
@@ -97,7 +99,7 @@ class WorkOrderController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $order, 'message' => 'تم فتح أمر الشغل.'], 201);
+        return response()->json(['data' => $this->present($order, $request), 'message' => 'تم فتح أمر الشغل.'], 201);
     }
 
     public function close(WorkOrder $workOrder): JsonResponse
@@ -107,6 +109,27 @@ class WorkOrderController extends Controller
         }
         $order = $this->service->close($workOrder->load('lines'));
 
-        return response()->json(['data' => $order, 'message' => 'تم إغلاق أمر الشغل.']);
+        return response()->json(['data' => $this->present($order, request()), 'message' => 'تم إغلاق أمر الشغل.']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function present(WorkOrder $order, Request $request): array
+    {
+        $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
+        $payload = $order->toArray();
+        $payload['workshop'] = MaintenanceContractLabel::present($payload['workshop'] ?? null, $canContracts);
+        $payload['notes'] = MaintenanceContractLabel::present($payload['notes'] ?? null, $canContracts);
+        if (isset($payload['lines']) && is_array($payload['lines'])) {
+            foreach ($payload['lines'] as $index => $line) {
+                if (is_array($line)) {
+                    $line['description'] = MaintenanceContractLabel::present($line['description'] ?? null, $canContracts);
+                    $payload['lines'][$index] = $line;
+                }
+            }
+        }
+
+        return VehicleOwnerVisibility::redactEmbedded($payload, $request->user());
     }
 }

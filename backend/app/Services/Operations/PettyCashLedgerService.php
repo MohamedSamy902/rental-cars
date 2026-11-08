@@ -7,6 +7,7 @@ use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
+use App\Support\MaintenanceContractLabel;
 
 class PettyCashLedgerService
 {
@@ -15,7 +16,7 @@ class PettyCashLedgerService
      *
      * @return array<string, mixed>
      */
-    public function dossier(PettyCashAccount $account): array
+    public function dossier(PettyCashAccount $account, bool $canSeeContracts = true): array
     {
         $account->load('employee:id,name,job_title,status');
 
@@ -121,14 +122,14 @@ class PettyCashLedgerService
                         $usedLineIds[$line->id] = true;
                         $parts[] = [
                             'id' => $line->id,
-                            'description' => $line->description,
+                            'description' => MaintenanceContractLabel::present($line->description, $canSeeContracts),
                             'quantity' => $line->quantity,
                             'unit_price' => $line->unit_price,
                             'amount' => (int) ($line->petty_cash_amount ?: ((int) $line->quantity * (int) $line->unit_price)),
                         ];
                     }
                     if ($workOrder?->workshop) {
-                        $label = 'أمر شغل صيانة · '.$workOrder->workshop;
+                        $label = 'أمر شغل صيانة · '.MaintenanceContractLabel::present($workOrder->workshop, $canSeeContracts);
                     }
                 } else {
                     $category = 'expense';
@@ -190,7 +191,7 @@ class PettyCashLedgerService
                 ] : null,
                 'work_order' => $workOrder ? [
                     'id' => $workOrder->id,
-                    'workshop' => $workOrder->workshop,
+                    'workshop' => MaintenanceContractLabel::present($workOrder->workshop, $canSeeContracts),
                     'status' => $workOrder->status,
                     'opened_on' => $workOrder->opened_on?->toDateString() ?? ($workOrder->opened_at?->toDateString()),
                     'vehicle_id' => $workOrder->vehicle_id,

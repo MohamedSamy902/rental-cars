@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Violation;
 use App\Services\Operations\AuditNarrator;
 use App\Support\NestedCustomerRedactor;
+use App\Support\VehicleOwnerVisibility;
 
 /**
  * Full read model for the contract page: parties, inspections, payment ledger,
@@ -145,7 +146,10 @@ class ContractDossierService
             $payload['customer'] = Customer::normalizeDateOnlyFields($payload['customer']);
         }
 
-        $payload = NestedCustomerRedactor::contract($payload, $user);
+        $payload = VehicleOwnerVisibility::redactEmbedded(
+            NestedCustomerRedactor::contract($payload, $user),
+            $user,
+        );
 
         return [
             ...$payload,

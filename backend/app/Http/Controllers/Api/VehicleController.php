@@ -10,6 +10,7 @@ use App\Models\Expense;
 use App\Models\MediaFile;
 use App\Models\OwnerMonthDue;
 use App\Models\OwnerPayout;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleDocument;
 use App\Models\Violation;
@@ -18,8 +19,10 @@ use App\Services\Fleet\VehicleAssetService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Fleet\VehicleRecommendationService;
 use App\Services\Fleet\VehicleService;
+use App\Support\MaintenanceContractLabel;
 use App\Support\PaginationInput;
 use App\Support\PublicAppUrl;
+use App\Support\VehicleOwnerVisibility;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
@@ -158,21 +161,26 @@ class VehicleController extends Controller
             }
         }
 
-        $q->with([
-            'owner:id,full_name,phone',
-            'contracts' => function ($c) {
-                $c->where('status', 'active')->latest('planned_ends_at');
-            },
+        $with = [
             'documents' => function ($d) {
                 $this->constrainLicenseDocuments($d)->orderByDesc('id');
             },
-        ]);
+        ];
+        if ($request->user()?->hasPermission('owners.view')) {
+            $with[] = 'owner:id,full_name,phone';
+        }
+        if ($request->user()?->hasPermission('contracts.view')) {
+            $with['contracts'] = function ($c) {
+                $c->where('status', 'active')->latest('planned_ends_at');
+            };
+        }
+        $q->with($with);
         $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
 
-        $data = collect($rows->items())->map(function (Vehicle $v) {
-            return $this->present($v);
+        $data = collect($rows->items())->map(function (Vehicle $v) use ($request) {
+            return $this->present($v, $request->user());
         });
 
         return response()->json([
@@ -200,10 +208,10 @@ class VehicleController extends Controller
         }
 
         $payload = [
-            'data' => $this->present($vehicle),
+            'data' => $this->present($vehicle, $request->user()),
             'message' => 'تم إضافة العربية.',
         ];
-        if ($vehicle->owner_id) {
+        if ($vehicle->owner_id && $request->user()?->hasPermission('owners.view')) {
             try {
                 $payload['owner_agreement'] = $this->vehicles->ownerAgreementPrintPayload($vehicle);
                 $payload['message'] = 'تم إضافة العربية وتسجيل عقد المالك للطباعة.';
@@ -215,17 +223,27 @@ class VehicleController extends Controller
         return response()->json($payload, 201);
     }
 
-    public function show(Vehicle $vehicle): JsonResponse
+    public function show(Request $request, Vehicle $vehicle): JsonResponse
     {
         $this->authorize('view', $vehicle);
+        $with = ['accessories', 'documents'];
+        if ($request->user()?->hasPermission('owners.view')) {
+            $with[] = 'owner';
+        }
 
-        return response()->json(['data' => $this->present($vehicle->load(['accessories', 'documents', 'owner']))]);
+        return response()->json(['data' => $this->present($vehicle->load($with), $request->user())]);
     }
 
     /** ملف العربية الكامل: حجوزات · صيانة · مصروفات · مرفقات · مالك · QR */
     public function dossier(Request $request, Vehicle $vehicle): JsonResponse
     {
-        $vehicle->load(['accessories', 'documents', 'owner']);
+        $viewer = $request->user();
+        $canContracts = (bool) $viewer?->hasPermission('contracts.view');
+        $with = ['accessories', 'documents'];
+        if ($viewer?->hasPermission('owners.view')) {
+            $with[] = 'owner';
+        }
+        $vehicle->load($with);
 
         $contracts = Contract::query()
             ->with(['customer:id,full_name,phone', 'deposit'])
@@ -260,16 +278,16 @@ class VehicleController extends Controller
             ->map(fn (WorkOrder $w) => [
                 'id' => $w->id,
                 'status' => $w->status,
-                'workshop' => $w->workshop,
+                'workshop' => MaintenanceContractLabel::present($w->workshop, $canContracts),
                 'opened_on' => $w->opened_on?->toDateString(),
                 'closed_on' => $w->closed_on?->toDateString(),
                 'odometer' => $w->odometer,
                 'parts_cost' => $w->parts_cost,
                 'labor_cost' => $w->labor_cost,
-                'notes' => $w->notes,
+                'notes' => MaintenanceContractLabel::present($w->notes, $canContracts),
                 'lines' => $w->lines->map(fn ($l) => [
                     'id' => $l->id,
-                    'description' => $l->description,
+                    'description' => MaintenanceContractLabel::present($l->description, $canContracts),
                     'quantity' => $l->quantity,
                     'unit_price' => $l->unit_price,
                 ])->values(),
@@ -353,10 +371,9 @@ class VehicleController extends Controller
         $qr = PublicAppUrl::to('/showroom?vehicle='.$vehicle->id);
         $qrLabel = trim($vehicle->brand.' '.$vehicle->model.' · '.$vehicle->plate);
 
-        $user = $request->user();
+        $user = $viewer;
         $canExpenses = (bool) ($user?->hasPermission('expenses.view') || $user?->hasPermission('hr.expenses'));
         $canOwners = (bool) $user?->hasPermission('owners.view');
-        $canContracts = (bool) $user?->hasPermission('contracts.view');
         $canCustomers = (bool) $user?->hasPermission('customers.view');
         $canFinance = (bool) ($user?->hasPermission('reports.view') || $user?->hasPermission('accounting.view'));
         $contractMoney = $contracts;
@@ -434,7 +451,7 @@ class VehicleController extends Controller
 
         return response()->json([
             'data' => [
-                'vehicle' => $this->present($vehicle),
+                'vehicle' => $this->present($vehicle, $viewer),
                 'contracts' => $contracts->values(),
                 'work_orders' => $workOrders->values(),
                 'expenses' => $expenses->values(),
@@ -505,16 +522,22 @@ class VehicleController extends Controller
             $data = $request->validated();
             $addonIds = array_key_exists('addon_ids', $data) ? ($data['addon_ids'] ?? []) : null;
             unset($data['addon_ids']);
+            if (! $request->user()?->hasPermission('owners.view')) {
+                unset($data['owner_id'], $data['owner_since']);
+                if (! VehicleOwnerVisibility::canSeeAmount($request->user())) {
+                    unset($data['owner_monthly_amount']);
+                }
+            }
             $vehicle = $this->vehicles->update($vehicle, $data, is_array($addonIds) ? $addonIds : null);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
         $payload = [
-            'data' => $this->present($vehicle),
+            'data' => $this->present($vehicle, $request->user()),
             'message' => 'تم تحديث العربية.',
         ];
-        if ($vehicle->owner_id) {
+        if ($vehicle->owner_id && $request->user()?->hasPermission('owners.view')) {
             try {
                 $payload['owner_agreement'] = $this->vehicles->ownerAgreementPrintPayload($vehicle);
                 $payload['message'] = 'تم تحديث العربية وتحديث عقد المالك للطباعة.';
@@ -526,8 +549,12 @@ class VehicleController extends Controller
         return response()->json($payload);
     }
 
-    public function ownerAgreementPrint(Vehicle $vehicle): JsonResponse
+    public function ownerAgreementPrint(Request $request, Vehicle $vehicle): JsonResponse
     {
+        if (! $request->user()?->hasPermission('owners.view')) {
+            return response()->json(['message' => 'ليست لديك صلاحية لتنفيذ هذا الإجراء.'], 403);
+        }
+
         try {
             $payload = $this->vehicles->ownerAgreementPrintPayload($vehicle);
         } catch (DomainException $e) {
@@ -540,8 +567,12 @@ class VehicleController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function present(Vehicle $v): array
+    private function present(Vehicle $v, ?User $viewer = null): array
     {
+        $viewer ??= request()->user();
+        $canOwners = VehicleOwnerVisibility::canSeeProfile($viewer);
+        $canAmount = VehicleOwnerVisibility::canSeeAmount($viewer);
+        $canContracts = (bool) $viewer?->hasPermission('contracts.view');
         $status = $this->availability->statusOnDate([
             'manual_status' => $v->manual_status,
             'has_active_handover' => $v->contracts()->where('status', 'active')->exists(),
@@ -588,12 +619,12 @@ class VehicleController extends Controller
             'manual_status' => $v->manual_status,
             'is_active' => $v->is_active,
             'status' => $status,
-            'owner_id' => $v->owner_id !== null ? (int) $v->owner_id : null,
-            'owner_monthly_amount' => $v->owner_monthly_amount !== null ? (int) $v->owner_monthly_amount : null,
-            'owner_since' => $v->owner_since?->toDateString(),
+            'owner_id' => $canOwners && $v->owner_id !== null ? (int) $v->owner_id : null,
+            'owner_monthly_amount' => $canAmount && $v->owner_monthly_amount !== null ? (int) $v->owner_monthly_amount : null,
+            'owner_since' => $canOwners ? $v->owner_since?->toDateString() : null,
             'owner_agreement_starts_on' => $v->owner_agreement_starts_on?->toDateString(),
             'owner_agreement_ends_on' => $v->owner_agreement_ends_on?->toDateString(),
-            'owner' => $v->relationLoaded('owner') && $v->owner ? [
+            'owner' => $canOwners && $v->relationLoaded('owner') && $v->owner ? [
                 'id' => $v->owner->id,
                 'full_name' => $v->owner->full_name,
                 'phone' => $v->owner->phone,
@@ -601,7 +632,7 @@ class VehicleController extends Controller
             'accessories' => $v->relationLoaded('accessories') ? $v->accessories : null,
             'documents' => $v->relationLoaded('documents') ? $v->documents : null,
             'notes' => $v->notes,
-            'active_contract_ends_at' => $this->activeContractEndsAt($v),
+            'active_contract_ends_at' => $canContracts ? $this->activeContractEndsAt($v) : null,
             'license_expires_on' => $this->licenseExpiresOn($v),
             'created_at' => $v->created_at?->toIso8601String(),
             'updated_at' => $v->updated_at?->toIso8601String(),

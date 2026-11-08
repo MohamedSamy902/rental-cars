@@ -25,23 +25,24 @@ class AttentionController extends Controller
     {
         $user = $request->user();
 
-        $overdueReturns = Contract::query()
+        $canContracts = (bool) $user?->hasPermission('contracts.view');
+        $overdueReturns = $canContracts ? Contract::query()
             ->where('status', 'active')
             ->where('planned_ends_at', '<', now())
-            ->count();
+            ->count() : null;
 
-        $pendingApprovals = Contract::query()->where('status', 'pending')->count();
+        $pendingApprovals = $canContracts ? Contract::query()->where('status', 'pending')->count() : null;
 
-        $returningToday = Contract::query()
+        $returningToday = $canContracts ? Contract::query()
             ->where('status', 'active')
             ->whereDate('planned_ends_at', today())
             ->where('planned_ends_at', '>=', now())
-            ->count();
+            ->count() : null;
 
-        $pickupsToday = Contract::query()
+        $pickupsToday = $canContracts ? Contract::query()
             ->where('status', 'approved')
             ->whereDate('starts_at', today())
-            ->count();
+            ->count() : null;
 
         $blockingWorkOrders = WorkOrder::query()
             ->where('puts_in_maintenance', true)
@@ -73,9 +74,11 @@ class AttentionController extends Controller
 
         $draftPayroll = PayrollRun::query()->where('status', 'draft')->count();
 
-        $blacklistedCustomers = Customer::query()->where('status', 'blacklist')->count();
+        $blacklistedCustomers = $user?->hasPermission('customers.view')
+            ? Customer::query()->where('status', 'blacklist')->count()
+            : null;
 
-        $ownersUnpaid = $this->ownersWithUnpaidBalance();
+        $ownersUnpaid = $user?->hasPermission('owners.view') ? $this->ownersWithUnpaidBalance() : null;
 
         return response()->json([
             'data' => [

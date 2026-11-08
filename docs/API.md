@@ -136,7 +136,9 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 `fleet_prep.groups.maintenance` ليوم «اليوم» = كل أوامر الشغل المفتوحة/`in_progress`؛ للأيام التالية = المجدولة بـ `next_service_on`.
 
-صفوف `pickups` / `returns` وأعدادها تُحذف بلا `contracts.view`. `customer` و`customer_phone` يُصفَّران بلا `customers.view`. صلاحية العملاء وحدها لا تُظهر مواعيد العقود.
+صفوف `pickups` / `returns` وأعدادها تُحذف بلا `contracts.view`. `customer` و`customer_phone` يُصفَّران بلا `customers.view`. صلاحية العملاء وحدها لا تُظهر مواعيد العقود. عنوان صيانة «تبديل بسبب عطل» يُخفي رقم العقد بلا `contracts.view`. `kpis.returning_today` يكون `null` بلا `contracts.view`.
+
+هوية المالك والمبلغ الشهري على العربية: الاسم/الهاتف/`owner_id` مع `owners.view`؛ المبلغ مع `owners.view` أو `reports.view` أو `accounting.view`. تاريخا عقد المالك يبقيان.
 
 `daily_cash` سجل حركة فلوس اليوم (دفعات + مصروفات) حسب صلاحيات `payments.view`/`accounting.view` و`expenses.view` — أو `null` إن لا صلاحية.
 

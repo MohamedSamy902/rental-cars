@@ -373,10 +373,13 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function pettyCashShow(PettyCashAccount $account): JsonResponse
+    public function pettyCashShow(Request $request, PettyCashAccount $account): JsonResponse
     {
         return response()->json([
-            'data' => $this->pettyCashLedger->dossier($account),
+            'data' => $this->pettyCashLedger->dossier(
+                $account,
+                (bool) $request->user()?->hasPermission('contracts.view'),
+            ),
         ]);
     }
 

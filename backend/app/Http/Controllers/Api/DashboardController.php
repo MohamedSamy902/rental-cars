@@ -70,10 +70,7 @@ class DashboardController extends Controller
         }
 
         $active = $activeIds->count();
-        $returningToday = Contract::query()
-            ->where('status', 'active')
-            ->whereDate('planned_ends_at', today())
-            ->count();
+        $returningToday = null;
         $expectedRevenue = (int) Contract::query()
             ->whereIn('status', ['approved', 'active'])
             ->get(['frozen_daily_rate', 'starts_at', 'planned_ends_at'])
@@ -84,6 +81,12 @@ class DashboardController extends Controller
         $canFinance = (bool) ($request->user()?->hasPermission('reports.view') || $request->user()?->hasPermission('accounting.view'));
         $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
         $canCustomers = (bool) $request->user()?->hasPermission('customers.view');
+        if ($canContracts) {
+            $returningToday = Contract::query()
+                ->where('status', 'active')
+                ->whereDate('planned_ends_at', today())
+                ->count();
+        }
 
         $tasks = $canContracts
             ? Contract::query()
