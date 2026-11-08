@@ -140,7 +140,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 هوية المالك والمبلغ الشهري على العربية: الاسم/الهاتف/`owner_id` مع `owners.view`؛ المبلغ مع `owners.view` أو `reports.view` أو `accounting.view`. تاريخا عقد المالك يبقيان.
 
-`daily_cash` سجل حركة فلوس اليوم (دفعات + مصروفات) حسب صلاحيات `payments.view`/`accounting.view` و`expenses.view` — أو `null` إن لا صلاحية. بلا `contracts.view` يُحذف رقم العقد من التفصيل ويصبح `href` للعقد `null`. رابط قبض/رد التأمين هو `/contracts/{contract_id}` وليس معرّف التأمين.
+`daily_cash` سجل حركة فلوس اليوم (دفعات + مصروفات) حسب صلاحيات `payments.view`/`accounting.view` و`expenses.view` — أو `null` إن لا صلاحية. بلا `contracts.view` يُحذف رقم العقد وعبارة `عقد #المعرّف` من التفصيل (تبقى «دفعة عقد»)، ويصبح `href` للعقد `null`. رابط قبض/رد التأمين هو `/contracts/{contract_id}` وليس معرّف التأمين.
 
 `important_tasks` قائمة مهام تشغيلية للوحة اليوم (حد أقصى ٢٠)، مرتّبة بالحرج ثم التاريخ، ومفلترة بصلاحيات المستخدم الحالي:
 

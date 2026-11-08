@@ -151,7 +151,7 @@ class HomeDailyCashService
             $parts[] = $this->visibleText((string) $p->reference, $canContracts);
         }
         if ($p->link_type) {
-            $parts[] = $this->linkTypeLabel($p->link_type).($p->link_id ? ' #'.$p->link_id : '');
+            $parts[] = $this->linkLabel($p, $canContracts);
         }
         if ($p->method) {
             $parts[] = (string) $p->method;
@@ -212,6 +212,15 @@ class HomeDailyCashService
         $text = preg_replace('/\s{2,}/u', ' ', $text) ?? $text;
 
         return trim($text, " \t·");
+    }
+
+    private function linkLabel(Payment $p, bool $canContracts): string
+    {
+        if ($p->link_type === 'contract' && ! $canContracts) {
+            return 'دفعة عقد';
+        }
+
+        return $this->linkTypeLabel((string) $p->link_type).($p->link_id ? ' #'.$p->link_id : '');
     }
 
     private function linkTypeLabel(string $type): string

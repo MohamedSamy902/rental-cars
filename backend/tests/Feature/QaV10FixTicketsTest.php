@@ -117,6 +117,7 @@ class QaV10FixTicketsTest extends TestCase
         $hidden = $this->getJson('/api/dashboard')->assertOk()->json('daily_cash');
         $this->assertNotNull($hidden);
         $this->assertStringNotContainsString('CNT-', (string) json_encode($hidden, JSON_UNESCAPED_UNICODE));
+        $this->assertStringNotContainsString('عقد #'.$contractId, (string) json_encode($hidden, JSON_UNESCAPED_UNICODE));
         $this->assertStringContainsString('قبض تأمين نقدي', (string) json_encode($hidden['entries'], JSON_UNESCAPED_UNICODE));
         $this->assertSame(1100, $hidden['totals']['in']);
         $this->assertSame(200, $hidden['totals']['out']);
@@ -128,6 +129,16 @@ class QaV10FixTicketsTest extends TestCase
                 $this->assertArrayHasKey('method', $entry);
             }
         }
+        $restrictedRent = collect($hidden['entries'])->first(
+            fn ($row) => ($row['title'] ?? '') === 'قبض إيجار / دفعة عقد'
+        );
+        $this->assertNotNull($restrictedRent);
+        $this->assertStringContainsString('دفعة عقد', (string) $restrictedRent['subtitle']);
+        $this->assertStringNotContainsString((string) $contractId, (string) $restrictedRent['subtitle']);
+        $this->assertSame(100, $restrictedRent['amount']);
+        $this->assertSame('in', $restrictedRent['direction']);
+        $this->assertSame('cash', $restrictedRent['method']);
+        $this->assertSame($hidden['totals']['count'], count($hidden['entries']));
 
         $this->assertStringContainsString($number, (string) Payment::query()
             ->where('link_type', 'deposit')
@@ -149,6 +160,7 @@ class QaV10FixTicketsTest extends TestCase
             $this->assertSame('/contracts/'.$contractId, $rent['href']);
             $this->assertSame('/contracts/'.$contractId, $refund['href']);
             $this->assertNotSame('/contracts/'.$depositId, $deposit['href']);
+            $this->assertStringContainsString('عقد #'.$contractId, (string) $rent['subtitle']);
         }
     }
 
