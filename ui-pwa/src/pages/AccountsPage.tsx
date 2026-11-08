@@ -50,7 +50,7 @@ export function AccountsPage() {
     try {
       const [overview, pay] = await Promise.all([
         api<{ data: { months: MonthRow[]; accounts: Account[]; payments_in: number; payments_out: number } }>('/accounting/overview'),
-        api<{ data: Payment[] }>('/accounting/payments'),
+        api<{ data: Payment[] }>('/accounting/payments?per_page=50'),
       ])
       setMonths(overview.data.months)
       setAccounts(overview.data.accounts)

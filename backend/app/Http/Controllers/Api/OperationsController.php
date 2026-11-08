@@ -353,11 +353,20 @@ class OperationsController extends Controller
         ]);
     }
 
-    public function pettyCashIndex(): JsonResponse
+    public function pettyCashIndex(Request $request): JsonResponse
     {
-        $rows = PettyCashAccount::query()->with('employee')->orderByDesc('id')->get();
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+        $page = PaginationInput::page($request);
+        $rows = PettyCashAccount::query()->with('employee')->orderByDesc('id')->paginate($perPage, ['*'], 'page', $page);
 
-        return response()->json(['data' => $rows]);
+        return response()->json([
+            'data' => $rows->items(),
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'total' => $rows->total(),
+            ],
+        ]);
     }
 
     public function pettyCashShow(PettyCashAccount $account): JsonResponse

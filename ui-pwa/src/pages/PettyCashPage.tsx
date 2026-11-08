@@ -35,6 +35,8 @@ export function PettyCashPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Account[]>([])
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 })
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -43,11 +45,17 @@ export function PettyCashPage() {
   const [form, setForm] = useState({ employee_id: '', balance: '' })
   const [move, setMove] = useState({ type: 'topup', amount: '', notes: '' })
 
-  async function load() {
+  async function load(nextPage = page) {
     setLoading(true)
     try {
-      const res = await api<{ data: Account[] }>('/petty-cash')
+      const res = await api<{ data: Account[]; meta?: { current_page: number; last_page: number; total: number } }>(`/petty-cash?page=${nextPage}&per_page=50`)
       setRows(res.data)
+      setMeta({
+        current_page: res.meta?.current_page ?? nextPage,
+        last_page: res.meta?.last_page ?? 1,
+        total: res.meta?.total ?? res.data.length,
+      })
+      setPage(res.meta?.current_page ?? nextPage)
     } catch (e) {
       toast.error((e as ApiError).message)
     } finally {
@@ -55,7 +63,7 @@ export function PettyCashPage() {
     }
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => { void load(page) }, [page])
 
   async function openCreate() {
     setForm({ employee_id: '', balance: '' })
@@ -150,6 +158,13 @@ export function PettyCashPage() {
         ]}
         emptyTitle="لا توجد عهد مسجّلة"
         emptyDescription="سجّل عهدة لموظف لتتبع التسليم والاستخدام والاسترداد."
+        serverPagination={{
+          page: meta.current_page,
+          lastPage: meta.last_page,
+          total: meta.total,
+          perPage: 50,
+          onPageChange: setPage,
+        }}
       />
 
       <Sheet

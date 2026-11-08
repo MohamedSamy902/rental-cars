@@ -132,6 +132,9 @@ class UpdateCustomerRequest extends FormRequest
     {
         return [
             'phone.string' => 'الهاتف غير صالح.',
+            'phone.unique' => 'رقم الهاتف مسجل لعميل آخر.',
+            'license_number.unique' => 'رقم الرخصة مسجل لعميل آخر.',
+            'national_id.unique' => 'الرقم القومي مسجل لعميل آخر.',
             'status.in' => 'الحالة غير صالحة.',
             'email.email' => 'البريد الإلكتروني غير صالح.',
             'license_number.required' => 'رقم الرخصة مطلوب.',

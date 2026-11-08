@@ -113,6 +113,8 @@ class DashboardController extends Controller
         $occupancyPct = $this->occupancy->percent(now()->startOfMonth(), now());
 
         $canFinance = (bool) ($request->user()?->hasPermission('reports.view') || $request->user()?->hasPermission('accounting.view'));
+        $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
+        $canCustomers = (bool) $request->user()?->hasPermission('customers.view');
 
         return response()->json([
             'center_name' => $center,
@@ -126,8 +128,8 @@ class DashboardController extends Controller
                 'rented' => $statusCounts['rented'],
                 'returning_today' => $returningToday,
                 'expected_revenue' => $canFinance ? $expectedRevenue : null,
-                'customers' => Customer::query()->count(),
-                'active_contracts' => $active,
+                'customers' => $canCustomers ? Customer::query()->count() : null,
+                'active_contracts' => $canContracts ? $active : null,
                 'open_work_orders' => WorkOrder::query()->whereIn('status', ['open', 'in_progress'])->count(),
                 'open_violations' => Violation::query()->whereNotIn('status', ['paid', 'confirmed'])->count(),
                 'low_stock' => $lowStock,
@@ -136,13 +138,13 @@ class DashboardController extends Controller
                     ->whereNull('read_at')
                     ->count(),
             ],
-            'tasks' => $tasks,
+            'tasks' => $canContracts ? $tasks : [],
             'important_tasks' => $request->user()
                 ? $this->importantTasks->forUser($request->user())
                 : [],
             'fleet_prep' => $this->dailyPrep->summarize(now(), 5),
             'daily_cash' => $canFinance ? $this->dailyCash->forUser($request->user()) : null,
-            'recent_contracts' => Contract::query()
+            'recent_contracts' => $canContracts ? Contract::query()
                 ->with(['customer:id,full_name', 'vehicle:id,brand,model,plate'])
                 ->latest('id')
                 ->limit(5)
@@ -153,7 +155,7 @@ class DashboardController extends Controller
 
                     return $arr;
                 })
-                ->values(),
+                ->values() : [],
         ]);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Models\InventoryBatch;
 use App\Models\InventoryItem;
 use App\Services\Accounting\AccountingService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class InventoryService
 {
@@ -84,27 +85,41 @@ class InventoryService
      */
     public function catalog(): array
     {
-        return InventoryItem::query()->with('batches')->latest('id')->get()->map(function (InventoryItem $item) {
-            $remaining = $item->remainingQuantity();
-            $nextBatch = $item->batches
-                ->filter(fn ($b) => (float) $b->remaining > 0)
-                ->sortBy([
-                    ['received_on', 'asc'],
-                    ['id', 'asc'],
-                ])
-                ->first();
+        return $this->catalogPage(10000, 1)->items();
+    }
 
-            return [
-                'id' => $item->id,
-                'code' => $item->code,
-                'name' => $item->name,
-                'category' => $item->category,
-                'unit' => $item->unit,
-                'reorder_level' => $item->reorder_level,
-                'remaining' => $remaining,
-                'unit_cost' => $nextBatch ? (int) $nextBatch->unit_cost : null,
-                'is_low' => $remaining <= $item->reorder_level,
-            ];
-        })->all();
+    public function catalogPage(int $perPage, int $page): LengthAwarePaginator
+    {
+        $rows = InventoryItem::query()->with('batches')->latest('id')->paginate($perPage, ['*'], 'page', $page);
+        $rows->setCollection($rows->getCollection()->map(fn (InventoryItem $item) => $this->presentItem($item)));
+
+        return $rows;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentItem(InventoryItem $item): array
+    {
+        $remaining = $item->remainingQuantity();
+        $nextBatch = $item->batches
+            ->filter(fn ($b) => (float) $b->remaining > 0)
+            ->sortBy([
+                ['received_on', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->first();
+
+        return [
+            'id' => $item->id,
+            'code' => $item->code,
+            'name' => $item->name,
+            'category' => $item->category,
+            'unit' => $item->unit,
+            'reorder_level' => $item->reorder_level,
+            'remaining' => $remaining,
+            'unit_cost' => $nextBatch ? (int) $nextBatch->unit_cost : null,
+            'is_low' => $remaining <= $item->reorder_level,
+        ];
     }
 }

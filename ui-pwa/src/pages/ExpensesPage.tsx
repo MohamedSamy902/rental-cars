@@ -70,6 +70,8 @@ export function ExpensesPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<ExpenseEditInitial | null>(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 })
   const [chip, setChip] = useQueryTab({ allowed: ExpensesPageTabs, defaultValue: 'all' })
 
   const chips = useMemo(
@@ -81,13 +83,21 @@ export function ExpensesPage() {
     [],
   )
 
-  async function load() {
+  async function load(nextPage = page) {
     setLoading(true)
     try {
       const qs = new URLSearchParams()
+      qs.set('page', String(nextPage))
+      qs.set('per_page', '50')
       if (chip === 'general' || chip === 'vehicle') qs.set('scope', chip)
-      const res = await api<{ data: Expense[] }>(`/expenses?${qs}`)
+      const res = await api<{ data: Expense[]; meta?: { current_page: number; last_page: number; total: number } }>(`/expenses?${qs}`)
       setRows(res.data)
+      setMeta({
+        current_page: res.meta?.current_page ?? nextPage,
+        last_page: res.meta?.last_page ?? 1,
+        total: res.meta?.total ?? res.data.length,
+      })
+      setPage(res.meta?.current_page ?? nextPage)
     } catch (e) {
       toast.error((e as ApiError).message)
     } finally {
@@ -95,7 +105,7 @@ export function ExpensesPage() {
     }
   }
 
-  useEffect(() => { void load() }, [chip])
+  useEffect(() => { void load(page) }, [chip, page])
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -163,7 +173,7 @@ export function ExpensesPage() {
         placeholder="بحث بالبند أو من سجّل أو اللوحة…"
         chips={chips}
         activeChip={chip}
-        onChipChange={setChip}
+        onChipChange={(id) => { setChip(id); setPage(1) }}
       />
 
       <DataTable
@@ -178,6 +188,13 @@ export function ExpensesPage() {
         ]}
         emptyTitle="لا مصروفات بعد"
         emptyDescription="سجّل مصروفاً عاماً للفرع أو مرتبطاً بعربية ليظهر هنا."
+        serverPagination={{
+          page: meta.current_page,
+          lastPage: meta.last_page,
+          total: meta.total,
+          perPage: 50,
+          onPageChange: setPage,
+        }}
       />
       <ExpenseSheet
         open={open}

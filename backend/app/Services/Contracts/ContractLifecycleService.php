@@ -76,6 +76,7 @@ class ContractLifecycleService
                 throw new DomainException('العميل في القائمة السوداء.');
             }
 
+            $this->assertOwnerAgreementCoversRental($vehicle, $data['planned_ends_at']);
             $this->assertNoOverlap(
                 (int) $data['vehicle_id'],
                 $data['starts_at'],
@@ -215,6 +216,7 @@ class ContractLifecycleService
             /** @var Vehicle $vehicle */
             $vehicle = Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
 
+            $this->assertOwnerAgreementCoversRental($vehicle, $locked->planned_ends_at);
             $this->assertDocumentsAllowApproval($locked);
             $this->assertNoOverlap(
                 (int) $locked->vehicle_id,
@@ -345,6 +347,7 @@ class ContractLifecycleService
 
             /** @var Vehicle $vehicle */
             $vehicle = Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
+            $this->assertOwnerAgreementCoversRental($vehicle, $locked->planned_ends_at);
 
             $otherActive = Contract::query()
                 ->where('vehicle_id', $locked->vehicle_id)
@@ -716,6 +719,7 @@ class ContractLifecycleService
             );
 
             $replacement = Vehicle::query()->findOrFail($replacementId);
+            $this->assertOwnerAgreementCoversRental($replacement, $locked->planned_ends_at);
             if (! $replacement->is_active) {
                 throw new DomainException('العربية البديلة غير نشطة.');
             }
@@ -1034,6 +1038,22 @@ class ContractLifecycleService
             if ($endsBeforeContract) {
                 throw new DomainException('مستند العربية ('.$endsBeforeContract->type.') ينتهي قبل نهاية العقد المخططة.');
             }
+        }
+    }
+
+    private function assertOwnerAgreementCoversRental(Vehicle $vehicle, mixed $plannedEndsAt): void
+    {
+        $ends = $vehicle->owner_agreement_ends_on?->toDateString();
+        if ($ends === null || $ends === '') {
+            return;
+        }
+
+        $planned = Carbon::parse($plannedEndsAt)
+            ->timezone(config('app.timezone', 'Africa/Cairo'))
+            ->toDateString();
+        $today = now()->timezone(config('app.timezone', 'Africa/Cairo'))->toDateString();
+        if ($planned > $ends || $today > $ends) {
+            throw new DomainException("عقد المالك لهذه العربية ينتهي في {$ends} — لا يمكن تأجيرها بعد هذا التاريخ");
         }
     }
 

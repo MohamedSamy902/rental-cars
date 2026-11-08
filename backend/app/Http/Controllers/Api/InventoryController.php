@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Services\Inventory\InventoryService;
+use App\Support\PaginationInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +15,18 @@ class InventoryController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        return response()->json(['data' => $this->inventory->catalog()]);
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+        $page = PaginationInput::page($request);
+        $rows = $this->inventory->catalogPage($perPage, $page);
+
+        return response()->json([
+            'data' => $rows->items(),
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'total' => $rows->total(),
+            ],
+        ]);
     }
 
     public function storeItem(Request $request): JsonResponse

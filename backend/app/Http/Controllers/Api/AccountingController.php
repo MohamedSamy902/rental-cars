@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\Accounting\AccountingService;
 use App\Services\Accounting\MonthLedgerService;
+use App\Support\PaginationInput;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,9 +74,18 @@ class AccountingController extends Controller
 
     public function payments(Request $request): JsonResponse
     {
-        $rows = Payment::query()->latest('id')->limit(100)->get();
+        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+        $page = PaginationInput::page($request);
+        $rows = Payment::query()->latest('id')->paginate($perPage, ['*'], 'page', $page);
 
-        return response()->json(['data' => $rows]);
+        return response()->json([
+            'data' => $rows->items(),
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'total' => $rows->total(),
+            ],
+        ]);
     }
 
     public function storePayment(Request $request): JsonResponse

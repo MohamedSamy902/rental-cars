@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\TenantSetting;
 use App\Models\User;
+use App\Rules\EgyptianPhone;
 use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,9 +49,14 @@ class AuthController extends Controller
         /** @var User|null $user */
         $user = $this->findUserByLoginIdentifier($identifier);
 
-        if (! $user || ! Hash::check($data['password'], $user->password) || ! $user->is_active) {
+        if (! $user || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'login' => ['بيانات الدخول غير صحيحة.'],
+            ]);
+        }
+        if (! $user->is_active) {
+            throw ValidationException::withMessages([
+                'login' => ['الحساب موقوف، تواصل مع المدير'],
             ]);
         }
 
@@ -107,7 +113,7 @@ class AuthController extends Controller
                 'required',
                 'string',
                 'max:50',
-                new \App\Rules\EgyptianPhone,
+                new EgyptianPhone,
                 Rule::unique('users', 'phone')->ignore($user->id),
             ],
             'email' => [

@@ -73,7 +73,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     setFieldErrors({})
     setPutsInMaintenance(true)
     const requests: Promise<unknown>[] = [
-      api<{ data: Item[] }>('/inventory')
+      api<{ data: Item[] }>('/inventory?per_page=200')
         .then((r) => setItems(Array.isArray(r.data) ? r.data : []))
         .catch((e) => {
           setItems([])
