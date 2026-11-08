@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Services\Access\RoleAssignmentGuard;
 use App\Support\PermissionCatalog;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -90,6 +92,16 @@ class RoleController extends Controller
         ], [], [
             'permission_ids' => 'الصلاحيات',
         ]);
+
+        try {
+            app(RoleAssignmentGuard::class)->assertCanSyncPermissions(
+                $request->user(),
+                $role,
+                $data['permission_ids'],
+            );
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
 
         $role->permissions()->sync($data['permission_ids']);
         $role->load(['permissions:id,key,label,module']);

@@ -140,6 +140,7 @@ class ContractController extends Controller
 
     public function approve(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         try {
             $contract = $this->lifecycle->approve($contract, $request->user()?->id);
         } catch (DomainException $e) {
@@ -151,6 +152,7 @@ class ContractController extends Controller
 
     public function updatePricing(UpdateContractPricingRequest $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         try {
             $contract = $this->lifecycle->updateFrozenPricing($contract, $request->validated(), $request->user()?->id);
         } catch (DomainException $e) {
@@ -162,6 +164,13 @@ class ContractController extends Controller
 
     public function handover(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
+        if ($contract->status === 'pending' && ! $request->user()?->hasPermission('contracts.approve')) {
+            return response()->json([
+                'message' => 'التسليم يتطلب عقداً معتمداً، ولا تملك صلاحية الاعتماد.',
+            ], 403);
+        }
+
         $data = $request->validate([
             'odometer_out' => ['required', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
@@ -199,6 +208,7 @@ class ContractController extends Controller
 
     public function returnVehicle(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         $data = $request->validate([
             'odometer_in' => ['required', 'integer', 'min:0'],
             'returned_at' => ['nullable', 'date'],
@@ -235,6 +245,7 @@ class ContractController extends Controller
 
     public function printData(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         $contract->load(['customer', 'vehicle.documents', 'vehicle.accessories', 'deposit.deductions', 'inspections.damages']);
         $tenant = TenantSetting::query()->first();
         $ops = is_array($tenant?->operational) ? $tenant->operational : [];
@@ -303,11 +314,13 @@ class ContractController extends Controller
                     'variables' => $handoverVars,
                 ];
             }
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
             $templates = [
                 'contract' => null,
                 'handover_receipt' => null,
             ];
+            $templateError = 'تعذّر تجهيز قالب الطباعة.';
         }
 
         return response()->json([
@@ -324,12 +337,14 @@ class ContractController extends Controller
                 ],
                 'contract' => $payload,
                 'templates' => $templates,
+                'templates_error' => $templateError ?? null,
             ],
         ]);
     }
 
     public function cancel(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         $data = $request->validate([
             'reason' => ['required', 'string', 'min:3'],
         ], [], ['reason' => 'سبب الإلغاء']);
@@ -345,6 +360,7 @@ class ContractController extends Controller
 
     public function extend(ExtendContractRequest $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         try {
             $created = $this->lifecycle->extend($contract, $request->validated(), $request->user()?->id);
         } catch (DomainException $e) {
@@ -356,6 +372,7 @@ class ContractController extends Controller
 
     public function swap(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         $data = $request->validate([
             'replacement_vehicle_id' => ['required', 'exists:vehicles,id'],
             'odometer_in' => ['required', 'integer', 'min:0'],
@@ -390,6 +407,7 @@ class ContractController extends Controller
 
     public function receiveDeposit(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         $data = $request->validate([
             'amount' => ['nullable', 'integer', 'min:1'],
             'method' => ['required', 'string'],
@@ -411,6 +429,7 @@ class ContractController extends Controller
 
     public function deductDeposit(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         $data = $request->validate([
             'reason' => ['required', 'string'],
             'amount' => ['required', 'integer', 'min:1'],
@@ -432,6 +451,7 @@ class ContractController extends Controller
 
     public function returnDeposit(Request $request, Contract $contract): JsonResponse
     {
+        $this->authorize('view', $contract);
         $data = $request->validate([
             'method' => ['required', 'string'],
             'receipt_number' => ['required', 'string'],

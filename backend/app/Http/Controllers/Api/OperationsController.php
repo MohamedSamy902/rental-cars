@@ -129,12 +129,30 @@ class OperationsController extends Controller
             'license_number', 'license_expires_on', 'license_image_path', 'license_back_path', 'birth_date', 'status',
         ]);
 
+        $seeId = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
+        $seeImages = (bool) $request->user()?->hasPermission('sensitive.view_id_images');
+        $customers = $rows->map(function (Customer $customer) use ($seeId, $seeImages) {
+            $row = $customer->toArray();
+            if (! $seeId) {
+                $row['national_id'] = null;
+                $row['license_number'] = null;
+            }
+            if (! $seeImages) {
+                $row['national_id_image_path'] = null;
+                $row['national_id_back_path'] = null;
+                $row['license_image_path'] = null;
+                $row['license_back_path'] = null;
+            }
+
+            return $row;
+        })->values();
+
         return response()->json([
             'data' => [
                 'center_name' => $settings?->center_name,
                 'generated_at' => now()->toIso8601String(),
                 'filter' => $filter,
-                'customers' => $rows,
+                'customers' => $customers,
             ],
         ]);
     }

@@ -4,12 +4,15 @@ namespace App\Services\Contracts;
 
 use App\Models\Contract;
 use App\Models\Payment;
+use App\Models\TenantSetting;
 
 /**
  * Shared contract charge / paid / remaining math for dossier + statements.
  */
 class ContractLedgerMath
 {
+    public function __construct(private readonly ContractPricingService $pricing) {}
+
     /**
      * @return array{total: int, paid: int, balance: int}
      */
@@ -53,10 +56,13 @@ class ContractLedgerMath
 
         $days = max(0, (int) ($contract->approved_days ?? 0));
         if ($days <= 0 && $contract->starts_at && $contract->planned_ends_at) {
-            $days = max(1, (int) $contract->starts_at->diffInDays($contract->planned_ends_at));
-            if ($days < 1) {
-                $days = 1;
-            }
+            $ops = TenantSetting::query()->first()?->operational ?? [];
+            $threshold = (int) ($ops['rental_fraction_extra_day_hours'] ?? 0);
+            $days = $this->pricing->countRentalDays(
+                $contract->starts_at,
+                $contract->planned_ends_at,
+                $threshold > 0 ? $threshold : null,
+            );
         }
         $days = max(1, $days);
 

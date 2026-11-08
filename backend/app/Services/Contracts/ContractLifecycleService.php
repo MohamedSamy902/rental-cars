@@ -27,6 +27,10 @@ use Illuminate\Support\Facades\Schema;
 
 class ContractLifecycleService
 {
+    private const DEFAULT_DAILY_KM_ALLOWANCE = 200;
+
+    private const DEFAULT_EXCESS_KM_RATE = 5;
+
     public function __construct(
         private readonly ContractPricingService $pricing,
         private readonly VehicleAvailabilityService $availability,
@@ -81,6 +85,7 @@ class ContractLifecycleService
                 (int) $data['vehicle_id'],
                 $data['starts_at'],
                 $data['planned_ends_at'],
+                isset($data['extended_from_contract_id']) ? (int) $data['extended_from_contract_id'] : null,
             );
             $this->assertVehicleLicenseCoversRental(
                 (int) $vehicle->id,
@@ -96,12 +101,13 @@ class ContractLifecycleService
             $deposit = $allowPriceOverride && isset($data['deposit'])
                 ? (int) $data['deposit']
                 : (int) $vehicle->default_deposit;
+            $ops = TenantSetting::query()->first()?->operational ?? [];
             $kmAllowance = $allowPriceOverride && isset($data['daily_km_allowance'])
                 ? (int) $data['daily_km_allowance']
-                : 200;
+                : (int) ($ops['default_daily_km_allowance'] ?? self::DEFAULT_DAILY_KM_ALLOWANCE);
             $excessRate = $allowPriceOverride && isset($data['excess_km_rate'])
                 ? (int) $data['excess_km_rate']
-                : 5;
+                : (int) ($ops['default_excess_km_rate'] ?? self::DEFAULT_EXCESS_KM_RATE);
 
             $accessories = $this->resolveAccessoriesSnapshot($vehicle, $data['accessory_ids'] ?? null);
 
@@ -493,7 +499,7 @@ class ContractLifecycleService
             $plannedEnd = $locked->planned_ends_at;
             $lateDays = 0;
             if ($end > $plannedEnd) {
-                $lateDays = $this->pricing->countRentalDays($plannedEnd, $end, $threshold);
+                $lateDays = $this->pricing->countLateDays($plannedEnd, $end, $threshold);
             }
 
             $periodRent = $billableDays * (int) $locked->frozen_daily_rate;
@@ -511,6 +517,9 @@ class ContractLifecycleService
                 'other_fees' => (int) $locked->other_fees,
             ]);
             $finalInt = (int) round($final);
+            if ($finalInt < 0) {
+                throw new DomainException('الخصم أكبر من إجمالي العقد.');
+            }
 
             $locked->fill([
                 'status' => 'completed',
@@ -590,18 +599,25 @@ class ContractLifecycleService
         if ($contract->status === 'cancelled') {
             throw new DomainException('العقد ملغي مسبقاً.');
         }
-        if (! in_array($contract->status, ['pending', 'approved'], true)) {
-            throw new DomainException('بعد التسليم يُستخدم إنهاء مبكر أو استلام — لا إلغاء.');
-        }
         if (trim($reason) === '') {
             throw new DomainException('سبب الإلغاء إلزامي.');
         }
 
         return DB::transaction(function () use ($contract, $reason, $userId) {
-            $contract->fill([
+            /** @var Contract $locked */
+            $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status === 'cancelled') {
+                throw new DomainException('العقد ملغي مسبقاً.');
+            }
+            if (! in_array($locked->status, ['pending', 'approved'], true)) {
+                throw new DomainException('بعد التسليم يُستخدم إنهاء مبكر أو استلام — لا إلغاء.');
+            }
+
+            $locked->fill([
                 'status' => 'cancelled',
                 'cancel_reason' => $reason,
             ])->save();
+            $contract = $locked;
 
             $deposit = $contract->deposit;
             if ($deposit && $deposit->status === 'received') {
@@ -614,6 +630,14 @@ class ContractLifecycleService
                 ->where('direction', 'in')
                 ->get()
                 ->each(function (Payment $payment) use ($userId) {
+                    $refundRef = 'REFUND-'.$payment->id;
+                    $already = Payment::query()
+                        ->where('reference', $refundRef)
+                        ->where('direction', 'out')
+                        ->exists();
+                    if ($already) {
+                        return;
+                    }
                     $this->accounting->recordPayment([
                         'amount' => $payment->amount,
                         'method' => $payment->method,
@@ -710,6 +734,11 @@ class ContractLifecycleService
 
         return DB::transaction(function () use ($source, $data, $userId, $replacementId, $odometerIn, $odometerOut, $segmentStart) {
             $locked = Contract::query()->whereKey($source->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'active') {
+                throw new DomainException('التبديل بسبب عطل يتطلب عقداً نشطاً.');
+            }
+
+            $replacement = Vehicle::query()->whereKey($replacementId)->lockForUpdate()->firstOrFail();
 
             $this->assertNoOverlap(
                 $replacementId,
@@ -718,13 +747,20 @@ class ContractLifecycleService
                 $locked->id,
             );
 
-            $replacement = Vehicle::query()->findOrFail($replacementId);
             $this->assertOwnerAgreementCoversRental($replacement, $locked->planned_ends_at);
+            $this->assertVehicleLicenseCoversRental(
+                (int) $replacement->id,
+                $locked->planned_ends_at->toDateString(),
+            );
             if (! $replacement->is_active) {
                 throw new DomainException('العربية البديلة غير نشطة.');
             }
-            if ($replacement->manual_status === VehicleAvailabilityService::STATUS_MAINTENANCE) {
-                throw new DomainException('العربية البديلة في صيانة.');
+            if (in_array($replacement->manual_status, [
+                VehicleAvailabilityService::STATUS_MAINTENANCE,
+                VehicleAvailabilityService::STATUS_OUT_OF_SERVICE,
+                VehicleAvailabilityService::STATUS_SOLD,
+            ], true)) {
+                throw new DomainException('العربية البديلة غير متاحة.');
             }
             if ($odometerOut < (int) $replacement->odometer) {
                 throw new DomainException('عداد خروج البديلة أقل من عدادها المسجّل.');
@@ -889,7 +925,7 @@ class ContractLifecycleService
                 'link_id' => $deposit->id,
                 'notes' => 'قبض تأمين نقدي للعقد '.$contract->number,
             ], $userId);
-            $this->accounting->postDepositHold($deposit->fresh(), $contract, $userId);
+            $this->accounting->postDepositHold($deposit->fresh(), $contract, $userId, (string) $data['method']);
 
             return $deposit;
         });
@@ -900,15 +936,27 @@ class ContractLifecycleService
      */
     public function deductDeposit(Deposit $deposit, array $data, int $userId): Deposit
     {
-        if (! in_array($deposit->status, ['received', 'partial'], true)) {
-            throw new DomainException('لا يمكن الخصم من هذا التأمين.');
-        }
-        $amount = (int) $data['amount'];
-        $held = $deposit->remaining();
-        if ($amount <= 0 || $amount > $held) {
-            throw new DomainException('الخصم أكبر من التأمين المحتجز ('.$held.' ج.م).');
-        }
+        return DB::transaction(function () use ($deposit, $data, $userId) {
+            /** @var Deposit $deposit */
+            $deposit = Deposit::query()->whereKey($deposit->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($deposit->status, ['received', 'partial'], true)) {
+                throw new DomainException('لا يمكن الخصم من هذا التأمين.');
+            }
+            $amount = (int) $data['amount'];
+            $held = $deposit->remaining();
+            if ($amount <= 0 || $amount > $held) {
+                throw new DomainException('الخصم أكبر من التأمين المحتجز ('.$held.' ج.م).');
+            }
 
+            return $this->writeDepositDeduction($deposit, $data, $amount, $userId);
+        });
+    }
+
+    /**
+     * @param  array{reason: string, amount: int}  $data
+     */
+    private function writeDepositDeduction(Deposit $deposit, array $data, int $amount, int $userId): Deposit
+    {
         $deduction = DepositDeduction::query()->create([
             'deposit_id' => $deposit->id,
             'reason' => $data['reason'],
@@ -941,6 +989,16 @@ class ContractLifecycleService
     }
 
     public function returnDeposit(Deposit $deposit, string $method, string $receiptNumber, ?int $userId = null): Deposit
+    {
+        return DB::transaction(function () use ($deposit, $method, $receiptNumber, $userId) {
+            /** @var Deposit $deposit */
+            $deposit = Deposit::query()->whereKey($deposit->id)->lockForUpdate()->firstOrFail();
+
+            return $this->writeDepositReturn($deposit, $method, $receiptNumber, $userId);
+        });
+    }
+
+    private function writeDepositReturn(Deposit $deposit, string $method, string $receiptNumber, ?int $userId): Deposit
     {
         if (! in_array($deposit->status, ['received', 'partial'], true)) {
             throw new DomainException('لا يمكن رد هذا التأمين.');
@@ -976,7 +1034,7 @@ class ContractLifecycleService
                 'link_id' => $deposit->id,
                 'notes' => 'رد متبقي التأمين النقدي',
             ], $userId);
-            $this->accounting->postDepositReturn($deposit, $remaining, $userId);
+            $this->accounting->postDepositReturn($deposit, $remaining, $userId, $method);
         }
 
         return $deposit->fresh('deductions');
@@ -984,15 +1042,22 @@ class ContractLifecycleService
 
     private function assertNoOverlap(int $vehicleId, mixed $startsAt, mixed $endsAt, ?int $ignoreId = null): void
     {
-        $q = Contract::query()
-            ->where('vehicle_id', $vehicleId)
-            ->whereIn('status', ['pending', 'approved', 'active'])
-            ->where('starts_at', '<', $endsAt)
-            ->where('planned_ends_at', '>', $startsAt);
-
+        $q = Contract::query()->where('vehicle_id', $vehicleId);
         if ($ignoreId) {
             $q->where('id', '!=', $ignoreId);
         }
+
+        $q->where(function ($outer) use ($startsAt, $endsAt) {
+            $outer->where(function ($window) use ($startsAt, $endsAt) {
+                $window->whereIn('status', ['pending', 'approved'])
+                    ->where('starts_at', '<', $endsAt)
+                    ->where('planned_ends_at', '>', $startsAt);
+            })->orWhere(function ($active) use ($endsAt) {
+                // A car that is still out stays occupied until return, even past the planned end.
+                $active->where('status', 'active')
+                    ->where('starts_at', '<', $endsAt);
+            });
+        });
 
         $conflict = $q->first(['id', 'number']);
         if ($conflict) {
@@ -1086,28 +1151,62 @@ class ContractLifecycleService
 
     private function nextNumber(): string
     {
-        if (Schema::hasTable('contract_number_sequences')) {
-            $row = DB::table('contract_number_sequences')->where('id', 1)->lockForUpdate()->first();
-            if (! $row) {
-                DB::table('contract_number_sequences')->insert(['id' => 1, 'next_value' => 2, 'updated_at' => now(), 'created_at' => now()]);
-                $seq = 1;
-            } else {
-                $seq = (int) $row->next_value;
-                DB::table('contract_number_sequences')->where('id', 1)->update([
-                    'next_value' => $seq + 1,
-                    'updated_at' => now(),
-                ]);
+        if (! Schema::hasTable('contract_number_sequences')) {
+            $last = Contract::query()->withTrashed()->orderByDesc('id')->lockForUpdate()->value('number');
+            $seq = 1;
+            if (is_string($last) && preg_match('/(\d+)$/', $last, $m)) {
+                $seq = ((int) $m[1]) + 1;
             }
 
-            return 'CNT-'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
+            return $this->formatContractNumber($this->firstFreeContractSequence($seq));
         }
 
-        $last = Contract::query()->withTrashed()->orderByDesc('id')->lockForUpdate()->value('number');
-        $seq = 1;
-        if (is_string($last) && preg_match('/(\d+)$/', $last, $m)) {
-            $seq = ((int) $m[1]) + 1;
+        $row = DB::table('contract_number_sequences')->where('id', 1)->lockForUpdate()->first();
+        $seq = $row ? (int) $row->next_value : 1;
+        if ($seq < 1) {
+            $seq = 1;
         }
 
+        $highest = (int) (Contract::query()->withTrashed()
+            ->pluck('number')
+            ->map(function ($number) {
+                return is_string($number) && preg_match('/^CNT-(\d+)$/', $number, $m) ? (int) $m[1] : 0;
+            })
+            ->max() ?? 0);
+        if ($highest >= $seq) {
+            $seq = $highest + 1;
+        }
+        $seq = $this->firstFreeContractSequence($seq);
+
+        $next = $seq + 1;
+        if ($row) {
+            DB::table('contract_number_sequences')->where('id', 1)->update([
+                'next_value' => $next,
+                'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('contract_number_sequences')->insert([
+                'id' => 1,
+                'next_value' => $next,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return $this->formatContractNumber($seq);
+    }
+
+    private function firstFreeContractSequence(int $seq): int
+    {
+        while (Contract::query()->withTrashed()->where('number', $this->formatContractNumber($seq))->exists()) {
+            $seq++;
+        }
+
+        return $seq;
+    }
+
+    private function formatContractNumber(int $seq): string
+    {
         return 'CNT-'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
     }
 
@@ -1131,8 +1230,8 @@ class ContractLifecycleService
             foreach ($recipients as $user) {
                 $this->notifications->notify($user, $title, $body, 'contract', (int) $contract->id);
             }
-        } catch (\Throwable) {
-            // الإشعار لا يفشل العملية الأساسية
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 }

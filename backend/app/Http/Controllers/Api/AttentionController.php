@@ -44,35 +44,37 @@ class AttentionController extends Controller
             ->whereDate('starts_at', today())
             ->count() : null;
 
-        $blockingWorkOrders = WorkOrder::query()
+        $canMaintenance = (bool) $user?->hasPermission('maintenance.view');
+        $blockingWorkOrders = $canMaintenance ? WorkOrder::query()
             ->where('puts_in_maintenance', true)
             ->whereIn('status', ['open', 'in_progress'])
-            ->count();
+            ->count() : null;
 
-        $openWorkOrders = WorkOrder::query()
+        $openWorkOrders = $canMaintenance ? WorkOrder::query()
             ->whereIn('status', ['open', 'in_progress'])
-            ->count();
+            ->count() : null;
 
-        $openViolations = Violation::query()
+        $openViolations = $user?->hasPermission('violations.view') ? Violation::query()
             ->whereNotIn('status', ['paid', 'confirmed'])
-            ->count();
+            ->count() : null;
 
-        $lowStock = InventoryItem::query()
+        $lowStock = $user?->hasPermission('inventory.view') ? InventoryItem::query()
             ->withSum('batches as remaining_sum', 'remaining')
             ->get()
             ->filter(fn (InventoryItem $item) => (int) ($item->remaining_sum ?? 0) <= (int) $item->reorder_level)
-            ->count();
+            ->count() : null;
 
         $unread = Notification::query()
             ->when($user, fn ($q) => $q->where('user_id', $user->id))
             ->whereNull('read_at')
             ->count();
 
-        $pendingHrAcks = Schema::hasTable('employee_assignments')
+        $pendingHrAcks = $user?->hasPermission('hr.view') && Schema::hasTable('employee_assignments')
             ? EmployeeAssignment::query()->where('status', 'pending_ack')->count()
-            : 0;
+            : ($user?->hasPermission('hr.view') ? 0 : null);
 
-        $draftPayroll = PayrollRun::query()->where('status', 'draft')->count();
+        $canPayroll = (bool) ($user?->hasPermission('hr.salaries') || $user?->hasPermission('sensitive.view_salaries'));
+        $draftPayroll = $canPayroll ? PayrollRun::query()->where('status', 'draft')->count() : null;
 
         $blacklistedCustomers = $user?->hasPermission('customers.view')
             ? Customer::query()->where('status', 'blacklist')->count()

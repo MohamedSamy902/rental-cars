@@ -86,7 +86,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/{employee}', [EmployeeController::class, 'show']);
     });
-    Route::middleware('permission:hr.salaries,hr.view')->group(function () {
+    Route::middleware('permission:hr.salaries|sensitive.view_salaries')->group(function () {
         Route::get('/payroll', [PayrollController::class, 'index']);
     });
     Route::middleware('permission:hr.create,hr.salaries')->group(function () {

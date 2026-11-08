@@ -41,6 +41,31 @@ class ContractPricingService
     }
 
     /**
+     * Tagged late days are full days past the planned end only.
+     * A remainder shorter than a day is not tagged, and there is no separate penalty.
+     */
+    public function countLateDays(
+        \DateTimeInterface $plannedEnd,
+        \DateTimeInterface $actualEnd,
+        ?int $fractionExtraDayAfterHours = null,
+    ): int {
+        if ($actualEnd <= $plannedEnd) {
+            return 0;
+        }
+
+        $seconds = $actualEnd->getTimestamp() - $plannedEnd->getTimestamp();
+        $daySeconds = 24 * 60 * 60;
+        $fullDays = intdiv($seconds, $daySeconds);
+        $remainder = $seconds % $daySeconds;
+        $days = $fullDays;
+        if ($fractionExtraDayAfterHours !== null && $fractionExtraDayAfterHours > 0 && $remainder > ($fractionExtraDayAfterHours * 3600)) {
+            $days++;
+        }
+
+        return $days;
+    }
+
+    /**
      * Allowed kilometers at close = daily allowance × approved rental days.
      */
     public function allowedKilometers(int $dailyAllowance, int $approvedDays): int

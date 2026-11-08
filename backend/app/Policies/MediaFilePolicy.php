@@ -21,6 +21,11 @@ class MediaFilePolicy
 
     public function delete(User $user, MediaFile $medium): bool
     {
+        if ($medium->isSensitive()) {
+            return $user->hasPermission('media.delete')
+                && $user->hasPermission('sensitive.view_id_images');
+        }
+
         if ($medium->uploaded_by && (int) $medium->uploaded_by === (int) $user->id) {
             return true;
         }

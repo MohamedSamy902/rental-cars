@@ -228,13 +228,6 @@ class VehicleOwnerService
         $this->accounting->assertMonthOpen((int) $date->format('Y'), (int) $date->format('n'));
 
         $this->ensureAccruedThrough($owner, $date->format('Y-m'), $userId);
-        $balance = $this->balance($owner);
-        if ($amount > $balance['remaining']) {
-            throw new DomainException(sprintf(
-                'المبلغ أكبر من المتبقي للمالك (%d).',
-                $balance['remaining']
-            ));
-        }
 
         $vehicleId = isset($data['vehicle_id']) ? (int) $data['vehicle_id'] : null;
         if ($vehicleId) {
@@ -249,6 +242,16 @@ class VehicleOwnerService
         $this->ensureOwnerAccounts();
 
         return DB::transaction(function () use ($owner, $amount, $paidOn, $method, $vehicleId, $data, $userId) {
+            OwnerMonthDue::query()->where('owner_id', $owner->id)->lockForUpdate()->get();
+            OwnerPayout::query()->where('owner_id', $owner->id)->lockForUpdate()->get();
+            $balance = $this->balance($owner);
+            if ($amount > $balance['remaining']) {
+                throw new DomainException(sprintf(
+                    'المبلغ أكبر من المتبقي للمالك (%d).',
+                    $balance['remaining']
+                ));
+            }
+
             $payable = Account::query()->where('code', '2100')->firstOrFail();
             $cashCode = $method === 'transfer' || $method === 'bank' ? '1100' : '1000';
             $cash = Account::query()->where('code', $cashCode)->firstOrFail();

@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('notifications:scan')
     ->hourly()
     ->withoutOverlapping();
+
+Schedule::command('owners:accrue-dues')
+    ->dailyAt('00:30')
+    ->withoutOverlapping();

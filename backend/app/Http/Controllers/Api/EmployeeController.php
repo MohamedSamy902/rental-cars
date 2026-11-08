@@ -34,9 +34,17 @@ class EmployeeController extends Controller
         $perPage = PaginationInput::perPage($request, 100, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
+        $canSalary = $this->canSeeSalary($request);
 
         return response()->json([
-            'data' => $rows->items(),
+            'data' => collect($rows->items())->map(function (Employee $employee) use ($canSalary) {
+                $row = $employee->toArray();
+                if (! $canSalary) {
+                    unset($row['base_salary']);
+                }
+
+                return $row;
+            })->values(),
             'meta' => [
                 'current_page' => $rows->currentPage(),
                 'last_page' => $rows->lastPage(),
@@ -45,7 +53,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function show(Employee $employee): JsonResponse
+    public function show(Request $request, Employee $employee): JsonResponse
     {
         $user = User::query()
             ->with(['role:id,name,label', 'role.permissions:id,key,label,module'])
@@ -82,7 +90,16 @@ class EmployeeController extends Controller
             ->latest('id')
             ->limit(24)
             ->get()
-            ->map(function (PayrollLine $line) {
+            ->map(function (PayrollLine $line) use ($request) {
+                if (! $this->canSeeSalary($request)) {
+                    return [
+                        'id' => $line->id,
+                        'year' => $line->run?->year,
+                        'month' => $line->run?->month,
+                        'run_status' => $line->run?->status,
+                    ];
+                }
+
                 return [
                     'id' => $line->id,
                     'base_salary' => $line->base_salary,
@@ -98,6 +115,12 @@ class EmployeeController extends Controller
                     'payouts' => $line->payouts,
                 ];
             });
+
+        if (! $this->canSeeSalary($request)) {
+            $employee->makeHidden(['base_salary']);
+            $advances = [];
+            $petty = null;
+        }
 
         return response()->json([
             'data' => [
@@ -176,5 +199,12 @@ class EmployeeController extends Controller
             'data' => $employee->fresh(),
             'message' => 'تم تحديث بيانات الموظف.',
         ]);
+    }
+
+    private function canSeeSalary(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->hasPermission('sensitive.view_salaries') || $user?->hasPermission('hr.salaries'));
     }
 }

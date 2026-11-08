@@ -177,7 +177,13 @@ php artisan route:cache
 chmod -R 775 storage bootstrap/cache
 ```
 
-دخول أولي بعد الـ seed: `admin@rpm.local` / `password` — **غيّر كلمة المرور فوراً** من شاشة الموظفين.
+على الإنتاج `migrate --seed` يزرع الصلاحيات والأدوار فقط، بلا مستخدمين تجريبيين. أنشئ المدير بـ:
+
+```bash
+php artisan rpm:create-admin --name="مدير" --email="admin@example.com" --phone="01000000000" --password="كلمة-قوية"
+```
+
+بيئة التطوير ما زالت تزرع `admin@rpm.local` / `password`.
 
 ### ٣٫٦ PHP و SSL و Cron
 
