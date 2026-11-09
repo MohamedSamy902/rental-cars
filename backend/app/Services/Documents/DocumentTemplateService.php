@@ -170,16 +170,19 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
         $title = (string) $active->title;
-        // Only replace the legacy stock stub we shipped — never overwrite a custom published template.
-        $isLegacyStockTitle = $title === 'قالب العقد الأساسي' || $title === 'قالب العقد';
-        $looksLikeOldDefault = str_contains($content, 'بنود وشروط العقد')
-            && str_contains($content, '{{contract_terms}}')
-            && str_contains($content, 'عقد تأجير');
-        $alreadyPaperForm = str_contains($content, 'شروط التعاقد')
-            && str_contains($content, 'البند الأول');
-        $isShort = mb_strlen(strip_tags($content)) < 900;
 
-        if ($alreadyPaperForm || ! $isShort || (! $isLegacyStockTitle && ! $looksLikeOldDefault)) {
+        if (str_contains($content, 'rpm-paper-v2')) {
+            return;
+        }
+
+        // Upgrade only templates we previously shipped — never overwrite a custom published body.
+        $isLegacyShortTitle = in_array($title, ['قالب العقد الأساسي', 'قالب العقد'], true);
+        $looksLikeOurPriorDefault = str_contains($content, 'rpm-legal-contract')
+            || (str_contains($content, 'بنود وشروط العقد') && str_contains($content, 'عقد تأجير'))
+            || (str_contains($content, 'شروط التعاقد') && str_contains($content, 'rpm-lc-'));
+        $isTinyLegacyStub = $isLegacyShortTitle && mb_strlen(strip_tags($content)) < 900;
+
+        if (! $looksLikeOurPriorDefault && ! $isTinyLegacyStub) {
             return;
         }
 
@@ -639,53 +642,72 @@ class DocumentTemplateService
     private function defaultContractHtml(): string
     {
         return <<<'HTML'
-<article class="rpm-legal-contract">
+<article class="rpm-legal-contract rpm-paper-v2">
   <header class="rpm-lc-head">
-    <div class="rpm-lc-brand">
-      <img class="rpm-lc-logo" src="{{logo_src}}" alt="شعار الشركة" />
-      <div class="rpm-lc-tagline">{{company_tagline}}</div>
-    </div>
-    <div class="rpm-lc-title-pill">
-      <span class="rpm-lc-title-icon" aria-hidden="true">🤝</span>
-      <span>عقد إيجار سيارة</span>
-    </div>
-    <div class="rpm-lc-contact">
+    <div class="rpm-lc-badge rpm-lc-badge--contact">
       <div class="rpm-lc-signer-short">أ/ {{print_signer_name}}</div>
-      <div class="rpm-lc-phone" dir="ltr">{{company_phone}}</div>
+      <div class="rpm-lc-phone-pill">
+        <svg class="rpm-lc-ico-phone" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg>
+        <span dir="ltr">{{company_phone}}</span>
+      </div>
+    </div>
+    <div class="rpm-lc-badge rpm-lc-badge--title">
+      <div class="rpm-lc-title-row">
+        <svg class="rpm-lc-ico-handshake" viewBox="0 0 72 44" aria-hidden="true">
+          <path fill="#fff" d="M8 26c0-5 4-9 9-9h7l9-9 5 5-7 7h6c3 0 5 2 5 5v3H8v-2z"/>
+          <path fill="#fff" d="M64 26c0-5-4-9-9-9h-5l-4-4-5 5 6 6h-4c-3 0-5 2-5 5v3h26v-2z"/>
+          <rect x="22" y="24" width="28" height="7" rx="2" fill="#e10600"/>
+          <rect x="24" y="26" width="24" height="3" rx="1" fill="#fff"/>
+        </svg>
+        <span>عقد إيجار سيارة</span>
+      </div>
+    </div>
+    <div class="rpm-lc-badge rpm-lc-badge--brand">
+      <img class="rpm-lc-logo" src="{{logo_src}}" alt="RPM" />
+      <div class="rpm-lc-swoosh" aria-hidden="true"></div>
+      <div class="rpm-lc-tagline">{{company_tagline}}</div>
     </div>
   </header>
 
-  <p class="rpm-lc-meta">رقم العقد <strong>{{contract_number}}</strong> · إصدار القالب {{template_version}}</p>
+  <p class="rpm-lc-meta">{{contract_number}}</p>
 
   <section class="rpm-lc-block">
     <p>
       إنه في يوم : <span class="fill">{{contract_day}}</span>
-      الموافق : <span class="fill">{{contract_date}}</span> م ،
+      الموافق : <span class="fill mid">{{contract_date}}</span> م ،
       الساعة : <span class="fill">{{contract_time}}</span> .
     </p>
     <p>
-      أجر السيد/ <strong>{{company_name}}</strong> ،
-      ويمثله في التوقيع — <strong>{{print_signer_name}}</strong>
-      — سجل تجاري / <span class="fill" dir="ltr">{{company_cr}}</span> .
+      أجر السيد/ ( <strong>{{company_name}}</strong> ) ،
+      ويمثله في التوقيع - <strong>{{print_signer_name}}</strong>
+      - سجل تجاري / <span class="fill" dir="ltr">{{company_cr}}</span> .
     </p>
-    <p>ومقرها/ <span class="fill">{{company_address}}</span> .</p>
-    <div class="rpm-lc-party-tag"> ( الطرف الأول المؤجر ) </div>
+    <p>ومقرها/ <span class="fill wide">{{company_address}}</span> .</p>
+    <div class="rpm-lc-party-tag">( الطرف الأول المؤجر )</div>
   </section>
 
   <section class="rpm-lc-block">
     <p>
       إلى السيد/ <span class="fill wide">{{customer_name}}</span>
-      بطاقة رقم : <span class="fill" dir="ltr">{{customer_national_id}}</span>
+      بطاقة رقم : <span class="fill mid" dir="ltr">{{customer_national_id}}</span>
     </p>
     <p>
       الجنسية : <span class="fill">{{customer_nationality}}</span>
-      رخصة رقم : <span class="fill" dir="ltr">{{customer_license}}</span>
+      صادر من : <span class="fill mid"></span>
+      تاريخ الصدور : <span class="fill"></span>
+    </p>
+    <p>
+      رخصة رقم : <span class="fill mid" dir="ltr">{{customer_license}}</span>
+      صادر من : <span class="fill mid"></span>
     </p>
     <p>محل إقامة المستأجر : <span class="fill wide">{{customer_address}}</span></p>
-    <div class="rpm-lc-party-tag"> ( الطرف الثاني المستأجر ) </div>
+    <div class="rpm-lc-party-tag">( الطرف الثاني المستأجر )</div>
   </section>
 
-  <section class="rpm-lc-block rpm-lc-vehicle">
+  <section class="rpm-lc-block rpm-lc-block--icon">
+    <div class="rpm-lc-float-ico rpm-lc-float-ico--car" aria-hidden="true">
+      <svg viewBox="0 0 64 40" fill="none"><path fill="#fff" d="M8 24l6-10h28l8 10H8zm4 8a4 4 0 110-8 4 4 0 010 8zm28 0a4 4 0 110-8 4 4 0 010 8z"/><path stroke="#fff" stroke-width="2" d="M6 24h52v4H6z"/></svg>
+    </div>
     <p>
       أجر الطرف الأول إلى الطرف الثاني السيارة رقم : <span class="fill">{{vehicle_plate}}</span> ،
       ماركة : <span class="fill">{{vehicle_brand}}</span> ،
@@ -699,29 +721,34 @@ class DocumentTemplateService
     </p>
   </section>
 
-  <section class="rpm-lc-block rpm-lc-duration">
+  <section class="rpm-lc-block rpm-lc-block--icon">
+    <div class="rpm-lc-float-ico rpm-lc-float-ico--cal" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="#fff" stroke-width="2"/><path stroke="#fff" stroke-width="2" d="M3 10h18M8 3v4M16 3v4"/><path fill="#fff" d="M7 13h3v3H7zm5 0h3v3h-3z"/></svg>
+    </div>
     <p>
       وذلك لمدة : <span class="fill">{{rental_duration}}</span>
-      إبتداءً من : <span class="fill">{{start_date}}</span>
-      إلى : <span class="fill">{{end_date}}</span>
-      . قابلة للتجديد بموافقة الطرفين .
+      إبتداءً من : <span class="fill mid">{{start_date}}</span>
+      إلى : <span class="fill mid">{{end_date}}</span>
     </p>
+    <p>. قابلة للتجديد بموافقة الطرفين .</p>
   </section>
 
-  <h2 class="rpm-lc-terms-banner">شروط التعاقد</h2>
-  <ol class="rpm-lc-terms">
-    <li><strong class="rpm-lc-band">البند الأول:</strong> تم دفع تأمين للسيارة مبلغ وقدره ( <span class="fill">{{deposit}}</span> ) يسترد للمستأجر عند إستلام السيارة بدون أي تلفيات أو مخالفات .</li>
-    <li><strong class="rpm-lc-band">البند الثاني:</strong> في حالة رغبة الطرف الثاني تجديد مدة الإيجار عليه أن يخطر الطرف الأول بانتهاء الإيجار بيوم واحد ، وإذا تأخر المستأجر عن التسليم كحد أقصى ، ساعتين ، تحسب يوم جديد ، ويتم سحب السيارة دون تنبيه على المستأجر إذا تغيب الطرف الثاني لمدة 24 ساعة .</li>
-    <li><strong class="rpm-lc-band">البند الثالث:</strong> معدل أستخدام السيارة لا يتعدي ( <span class="fill">{{daily_km}}</span> ) كيلو متر في اليوم الواحد ، ما يزيد عن ذلك يحسب بعد كل كيلو متر مبلغ ( <span class="fill">{{excess_km_rate}}</span> ) .</li>
-    <li><strong class="rpm-lc-band">البند الرابع:</strong> من حق الطرف الأول سحب السيارة من الطرف الثاني إذا وجدت بقيادة شخص آخر أو تم أستخدام السيارة إستخدام غير شرعي أو بطريقة غير قانونية ولا يحق للطرف الثاني إسترداد باقي مبلغ الإيجار .</li>
-    <li><strong class="rpm-lc-band">البند الخامس:</strong> إذا حصل لا قدر الله أي حادث للسيارة فعلى الطرف الثاني أن يرجع للطرف الأول قبل أن يقوم بأي تصليح للسيارة .</li>
-    <li><strong class="rpm-lc-band">البند السادس:</strong> في حالة عدم إعادة السيارة أو حدوث حادث جسيم للسيارة ولا يمكن إصلاحها بأي حال من الأحوال ، فالطرف الثاني يكون ملزم بدفع ثمن السيارة والذي يقدر بـ ( <span class="fill">{{vehicle_value}}</span> ) جنيه مصري لا غير .</li>
-    <li><strong class="rpm-lc-band">البند السابع:</strong> يقر الطرف الثاني بأنه إستلم السيارة بصفة أمانة وهي في حالة جيدة وأصبح مسؤولا عنها جنائيا ومدنيا وعن كل الأضرار التي تسببها هذه السيارة للغير وأيضا عن جميع المخالفات ، وكذلك يقر أنه على علم تام نافية للجهالة بجميع شروط وقوانين وتعليمات المرور والأمن العام ، كما يلتزم المستأجر في حالة حدوث سرقات أو أي جريمة جنائية تقع بسبب الطرف الثاني ( المستأجر ) أن يتحمل عقوبتها وحده دون أدنى مسؤولية على الطرف الأول المؤجر .</li>
-    <li><strong class="rpm-lc-band">البند الثامن:</strong> يلتزم الطرف الثاني بأنه ينفذ تعليمات المرور من حيث السرعة داخل الجمهورية والطرق الصحراوية والزراعية .</li>
-    <li><strong class="rpm-lc-band">البند التاسع:</strong> يلتزم المستأجر بدفع قيمة أربعة أيام إيجار في حالة سحب رخصة السيارة أو فقدها حتى يتم إسترداد الرخصة .</li>
-    <li><strong class="rpm-lc-band">البند العاشر:</strong> في حالة وقوع حادث تكون تكلفة الإصلاح على عاتق المستأجر وبنفس قيمة الإيجار اليومي المتفق عليها .</li>
-    <li><strong class="rpm-lc-band">البند الحادي عشر:</strong> يلتزم الطرف الثاني بدفع قيمة المخالفات المرورية خلال فترة الإيجار وحتى بعد تسليم السيارة .</li>
-  </ol>
+  <div class="rpm-lc-terms-wrap">
+    <div class="rpm-lc-terms-banner"><span>شروط التعاقد</span></div>
+    <ol class="rpm-lc-terms">
+      <li><span class="rpm-lc-band">البند الأول</span> تم دفع تأمين للسيارة مبلغ وقدره ( <span class="fill">{{deposit}}</span> ) يسترد للمستأجر عند إستلام السيارة بدون أي تلفيات أو مخالفات .</li>
+      <li><span class="rpm-lc-band">البند الثاني</span> في حالة رغبة الطرف الثاني تجديد مدة الإيجار عليه أن يخطر الطرف الأول بانتهاء الإيجار بيوم واحد ، وإذا تأخر المستأجر عن التسليم كحد أقصى ، ساعتين ، تحسب يوم جديد ، ويتم سحب السيارة دون تنبيه على المستأجر إذا تغيب الطرف الثاني لمدة 24 ساعة .</li>
+      <li><span class="rpm-lc-band">البند الثالث</span> معدل أستخدام السيارة لا يتعدي ( <span class="fill">{{daily_km}}</span> ) كيلو متر في اليوم الواحد ، ما يزيد عن ذلك يحسب بعد كل كيلو متر مبلغ ( <span class="fill">{{excess_km_rate}}</span> ) .</li>
+      <li><span class="rpm-lc-band">البند الرابع</span> من حق الطرف الأول سحب السيارة من الطرف الثاني إذا وجدت بقيادة شخص آخر أو تم أستخدام السيارة إستخدام غير شرعي أو بطريقة غير قانونية ولا يحق للطرف الثاني إسترداد باقي مبلغ الإيجار .</li>
+      <li><span class="rpm-lc-band">البند الخامس</span> إذا حصل لا قدر الله أي حادث للسيارة فعلى الطرف الثاني أن يرجع للطرف الأول قبل أن يقوم بأي تصليح للسيارة .</li>
+      <li><span class="rpm-lc-band">البند السادس</span> في حالة عدم إعادة السيارة أو حدوث حادث جسيم للسيارة ولا يمكن إصلاحها بأي حال من الأحوال ، فالطرف الثاني يكون ملزم بدفع ثمن السيارة والذي يقدر بـ ( <span class="fill">{{vehicle_value}}</span> ) جنيه مصري لا غير .</li>
+      <li><span class="rpm-lc-band">البند السابع</span> يقر الطرف الثاني بأنه إستلم السيارة بصفة أمانة وهي في حالة جيدة وأصبح مسؤولا عنها جنائيا ومدنيا وعن كل الأضرار التي تسببها هذه السيارة للغير وأيضا عن جميع المخالفات ، وكذلك يقر أنه على علم تام نافية للجهالة بجميع شروط وقوانين وتعليمات المرور والأمن العام ، كما يلتزم المستأجر في حالة حدوث سرقات أو أي جريمة جنائية تقع بسبب الطرف الثاني ( المستأجر ) أن يتحمل عقوبتها وحده دون أدنى مسؤولية على الطرف الأول المؤجر .</li>
+      <li><span class="rpm-lc-band">البند الثامن</span> يلتزم الطرف الثاني بأنه ينفذ تعليمات المرور من حيث السرعة داخل الجمهورية والطرق الصحراوية والزراعية .</li>
+      <li><span class="rpm-lc-band">البند التاسع</span> يلتزم المستأجر بدفع قيمة أربعة أيام إيجار في حالة سحب رخصة السيارة أو فقدها حتى يتم إسترداد الرخصة .</li>
+      <li><span class="rpm-lc-band">البند العاشر</span> في حالة وقوع حادث تكون تكلفة الإصلاح على عاتق المستأجر وبنفس قيمة الإيجار اليومي المتفق عليها .</li>
+      <li><span class="rpm-lc-band">البند الحادي عشر</span> يلتزم الطرف الثاني بدفع قيمة المخالفات المرورية خلال فترة الإيجار وحتى بعد تسليم السيارة .</li>
+    </ol>
+  </div>
 
   <section class="rpm-lc-extra-terms" data-optional-terms="1">
     <div class="terms">{{contract_terms}}</div>
@@ -729,22 +756,24 @@ class DocumentTemplateService
 
   <footer class="rpm-lc-sign">
     <div class="rpm-lc-sign-col">
-      <h4>الطرف الأول (المؤجر)</h4>
-      <p>الإسم : {{company_name}}</p>
-      <p>ويمثله / {{print_signer_name}}</p>
+      <div class="rpm-lc-party-tag">الطرف الثاني (المستأجر)</div>
+      <p>الإسم : <span class="fill wide">{{customer_name}}</span></p>
+      <p>الرقم القومي : <span class="fill mid" dir="ltr">{{customer_national_id}}</span></p>
       <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
     </div>
     <div class="rpm-lc-stamp">
       <div class="rpm-lc-stamp-ring">
         <img src="{{logo_src}}" alt="" />
-        <span>{{company_name}}</span>
-        <span dir="ltr">س.ت {{company_cr}}</span>
+        <div class="stamp-rpm">RPM</div>
+        <div class="stamp-en">Rent A Car</div>
+        <div>سجل تجاري {{company_cr}}</div>
+        <div class="stamp-stars" aria-hidden="true">★★★★★</div>
       </div>
     </div>
     <div class="rpm-lc-sign-col">
-      <h4>الطرف الثاني (المستأجر)</h4>
-      <p>الإسم : {{customer_name}}</p>
-      <p>الرقم القومي : <span dir="ltr">{{customer_national_id}}</span></p>
+      <div class="rpm-lc-party-tag">الطرف الأول (المؤجر)</div>
+      <p>الإسم : {{company_name}}</p>
+      <p>ويمثله / {{print_signer_name}}</p>
       <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
     </div>
   </footer>

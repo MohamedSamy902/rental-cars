@@ -145,6 +145,7 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringContainsString('عميل القوالب', $rendered);
         $this->assertStringContainsString('ط ظ ع 55', $rendered);
         $this->assertStringContainsString('700', $rendered);
+        $this->assertStringNotContainsString('شروط التعاقد', $rendered);
         $this->assertNotEmpty($print->json('data.templates.handover_receipt.rendered_html'));
     }
 
@@ -211,6 +212,7 @@ class DocumentTemplateTest extends TestCase
         $print = $this->getJson("/api/contracts/{$contract->id}/print")->assertOk();
         $rendered = (string) $print->json('data.templates.contract.rendered_html');
 
+        $this->assertStringContainsString('rpm-paper-v2', $rendered);
         $this->assertStringContainsString('شروط التعاقد', $rendered);
         $this->assertStringContainsString('البند الأول', $rendered);
         $this->assertStringContainsString('البند الحادي عشر', $rendered);
@@ -258,6 +260,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(1, (int) $active->version);
+        $this->assertStringContainsString('rpm-paper-v2', (string) $active->content);
         $this->assertStringContainsString('شروط التعاقد', (string) $active->content);
         $this->assertStringContainsString('البند السادس', (string) $active->content);
     }
