@@ -148,6 +148,120 @@ class DocumentTemplateTest extends TestCase
         $this->assertNotEmpty($print->json('data.templates.handover_receipt.rendered_html'));
     }
 
+    public function test_default_rental_contract_template_autofills_party_and_terms(): void
+    {
+        $this->actingAdmin();
+        TenantSetting::query()->first()?->update([
+            'center_name' => 'آر - بي - إم للنقل والسياحة',
+            'operational' => [
+                'print_phone' => '01125253888',
+                'print_address' => '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة',
+                'print_commercial_register' => '18766',
+                'print_signer_name' => 'محمد عبد القادر محمد عطية',
+                'company_tagline' => 'لخدمات رجال الأعمال',
+                'default_contract_vehicle_value' => '450000',
+                'default_daily_km' => 200,
+                'excess_km_rate' => 5,
+            ],
+        ]);
+
+        $service = app(DocumentTemplateService::class);
+        $service->ensureDefaults();
+
+        $customer = Customer::query()->create([
+            'full_name' => 'سارة علي حسن',
+            'phone' => '01012345678',
+            'national_id' => '29001011234567',
+            'address' => 'المعادي — القاهرة',
+            'birth_date' => '1990-01-01',
+            'license_number' => 'DRV-9090',
+            'license_expires_on' => now()->addYears(2)->toDateString(),
+            'status' => 'active',
+        ]);
+        $vehicle = Vehicle::query()->create([
+            'code' => 'LEG-1',
+            'plate' => 'س ص ع 100',
+            'brand' => 'هيونداي',
+            'model' => 'إلنترا',
+            'year' => 2023,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'chassis_number' => 'CHS-999',
+            'engine_number' => 'ENG-888',
+            'odometer' => 22000,
+            'daily_rate' => 900,
+            'default_deposit' => 5000,
+            'is_active' => true,
+        ]);
+        $contract = Contract::query()->create([
+            'number' => 'C-LEG-1',
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'active',
+            'starts_at' => now()->startOfDay(),
+            'planned_ends_at' => now()->startOfDay()->addDays(3),
+            'frozen_daily_rate' => 900,
+            'frozen_agreed_deposit' => 5000,
+            'frozen_daily_km_allowance' => 250,
+            'frozen_excess_km_rate' => 6,
+            'frozen_min_days' => 1,
+            'odometer_out' => 22000,
+        ]);
+
+        $print = $this->getJson("/api/contracts/{$contract->id}/print")->assertOk();
+        $rendered = (string) $print->json('data.templates.contract.rendered_html');
+
+        $this->assertStringContainsString('شروط التعاقد', $rendered);
+        $this->assertStringContainsString('البند الأول', $rendered);
+        $this->assertStringContainsString('البند الحادي عشر', $rendered);
+        $this->assertStringContainsString('سارة علي حسن', $rendered);
+        $this->assertStringContainsString('29001011234567', $rendered);
+        $this->assertStringContainsString('مصري', $rendered);
+        $this->assertStringContainsString('س ص ع 100', $rendered);
+        $this->assertStringContainsString('هيونداي', $rendered);
+        $this->assertStringContainsString('CHS-999', $rendered);
+        $this->assertStringContainsString('5000', $rendered);
+        $this->assertStringContainsString('250', $rendered);
+        $this->assertStringContainsString('450000', $rendered);
+        $this->assertStringContainsString('محمد عبد القادر محمد عطية', $rendered);
+        $this->assertStringContainsString('التوقيع :', $rendered);
+        $this->assertStringNotContainsString('{{customer_name}}', $rendered);
+        $this->assertStringNotContainsString('{{deposit}}', $rendered);
+    }
+
+    public function test_stock_contract_stub_upgrades_to_paper_form(): void
+    {
+        $this->actingAdmin();
+        DocumentTemplate::query()->where('type', DocumentTemplate::TYPE_CONTRACT)->delete();
+        DocumentTemplate::query()->create([
+            'type' => DocumentTemplate::TYPE_CONTRACT,
+            'title' => 'قالب العقد الأساسي',
+            'content' => <<<'HTML'
+<header class="print-head"><h1>{{company_name}}</h1></header>
+<h2>عقد تأجير · رقم {{contract_number}}</h2>
+<table><tr><th>العميل</th><td>{{customer_name}}</td></tr></table>
+<h2>بنود وشروط العقد</h2>
+<div class="terms">{{contract_terms}}</div>
+HTML,
+            'format' => 'html',
+            'version' => 1,
+            'is_active' => true,
+        ]);
+
+        app(DocumentTemplateService::class)->ensureDefaults();
+
+        $active = DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_CONTRACT)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->first();
+
+        $this->assertNotNull($active);
+        $this->assertGreaterThan(1, (int) $active->version);
+        $this->assertStringContainsString('شروط التعاقد', (string) $active->content);
+        $this->assertStringContainsString('البند السادس', (string) $active->content);
+    }
+
     public function test_viewer_cannot_mutate_templates_but_service_still_renders(): void
     {
         $viewerRole = Role::query()->where('name', 'viewer')->firstOrFail();

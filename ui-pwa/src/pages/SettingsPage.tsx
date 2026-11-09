@@ -19,6 +19,9 @@ type Ops = {
   print_address?: string | null
   print_commercial_register?: string | null
   print_tax_info?: string | null
+  print_signer_name?: string | null
+  company_tagline?: string | null
+  default_contract_vehicle_value?: string | null
   contract_terms?: string | null
 }
 
@@ -34,6 +37,9 @@ export function SettingsPage() {
   const [printAddress, setPrintAddress] = useState('')
   const [printCr, setPrintCr] = useState('')
   const [printTax, setPrintTax] = useState('')
+  const [printSigner, setPrintSigner] = useState('')
+  const [companyTagline, setCompanyTagline] = useState('')
+  const [defaultVehicleValue, setDefaultVehicleValue] = useState('')
   const [contractTerms, setContractTerms] = useState('')
   const [ops, setOps] = useState<Ops>({})
 
@@ -48,6 +54,9 @@ export function SettingsPage() {
       setPrintAddress(operational.print_address || '')
       setPrintCr(operational.print_commercial_register || '')
       setPrintTax(operational.print_tax_info || '')
+      setPrintSigner(operational.print_signer_name || '')
+      setCompanyTagline(operational.company_tagline || 'لخدمات رجال الأعمال')
+      setDefaultVehicleValue(operational.default_contract_vehicle_value || '')
       setContractTerms(operational.contract_terms || '')
       setOps({
         default_daily_km: operational.default_daily_km ?? 200,
@@ -78,6 +87,9 @@ export function SettingsPage() {
           print_address: printAddress || null,
           print_commercial_register: printCr || null,
           print_tax_info: printTax || null,
+          print_signer_name: printSigner || null,
+          company_tagline: companyTagline || null,
+          default_contract_vehicle_value: defaultVehicleValue || null,
           contract_terms: contractTerms || null,
           operational: ops,
         },
@@ -123,14 +135,22 @@ export function SettingsPage() {
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>قالب وبنود العقد والطباعة</h3></div>
         <p className="muted" style={{ marginBlockEnd: '0.75rem' }}>
-          يتحكم في بيانات الترويسة والتذييل وبنود العقد المطبوعة (العقد · الفاتورة · إيصال الاستلام والتأمين).
+          بيانات ترويسة عقد الإيجار المطبوع (الشركة · المفوض · السجل). البنود القانونية الأحد عشر تُعدَّل من «قوالب العقود والمستندات» أدناه، ويمكن تعديل نسخة عقد واحد فقط قبل الطباعة دون تغيير القالب.
         </p>
         <div className="rpm-form-grid">
           <TextField label="اسم الشركة على المطبوعات" value={centerName} onChange={(e) => setCenterName(e.target.value)} />
+          <TextField label="الشعار الفرعي تحت اللوجو" value={companyTagline} onChange={(e) => setCompanyTagline(e.target.value)} />
+          <TextField label="المفوض بالتوقيع" value={printSigner} onChange={(e) => setPrintSigner(e.target.value)} hint="يظهر في رأس العقد وتوقيع الطرف الأول" />
           <TextField label="هاتف الشركة" value={printPhone} onChange={(e) => setPrintPhone(e.target.value)} />
           <TextField label="عنوان الشركة" value={printAddress} onChange={(e) => setPrintAddress(e.target.value)} />
           <TextField label="السجل التجاري" value={printCr} onChange={(e) => setPrintCr(e.target.value)} />
           <TextField label="البطاقة الضريبية / الرقم الضريبي" value={printTax} onChange={(e) => setPrintTax(e.target.value)} />
+          <TextField
+            label="قيمة السيارة الافتراضية في العقد (ج.م)"
+            value={defaultVehicleValue}
+            onChange={(e) => setDefaultVehicleValue(e.target.value)}
+            hint="تُملأ في البند السادس؛ يمكن تعديلها لعقد واحد قبل الطباعة"
+          />
           <MediaUpload
             label="شعار الشركة على المطبوعات"
             collection="tenant"
@@ -140,10 +160,10 @@ export function SettingsPage() {
             accept="image"
           />
           <TextAreaField
-            label="بنود وشروط العقد"
+            label="بنود إضافية اختيارية"
             value={contractTerms}
             onChange={(e) => setContractTerms(e.target.value)}
-            hint="تظهر في نهاية العقد المطبوع"
+            hint="نص حر يُلحق بعد البنود الأحد عشر في القالب الافتراضي (اختياري)"
           />
           <TextAreaField
             label="ملاحظات التذييل"

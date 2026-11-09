@@ -17,7 +17,7 @@ import {
 } from '@/shared/contracts/contractModel'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
-import { printContractDocument } from '@/shared/contracts/printContract'
+import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
 import './pages.css'
 
 const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed'] as const
@@ -43,6 +43,7 @@ export function BookingsPage() {
   const beginRequest = useLatestRequest()
   const { openNewContract, createdVersion } = useNewContract()
   const life = useContractLifecycle(() => void load(page))
+  const { openPrint, printSheet } = useContractPrint()
   const { counts: attention } = useAttentionSignals(true)
 
   const chips = useMemo(
@@ -268,7 +269,7 @@ export function BookingsPage() {
               view: () => navigate(`/contracts/${b.id}`),
               approve: () => void life.approve(b.id),
               openAction: (kind) => void life.openAction(kind, b),
-              print: (kind = 'contract') => void printContractDocument(b.id, kind, toast.error),
+              print: (kind = 'contract') => openPrint(b.id, kind),
               can,
             })
           }
@@ -295,6 +296,7 @@ export function BookingsPage() {
         onConfirm={() => void life.runAction()}
         onClose={life.closeAction}
       />
+      {printSheet}
     </div>
   )
 }

@@ -149,6 +149,9 @@ class OperationsController extends Controller
             'print_address' => ['nullable', 'string', 'max:500'],
             'print_commercial_register' => ['nullable', 'string', 'max:120'],
             'print_tax_info' => ['nullable', 'string', 'max:200'],
+            'print_signer_name' => ['nullable', 'string', 'max:200'],
+            'company_tagline' => ['nullable', 'string', 'max:200'],
+            'default_contract_vehicle_value' => ['nullable', 'string', 'max:50'],
             'contract_terms' => ['nullable', 'string', 'max:20000'],
             'operational' => ['nullable', 'array'],
         ]);
@@ -159,7 +162,16 @@ class OperationsController extends Controller
         if (array_key_exists('operational', $data) && is_array($data['operational'])) {
             $ops = array_merge($ops, $data['operational']);
         }
-        foreach (['print_phone', 'print_address', 'print_commercial_register', 'print_tax_info', 'contract_terms'] as $key) {
+        foreach ([
+            'print_phone',
+            'print_address',
+            'print_commercial_register',
+            'print_tax_info',
+            'print_signer_name',
+            'company_tagline',
+            'default_contract_vehicle_value',
+            'contract_terms',
+        ] as $key) {
             if (array_key_exists($key, $data)) {
                 $ops[$key] = $data[$key];
                 unset($data[$key]);

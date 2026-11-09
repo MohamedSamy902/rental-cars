@@ -34,8 +34,23 @@ class DocumentTemplateService
             ['key' => 'contract_status', 'aliases' => ['حالة_العقد'], 'label' => 'حالة العقد', 'sample' => 'نشط'],
             ['key' => 'customer_name', 'aliases' => ['اسم_العميل'], 'label' => 'اسم العميل', 'sample' => 'محمد أحمد'],
             ['key' => 'customer_phone', 'aliases' => ['هاتف_العميل', 'رقم_الهاتف'], 'label' => 'هاتف العميل', 'sample' => '01000000000'],
+            ['key' => 'customer_national_id', 'aliases' => ['الرقم_القومي', 'قومي_العميل'], 'label' => 'الرقم القومي للعميل', 'sample' => '29001011234567'],
+            ['key' => 'customer_nationality', 'aliases' => ['جنسية_العميل'], 'label' => 'جنسية العميل', 'sample' => 'مصري'],
+            ['key' => 'customer_address', 'aliases' => ['عنوان_العميل', 'محل_الإقامة'], 'label' => 'محل إقامة المستأجر', 'sample' => 'القاهرة — المعادي'],
+            ['key' => 'customer_license', 'aliases' => ['رخصة_العميل', 'رقم_الرخصة'], 'label' => 'رقم رخصة القيادة', 'sample' => 'LIC-12345'],
             ['key' => 'vehicle_plate', 'aliases' => ['رقم_اللوحة'], 'label' => 'رقم اللوحة', 'sample' => 'أ ب ج 1234'],
             ['key' => 'vehicle_name', 'aliases' => ['اسم_العربية', 'العربية'], 'label' => 'الماركة والموديل', 'sample' => 'هيونداي إلنترا'],
+            ['key' => 'vehicle_brand', 'aliases' => ['ماركة_العربية'], 'label' => 'ماركة العربية', 'sample' => 'هيونداي'],
+            ['key' => 'vehicle_model', 'aliases' => ['موديل_العربية'], 'label' => 'موديل العربية', 'sample' => 'إلنترا'],
+            ['key' => 'daily_km', 'aliases' => ['بدل_الكيلومتر', 'الكيلومتر_اليومي'], 'label' => 'بدل الكيلومتر اليومي', 'sample' => '200'],
+            ['key' => 'excess_km_rate', 'aliases' => ['سعر_الكيلومتر_الزائد'], 'label' => 'سعر الكيلومتر الزائد', 'sample' => '5'],
+            ['key' => 'rental_duration', 'aliases' => ['مدة_الإيجار'], 'label' => 'مدة الإيجار', 'sample' => '4 أيام'],
+            ['key' => 'contract_day', 'aliases' => ['يوم_التحرير'], 'label' => 'يوم تحرير العقد', 'sample' => 'السبت'],
+            ['key' => 'contract_date', 'aliases' => ['تاريخ_التحرير'], 'label' => 'تاريخ تحرير العقد (يوم/شهر/سنة)', 'sample' => '08/11/2026'],
+            ['key' => 'contract_time', 'aliases' => ['ساعة_التحرير'], 'label' => 'ساعة تحرير العقد', 'sample' => '10:30'],
+            ['key' => 'print_signer_name', 'aliases' => ['المفوض_بالتوقيع', 'اسم_المفوض'], 'label' => 'المفوض بالتوقيع عن المركز', 'sample' => 'محمد عبد القادر محمد عطية'],
+            ['key' => 'company_tagline', 'aliases' => ['شعار_فرعي'], 'label' => 'الشعار الفرعي تحت اللوجو', 'sample' => 'لخدمات رجال الأعمال'],
+            ['key' => 'vehicle_value', 'aliases' => ['قيمة_السيارة', 'ثمن_السيارة'], 'label' => 'قيمة السيارة المتفق عليها (البند السادس)', 'sample' => '450000'],
             ['key' => 'start_date', 'aliases' => ['تاريخ_البداية'], 'label' => 'تاريخ البداية', 'sample' => '2026-11-01'],
             ['key' => 'end_date', 'aliases' => ['تاريخ_النهاية', 'النهاية_المخططة'], 'label' => 'تاريخ النهاية المخططة', 'sample' => '2026-11-05'],
             ['key' => 'actual_end_date', 'aliases' => ['تاريخ_الاستلام_الفعلي'], 'label' => 'تاريخ الاستلام الفعلي', 'sample' => '2026-11-05'],
@@ -90,7 +105,7 @@ class DocumentTemplateService
 
         foreach ([
             DocumentTemplate::TYPE_CONTRACT => [
-                'title' => 'قالب العقد الأساسي',
+                'title' => 'عقد إيجار سيارة (نموذج المركز)',
                 'content' => $this->defaultContractHtml(),
             ],
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => [
@@ -134,6 +149,46 @@ class DocumentTemplateService
             ]);
 
         $this->upgradeStockOwnerAgreementTemplate($userId);
+        $this->upgradeStockContractTemplate($userId);
+    }
+
+    /**
+     * Replace the short stock rental-contract stub with the paper-form legal default
+     * when the active row still lacks the RPM contract clauses / party structure.
+     */
+    private function upgradeStockContractTemplate(?int $userId = null): void
+    {
+        $active = DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_CONTRACT)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->first();
+
+        if (! $active) {
+            return;
+        }
+
+        $content = (string) $active->content;
+        $title = (string) $active->title;
+        // Only replace the legacy stock stub we shipped — never overwrite a custom published template.
+        $isLegacyStockTitle = $title === 'قالب العقد الأساسي' || $title === 'قالب العقد';
+        $looksLikeOldDefault = str_contains($content, 'بنود وشروط العقد')
+            && str_contains($content, '{{contract_terms}}')
+            && str_contains($content, 'عقد تأجير');
+        $alreadyPaperForm = str_contains($content, 'شروط التعاقد')
+            && str_contains($content, 'البند الأول');
+        $isShort = mb_strlen(strip_tags($content)) < 900;
+
+        if ($alreadyPaperForm || ! $isShort || (! $isLegacyStockTitle && ! $looksLikeOldDefault)) {
+            return;
+        }
+
+        $this->publish([
+            'type' => DocumentTemplate::TYPE_CONTRACT,
+            'title' => 'عقد إيجار سيارة (نموذج المركز)',
+            'content' => $this->defaultContractHtml(),
+            'format' => 'html',
+        ], null, $userId);
     }
 
     /**
@@ -336,6 +391,19 @@ class DocumentTemplateService
         $customer = $contract->customer;
         $deposit = $contract->deposit;
 
+        $issuedAt = $contract->starts_at ?? $contract->created_at ?? now();
+        $dayNames = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        $durationDays = null;
+        if ($contract->starts_at && $contract->planned_ends_at) {
+            $durationDays = max(1, (int) $contract->starts_at->copy()->startOfDay()
+                ->diffInDays($contract->planned_ends_at->copy()->startOfDay()) ?: 1);
+        }
+
+        $nationalId = (string) ($customer?->national_id ?: '');
+        $nationality = $nationalId !== ''
+            ? 'مصري'
+            : ((string) ($customer?->passport_number ?: '') !== '' ? '' : '');
+
         $map = [
             'company_name' => (string) ($tenant?->center_name ?: 'مركز التأجير'),
             'company_phone' => (string) ($ops['print_phone'] ?? ''),
@@ -344,19 +412,38 @@ class DocumentTemplateService
             'company_tax' => (string) ($ops['print_tax_info'] ?? ''),
             'logo_src' => (string) ($tenant?->logo_path ?: '/brand/rpm-logo.webp'),
             'print_footer' => (string) ($tenant?->print_footer ?: ''),
+            'print_signer_name' => (string) ($ops['print_signer_name'] ?? ''),
+            'company_tagline' => (string) ($ops['company_tagline'] ?? 'لخدمات رجال الأعمال'),
             'contract_terms' => (string) ($ops['contract_terms'] ?? ''),
             'contract_number' => (string) ($contract->number ?: ('C-'.$contract->id)),
             'contract_status' => (string) $contract->status,
+            'contract_day' => $dayNames[(int) $issuedAt->dayOfWeek] ?? '',
+            'contract_date' => $issuedAt->format('d/m/Y'),
+            'contract_time' => $issuedAt->format('H:i'),
             'customer_name' => (string) ($customer?->full_name ?: ''),
             'customer_phone' => (string) ($customer?->phone ?: ''),
+            'customer_national_id' => $nationalId,
+            'customer_nationality' => $nationality,
+            'customer_address' => (string) ($customer?->address ?: ''),
+            'customer_license' => (string) ($customer?->license_number ?: ''),
             'national_id_front' => (string) ($customer?->national_id_image_path ?: ''),
             'national_id_back' => (string) ($customer?->national_id_back_path ?: ''),
             'vehicle_plate' => (string) ($vehicle?->plate ?: ''),
             'vehicle_name' => trim(($vehicle?->brand ?? '').' '.($vehicle?->model ?? '')),
+            'vehicle_brand' => (string) ($vehicle?->brand ?: ''),
+            'vehicle_model' => (string) ($vehicle?->model ?: ''),
+            'vehicle_year' => (string) ($vehicle?->year ?: ''),
+            'vehicle_chassis' => (string) ($vehicle?->chassis_number ?: ''),
+            'vehicle_engine' => (string) ($vehicle?->engine_number ?: ''),
+            'vehicle_odometer' => (string) ($handover?->odometer ?? $contract->odometer_out ?? $vehicle?->odometer ?? ''),
+            'vehicle_value' => (string) ($ops['default_contract_vehicle_value'] ?? ''),
             'start_date' => $contract->starts_at?->format('Y-m-d H:i') ?? '',
             'end_date' => $contract->planned_ends_at?->format('Y-m-d H:i') ?? '',
             'actual_end_date' => $contract->actual_ends_at?->format('Y-m-d H:i') ?? '',
+            'rental_duration' => $durationDays === null ? '' : ($durationDays === 1 ? 'يوم واحد' : $durationDays.' أيام'),
             'daily_rate' => (string) (int) $contract->frozen_daily_rate,
+            'daily_km' => (string) (int) ($contract->frozen_daily_km_allowance ?? $ops['default_daily_km'] ?? 0),
+            'excess_km_rate' => (string) (int) ($contract->frozen_excess_km_rate ?? $ops['excess_km_rate'] ?? 0),
             'deposit' => (string) (int) ($deposit?->original_amount ?? $contract->frozen_agreed_deposit ?? 0),
             'deposit_status' => (string) ($deposit?->status ?? ''),
             'deposit_remaining' => (string) (int) ($deposit ? $deposit->remaining() : ($contract->frozen_agreed_deposit ?? 0)),
@@ -542,7 +629,7 @@ class DocumentTemplateService
     private function defaultTitle(string $type): string
     {
         return match ($type) {
-            DocumentTemplate::TYPE_CONTRACT => 'قالب العقد الأساسي',
+            DocumentTemplate::TYPE_CONTRACT => 'عقد إيجار سيارة (نموذج المركز)',
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب إيصال الاستلام والتأمين',
             DocumentTemplate::TYPE_OWNER_AGREEMENT => 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
             default => 'قالب مستند',
@@ -552,27 +639,118 @@ class DocumentTemplateService
     private function defaultContractHtml(): string
     {
         return <<<'HTML'
-<header class="print-head">
-  <img class="print-logo" src="{{logo_src}}" alt="شعار الشركة" />
-  <div>
-    <h1>{{company_name}}</h1>
-    <p class="muted">{{company_phone}} · {{company_address}}</p>
-  </div>
-</header>
-<h2>عقد تأجير · رقم {{contract_number}}</h2>
-<p class="muted"><span class="badge">{{contract_status}}</span> · إصدار القالب {{template_version}}</p>
-<table>
-  <tr><th>العميل</th><td>{{customer_name}} · <span dir="ltr">{{customer_phone}}</span></td></tr>
-  <tr><th>العربية</th><td>{{vehicle_name}} · {{vehicle_plate}}</td></tr>
-  <tr><th>البداية</th><td>{{start_date}}</td></tr>
-  <tr><th>النهاية المخططة</th><td>{{end_date}}</td></tr>
-  <tr><th>السعر اليومي</th><td>{{daily_rate}}</td></tr>
-  <tr><th>التأمين النقدي</th><td>{{deposit}}</td></tr>
-  <tr><th>الإجمالي النهائي</th><td>{{final_total}}</td></tr>
-</table>
-<h2>بنود وشروط العقد</h2>
-<div class="terms">{{contract_terms}}</div>
-<p class="foot">{{print_footer}}</p>
+<article class="rpm-legal-contract">
+  <header class="rpm-lc-head">
+    <div class="rpm-lc-brand">
+      <img class="rpm-lc-logo" src="{{logo_src}}" alt="شعار الشركة" />
+      <div class="rpm-lc-tagline">{{company_tagline}}</div>
+    </div>
+    <div class="rpm-lc-title-pill">
+      <span class="rpm-lc-title-icon" aria-hidden="true">🤝</span>
+      <span>عقد إيجار سيارة</span>
+    </div>
+    <div class="rpm-lc-contact">
+      <div class="rpm-lc-signer-short">أ/ {{print_signer_name}}</div>
+      <div class="rpm-lc-phone" dir="ltr">{{company_phone}}</div>
+    </div>
+  </header>
+
+  <p class="rpm-lc-meta">رقم العقد <strong>{{contract_number}}</strong> · إصدار القالب {{template_version}}</p>
+
+  <section class="rpm-lc-block">
+    <p>
+      إنه في يوم : <span class="fill">{{contract_day}}</span>
+      الموافق : <span class="fill">{{contract_date}}</span> م ،
+      الساعة : <span class="fill">{{contract_time}}</span> .
+    </p>
+    <p>
+      أجر السيد/ <strong>{{company_name}}</strong> ،
+      ويمثله في التوقيع — <strong>{{print_signer_name}}</strong>
+      — سجل تجاري / <span class="fill" dir="ltr">{{company_cr}}</span> .
+    </p>
+    <p>ومقرها/ <span class="fill">{{company_address}}</span> .</p>
+    <div class="rpm-lc-party-tag"> ( الطرف الأول المؤجر ) </div>
+  </section>
+
+  <section class="rpm-lc-block">
+    <p>
+      إلى السيد/ <span class="fill wide">{{customer_name}}</span>
+      بطاقة رقم : <span class="fill" dir="ltr">{{customer_national_id}}</span>
+    </p>
+    <p>
+      الجنسية : <span class="fill">{{customer_nationality}}</span>
+      رخصة رقم : <span class="fill" dir="ltr">{{customer_license}}</span>
+    </p>
+    <p>محل إقامة المستأجر : <span class="fill wide">{{customer_address}}</span></p>
+    <div class="rpm-lc-party-tag"> ( الطرف الثاني المستأجر ) </div>
+  </section>
+
+  <section class="rpm-lc-block rpm-lc-vehicle">
+    <p>
+      أجر الطرف الأول إلى الطرف الثاني السيارة رقم : <span class="fill">{{vehicle_plate}}</span> ،
+      ماركة : <span class="fill">{{vehicle_brand}}</span> ،
+      موديل : <span class="fill">{{vehicle_model}}</span> ،
+    </p>
+    <p>
+      رقم الموتور : <span class="fill" dir="ltr">{{vehicle_engine}}</span> ،
+      رقم الشاسية : <span class="fill" dir="ltr">{{vehicle_chassis}}</span> ،
+      عداد الكيلو متر : <span class="fill">{{vehicle_odometer}}</span> ،
+      موبيل : <span class="fill" dir="ltr">{{customer_phone}}</span>
+    </p>
+  </section>
+
+  <section class="rpm-lc-block rpm-lc-duration">
+    <p>
+      وذلك لمدة : <span class="fill">{{rental_duration}}</span>
+      إبتداءً من : <span class="fill">{{start_date}}</span>
+      إلى : <span class="fill">{{end_date}}</span>
+      . قابلة للتجديد بموافقة الطرفين .
+    </p>
+  </section>
+
+  <h2 class="rpm-lc-terms-banner">شروط التعاقد</h2>
+  <ol class="rpm-lc-terms">
+    <li><strong class="rpm-lc-band">البند الأول:</strong> تم دفع تأمين للسيارة مبلغ وقدره ( <span class="fill">{{deposit}}</span> ) يسترد للمستأجر عند إستلام السيارة بدون أي تلفيات أو مخالفات .</li>
+    <li><strong class="rpm-lc-band">البند الثاني:</strong> في حالة رغبة الطرف الثاني تجديد مدة الإيجار عليه أن يخطر الطرف الأول بانتهاء الإيجار بيوم واحد ، وإذا تأخر المستأجر عن التسليم كحد أقصى ، ساعتين ، تحسب يوم جديد ، ويتم سحب السيارة دون تنبيه على المستأجر إذا تغيب الطرف الثاني لمدة 24 ساعة .</li>
+    <li><strong class="rpm-lc-band">البند الثالث:</strong> معدل أستخدام السيارة لا يتعدي ( <span class="fill">{{daily_km}}</span> ) كيلو متر في اليوم الواحد ، ما يزيد عن ذلك يحسب بعد كل كيلو متر مبلغ ( <span class="fill">{{excess_km_rate}}</span> ) .</li>
+    <li><strong class="rpm-lc-band">البند الرابع:</strong> من حق الطرف الأول سحب السيارة من الطرف الثاني إذا وجدت بقيادة شخص آخر أو تم أستخدام السيارة إستخدام غير شرعي أو بطريقة غير قانونية ولا يحق للطرف الثاني إسترداد باقي مبلغ الإيجار .</li>
+    <li><strong class="rpm-lc-band">البند الخامس:</strong> إذا حصل لا قدر الله أي حادث للسيارة فعلى الطرف الثاني أن يرجع للطرف الأول قبل أن يقوم بأي تصليح للسيارة .</li>
+    <li><strong class="rpm-lc-band">البند السادس:</strong> في حالة عدم إعادة السيارة أو حدوث حادث جسيم للسيارة ولا يمكن إصلاحها بأي حال من الأحوال ، فالطرف الثاني يكون ملزم بدفع ثمن السيارة والذي يقدر بـ ( <span class="fill">{{vehicle_value}}</span> ) جنيه مصري لا غير .</li>
+    <li><strong class="rpm-lc-band">البند السابع:</strong> يقر الطرف الثاني بأنه إستلم السيارة بصفة أمانة وهي في حالة جيدة وأصبح مسؤولا عنها جنائيا ومدنيا وعن كل الأضرار التي تسببها هذه السيارة للغير وأيضا عن جميع المخالفات ، وكذلك يقر أنه على علم تام نافية للجهالة بجميع شروط وقوانين وتعليمات المرور والأمن العام ، كما يلتزم المستأجر في حالة حدوث سرقات أو أي جريمة جنائية تقع بسبب الطرف الثاني ( المستأجر ) أن يتحمل عقوبتها وحده دون أدنى مسؤولية على الطرف الأول المؤجر .</li>
+    <li><strong class="rpm-lc-band">البند الثامن:</strong> يلتزم الطرف الثاني بأنه ينفذ تعليمات المرور من حيث السرعة داخل الجمهورية والطرق الصحراوية والزراعية .</li>
+    <li><strong class="rpm-lc-band">البند التاسع:</strong> يلتزم المستأجر بدفع قيمة أربعة أيام إيجار في حالة سحب رخصة السيارة أو فقدها حتى يتم إسترداد الرخصة .</li>
+    <li><strong class="rpm-lc-band">البند العاشر:</strong> في حالة وقوع حادث تكون تكلفة الإصلاح على عاتق المستأجر وبنفس قيمة الإيجار اليومي المتفق عليها .</li>
+    <li><strong class="rpm-lc-band">البند الحادي عشر:</strong> يلتزم الطرف الثاني بدفع قيمة المخالفات المرورية خلال فترة الإيجار وحتى بعد تسليم السيارة .</li>
+  </ol>
+
+  <section class="rpm-lc-extra-terms" data-optional-terms="1">
+    <div class="terms">{{contract_terms}}</div>
+  </section>
+
+  <footer class="rpm-lc-sign">
+    <div class="rpm-lc-sign-col">
+      <h4>الطرف الأول (المؤجر)</h4>
+      <p>الإسم : {{company_name}}</p>
+      <p>ويمثله / {{print_signer_name}}</p>
+      <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
+    </div>
+    <div class="rpm-lc-stamp">
+      <div class="rpm-lc-stamp-ring">
+        <img src="{{logo_src}}" alt="" />
+        <span>{{company_name}}</span>
+        <span dir="ltr">س.ت {{company_cr}}</span>
+      </div>
+    </div>
+    <div class="rpm-lc-sign-col">
+      <h4>الطرف الثاني (المستأجر)</h4>
+      <p>الإسم : {{customer_name}}</p>
+      <p>الرقم القومي : <span dir="ltr">{{customer_national_id}}</span></p>
+      <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
+    </div>
+  </footer>
+
+  <p class="foot">{{print_footer}}</p>
+</article>
 HTML;
     }
 

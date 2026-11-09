@@ -4,6 +4,7 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import { Button, TextAreaField, TextField, useToast } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
+import { shellRentalContractHtml } from '@/shared/contracts/rentalContractPrint'
 
 type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement'
 
@@ -27,8 +28,8 @@ type TemplateRow = {
 
 const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
   contract: {
-    title: 'قالب العقد الأساسي',
-    hint: 'يُستخدم عند طباعة عقد التأجير. يدعم HTML أو Markdown أو رفع ملف Word (.docx).',
+    title: 'عقد إيجار سيارة (نموذج المركز)',
+    hint: 'نموذج عقد الإيجار بين المركز والمستأجر (مطابق للنموذج الورقي). عدّل البنود هنا لكل العقود، أو عدّل نسخة عقد واحد فقط من شاشة الطباعة قبل الإرسال للطابعة.',
   },
   handover_receipt: {
     title: 'قالب إيصال الاستلام والتأمين',
@@ -43,6 +44,9 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
 function shellPreview(type: TemplateType, title: string, body: string) {
   if (type === 'owner_agreement') {
     return shellOwnerAgreementHtml(body, title)
+  }
+  if (type === 'contract') {
+    return shellRentalContractHtml(body, title)
   }
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${title}</title>
 <style>

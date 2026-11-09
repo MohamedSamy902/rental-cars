@@ -42,11 +42,22 @@ final class NestedCustomerRedactor
         foreach ([
             'customer_name',
             'customer_phone',
+            'customer_national_id',
+            'customer_nationality',
+            'customer_address',
+            'customer_license',
             'national_id_front',
             'national_id_back',
             'اسم_العميل',
             'هاتف_العميل',
             'رقم_الهاتف',
+            'الرقم_القومي',
+            'قومي_العميل',
+            'جنسية_العميل',
+            'عنوان_العميل',
+            'محل_الإقامة',
+            'رخصة_العميل',
+            'رقم_الرخصة',
         ] as $key) {
             if (array_key_exists($key, $variables)) {
                 $variables[$key] = '';

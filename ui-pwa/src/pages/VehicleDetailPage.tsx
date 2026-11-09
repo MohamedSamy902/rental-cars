@@ -19,7 +19,7 @@ import { useNewContract } from '@/shared/contracts/newContractContext'
 import { ContractActionsBar } from '@/shared/contracts/ContractActionsBar'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
-import { printContractDocument } from '@/shared/contracts/printContract'
+import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
 import type { Contract } from '@/shared/contracts/contractModel'
 import { printDomSubtree, printHtmlDocument } from '@/utils/printHtml'
 import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
@@ -380,6 +380,7 @@ export function VehicleDetailPage() {
 
   useEffect(() => { void load() }, [vehicleId])
   const life = useContractLifecycle(() => { void load() })
+  const { openPrint, printSheet } = useContractPrint()
 
   async function closeWorkOrder(id: number) {
     try {
@@ -879,7 +880,7 @@ export function VehicleDetailPage() {
                     contract={contract}
                     onApprove={() => void life.approve(c.id)}
                     onAction={(kind) => void life.openAction(kind, contract)}
-                    onPrint={(kind = 'contract') => void printContractDocument(c.id, kind, toast.error)}
+                    onPrint={(kind = 'contract') => openPrint(c.id, kind)}
                   />
                 </div>
               </article>
@@ -1339,6 +1340,7 @@ export function VehicleDetailPage() {
 
   return (
     <div className="vd">
+      {printSheet}
       <div className="vd-print-head">
         <strong>ملف عربية — RPM</strong>
         <span>{v.brand} {v.model} · {v.plate}</span>

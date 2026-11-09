@@ -2,6 +2,7 @@ import { api, getToken, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { statusLabel } from './contractModel'
+import { isRentalContractBody, shellRentalContractHtml } from './rentalContractPrint'
 
 export type PrintDocKind = 'contract' | 'invoice' | 'receipt'
 
@@ -57,11 +58,14 @@ type PrintTenant = {
   print_address?: string | null
   print_commercial_register?: string | null
   print_tax_info?: string | null
+  print_signer_name?: string | null
+  company_tagline?: string | null
+  default_contract_vehicle_value?: string | null
   contract_terms?: string | null
   logo_src?: string | null
 }
 
-type PrintTemplate = {
+export type PrintTemplate = {
   id: number
   type: string
   title: string
@@ -73,7 +77,7 @@ type PrintTemplate = {
   variables?: Record<string, string>
 }
 
-type PrintPayload = {
+export type PrintPayload = {
   tenant: PrintTenant
   contract: PrintContract
   templates?: {
@@ -345,15 +349,19 @@ function applyRuntimeAssets(html: string, tenant: PrintTenant): string {
     })
 }
 
-function wrapTemplateHtml(title: string, html: string): string {
+function wrapTemplateHtml(title: string, html: string, kind: PrintDocKind = 'contract'): string {
   const trimmed = html.trim()
   if (/^<!doctype/i.test(trimmed) || /<html[\s>]/i.test(trimmed)) {
     return trimmed
   }
+  if (kind === 'contract' && isRentalContractBody(trimmed)) {
+    return shellRentalContractHtml(trimmed, title)
+  }
   return shell(title, trimmed)
 }
 
-function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
+/** Build a complete printable HTML document for a contract print kind. */
+export function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
   const { tenant, contract, templates } = payload
   const title = `${titles[kind]} ${contract.number}`
 
@@ -363,16 +371,69 @@ function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
 
   if (kind === 'contract' && templates?.contract?.rendered_html) {
     const body = applyRuntimeAssets(templates.contract.rendered_html, tenant)
-    return wrapTemplateHtml(title, body)
+    return wrapTemplateHtml(title, body, 'contract')
   }
 
   if (kind === 'receipt' && templates?.handover_receipt?.rendered_html) {
     const body = applyRuntimeAssets(templates.handover_receipt.rendered_html, tenant)
-    return wrapTemplateHtml(title, body)
+    return wrapTemplateHtml(title, body, 'receipt')
   }
 
   if (kind === 'receipt') return shell(title, receiptBody(tenant, contract))
+  if (kind === 'contract') {
+    // Fallback stub still uses the simple shell.
+    return shell(title, contractBody(tenant, contract))
+  }
   return shell(title, contractBody(tenant, contract))
+}
+
+/** Extract the editable body from a full HTML document (or return as-is). */
+export function extractPrintableBody(html: string): string {
+  const trimmed = html.trim()
+  const match = trimmed.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+  return match ? match[1].trim() : trimmed
+}
+
+/** Wrap an edited body back into a full print document for the given kind. */
+export function wrapEditedPrintHtml(kind: PrintDocKind, title: string, bodyOrFull: string): string {
+  return wrapTemplateHtml(title, bodyOrFull, kind)
+}
+
+export async function loadContractPrintPayload(id: number): Promise<PrintPayload> {
+  return loadPrintPayload(id)
+}
+
+/** Persist a print snapshot then open the browser print dialog. */
+export async function commitPrintDocument(
+  id: number,
+  kind: PrintDocKind,
+  payload: PrintPayload,
+  html: string,
+  opts?: { editedBeforePrint?: boolean },
+) {
+  const templateMeta =
+    kind === 'contract'
+      ? payload.templates?.contract
+      : kind === 'receipt'
+        ? payload.templates?.handover_receipt
+        : null
+
+  await api('/print-snapshots', {
+    method: 'POST',
+    json: {
+      type: snapshotType[kind],
+      record_type: 'contract',
+      record_id: id,
+      payload: {
+        ...payload,
+        template_version: templateMeta?.version ?? null,
+        template_id: templateMeta?.id ?? null,
+        edited_before_print: Boolean(opts?.editedBeforePrint),
+      },
+    },
+  }).catch(() => undefined)
+
+  printHtmlDocument(html)
 }
 
 /** Print one of the three core contract documents via hidden iframe. */

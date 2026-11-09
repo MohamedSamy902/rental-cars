@@ -4,7 +4,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
-  Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState, useToast,
+  Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState,
   RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, IconAlert, PhoneActions,
 } from '@/shared/ui'
 import {
@@ -13,7 +13,7 @@ import {
 import { ContractActionsBar } from '@/shared/contracts/ContractActionsBar'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
-import { printContractDocument } from '@/shared/contracts/printContract'
+import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
 import './pages.css'
 import './ContractDetailPage.css'
 
@@ -26,7 +26,6 @@ const relationLabel: Record<string, string> = {
 
 export function ContractDetailPage() {
   const { id } = useParams()
-  const toast = useToast()
   const { can } = useAuth()
   const contractId = Number(id)
   const [row, setRow] = useState<Contract | null>(null)
@@ -54,6 +53,7 @@ export function ContractDetailPage() {
   useEffect(() => { void load() }, [load])
 
   const life = useContractLifecycle(() => void load())
+  const { openPrint, printSheet } = useContractPrint()
 
   if (loading && !row) return <div className="cd"><SkeletonBlock rows={10} /></div>
   if (error || !row) {
@@ -89,9 +89,9 @@ export function ContractDetailPage() {
           <div className="cd-hero__actions">
             {can('contracts.print') ? (
               <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
-                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'contract', toast.error)}>طباعة العقد</Button>
-                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'invoice', toast.error)}>الفاتورة / كشف الحساب</Button>
-                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => void printContractDocument(row.id, 'receipt', toast.error)}>إيصال الاستلام والتأمين</Button>
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'contract')}>طباعة العقد</Button>
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'invoice')}>الفاتورة / كشف الحساب</Button>
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'receipt')}>إيصال الاستلام والتأمين</Button>
               </div>
             ) : null}
           </div>
@@ -115,9 +115,10 @@ export function ContractDetailPage() {
           contract={row}
           onApprove={() => void life.approve(row.id)}
           onAction={(kind) => void life.openAction(kind, row)}
-          onPrint={(kind = 'contract') => void printContractDocument(row.id, kind, toast.error)}
+          onPrint={(kind = 'contract') => openPrint(row.id, kind)}
         />
       </header>
+      {printSheet}
 
       <MetricCardGrid
         label="ملخص مالي"
