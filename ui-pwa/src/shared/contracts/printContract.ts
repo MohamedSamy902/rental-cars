@@ -3,6 +3,7 @@ import { formatDate, formatMoney } from '@/shared/lib/format'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { statusLabel } from './contractModel'
 import { isRentalContractBody, shellRentalContractHtml } from './rentalContractPrint'
+import { buildInvoiceBody, isInvoiceBody, shellInvoiceHtml } from './invoicePrint'
 
 export type PrintDocKind = 'contract' | 'invoice' | 'receipt'
 
@@ -12,18 +13,35 @@ type PrintContract = Record<string, unknown> & {
   customer?: {
     full_name?: string
     phone?: string
+    address?: string | null
+    national_id?: string | null
+    passport_number?: string | null
+    license_number?: string
+    license_expires_on?: string | null
+    national_id_expires_on?: string | null
     national_id_image_path?: string | null
     national_id_back_path?: string | null
   }
-  vehicle?: { brand: string; model: string; plate: string }
+  vehicle?: {
+    brand: string
+    model: string
+    plate: string
+    year?: number | string | null
+    color?: string | null
+  }
   starts_at: string
   planned_ends_at: string
   actual_ends_at?: string | null
   frozen_daily_rate: number
   frozen_agreed_deposit?: number
+  approved_days?: number | null
   period_rent?: number | null
+  excess_km?: number | null
   excess_km_amount?: number | null
   damage_fee?: number | null
+  other_fees?: number | null
+  other_fees_description?: string | null
+  discount?: number | null
   final_total?: number | null
   odometer_out?: number | null
   odometer_in?: number | null
@@ -88,7 +106,7 @@ export type PrintPayload = {
 
 const titles: Record<PrintDocKind, string> = {
   contract: 'عقد تأجير',
-  invoice: 'فاتورة / كشف حساب',
+  invoice: 'فاتورة',
   receipt: 'إيصال الاستلام والتأمين',
 }
 
@@ -198,42 +216,7 @@ function contractBody(tenant: PrintTenant, c: PrintContract) {
 }
 
 function invoiceBody(tenant: PrintTenant, c: PrintContract) {
-  const payments = c.payments || []
-  const rent = c.period_rent ?? null
-  const excess = c.excess_km_amount ?? 0
-  const damage = c.damage_fee ?? 0
-  const total = c.final_total ?? ((rent || 0) + excess + damage)
-  const paidIn = payments.filter((p) => p.direction === 'in').reduce((s, p) => s + Number(p.amount || 0), 0)
-  const paidOut = payments.filter((p) => p.direction === 'out').reduce((s, p) => s + Number(p.amount || 0), 0)
-  const balance = Math.max(0, total - (paidIn - paidOut))
-  const rows = payments.map((p) => `
-    <tr>
-      <td>${esc(p.date || p.paid_at || '—')}</td>
-      <td>${esc(p.direction === 'in' ? 'قبض' : 'صرف')}</td>
-      <td>${esc(p.method || '—')}</td>
-      <td>${esc(p.reference || '—')}</td>
-      <td>${formatMoney(p.amount)}</td>
-    </tr>`).join('')
-
-  return `
-    ${headerBlock(tenant)}
-    <h2>فاتورة / كشف حساب · عقد ${esc(c.number)}</h2>
-    <p class="muted">${esc(c.customer?.full_name || '—')}</p>
-    <table>
-      <tr><th>إيجار الفترة</th><td>${rent != null ? formatMoney(rent) : '—'}</td></tr>
-      <tr><th>كيلومترات زيادة</th><td>${formatMoney(excess)}</td></tr>
-      <tr><th>رسوم أضرار</th><td>${formatMoney(damage)}</td></tr>
-      <tr><th>الإجمالي</th><td><strong>${formatMoney(total)}</strong></td></tr>
-      <tr><th>المدفوع (صافي)</th><td>${formatMoney(paidIn - paidOut)}</td></tr>
-      <tr><th>المتبقي على العميل</th><td><strong>${formatMoney(balance)}</strong></td></tr>
-      <tr><th>التأمين المحتجز</th><td>${formatMoney(c.deposit?.remaining ?? c.deposit?.original_amount ?? c.frozen_agreed_deposit ?? 0)}</td></tr>
-    </table>
-    <h2>حركة الدفعات</h2>
-    <table>
-      <tr><th>التاريخ</th><th>الاتجاه</th><th>الطريقة</th><th>المرجع</th><th>المبلغ</th></tr>
-      ${rows || '<tr><td colspan="5">لا دفعات مسجّلة بعد.</td></tr>'}
-    </table>
-    <p class="foot">${esc(tenant.print_footer || '')}</p>`
+  return buildInvoiceBody(tenant, c)
 }
 
 function idCardsBlock(c: PrintContract) {
@@ -357,6 +340,9 @@ function wrapTemplateHtml(title: string, html: string, kind: PrintDocKind = 'con
   if (kind === 'contract' && isRentalContractBody(trimmed)) {
     return shellRentalContractHtml(trimmed, title)
   }
+  if (kind === 'invoice' && isInvoiceBody(trimmed)) {
+    return shellInvoiceHtml(trimmed, title)
+  }
   return shell(title, trimmed)
 }
 
@@ -366,7 +352,7 @@ export function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
   const title = `${titles[kind]} ${contract.number}`
 
   if (kind === 'invoice') {
-    return shell(title, invoiceBody(tenant, contract))
+    return shellInvoiceHtml(invoiceBody(tenant, contract), title)
   }
 
   if (kind === 'contract' && templates?.contract?.rendered_html) {

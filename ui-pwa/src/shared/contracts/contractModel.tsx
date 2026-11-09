@@ -215,7 +215,7 @@ export function contractMenu(
   if (can('contracts.print')) {
     items.push(
       { id: 'print-contract', label: 'طباعة العقد', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('contract') },
-      { id: 'print-invoice', label: 'الفاتورة / كشف الحساب', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('invoice') },
+      { id: 'print-invoice', label: 'الفاتورة', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('invoice') },
       { id: 'print-receipt', label: 'إيصال الاستلام والتأمين', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
     )
   }

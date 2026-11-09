@@ -90,7 +90,7 @@ export function ContractDetailPage() {
             {can('contracts.print') ? (
               <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
                 <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'contract')}>طباعة العقد</Button>
-                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'invoice')}>الفاتورة / كشف الحساب</Button>
+                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'invoice')}>الفاتورة</Button>
                 <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'receipt')}>إيصال الاستلام والتأمين</Button>
               </div>
             ) : null}
