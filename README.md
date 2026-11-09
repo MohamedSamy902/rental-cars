@@ -86,125 +86,99 @@ cd ui-pwa && npm run lint && npm run build
 
 ---
 
-## ٣) الرفع على cPanel — خطوة بخطوة بدقة
+## ٣) الرفع على cPanel — فرونت + باك كامل (بلا Node على السيرفر)
 
-### ٣٫١ ما سترفعه
+الاستضافة: **cPanel + MySQL** · SSH مُفضَّل · **لا Node** على السيرفر (البناء محلياً أو في GitHub Actions).
+
+### ٣٫١ ما يُرفع
 
 | على الاستضافة | المحتوى |
 |---------------|---------|
-| `/home/USER/rpm/` | تطبيق Laravel كاملاً (`app`, `vendor`, `artisan`, `.env`, …) **خارج** الويب |
-| `/home/USER/public_html/` | واجهة SPA + `index.php` + `.htaccess` (نقطة الدخول العامة) |
+| `/home/USER/rpm/` | Laravel كامل: `app` · `vendor` · `artisan` · `.env` … **خارج** الويب |
+| `/home/USER/public_html/` | SPA مبنية + `index.php` + `.htaccess` |
 
- Domains: دومين واحد يكفي — `/api/*` يذهب لـ Laravel وباقي المسارات للواجهة.
+دومين واحد يكفي: `/api/*` و `/up` و `/sanctum/*` → Laravel · باقي المسارات → الواجهة.
 
-### ٣٫٢ تجهيز الحزمة من جهازك أو من CI
+### ٣٫٢ إنشاء قاعدة MySQL (مرة أولى)
+
+1. **MySQL® Databases** → قاعدة مثل `rpm_prod`.  
+2. مستخدم + كلمة مرور قوية → **All Privileges**.  
+3. سجّل: القاعدة · المستخدم · كلمة المرور · المضيف غالباً `localhost`.
+
+### ٣٫٣ أول رفع على الإطلاق (فرونت + باك + قاعدة)
+
+من جهازك (فيه Node للبناء فقط — **السيرفر بلا Node**):
 
 ```bash
-# من جذر المشروع
+# 1) بعد إنشاء قاعدة MySQL من cPanel:
+export CPANEL_SSH_HOST=your-domain.com
+export CPANEL_SSH_USER=cpaneluser
+export CPANEL_SSH_KEY=~/.ssh/id_rsa
+
+export APP_URL=https://your-domain.com
+export DB_DATABASE=USER_rpm_prod
+export DB_USERNAME=USER_rpm_user
+export DB_PASSWORD='********'
+# اختياري: DB_HOST=localhost  DB_PORT=3306
+
+bash scripts/cpanel-first-install.sh
+```
+
+هذا السكربت (للتثبيت الأول فقط):
+1. يبني الحزمة كاملة (React + Laravel + `vendor`)  
+2. يرفع الباك → `~/rpm/` والفرونت → `~/public_html/`  
+3. يكتب `.env` للإنتاج على السيرفر  
+4. يشغّل `key:generate` · `migrate` · `db:seed` · `config/route:cache`
+
+دخول أولي: `admin@rpm.local` / `password` — **غيّر كلمة المرور فوراً**.
+
+> للتحديثات اللاحقة (بدون seed وبدون استبدال `.env`):  
+> `bash scripts/deploy-cpanel-ssh.sh`
+
+### ٣٫٤ بناء الحزمة فقط (رفع يدوي / File Manager)
+
+```bash
 bash scripts/build-production.sh
 ```
 
 ينتج:
-- `dist/cpanel/` → ارفعه إلى `public_html/`
-- `dist/cpanel-app/` → ارفعه إلى `~/rpm/`
-- `dist/README-DEPLOY.txt` → ملخص سريع
+- `dist/cpanel/` → `public_html/`
+- `dist/cpanel-app/` → `~/rpm/`
+- `dist/rpm-cpanel.tar.gz` → أرشيف الاثنين
+- `dist/README-DEPLOY.txt`
 
-أو من GitHub Actions: Workflow **CI** على `main` يرفع Artifact باسم `rpm-cpanel-bundle`.
+`vendor` مضمّن افتراضياً — **لا تحتاج Composer ولا Node على الاستضافة**.  
+تأكد أن `public_html/index.php` يشير إلى `../rpm` (ملف [`scripts/cpanel-index.php`](scripts/cpanel-index.php)).
 
-### ٣٫٣ إنشاء قاعدة MySQL من cPanel
+### ٣٫٥ PHP و SSL و Cron
 
-1. **MySQL® Databases** → أنشئ قاعدة `rpm_prod` (أو أي اسم).  
-2. أنشئ مستخدماً بكلمة مرور قوية واربطه بالقاعدة بـ **All Privileges**.  
-3. سجّل: اسم القاعدة · المستخدم · كلمة المرور · المضيف غالباً `localhost`.
-
-### ٣٫٤ رفع الملفات
-
-**File Manager** أو FTP:
-
-1. ارفع محتويات `dist/cpanel-app/` → `/home/USER/rpm/`  
-2. ارفع محتويات `dist/cpanel/` → `/home/USER/public_html/`  
-   - استبدل `.htaccess` إن طُلب  
-3. استبدل `public_html/index.php` بنسخة [`scripts/cpanel-index.php`](scripts/cpanel-index.php)  
-4. داخل `public_html/index.php` تأكد أن:
-   ```php
-   $laravelRoot = __DIR__.'/../rpm';
-   ```
-   يطابق مسار رفع Laravel.
-
-> إن رفعت `vendor` ضمن الحزمة لا تحتاج Composer على الاستضافة.  
-> إن لم ترفعه: من Terminal في cPanel نفّذ `cd ~/rpm && composer install --no-dev --optimize-autoloader`.
-
-### ٣٫٥ ملف البيئة `.env`
-
-في `/home/USER/rpm/`:
-
-```bash
-cp .env.example .env
-```
-
-عدّل على الأقل:
-
-```env
-APP_NAME=RPM
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://your-domain.com
-
-DB_CONNECTION=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=USER_rpm_prod
-DB_USERNAME=USER_rpm_user
-DB_PASSWORD=********
-
-SESSION_DRIVER=database
-QUEUE_CONNECTION=database
-CACHE_STORE=database
-FILESYSTEM_DISK=local
-LOG_CHANNEL=stack
-LOG_LEVEL=error
-```
-
-ثم:
-
-```bash
-cd ~/rpm
-php artisan key:generate --force
-php artisan migrate --force
-php artisan db:seed --force          # أول تثبيت فقط (مستخدم تجريبي + بيانات عرض)
-php artisan config:cache
-php artisan route:cache
-chmod -R 775 storage bootstrap/cache
-```
-
-دخول أولي بعد الـ seed: `admin@rpm.local` / `password` — **غيّر كلمة المرور فوراً** من شاشة الموظفين.
-
-### ٣٫٦ PHP و SSL و Cron
-
-1. **MultiPHP Manager** → اختر **PHP 8.2 أو 8.3** لـ `public_html`.  
-2. فعّل الامتدادات: `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `fileinfo`, `curl`.  
-3. **SSL/TLS** → AutoSSL أو شهادة Let’s Encrypt للدومين.  
-4. **Cron Jobs** → أضف (كل دقيقة):
+1. **MultiPHP Manager** → **PHP 8.2 أو 8.3** لـ `public_html`.  
+2. امتدادات: `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `fileinfo`, `curl`.  
+3. حدود الرفع: راجع [`docs/cpanel-php-ini.md`](docs/cpanel-php-ini.md).  
+4. **SSL/TLS** → AutoSSL.  
+5. **Cron Jobs** (كل دقيقة):
    ```cron
    * * * * * cd /home/USER/rpm && php artisan schedule:run >> /dev/null 2>&1
    ```
-5. للنسخ الاحتياطي: فعّل **Backup** اليومي في cPanel أو JetBackup واذكر مكان الحفظ في محضر التسليم (٣٠ يوماً وفق المواصفة).
+6. فعّل **Backup** يومي في cPanel.
 
-### ٣٫٧ تحقق بعد الرفع
+### ٣٫٦ تحقق بعد الرفع
 
 | فحص | متوقع |
 |------|--------|
 | `https://your-domain.com/` | شاشة الدخول العربية |
 | `https://your-domain.com/api/login` بـ POST | JSON توكن |
 | `https://your-domain.com/up` | صحة Laravel |
-| رفع صورة عميل | ملف تحت `rpm/storage/app/private/media/` |
+| رفع صورة عميل | تحت `rpm/storage/app/private/media/` |
 
-### ٣٫٨ تحديث لاحق (بدون مسح البيانات)
+### ٣٫٧ تحديث لاحق (بدون مسح البيانات)
 
-1. ابنِ حزمة جديدة `build-production.sh`  
-2. ارفع الكود الجديد فوق `~/rpm` **بدون** استبدال `.env` ولا `storage/app`  
-3. ارفع أصول `public_html` الجديدة  
-4. نفّذ: `php artisan migrate --force && php artisan config:cache && php artisan route:cache`
+```bash
+# من جهازك — نفس أوامر SSH أعلاه بدون SEED_FIRST
+bash scripts/deploy-cpanel-ssh.sh
+```
+
+الـ rsync لا يستبدل `.env` ولا وسائط `storage/app/private/media`.
 
 ---
 
@@ -212,10 +186,23 @@ chmod -R 775 storage bootstrap/cache
 
 | Workflow | الملف | ماذا يفعل |
 |----------|--------|-----------|
-| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | على كل PR وpush لـ `main`: PHPUnit + Lint + Build · وعلى `main` يصدر Artifact للحزمة |
-| **Deploy · cPanel** | [`.github/workflows/deploy-cpanel.yml`](.github/workflows/deploy-cpanel.yml) | نشر FTP يدوي (`workflow_dispatch` مع كتابة `deploy`) — جاهز للتلقائي لاحقاً |
+| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | PHPUnit + Lint + Build · وعلى `main` يصدر Artifact كامل `rpm-cpanel-full` |
+| **Deploy · cPanel** | [`.github/workflows/deploy-cpanel.yml`](.github/workflows/deploy-cpanel.yml) | نشر يدوي (`confirm=deploy`) عبر **SSH rsync للفرونت والباك** |
 
 ### أسرار النشر (Settings → Secrets → Actions)
+
+**SSH — مفضّل (يرفع الكل):**
+
+| السر | مثال |
+|------|------|
+| `CPANEL_SSH_HOST` | `your-domain.com` |
+| `CPANEL_SSH_USER` | مستخدم cPanel |
+| `CPANEL_SSH_KEY` | مفتاح خاص PEM كامل |
+| `CPANEL_SSH_PORT` | `22` (اختياري) |
+| `CPANEL_APP_DIR` | `rpm` (اختياري) |
+| `CPANEL_PUBLIC_DIR` | `public_html` (اختياري) |
+
+**FTP — بديل لـ `public_html` فقط** إن لم يتوفر SSH في Actions:
 
 | السر | مثال |
 |------|------|
@@ -225,10 +212,9 @@ chmod -R 775 storage bootstrap/cache
 | `CPANEL_FTP_REMOTE_DIR` | `/public_html/` |
 | `CPANEL_FTP_PORT` | `21` (اختياري) |
 
-> الـ Deploy يرفع محتويات الحزمة المبنية. مسار Laravel خارج `public_html` يُفضَّل رفعه مرة أولى يدوياً أو عبر FTP منفصل لنفس السبب الأمني.
+شغّل **Deploy · cPanel** من Actions واكتب `deploy` للتأكيد. لأول تثبيت يمكن تفعيل خيار `seed_first`.
 
 لفتح النشر التلقائي عند كل push على `main`: ألغِ تعليق قسم `push:` داخل `deploy-cpanel.yml`.
-
 ---
 
 ## ٥) الهيكل
@@ -239,11 +225,15 @@ rental-cars/
 ├── ui-pwa/                  React PWA
 ├── docs/                    مواصفات ومراجعات
 ├── scripts/
-│   ├── dev.sh               تشغيل محلي
-│   ├── build-production.sh  حزمة cPanel
+│   ├── dev.sh                 تشغيل محلي
+│   ├── build-production.sh    حزمة cPanel كاملة (فرونت+باك+vendor)
+│   ├── cpanel-first-install.sh تثبيت أول مرة (env+seed)
+│   ├── deploy-cpanel-ssh.sh    تحديث/نشر SSH/rsync
+│   ├── cpanel-post-deploy.sh   migrate/cache على السيرفر
+│   ├── env.cpanel.example      قالب .env للإنتاج
 │   ├── cpanel.htaccess
 │   └── cpanel-index.php
-└── .github/workflows/       CI + Deploy
+└── .github/workflows/         CI + Deploy
 ```
 
 ---

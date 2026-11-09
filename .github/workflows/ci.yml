@@ -91,12 +91,20 @@ jobs:
           cache: npm
           cache-dependency-path: ui-pwa/package-lock.json
 
-      - name: Build production package
+      - name: Setup PHP 8.3 (لـ vendor داخل الحزمة)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, fileinfo, tokenizer, xml, curl
+          coverage: none
+          tools: composer
+
+      - name: Build production package (front + back + vendor)
         run: bash scripts/build-production.sh
 
-      - name: Upload deploy artifact
+      - name: Upload full deploy artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rpm-cpanel-bundle
-          path: dist/cpanel
+          name: rpm-cpanel-full
+          path: dist/
           retention-days: 14
