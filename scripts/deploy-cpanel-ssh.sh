@@ -22,6 +22,8 @@ RUN_MIGRATE="${RUN_MIGRATE:-1}"
 SEED_FIRST="${SEED_FIRST:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 PUBLIC_MODE="${PUBLIC_MODE:-api}"
+# على cPanel غالباً: /opt/cpanel/ea-php84/root/usr/bin/php
+PHP_BIN="${PHP_BIN:-/opt/cpanel/ea-php84/root/usr/bin/php}"
 
 SSH_OPTS=(-p "$CPANEL_SSH_PORT" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30)
 RSYNC_SSH="ssh -p $CPANEL_SSH_PORT -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30"
@@ -111,7 +113,7 @@ scp "${SCP_OPTS[@]}" \
 
 if [[ "$RUN_MIGRATE" == "1" ]]; then
   ssh "${SSH_OPTS[@]}" "$REMOTE" \
-    "SEED_FIRST=${SEED_FIRST} bash \"\$HOME/${CPANEL_APP_DIR}/cpanel-post-deploy.sh\" \"\$HOME/${CPANEL_APP_DIR}\""
+    "SEED_FIRST=${SEED_FIRST} PHP_BIN='${PHP_BIN}' bash \"\$HOME/${CPANEL_APP_DIR}/cpanel-post-deploy.sh\" \"\$HOME/${CPANEL_APP_DIR}\""
 else
   echo "==> تخطّي migrate"
 fi
