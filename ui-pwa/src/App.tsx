@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/shared/auth/AuthContext'
+import { RequireRouteAccess } from '@/shared/auth/PermissionGate'
 import { ThemeProvider } from '@/shared/theme/ThemeContext'
 import { AppShell, ToastProvider, SkeletonBlock } from '@/shared/ui'
 import { NewContractProvider } from '@/shared/contracts/NewContract'
@@ -63,9 +64,11 @@ export default function App() {
               <Route
                 element={
                   <Protected>
-                    <NewContractProvider>
-                      <AppShell />
-                    </NewContractProvider>
+                    <RequireRouteAccess>
+                      <NewContractProvider>
+                        <AppShell />
+                      </NewContractProvider>
+                    </RequireRouteAccess>
                   </Protected>
                 }
               >

@@ -1,4 +1,5 @@
 export { AppShell } from './AppShell'
+export { PermissionGate, RequireRouteAccess } from '@/shared/auth/PermissionGate'
 export { BrandLogo } from './BrandLogo'
 export { useIsMobile, useSheetDrag } from './useSheetDrag'
 export * from './Icons'
