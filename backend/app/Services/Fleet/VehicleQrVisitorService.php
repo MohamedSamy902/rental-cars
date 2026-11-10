@@ -16,7 +16,7 @@ final class VehicleQrVisitorService
     /**
      * @return array{
      *   vehicle: array{id:int,plate:?string,brand:?string,model:?string,year:?int},
-     *   center: array{name:string,tagline:?string,phone:?string,address:?string,logo_url:?string,social:array<string,string>},
+     *   center: array{name:string,tagline:?string,phone:?string,address:?string,map_url:?string,logo_url:?string,social:array<string,string>},
      *   current_renter: null|array{full_name:string,phone:?string},
      *   is_rented: bool,
      *   credit: array{name:string,whatsapp_url:string}
@@ -58,6 +58,8 @@ final class VehicleQrVisitorService
                     ?? $this->stringOrNull(config('rpm.center_public_phone')),
                 'address' => $this->stringOrNull($ops['print_address'] ?? null)
                     ?? $this->stringOrNull(config('rpm.center_public_address')),
+                'map_url' => $this->stringOrNull($ops['print_map_url'] ?? null)
+                    ?? $this->stringOrNull(config('rpm.center_public_map_url')),
                 'logo_url' => $this->publicLogoUrl($tenant?->logo_path),
                 'social' => $this->socialLinks($ops),
             ],
