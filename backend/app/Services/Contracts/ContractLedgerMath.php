@@ -51,6 +51,7 @@ class ContractLedgerMath
                 + (int) $contract->damage_fee
                 + (int) ($contract->frozen_operating_insurance_fee ?? 0)
                 + (int) $contract->other_fees
+                + (int) ($contract->delivery_service_fee ?? 0)
                 - (int) $contract->discount;
         }
 
@@ -68,6 +69,7 @@ class ContractLedgerMath
 
         return $days * (int) $contract->frozen_daily_rate
             + (int) $contract->other_fees
+            + (int) ($contract->delivery_service_fee ?? 0)
             - (int) $contract->discount;
     }
 

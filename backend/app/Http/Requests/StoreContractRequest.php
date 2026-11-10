@@ -36,6 +36,7 @@ class StoreContractRequest extends FormRequest
             'min_days',
             'discount',
             'other_fees',
+            'delivery_service_fee',
             'odometer',
             'payment_amount',
             'extended_from_contract_id',
@@ -71,6 +72,9 @@ class StoreContractRequest extends FormRequest
             'discount' => ['nullable', 'integer', 'min:0'],
             'other_fees' => ['nullable', 'integer', 'min:0'],
             'other_fees_description' => ['nullable', 'string', 'max:500'],
+            'has_delivery_service' => ['sometimes', 'boolean'],
+            'delivery_service_fee' => ['required_if:has_delivery_service,true', 'nullable', 'integer', 'min:0'],
+            'delivery_service_notes' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'odometer' => ['nullable', 'integer', 'min:0'],
             'accessory_ids' => ['nullable', 'array'],
@@ -127,11 +131,15 @@ class StoreContractRequest extends FormRequest
                 return;
             }
             $days = max(1, (int) ceil($a->diffInSeconds($b) / 86400));
-            $total = $days * $rate;
+            $deliveryEnabled = filter_var($this->input('has_delivery_service', false), FILTER_VALIDATE_BOOLEAN);
+            $deliveryFee = $deliveryEnabled ? (int) $this->input('delivery_service_fee', 0) : 0;
+            $otherFees = (int) $this->input('other_fees', 0);
+            $discount = (int) $this->input('discount', 0);
+            $total = max(0, ($days * $rate) + $deliveryFee + $otherFees - $discount);
             if ($paid > $total) {
                 $v->errors()->add(
                     'payment_amount',
-                    sprintf('مبلغ الدفعة لا يجوز أن يتجاوز إجمالي الإيجار (%d ج.م).', $total)
+                    sprintf('مبلغ الدفعة لا يجوز أن يتجاوز إجمالي العقد التقديري (%d ج.م).', $total)
                 );
             }
         });
@@ -156,6 +164,9 @@ class StoreContractRequest extends FormRequest
             'discount' => 'الخصم',
             'other_fees' => 'رسوم أخرى',
             'other_fees_description' => 'وصف الرسوم الأخرى',
+            'has_delivery_service' => 'خدمة تسليم واستلام',
+            'delivery_service_fee' => 'مبلغ خدمة التسليم والاستلام',
+            'delivery_service_notes' => 'ملاحظات التسليم/المكان',
             'notes' => 'الملاحظات',
             'odometer' => 'العداد الحالي',
             'accessory_ids' => 'المستلزمات',
@@ -193,6 +204,10 @@ class StoreContractRequest extends FormRequest
             'discount.min' => 'لا يجوز أن يكون الخصم سالباً.',
             'other_fees.integer' => 'يجب أن تكون الرسوم الأخرى عدداً صحيحاً.',
             'other_fees.min' => 'لا يجوز أن تكون الرسوم الأخرى سالبة.',
+            'delivery_service_fee.required_if' => 'حدّد مبلغ خدمة التسليم والاستلام عند تفعيلها.',
+            'delivery_service_fee.integer' => 'يجب أن يكون مبلغ خدمة التسليم والاستلام عدداً صحيحاً.',
+            'delivery_service_fee.min' => 'لا يجوز أن يكون مبلغ خدمة التسليم والاستلام سالباً.',
+            'delivery_service_notes.max' => 'ملاحظات التسليم لا تتجاوز 255 حرفاً.',
             'payment_amount.required' => 'دفعة عند الإنشاء مطلوبة — لا تأجير بلا دفع.',
             'payment_amount.min' => 'دفعة عند الإنشاء يجب أن تكون أكبر من صفر.',
             'extended_from_contract_id.exists' => 'عقد التمديد السابق غير صالح.',

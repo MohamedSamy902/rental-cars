@@ -49,6 +49,7 @@ class AccountingService
             ['code' => '4100', 'name' => 'إيراد كيلومترات زيادة', 'type' => 'income'],
             ['code' => '4200', 'name' => 'إيراد أضرار', 'type' => 'income'],
             ['code' => '4300', 'name' => 'إيراد رسوم تشغيل', 'type' => 'income'],
+            ['code' => '4400', 'name' => 'إيراد خدمة تسليم واستلام', 'type' => 'income'],
             ['code' => '5100', 'name' => 'مصروفات تشغيل', 'type' => 'expense'],
             ['code' => '5200', 'name' => 'مصروف إيجار ملاك', 'type' => 'expense'],
             ['code' => '5300', 'name' => 'مصروف صيانة وقطع', 'type' => 'expense'],
@@ -340,11 +341,13 @@ class AccountingService
             $excess = Account::query()->where('code', '4100')->firstOrFail();
             $damage = Account::query()->where('code', '4200')->firstOrFail();
             $fees = Account::query()->where('code', '4300')->firstOrFail();
+            $delivery = Account::query()->where('code', '4400')->firstOrFail();
 
             $extras = [
                 [(int) $contract->excess_km_amount, $excess->id],
                 [(int) $contract->damage_fee, $damage->id],
                 [(int) ($contract->frozen_operating_insurance_fee ?? 0) + (int) $contract->other_fees, $fees->id],
+                [(int) ($contract->delivery_service_fee ?? 0), $delivery->id],
             ];
             foreach ($extras as [$amount, $accountId]) {
                 if ($amount <= 0) {
@@ -898,7 +901,7 @@ class AccountingService
                 })
                 ->sum('credit');
             $feesCredit = (int) JournalLine::query()
-                ->whereHas('account', fn ($q) => $q->whereIn('code', ['4100', '4200', '4300']))
+                ->whereHas('account', fn ($q) => $q->whereIn('code', ['4100', '4200', '4300', '4400']))
                 ->whereHas('entry', function ($q) use ($year, $month) {
                     $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
                 })

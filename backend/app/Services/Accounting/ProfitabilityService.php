@@ -84,7 +84,7 @@ class ProfitabilityService
         $to = $monthStart->copy()->endOfMonth();
 
         $journalCredits = JournalLine::query()
-            ->whereHas('account', fn ($q) => $q->whereIn('code', ['4000', '4100', '4200', '4300']))
+            ->whereHas('account', fn ($q) => $q->whereIn('code', ['4000', '4100', '4200', '4300', '4400']))
             ->whereHas('entry', fn ($q) => $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month))
             ->get(['vehicle_id', 'credit']);
 

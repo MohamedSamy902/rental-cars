@@ -661,9 +661,12 @@ class E2EDataSeeder extends Seeder
                 'discount' => 100,
                 'damage_fee' => 0,
                 'other_fees' => 0,
-                'final_total' => 4150,
+                'has_delivery_service' => true,
+                'delivery_service_fee' => 1000,
+                'delivery_service_notes' => 'تسليم مطار القاهرة',
+                'final_total' => 5150,
                 'sales_user_id' => $salesId,
-                'notes' => 'عقد مكتمل — سداد كامل',
+                'notes' => 'عقد مكتمل — سداد كامل + خدمة تسليم',
             ],
         );
         Deposit::query()->firstOrCreate(
@@ -680,17 +683,17 @@ class E2EDataSeeder extends Seeder
                 'deductions_total' => 0,
             ],
         );
-        Payment::query()->firstOrCreate(
+        Payment::query()->updateOrCreate(
             ['reference' => 'PAY-CNT-DONE-01'],
             [
-                'amount' => 4150,
+                'amount' => 5150,
                 'paid_at' => now()->subDays(15)->setTime(11, 35),
                 'method' => 'cash',
                 'direction' => 'in',
                 'link_type' => 'contract',
                 'link_id' => $done->id,
                 'user_id' => $opsId,
-                'notes' => 'تسوية نهائية شاملة كيلومتر زائد',
+                'notes' => 'تسوية نهائية شاملة كيلومتر زائد + تسليم',
             ],
         );
         Inspection::query()->firstOrCreate(

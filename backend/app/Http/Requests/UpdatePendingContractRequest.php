@@ -36,6 +36,7 @@ class UpdatePendingContractRequest extends FormRequest
             'min_days',
             'discount',
             'other_fees',
+            'delivery_service_fee',
             'odometer',
         ];
     }
@@ -70,6 +71,9 @@ class UpdatePendingContractRequest extends FormRequest
             'discount' => ['nullable', 'integer', 'min:0'],
             'other_fees' => ['nullable', 'integer', 'min:0'],
             'other_fees_description' => ['nullable', 'string', 'max:500'],
+            'has_delivery_service' => ['sometimes', 'boolean'],
+            'delivery_service_fee' => ['required_if:has_delivery_service,true', 'nullable', 'integer', 'min:0'],
+            'delivery_service_notes' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'odometer' => ['nullable', 'integer', 'min:0'],
             'accessory_ids' => ['nullable', 'array'],

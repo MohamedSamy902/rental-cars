@@ -19,7 +19,8 @@ class Contract extends Model
         'frozen_agreed_deposit', 'frozen_operating_insurance_fee', 'frozen_min_days',
         'tagged_late_days', 'odometer_out', 'odometer_in', 'allowed_km', 'excess_km',
         'excess_km_amount', 'period_rent', 'discount', 'damage_fee', 'other_fees',
-        'other_fees_description', 'final_total', 'extended_from_contract_id',
+        'other_fees_description', 'has_delivery_service', 'delivery_service_fee',
+        'delivery_service_notes', 'final_total', 'extended_from_contract_id',
         'swapped_from_contract_id', 'swap_reason', 'sales_user_id', 'cancel_reason',
         'notes', 'balance_due_on', 'accessories_json', 'branch_id',
     ];
@@ -37,6 +38,8 @@ class Contract extends Model
             'sales_user_id' => 'integer',
             'extended_from_contract_id' => 'integer',
             'approved_days' => 'integer',
+            'has_delivery_service' => 'boolean',
+            'delivery_service_fee' => 'integer',
             'accessories_json' => 'array',
         ];
     }
