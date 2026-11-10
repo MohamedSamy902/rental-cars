@@ -77,7 +77,7 @@ export function useContractLifecycle(onMutated?: () => void) {
 
     if (action === 'handover') {
       const paid = actionForm.payment_amount ? Number(actionForm.payment_amount) : 0
-      const total = Number(selected.final_total || selected.ledger?.total || 0)
+      const total = Number(selected.final_total || selected.ledger?.contract_total || 0)
       const left = Math.max(0, total - paid)
       if (paid > 0 && left > 0 && !actionForm.balance_due_on) {
         toast.error('حدد تاريخ تحصيل باقي المبلغ')
