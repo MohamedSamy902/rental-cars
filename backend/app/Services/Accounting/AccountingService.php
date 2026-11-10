@@ -549,11 +549,7 @@ class AccountingService
                         sprintf('المبلغ يتجاوز المتبقي على العقد (%d ج.م).', $remaining)
                     );
                 }
-                $afterPay = $remaining - $amount;
-                $dueOn = $data['balance_due_on'] ?? null;
-                if ($afterPay > 0 && ($dueOn === null || $dueOn === '')) {
-                    throw new DomainException('حدد تاريخ تحصيل باقي المبلغ قبل تسجيل دفعة جزئية.');
-                }
+                // تاريخ التحصيل إلزامي من واجهة التشغيل؛ الـ API يبقى متساهلاً للتوافق مع المسارات القديمة.
             }
 
             $payment = Payment::query()->create([

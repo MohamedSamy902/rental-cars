@@ -74,6 +74,25 @@ export function useContractLifecycle(onMutated?: () => void) {
 
   async function runAction() {
     if (!selected || !action) return
+
+    if (action === 'handover') {
+      const paid = actionForm.payment_amount ? Number(actionForm.payment_amount) : 0
+      const total = Number(selected.final_total || selected.ledger?.total || 0)
+      const left = Math.max(0, total - paid)
+      if (paid > 0 && left > 0 && !actionForm.balance_due_on) {
+        toast.error('حدد تاريخ تحصيل باقي المبلغ')
+        return
+      }
+    }
+    if (action === 'collect') {
+      const paid = Number(actionForm.payment_amount || 0)
+      const remaining = Number(selected.ledger?.balance || 0)
+      if (paid > 0 && paid < remaining && !actionForm.balance_due_on) {
+        toast.error('حدد تاريخ تحصيل الباقي التالي')
+        return
+      }
+    }
+
     setSaving(true)
     try {
       if (action === 'handover') {
