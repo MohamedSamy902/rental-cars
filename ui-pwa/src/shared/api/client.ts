@@ -73,11 +73,16 @@ export async function api<T>(
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const method = (options.method || (options.json !== undefined ? 'POST' : 'GET')).toUpperCase()
-  const idemKey = applyIdempotency(headers, method, options.idempotencyKey)
+  const bodyForKey = options.json !== undefined ? options.json : options.body
+  const fingerprint = isMutatingMethod(method)
+    ? `${method}|${path}|${bodyForKey === undefined ? '' : typeof bodyForKey === 'string' ? bodyForKey : JSON.stringify(bodyForKey)}`
+    : null
 
-  if (idemKey && inflightMutations.has(idemKey)) {
-    return inflightMutations.get(idemKey) as Promise<T>
+  if (fingerprint && inflightMutations.has(fingerprint)) {
+    return inflightMutations.get(fingerprint) as Promise<T>
   }
+
+  applyIdempotency(headers, method, options.idempotencyKey)
 
   const run = (async () => {
     const res = await fetch(apiUrl(path), {
@@ -105,10 +110,10 @@ export async function api<T>(
 
     return data as T
   })()
-  if (idemKey) {
-    inflightMutations.set(idemKey, run)
+  if (fingerprint) {
+    inflightMutations.set(fingerprint, run)
     void run.finally(() => {
-      inflightMutations.delete(idemKey)
+      inflightMutations.delete(fingerprint)
     })
   }
 

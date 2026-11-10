@@ -12,6 +12,8 @@ class DocumentTemplate extends Model
     public const TYPE_HANDOVER_RECEIPT = 'handover_receipt';
 
     public const TYPE_OWNER_AGREEMENT = 'owner_agreement';
+    /** عقد اعتماد بين المركز ومالك العربية الأساسي (ليس عقد تأجير عميل). */
+    public const TYPE_CUSTODY_AGREEMENT = 'custody_agreement';
 
     protected $fillable = [
         'type',
@@ -39,6 +41,6 @@ class DocumentTemplate extends Model
 
     public static function allowedTypes(): array
     {
-        return [self::TYPE_CONTRACT, self::TYPE_HANDOVER_RECEIPT, self::TYPE_OWNER_AGREEMENT];
+        return [self::TYPE_CONTRACT, self::TYPE_HANDOVER_RECEIPT, self::TYPE_OWNER_AGREEMENT, self::TYPE_CUSTODY_AGREEMENT];
     }
 }

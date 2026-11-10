@@ -6,6 +6,7 @@ use App\Models\InventoryBatch;
 use App\Models\InventoryItem;
 use App\Services\Accounting\AccountingService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class InventoryService
 {
@@ -59,25 +60,27 @@ class InventoryService
      */
     public function receiveBatch(array $data, ?int $userId = null): InventoryBatch
     {
-        $batch = InventoryBatch::query()->create([
-            ...$data,
-            'remaining' => $data['quantity'],
-            'recorded_by' => $userId,
-            'from_petty_cash' => (bool) ($data['from_petty_cash'] ?? false),
-        ]);
-        $total = (int) $batch->quantity * (int) $batch->unit_cost;
-        if ($total > 0) {
-            $day = $batch->received_on?->toDateString() ?? now()->toDateString();
-            $this->accounting->postInventoryReceipt(
-                'inventory_receipt:'.$batch->id,
-                $total,
-                $day,
-                $userId,
-                (bool) $batch->from_petty_cash,
-            );
-        }
+        return DB::transaction(function () use ($data, $userId) {
+            $batch = InventoryBatch::query()->create([
+                ...$data,
+                'remaining' => $data['quantity'],
+                'recorded_by' => $userId,
+                'from_petty_cash' => (bool) ($data['from_petty_cash'] ?? false),
+            ]);
+            $total = (int) $batch->quantity * (int) $batch->unit_cost;
+            if ($total > 0) {
+                $day = $batch->received_on?->toDateString() ?? now()->toDateString();
+                $this->accounting->postInventoryReceipt(
+                    'inventory_receipt:'.$batch->id,
+                    $total,
+                    $day,
+                    $userId,
+                    (bool) $batch->from_petty_cash,
+                );
+            }
 
-        return $batch;
+            return $batch;
+        });
     }
 
     /**

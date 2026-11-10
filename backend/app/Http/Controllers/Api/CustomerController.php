@@ -171,6 +171,13 @@ class CustomerController extends Controller
             ], 422);
         }
 
+        $stamp = '__del_'.$customer->id;
+        $customer->forceFill([
+            'phone' => mb_substr((string) $customer->phone, 0, 200).$stamp,
+            'national_id' => $customer->national_id
+                ? mb_substr((string) $customer->national_id, 0, 200).$stamp
+                : null,
+        ])->save();
         $customer->delete();
 
         return response()->json(['message' => 'تم حذف العميل.']);

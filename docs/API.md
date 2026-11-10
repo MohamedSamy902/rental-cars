@@ -700,10 +700,10 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | Method | Path | الوصف |
 |--------|------|--------|
 | GET | `/push/vapid-public-key` | المفتاح العام للمتصفح |
-| GET | `/push/status` | `{ enabled, devices }` |
+| GET | `/push/status` | `{ enabled, devices, app_env, allow_test }` — `allow_test` يكون `false` عندما `APP_ENV=production` |
 | POST | `/push/subscribe` | تسجيل جهاز `{ endpoint, keys:{p256dh,auth} }` |
 | POST | `/push/unsubscribe` | إلغاء جهاز |
-| POST | `/push/test` | إرسال إشعار تجريبي. المتصفح لازم يتفعّل من الصفحة أولاً (ترميز aes128gcm). من غير جهاز مشترك يرجع 422 برسالة تطلب التفعيل، ومن غير مفاتيح VAPID رسالة منفصلة. |
+| POST | `/push/test` | إرسال إشعار تجريبي خارج الإنتاج فقط (`403` في `production`). المتصفح لازم يتفعّل من الصفحة أولاً (ترميز aes128gcm). من غير جهاز مشترك يرجع 422 برسالة تطلب التفعيل، ومن غير مفاتيح VAPID رسالة منفصلة. |
 
 ---
 
@@ -751,7 +751,18 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/owners/{id}/payouts` | `owners.payout` (حسّاسة) |
 | GET | `/owner-payouts` | `owners.view` |
 
-**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · عقد المالك (`owner_agreement_*`)
+**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · حقول مدة عقد الاعتماد (`owner_agreement_*`)
+
+**عقد الاعتماد (custody agreement)** — بين المركز ومالك العربية عند اعتماد السيارة للتأجير (مستقل عن عقود العملاء):
+
+| Method | Path | صلاحية |
+|--------|------|--------|
+| GET | `/vehicles/{id}/custody-agreements` | `vehicles.view` |
+| POST | `/vehicles/{id}/custody-agreements` | `vehicles.update` — يصدر نسخة ثابتة من القالب النشط `custody_agreement` بعد ملء بيانات المركز/المالك/العربية/المدة |
+| GET | `/vehicles/{id}/custody-agreements/{aid}` | `vehicles.view` |
+| GET | `/vehicles/{id}/custody-agreements/{aid}/print` | `vehicles.view` — يعيد `html` المجمد عند الإصدار |
+
+`POST` يقبل اختيارياً `number` · `starts_on` · `ends_on` · `monthly_amount`؛ إن غابت تُؤخذ من حقول `owner_agreement_*` / `owner_monthly_amount` على العربية. تعديل قالب الإعدادات لاحقاً لا يغيّر النسخ الصادرة.
 
 **حقول المالك (عند الإنشاء):** اسم (مطلوب) · هاتف (مطلوب) · هاتف بديل · رقم قومي (مطلوب) · بطاقة وش (مطلوب) · بطاقة ضهر (مطلوب) · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
 
@@ -813,6 +824,8 @@ password: password
 | GET/POST | `/employee-assignments` · `…/acknowledge` | `hr.custody` — تأكيد استلام الأدمن |
 | GET | `/vehicles/recommend` | العربيات المتاحة في الفترة (بلا أوزان/درجات) |
 | GET/POST | `/vehicles/{id}/tires|batteries|downtime|consumables` | أصول المركبة ٦٫٩–٦٫١١ · ١٤٫١ |
+| GET/POST | `/vehicles/{id}/custody-agreements` · `…/{aid}/print` | عقد اعتماد مالك↔مركز · نسخة ثابتة قابلة للطباعة |
+| GET/POST | `/document-templates` · `/document-templates/preview` | قوالب العقد · إيصال الاستلام · **عقد الاعتماد** (`custody_agreement`) |
 | GET/POST | `/consumable-templates` | قوالب قطع استهلاكية |
 | ~~GET/POST `/evaluations`~~ | **موقوف** — لا مسارات؛ التقييمات خارج التشغيل |
 | GET/POST | `/chat` | خلف `feature:chat` · حد 100/يوم |

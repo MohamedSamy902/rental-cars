@@ -13,6 +13,7 @@ use App\Models\JournalLine;
 use App\Models\MonthLock;
 use App\Models\Payment;
 use App\Models\PayrollPayout;
+use App\Models\SalaryAdvance;
 use App\Models\Vehicle;
 use App\Services\Contracts\ContractLedgerMath;
 use App\Services\Contracts\ContractPricingService;
@@ -42,6 +43,7 @@ class AccountingService
             ['code' => '1300', 'name' => 'تأمينات نقدية محتجزة', 'type' => 'liability'],
             ['code' => '1400', 'name' => 'مخزون قطع وزيوت', 'type' => 'asset'],
             ['code' => '1500', 'name' => 'عهد موظفين', 'type' => 'asset'],
+            ['code' => '1600', 'name' => 'سلف موظفين', 'type' => 'asset'],
             ['code' => '2100', 'name' => 'مستحقات ملاك العربيات', 'type' => 'liability'],
             ['code' => '4000', 'name' => 'إيرادات الإيجار', 'type' => 'income'],
             ['code' => '4100', 'name' => 'إيراد كيلومترات زيادة', 'type' => 'income'],
@@ -50,6 +52,7 @@ class AccountingService
             ['code' => '5100', 'name' => 'مصروفات تشغيل', 'type' => 'expense'],
             ['code' => '5200', 'name' => 'مصروف إيجار ملاك', 'type' => 'expense'],
             ['code' => '5300', 'name' => 'مصروف صيانة وقطع', 'type' => 'expense'],
+            ['code' => '5400', 'name' => 'مصروف رواتب', 'type' => 'expense'],
         ];
 
         $rows = [];
@@ -607,13 +610,15 @@ class AccountingService
         });
     }
 
-    public function postDepositHold(Deposit $deposit, Contract $contract, ?int $userId = null): JournalEntry
+    public function postDepositHold(Deposit $deposit, Contract $contract, ?int $userId = null, ?string $method = null): JournalEntry
     {
+        $cash = $this->methods->cashAccountCode($method ?? (string) ($deposit->collection_method ?? 'cash'));
+
         return $this->postTransfer(
             'deposit_hold:'.$deposit->id,
             now()->toDateString(),
             'قبض تأمين نقدي للعقد '.$contract->number,
-            '1000',
+            $cash,
             '1300',
             (int) $deposit->original_amount,
             $userId,
@@ -622,23 +627,88 @@ class AccountingService
         );
     }
 
-    public function postDepositReturn(Deposit $deposit, int $amount, ?int $userId = null): ?JournalEntry
+    public function postDepositReturn(Deposit $deposit, int $amount, ?int $userId = null, ?string $method = null): ?JournalEntry
     {
         if ($amount < 1) {
             return null;
         }
         $contract = Contract::query()->find($deposit->contract_id);
+        $cash = $this->methods->cashAccountCode($method ?? (string) ($deposit->return_method ?? $deposit->collection_method ?? 'cash'));
 
         return $this->postTransfer(
             'deposit_return:'.$deposit->id,
             now()->toDateString(),
             'رد تأمين نقدي',
             '1300',
-            '1000',
+            $cash,
             $amount,
             $userId,
             $contract ? (int) $contract->vehicle_id : null,
             $contract ? (int) $contract->customer_id : null,
+        );
+    }
+
+    public function postSalaryAdvance(SalaryAdvance $advance, ?int $userId = null): JournalEntry
+    {
+        $cash = $this->methods->cashAccountCode((string) ($advance->method ?? 'cash'));
+
+        return $this->postTransfer(
+            'salary_advance:'.$advance->id,
+            $advance->advanced_on?->toDateString() ?? now()->toDateString(),
+            'سلفة موظف',
+            '1600',
+            $cash,
+            (int) $advance->amount,
+            $userId,
+        );
+    }
+
+    public function postSalaryAdvanceVoid(SalaryAdvance $advance, ?int $userId = null): JournalEntry
+    {
+        $cash = $this->methods->cashAccountCode((string) ($advance->method ?? 'cash'));
+
+        return $this->postTransfer(
+            'salary_advance_void:'.$advance->id,
+            now()->toDateString(),
+            'إلغاء سلفة موظف',
+            $cash,
+            '1600',
+            (int) $advance->amount,
+            $userId,
+        );
+    }
+
+    public function postPayrollPayout(PayrollPayout $payout, ?int $userId = null): JournalEntry
+    {
+        $cash = $this->methods->cashAccountCode((string) ($payout->method ?? 'cash'));
+        $paidOn = $payout->paid_on;
+        $date = $paidOn instanceof \DateTimeInterface ? $paidOn->format('Y-m-d') : (string) ($paidOn ?: now()->toDateString());
+
+        return $this->postTransfer(
+            'payroll_payout:'.$payout->id,
+            $date,
+            'صرف راتب',
+            '5400',
+            $cash,
+            (int) $payout->amount,
+            $userId,
+        );
+    }
+
+    public function postPayrollAdvanceApply(int $lineId, int $amount, string $date, ?int $userId = null): ?JournalEntry
+    {
+        if ($amount < 1) {
+            return null;
+        }
+
+        return $this->postTransfer(
+            'payroll_advance_apply:'.$lineId,
+            $date,
+            'تسوية سلفة على مسير الرواتب',
+            '5400',
+            '1600',
+            $amount,
+            $userId,
         );
     }
 

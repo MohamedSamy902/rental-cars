@@ -60,7 +60,8 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('rpm-spa')->plainTextToken;
+        $minutes = (int) ($user->session_minutes ?: config('sanctum.expiration') ?: 720);
+        $token = $user->createToken('rpm-spa', ['*'], now()->addMinutes(max(15, $minutes)))->plainTextToken;
 
         return response()->json([
             'token' => $token,

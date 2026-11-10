@@ -52,6 +52,11 @@ class Vehicle extends Model
         return $this->belongsTo(VehicleOwner::class, 'owner_id');
     }
 
+    public function custodyAgreements(): HasMany
+    {
+        return $this->hasMany(VehicleCustodyAgreement::class);
+    }
+
     public function accessories(): HasMany
     {
         return $this->hasMany(VehicleAccessory::class);

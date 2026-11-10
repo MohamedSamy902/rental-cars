@@ -68,7 +68,9 @@ class WebPushSubscriptionTest extends TestCase
         $this->getJson('/api/push/status')
             ->assertOk()
             ->assertJsonPath('devices', 1)
-            ->assertJsonPath('enabled', true);
+            ->assertJsonPath('enabled', true)
+            ->assertJsonPath('allow_test', true)
+            ->assertJsonStructure(['app_env']);
 
         $this->postJson('/api/push/unsubscribe', [
             'endpoint' => 'https://fcm.googleapis.com/fcm/send/test-endpoint-abc',
@@ -106,5 +108,19 @@ class WebPushSubscriptionTest extends TestCase
         $this->postJson('/api/push/test')
             ->assertStatus(422)
             ->assertJsonPath('message', 'لا يوجد جهاز مشترك. اضغط «تفعيل على هذا الجهاز» واسمح للمتصفح بالإشعارات.');
+    }
+
+    public function test_test_push_blocked_in_production(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+
+        $this->postJson('/api/push/test')
+            ->assertForbidden()
+            ->assertJsonPath('message', 'إرسال التجربة غير متاح في بيئة الإنتاج.');
+
+        $this->getJson('/api/push/status')
+            ->assertOk()
+            ->assertJsonPath('allow_test', false)
+            ->assertJsonPath('app_env', 'production');
     }
 }

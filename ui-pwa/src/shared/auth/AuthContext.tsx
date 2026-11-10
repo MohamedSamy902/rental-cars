@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, setToken } from '@/shared/api/client'
+import { normalizePermissions, type PermissionRef } from '@/shared/auth/routeAccess'
 
 export type AuthUser = {
   id: number
@@ -23,7 +24,7 @@ type AuthApi = {
   applyUser: (next: AuthUser) => void
   /** Re-fetch GET /me into AuthContext. */
   refreshUser: () => Promise<AuthUser | null>
-  can: (permission: string) => boolean
+  can: (permission: PermissionRef) => boolean
   featureEnabled: (flag: string) => boolean
   isIntegrator: boolean
   featureFlags: Record<string, boolean>
@@ -79,10 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       featureFlags,
       applyUser,
       refreshUser,
-      can(permission: string) {
+      can(permission: PermissionRef) {
         if (!user) return false
         if (isIntegrator) return true
-        return perms.includes(permission)
+        return normalizePermissions(permission).some((key) => perms.includes(key))
       },
       featureEnabled(flag: string) {
         if (!(flag in featureFlags)) return true

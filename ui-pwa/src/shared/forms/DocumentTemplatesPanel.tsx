@@ -7,7 +7,7 @@ import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
 import { shellRentalContractHtml } from '@/shared/contracts/rentalContractPrint'
 import './DocumentTemplatesPanel.css'
 
-type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement'
+type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement' | 'custody_agreement'
 
 type Placeholder = {
   key: string
@@ -40,6 +40,10 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
   owner_agreement: {
     title: 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
     hint: 'يُملأ تلقائياً ببيانات المركز والمالك والعربية عند الحفظ/الطباعة.',
+  },
+  custody_agreement: {
+    title: 'قالب عقد الاعتماد',
+    hint: 'نسخ صادرة ثابتة من ملف العربية (مركز + مالك + عربية + مدة).',
   },
 }
 
@@ -226,6 +230,7 @@ export function DocumentTemplatesPanel() {
     contract: { title: '', content: '' },
     handover_receipt: { title: '', content: '' },
     owner_agreement: { title: '', content: '' },
+    custody_agreement: { title: '', content: '' },
   })
   const [files, setFiles] = useState<Partial<Record<TemplateType, File | null>>>({})
   const [saving, setSaving] = useState<TemplateType | null>(null)
@@ -236,21 +241,25 @@ export function DocumentTemplatesPanel() {
     contract: 0,
     handover_receipt: 0,
     owner_agreement: 0,
+    custody_agreement: 0,
   })
   const visualRefs = {
     contract: useRef<HTMLDivElement | null>(null),
     handover_receipt: useRef<HTMLDivElement | null>(null),
     owner_agreement: useRef<HTMLDivElement | null>(null),
+     custody_agreement: useRef<HTMLDivElement | null>(null),
   }
   const assetsRefs = {
     contract: useRef<Map<string, string>>(new Map()),
     handover_receipt: useRef<Map<string, string>>(new Map()),
     owner_agreement: useRef<Map<string, string>>(new Map()),
+     custody_agreement: useRef<Map<string, string>>(new Map()),
   }
   const textRefs = {
     contract: useRef<HTMLTextAreaElement | null>(null),
     handover_receipt: useRef<HTMLTextAreaElement | null>(null),
     owner_agreement: useRef<HTMLTextAreaElement | null>(null),
+     custody_agreement: useRef<HTMLTextAreaElement | null>(null),
   }
 
   const groupedPlaceholders = useMemo(() => {
@@ -284,9 +293,10 @@ export function DocumentTemplatesPanel() {
           contract: { title: TYPE_META.contract.title, content: '' },
           handover_receipt: { title: TYPE_META.handover_receipt.title, content: '' },
           owner_agreement: { title: TYPE_META.owner_agreement.title, content: '' },
+          custody_agreement: { title: TYPE_META.custody_agreement.title, content: '' },
         }
         for (const row of res.data || []) {
-          if (row.type !== 'contract' && row.type !== 'handover_receipt' && row.type !== 'owner_agreement') continue
+          if (row.type !== 'contract' && row.type !== 'handover_receipt' && row.type !== 'owner_agreement' && row.type !== 'custody_agreement') continue
           nextActive[row.type] = row
           nextDrafts[row.type] = { title: row.title, content: row.content }
         }
@@ -296,6 +306,7 @@ export function DocumentTemplatesPanel() {
           contract: (nextActive.contract?.version ?? 0) + 1,
           handover_receipt: (nextActive.handover_receipt?.version ?? 0) + 1,
           owner_agreement: (nextActive.owner_agreement?.version ?? 0) + 1,
+          custody_agreement: (nextActive.custody_agreement?.version ?? 0) + 1,
         })
       })
       .catch((e) => {
@@ -438,7 +449,7 @@ export function DocumentTemplatesPanel() {
         محرّر نص خفيف للبنود والجمل — الرسوم والترويسة والختم تظهر كشارات محمية ولا تتكسر أثناء التعديل. استخدم «معاينة طباعة» لرؤية الشكل النهائي قبل الحفظ.
       </p>
 
-      {(['contract', 'handover_receipt', 'owner_agreement'] as TemplateType[]).map((type) => {
+      {(['contract', 'handover_receipt', 'owner_agreement', 'custody_agreement'] as TemplateType[]).map((type) => {
         const meta = TYPE_META[type]
         const row = active[type]
         const isOpen = Boolean(expanded[type])

@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureFeatureFlag;
 use App\Http\Middleware\EnsureIdempotency;
 use App\Http\Middleware\EnsureIntegrator;
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -36,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'idempotency' => EnsureIdempotency::class,
             'active' => EnsureActiveUser::class,
         ]);
+        $middleware->append(SecurityHeaders::class);
         $middleware->api(append: [
             EnsureIdempotency::class,
         ]);
@@ -58,7 +60,9 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $exceptions->render(function (PostTooLargeException $e, Request $request) {
-            $payload = ['message' => __('http.payload_too_large')];
+            $upload = ini_get('upload_max_filesize') ?: '?';
+            $post = ini_get('post_max_size') ?: '?';
+            $payload = ['message' => "حجم الطلب أكبر من حد الخادم (رفع {$upload} · طلب {$post}). صغّر الملف أو ارفع الحد من cPanel."];
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json($payload, 413);
             }

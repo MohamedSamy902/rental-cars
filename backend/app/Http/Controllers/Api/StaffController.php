@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Access\RoleAssignmentGuard;
 use App\Support\PaginationInput;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,6 +88,12 @@ class StaffController extends Controller
             'base_salary' => 'الراتب الأساسي',
         ]);
 
+        try {
+            app(RoleAssignmentGuard::class)->assertCanAssignRole($request->user(), (int) $data['role_id']);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
+
         $user = DB::transaction(function () use ($data) {
             $employeeId = $data['employee_id'] ?? null;
 
@@ -159,6 +167,16 @@ class StaffController extends Controller
 
         if (array_key_exists('phone', $data)) {
             $data['phone'] = trim((string) $data['phone']);
+        }
+
+        try {
+            $guard = app(RoleAssignmentGuard::class);
+            $guard->assertCanEditUser($request->user(), $user);
+            if (isset($data['role_id'])) {
+                $guard->assertCanAssignRole($request->user(), (int) $data['role_id']);
+            }
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
         }
 
         $wasActive = (bool) $user->is_active;
