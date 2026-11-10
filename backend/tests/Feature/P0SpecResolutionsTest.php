@@ -221,6 +221,7 @@ class P0SpecResolutionsTest extends TestCase
         $this->postJson('/api/work-orders', [
             'vehicle_id' => $this->vehicle->id,
             'odometer' => 10000,
+            'next_service_on' => now()->addMonths(3)->toDateString(),
             'puts_in_maintenance' => false,
             'labor_cost' => 0,
             'lines' => [[

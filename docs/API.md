@@ -462,6 +462,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 Query: `filter=all|one|today|week|range`  
 - `one` → `customer_id`  
 - `range` → `from` & `to` (dates)  
+يعيد `statements[]` لطباعة **بيان سيارة مؤجرة** (مستأجر · قومي · نوع/رقم السيارة · مدة · تواريخ · عنوان · ملاحظات) مع ترويسة المفوض والهواتف.  
 يتطلب `feature_flags.department_notice !== false`.
 
 ### `GET /audit-logs`
@@ -553,7 +554,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
   "odometer": 89000,
   "puts_in_maintenance": true,
   "next_service_on": "2027-04-30",
-  "next_service_odometer": 95000,
+  "next_service_odometer": null,
   "force_after_resolution": false,
   "labor_cost": 0,
   "notes": null,
@@ -591,7 +592,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ---
 
-## ١٣) المخالفات (متابعة بلا ترحيل محاسبي)
+## ١٣) المخالفات (متابعة تشغيلية)
 
 | Method | Path |
 |--------|------|

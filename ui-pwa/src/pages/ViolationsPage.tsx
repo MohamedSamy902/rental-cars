@@ -226,7 +226,7 @@ export function ViolationsPage() {
         toast.success('تم تحديث المخالفة.')
       } else {
         await api('/violations', { method: 'POST', json: payload })
-        toast.success('تم التسجيل للمتابعة بلا ترحيل محاسبي.')
+        toast.success('تم تسجيل المخالفة للمتابعة.')
       }
       setOpen(false)
       setEditing(null)
@@ -260,7 +260,7 @@ export function ViolationsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="المخالفات"
-        subtitle="متابعة تشغيلية على الحجز — بلا ترحيل محاسبي"
+        subtitle="متابعة تشغيلية على الحجز والعقود"
         action={<Button onClick={() => void openCreate()}>تسجيل مخالفة</Button>}
         mobileFab
       />

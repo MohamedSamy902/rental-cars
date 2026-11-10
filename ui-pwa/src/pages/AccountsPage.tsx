@@ -5,7 +5,7 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import { formatMoney } from '@/shared/lib/format'
 import {
   PageHeader, MetricCardGrid, Button, StatusPill, useToast,
-  SkeletonBlock, ErrorState, EmptyState, TextField, Sheet,
+  SkeletonBlock, ErrorState, TextField, Sheet,
   IconCash, IconReturn, IconLandmark,
 } from '@/shared/ui'
 import './pages.css'
@@ -101,21 +101,31 @@ export function AccountsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="الحسابات"
-        subtitle="توزيع الإيجار على الشهور · إقفال شهر — التقارير ليست نهائية بعد (ترحيل التأمين/الدفعات مؤجّل)"
+        subtitle="توزيع الإيجار والرسوم والرواتب على الشهور · إقفال شهر مع سجل تدقيق"
       />
 
       <MetricCardGrid
         label="ملخص الحسابات"
         items={[
-          { id: 'in', label: 'مقبوضات', value: totals.payments_in, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
-          { id: 'out', label: 'مدفوعات للعملاء', value: totals.payments_out, format: 'money', tone: 'warning', icon: <IconReturn size={16} /> },
-          { id: 'coa', label: 'دليل الحسابات', value: accounts.length, icon: <IconLandmark size={16} /> },
+          { id: 'in', label: 'مقبوضات / إيرادات', value: totals.payments_in ?? 0, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
+          { id: 'out', label: 'مدفوع للعملاء', value: totals.payments_out ?? 0, format: 'money', tone: 'warning', icon: <IconReturn size={16} /> },
+          { id: 'coa', label: 'دليل الحسابات', value: accounts.length ?? 0, icon: <IconLandmark size={16} /> },
         ]}
       />
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>الشهور</h3></div>
-        {months.length === 0 ? <EmptyState title="لا توجد بيانات شهرية بعد" /> : (
+        {months.length === 0 ? (
+          <div className="rpm-dense-list">
+            <div className="rpm-dense-row">
+              <div>
+                <strong>إيراد الإيجار</strong>
+                <p className="muted">لا شهور مرحّلة بعد — القيمة صفر</p>
+              </div>
+              <strong className="tabular-nums">{formatMoney(0)}</strong>
+            </div>
+          </div>
+        ) : (
           <div className="ac-months">
             {months.map((m) => (
               <article key={monthKey(m)} className="ac-month">
@@ -170,7 +180,17 @@ export function AccountsPage() {
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>آخر الحركات</h3></div>
-        {payments.length === 0 ? <EmptyState title="لا حركات بعد" description="تظهر هنا قبض/رد التأمين ومدفوعات العقود." /> : (
+        {payments.length === 0 ? (
+          <div className="rpm-dense-list">
+            <div className="rpm-dense-row">
+              <div>
+                <strong>لا حركات بعد</strong>
+                <p className="muted">تظهر هنا قبض/رد التأمين ومدفوعات العقود — القيمة صفر حالياً</p>
+              </div>
+              <strong className="tabular-nums">{formatMoney(0)}</strong>
+            </div>
+          </div>
+        ) : (
           <div className="rpm-dense-list">
             {payments.slice(0, 20).map((p) => (
               <div key={p.id} className="rpm-dense-row">

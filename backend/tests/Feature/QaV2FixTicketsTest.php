@@ -329,6 +329,7 @@ class QaV2FixTicketsTest extends TestCase
         $wo = $this->postJson('/api/work-orders', [
             'vehicle_id' => $vehicle->id,
             'odometer' => 1000,
+            'next_service_on' => now()->addMonths(3)->toDateString(),
             'workshop' => 'QA',
             'opened_on' => '2026-11-08',
             'puts_in_maintenance' => false,

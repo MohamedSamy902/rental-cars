@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
-  Button, BackNavButton, MetricCardGrid, StatusPill, SkeletonBlock, ErrorState, EmptyState, Sheet, TextField, useToast,
+  Button, BackNavButton, MetricCardGrid, StatusPill, SkeletonBlock, ErrorState, Sheet, TextField, useToast,
   IconCash, IconReceipt, IconWallet, IconTrend, IconReturn, IconBriefcase, IconAlert, IconKey,
 } from '@/shared/ui'
 import './pages.css'
@@ -82,7 +82,19 @@ function when(value?: string | null) {
 }
 
 function MoneyRows({ rows, empty, render }: { rows: Row[]; empty: string; render: (r: Row) => { title: string; sub: string } }) {
-  if (rows.length === 0) return <EmptyState title={empty} />
+  if (rows.length === 0) {
+    return (
+      <div className="rpm-dense-list">
+        <div className="rpm-dense-row">
+          <div>
+            <strong>{empty}</strong>
+            <p className="muted">لا حركات مسجّلة — القيمة الحالية صفر</p>
+          </div>
+          <strong className="tabular-nums">{formatMoney(0)}</strong>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="rpm-dense-list">
       {rows.map((r) => {
@@ -216,13 +228,13 @@ export function MonthLedgerPage() {
           { id: 'net', label: 'صافي التشغيل', value: s.net_operating, format: 'money', tone: s.net_operating >= 0 ? 'success' : 'danger', icon: <IconWallet size={16} /> },
           { id: 'dep', label: 'تأمينات مقبوضة', value: s.deposits_received, format: 'money', icon: <IconKey size={16} /> },
           { id: 'out', label: 'مدفوع للعملاء', value: s.client_payouts, format: 'money', icon: <IconReturn size={16} /> },
-          { id: 'viol', label: 'مخالفات متابعة', value: s.violations_tracked, format: 'money', tone: 'warning', icon: <IconAlert size={16} />, hint: 'بلا ترحيل محاسبي' },
+          { id: 'viol', label: 'مخالفات متابعة', value: s.violations_tracked ?? 0, format: 'money', tone: 'warning', icon: <IconAlert size={16} /> },
         ]}
       />
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>الإيجارات المرحّلة</h3></div>
-        <MoneyRows rows={data.rents} empty="لا إيجار مرحّل هذا الشهر" render={(r) => ({
+        <MoneyRows rows={data.rents} empty="الإيجارات المرحّلة" render={(r) => ({
           title: r.contract ? `${r.contract} · ${r.customer || ''}` : (r.narration || 'قيد إيجار'),
           sub: `${when(r.date)} · ${r.vehicle || ''}`.trim(),
         })} />
@@ -230,7 +242,7 @@ export function MonthLedgerPage() {
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>رسوم وأضرار</h3></div>
-        <MoneyRows rows={data.fees} empty="لا رسوم إضافية" render={(r) => ({
+        <MoneyRows rows={data.fees} empty="رسوم وأضرار" render={(r) => ({
           title: `${r.kind || 'رسم'} · ${r.contract || ''}`,
           sub: `${when(r.date)} · ${r.customer || ''}`,
         })} />
@@ -281,15 +293,29 @@ export function MonthLedgerPage() {
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>مخالفات للمتابعة</h3></div>
-        <MoneyRows rows={data.violations} empty="لا مخالفات هذا الشهر" render={(r) => ({
+        <MoneyRows rows={data.violations} empty="مخالفات للمتابعة" render={(r) => ({
           title: `${r.plate || ''} · ${r.customer || 'بدون عميل'}`,
-          sub: `${when(r.date)} · ${r.status || ''} — بلا ترحيل محاسبي`,
+          sub: `${when(r.date)} · ${r.status || 'متابعة'}`,
         })} />
       </section>
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>سجل الإقفال</h3></div>
-        {data.audit.length === 0 ? <EmptyState title="لا أثر إقفال بعد" /> : (
+        <p className="muted" style={{ marginBlockEnd: '0.75rem' }}>
+          سجل تدقيق لإقفال الشهر المحاسبي أو إعادة فتحه بعد الإقفال. كل صف يوثّق من نفّذ العملية ومتى ولماذا (عند إعادة الفتح).
+          بعد الإقفال تُمنع القيود الجديدة على هذا الشهر حتى إعادة الفتح بصلاحية مناسبة.
+        </p>
+        {data.audit.length === 0 ? (
+          <div className="rpm-dense-list">
+            <div className="rpm-dense-row">
+              <div>
+                <strong>لا أثر إقفال بعد</strong>
+                <p className="muted">يظهر هنا عند أول إقفال أو إعادة فتح لهذا الشهر</p>
+              </div>
+              <strong className="tabular-nums">٠</strong>
+            </div>
+          </div>
+        ) : (
           <ol className="ml-audit">
             {data.audit.map((a) => (
               <li key={a.id}>

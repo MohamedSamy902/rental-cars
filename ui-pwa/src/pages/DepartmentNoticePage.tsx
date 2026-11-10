@@ -1,58 +1,78 @@
 import { useState } from 'react'
-import { api, getToken, type ApiError } from '@/shared/api/client'
+import { api, type ApiError } from '@/shared/api/client'
 import {
   PageHeader, Button, SelectField, TextField, useToast, EmptyState, SkeletonBlock,
 } from '@/shared/ui'
 import { escapeHtml } from '@/shared/lib/escapeHtml'
-import { formatDateTime } from '@/shared/lib/format'
+import { formatDate, formatDateTime } from '@/shared/lib/format'
 import { printHtmlDocument } from '@/utils/printHtml'
 import './pages.css'
 
-type CustomerRow = {
-  id: number
-  full_name: string
-  phone: string
+type StatementRow = {
+  contract_id: number
+  contract_number?: string | null
+  renter_name?: string | null
   national_id?: string | null
-  national_id_image_path?: string | null
-  national_id_back_path?: string | null
-  license_number?: string | null
-  license_expires_on?: string | null
-  license_image_path?: string | null
-  license_back_path?: string | null
-  birth_date?: string | null
-  status: string
+  vehicle_type?: string | null
+  plate?: string | null
+  rental_duration_days?: number | null
+  starts_on?: string | null
+  ends_on?: string | null
+  address?: string | null
+  notes?: string | null
+  status?: string | null
 }
 
-async function resolveMediaSrc(path?: string | null): Promise<string | null> {
-  if (!path) return null
-  try {
-    const resolved = path.startsWith('/api/')
-      ? path
-      : path.startsWith('/media/')
-        ? `/api${path}`
-        : path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:')
-          ? path
-          : `/api${path.startsWith('/') ? path : `/${path}`}`
-    if (resolved.startsWith('http') || resolved.startsWith('data:') || resolved.startsWith('blob:')) {
-      return resolved
-    }
-    const headers: HeadersInit = { Accept: '*/*' }
-    const token = getToken()
-    if (token) headers.Authorization = `Bearer ${token}`
-    const res = await fetch(resolved, { headers })
-    if (!res.ok) return null
-    const blob = await res.blob()
-    return URL.createObjectURL(blob)
-  } catch {
-    return null
-  }
+type NoticePayload = {
+  center_name?: string
+  signer_name?: string
+  tagline?: string
+  phones?: string[]
+  generated_at: string
+  statements: StatementRow[]
 }
 
-function imgBlock(label: string, src: string | null): string {
-  if (!src) {
-    return `<div style="border:1px dashed #94a3b8;border-radius:10px;padding:18px;text-align:center;color:#64748b;font-size:12px">${escapeHtml(label)} — غير متوفرة</div>`
-  }
-  return `<figure style="margin:0"><figcaption style="font-size:12px;color:#64748b;margin-bottom:4px">${escapeHtml(label)}</figcaption><img src="${src}" alt="${escapeHtml(label)}" style="width:100%;max-height:180px;object-fit:contain;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc" /></figure>`
+function cell(label: string, value: string): string {
+  return `<tr>
+    <th style="width:32%;background:#f1f5f9;border:1px solid #94a3b8;padding:8px 10px;text-align:right;font-weight:700">${escapeHtml(label)}</th>
+    <td style="border:1px solid #94a3b8;padding:8px 10px;text-align:right">${escapeHtml(value || '—')}</td>
+  </tr>`
+}
+
+function statementHtml(row: StatementRow, meta: NoticePayload): string {
+  const phones = (meta.phones || []).map((p) => `<span dir="ltr">${escapeHtml(p)}</span>`).join(' &nbsp;|&nbsp; ')
+  const duration = row.rental_duration_days != null ? `${row.rental_duration_days} يوم` : '—'
+  return `
+  <article class="sheet" style="break-inside:avoid;page-break-inside:avoid;margin:0 0 28px;padding:18px 16px;border:1px solid #cbd5e1;border-radius:8px">
+    <header style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;margin-bottom:14px">
+      <div style="text-align:right">
+        <div style="font-size:18px;font-weight:800">${escapeHtml(meta.signer_name || 'أ/ محمد عبدالقادر')}</div>
+        <div style="font-size:13px;color:#334155;margin-top:2px">${escapeHtml(meta.tagline || 'لتجارة وإيجار أحدث أنواع السيارات')}</div>
+        <div style="font-size:13px;margin-top:6px;color:#0f172a">${phones || '—'}</div>
+      </div>
+      <div style="text-align:left;min-width:110px">
+        <div style="font-size:20px;font-weight:900;letter-spacing:0.04em">RPM</div>
+        <div style="font-size:11px;color:#64748b">${escapeHtml(meta.center_name || '')}</div>
+      </div>
+    </header>
+    <h2 style="margin:0 0 12px;text-align:center;font-size:20px;font-weight:800">بيان سيارة مؤجرة</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      ${cell('اسم المستأجر', row.renter_name || '—')}
+      ${cell('الرقم القومي', row.national_id || '—')}
+      ${cell('نوع السيارة', row.vehicle_type || '—')}
+      ${cell('رقم السيارة', row.plate || '—')}
+      ${cell('مدة الايجار', duration)}
+      ${cell('تاريخ الايجار', row.starts_on ? formatDate(row.starts_on) : '—')}
+      ${cell('نهايه تاريخ الايجار', row.ends_on ? formatDate(row.ends_on) : '—')}
+      ${cell('عنوان المستأجر', row.address || '—')}
+      ${cell('الملاحظات', row.notes || '—')}
+    </table>
+    <p style="margin:14px 0 18px;text-align:center;font-size:13px;color:#334155">بيان إيجار السيارة بالعرض للمتابعه و العلم</p>
+    <footer style="display:flex;justify-content:space-between;gap:16px;font-size:13px;font-weight:700;margin-top:8px">
+      <span>إدارة المعرض</span>
+      <span>رئيس المباحث</span>
+    </footer>
+  </article>`
 }
 
 export function DepartmentNoticePage() {
@@ -61,12 +81,12 @@ export function DepartmentNoticePage() {
   const [customerId, setCustomerId] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [center, setCenter] = useState('')
-  const [generatedAt, setGeneratedAt] = useState('')
-  const [rows, setRows] = useState<CustomerRow[]>([])
+  const [payload, setPayload] = useState<NoticePayload | null>(null)
   const [loading, setLoading] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [customers, setCustomers] = useState<{ id: number; full_name: string }[]>([])
+
+  const rows = payload?.statements || []
 
   async function ensureCustomers() {
     if (customers.length) return
@@ -83,12 +103,8 @@ export function DepartmentNoticePage() {
         qs.set('from', from)
         qs.set('to', to)
       }
-      const res = await api<{ data: { center_name?: string; generated_at: string; customers: CustomerRow[] } }>(
-        `/department-notice?${qs}`,
-      )
-      setCenter(res.data.center_name || '')
-      setGeneratedAt(res.data.generated_at)
-      setRows(res.data.customers || [])
+      const res = await api<{ data: NoticePayload }>(`/department-notice?${qs}`)
+      setPayload(res.data)
     } catch (e) {
       toast.error((e as ApiError).message)
     } finally {
@@ -96,41 +112,23 @@ export function DepartmentNoticePage() {
     }
   }
 
-  async function printNotice() {
+  function printNotice() {
+    if (!payload || !rows.length) return
     setPrinting(true)
     try {
-      const sections = await Promise.all(rows.map(async (c) => {
-        const [idFront, idBack, licFront, licBack] = await Promise.all([
-          resolveMediaSrc(c.national_id_image_path),
-          resolveMediaSrc(c.national_id_back_path),
-          resolveMediaSrc(c.license_image_path),
-          resolveMediaSrc(c.license_back_path),
-        ])
-        return `
-      <section style="break-inside:avoid;margin:0 0 18px;padding:14px;border:1px solid #cbd5e1;border-radius:12px">
-        <h2 style="margin:0 0 8px;font-size:18px">${escapeHtml(c.full_name)}</h2>
-        <p>الهاتف: ${escapeHtml(c.phone || '—')}</p>
-        <p>الرقم القومي: ${escapeHtml(c.national_id || '—')}</p>
-        <p>الرخصة: ${escapeHtml(c.license_number || '—')} · تنتهي ${escapeHtml(c.license_expires_on || '—')}</p>
-        <p>تاريخ الميلاد: ${escapeHtml(c.birth_date || '—')}</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
-          ${imgBlock('بطاقة — وش', idFront)}
-          ${imgBlock('بطاقة — ضهر', idBack)}
-          ${imgBlock('رخصة — وش', licFront)}
-          ${imgBlock('رخصة — ضهر', licBack)}
-        </div>
-      </section>`
-      }))
-      const meta = `${escapeHtml(center || '')} · ${escapeHtml(generatedAt ? formatDateTime(generatedAt) : '')}`
-      printHtmlDocument(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>إخطار القسم</title>
-      <style>body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a} h1{margin:0 0 4px} .muted{color:#64748b}</style>
-      </head><body>
-      <h1>إخطار القسم</h1>
-      <p class="muted">${meta}</p>
-      ${sections.join('') || '<p>لا توجد بيانات</p>'}
+      const body = rows.map((r) => statementHtml(r, payload)).join('')
+      printHtmlDocument(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>بيان سيارة مؤجرة</title>
+      <style>
+        body{font-family:Tahoma,Arial,sans-serif;padding:18px;color:#0f172a;background:#fff}
+        @media print { body{padding:0} .sheet{border:none!important;margin:0 0 18mm!important} }
+      </style></head><body>
+      <p style="text-align:center;color:#64748b;font-size:12px;margin:0 0 12px">
+        ${escapeHtml(payload.center_name || '')} · ${escapeHtml(payload.generated_at ? formatDateTime(payload.generated_at) : '')}
+      </p>
+      ${body || '<p>لا توجد بيانات</p>'}
       </body></html>`)
     } catch (e) {
-      toast.error((e as Error).message || 'تعذّر طباعة إخطار القسم.')
+      toast.error((e as Error).message || 'تعذّر طباعة بيان السيارة المؤجرة.')
     } finally {
       setPrinting(false)
     }
@@ -140,8 +138,8 @@ export function DepartmentNoticePage() {
     <div className="rpm-stack">
       <PageHeader
         title="إخطار القسم"
-        subtitle="مستند جاهز للطباعة مع صور البطاقة والرخصة · عميل واحد أو مجموعة حسب الفترة"
-        action={<Button onClick={() => void printNotice()} loading={printing} disabled={!rows.length}>طباعة</Button>}
+        subtitle="بيان سيارة مؤجرة للطباعة بنفس بيانات النموذج الورقي"
+        action={<Button onClick={() => printNotice()} loading={printing} disabled={!rows.length}>طباعة</Button>}
       />
       <section className="rpm-panel">
         <div className="rpm-form-grid">
@@ -157,7 +155,7 @@ export function DepartmentNoticePage() {
               { value: 'one', label: 'عميل واحد' },
               { value: 'today', label: 'من أجّروا اليوم' },
               { value: 'week', label: 'هذا الأسبوع' },
-              { value: 'all', label: 'كل العملاء' },
+              { value: 'all', label: 'كل العقود' },
               { value: 'range', label: 'فترة مخصصة' },
             ]}
           />
@@ -176,25 +174,24 @@ export function DepartmentNoticePage() {
             </>
           ) : null}
           <div>
-            <Button loading={loading} onClick={() => void load()}>تحضير الإخطار</Button>
+            <Button loading={loading} onClick={() => void load()}>تحضير البيان</Button>
           </div>
         </div>
       </section>
 
       {loading ? <SkeletonBlock rows={4} /> : null}
-      {!loading && rows.length === 0 ? <EmptyState title="اختر الفلتر ثم حضّر الإخطار" /> : null}
+      {!loading && rows.length === 0 ? <EmptyState title="اختر الفلتر ثم حضّر البيان" /> : null}
       {!loading && rows.length > 0 ? (
         <div className="rpm-card-list">
-          {rows.map((c) => (
-            <article key={c.id} className="rpm-card">
-              <strong>{c.full_name}</strong>
-              <p>{c.phone}</p>
-              <p className="muted">قومي {c.national_id || '—'} · رخصة {c.license_number || '—'}</p>
+          {rows.map((r) => (
+            <article key={r.contract_id} className="rpm-card">
+              <strong>{r.renter_name || '—'}</strong>
+              <p>{r.vehicle_type || '—'} · {r.plate || '—'}</p>
               <p className="muted">
-                بطاقة: {c.national_id_image_path ? 'وش ✓' : 'وش —'}{c.national_id_back_path ? ' · ضهر ✓' : ' · ضهر —'}
-                {' · '}
-                رخصة: {c.license_image_path ? 'وش ✓' : 'وش —'}{c.license_back_path ? ' · ضهر ✓' : ' · ضهر —'}
+                من {r.starts_on ? formatDate(r.starts_on) : '—'} إلى {r.ends_on ? formatDate(r.ends_on) : '—'}
+                {r.rental_duration_days != null ? ` · ${r.rental_duration_days} يوم` : ''}
               </p>
+              <p className="muted">قومي {r.national_id || '—'} · {r.address || 'بدون عنوان'}</p>
             </article>
           ))}
         </div>

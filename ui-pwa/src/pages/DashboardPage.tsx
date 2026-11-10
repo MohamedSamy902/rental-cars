@@ -210,12 +210,12 @@ function taskIcon(rule: string) {
 
 function contractStatusPill(status: string): { label: string; tone: BadgeTone } {
   const map: Record<string, { label: string; tone: BadgeTone }> = {
-    active: { label: 'نشط', tone: 'steel' },
-    approved: { label: 'معتمد', tone: 'success' },
-    pending: { label: 'معلّق', tone: 'warning' },
+    active: { label: 'تم التسليم', tone: 'steel' },
+    approved: { label: 'بانتظار التسليم', tone: 'success' },
+    pending: { label: 'قيد المراجعة', tone: 'warning' },
     draft: { label: 'مسودة', tone: 'muted' },
-    completed: { label: 'مكتمل', tone: 'muted' },
-    cancelled: { label: 'ملغى', tone: 'danger' },
+    completed: { label: 'تم الاستلام', tone: 'muted' },
+    cancelled: { label: 'تم الإلغاء', tone: 'danger' },
   }
   return map[status] || { label: status, tone: 'muted' }
 }

@@ -103,7 +103,11 @@ export type VehicleOption = { id: number; brand: string; model: string; plate: s
 export type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposit' | 'deduct' | 'refund' | 'collect' | null
 
 export const statusLabel: Record<string, string> = {
-  pending: 'معلّق', approved: 'معتمد', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغى',
+  pending: 'قيد المراجعة',
+  approved: 'بانتظار التسليم',
+  active: 'تم التسليم',
+  completed: 'تم الاستلام',
+  cancelled: 'تم الإلغاء',
 }
 
 export const depositLabel: Record<string, { label: string; tone: 'success' | 'warning' | 'steel' | 'muted' | 'danger' }> = {

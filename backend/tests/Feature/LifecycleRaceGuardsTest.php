@@ -77,6 +77,7 @@ class LifecycleRaceGuardsTest extends TestCase
             'vehicle_id' => $vehicle->id,
             'odometer' => (int) $vehicle->odometer + 20,
             'puts_in_maintenance' => true,
+            'next_service_on' => now()->addMonths(2)->toDateString(),
         ]);
         $res->assertStatus(422);
         $this->assertStringContainsString('صيانة', (string) $res->json('message'));

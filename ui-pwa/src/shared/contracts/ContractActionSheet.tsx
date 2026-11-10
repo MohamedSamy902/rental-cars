@@ -92,7 +92,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
           >
             <strong>مبلغ مطلوب · مخالفات مفتوحة</strong>
             <span style={{ fontSize: '1.15rem', fontWeight: 800 }}>{formatMoney(selected?.open_violations_total ?? 0)}</span>
-            <span className="muted" style={{ color: 'inherit', opacity: 0.85 }}>للمتابعة فقط — بلا ترحيل محاسبي</span>
+            <span className="muted" style={{ color: 'inherit', opacity: 0.85 }}>للمتابعة التشغيلية</span>
             {(selected?.open_violations?.length ?? 0) > 0 ? (
               <ul style={{ margin: 0, paddingInlineStart: '1.1rem' }}>
                 {(selected?.open_violations || []).map((v) => (

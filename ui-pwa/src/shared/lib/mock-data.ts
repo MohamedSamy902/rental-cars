@@ -137,11 +137,11 @@ export const vehicleStatusLabel: Record<VehicleStatus, string> = {
 }
 
 export const bookingStatusLabel: Record<BookingStatus, string> = {
-  pending: 'معلّق',
-  approved: 'معتمد',
-  active: 'نشط',
-  completed: 'مكتمل',
-  cancelled: 'ملغى',
+  pending: 'قيد المراجعة',
+  approved: 'بانتظار التسليم',
+  active: 'تم التسليم',
+  completed: 'تم الاستلام',
+  cancelled: 'تم الإلغاء',
 }
 
 export const categoryOptions = [

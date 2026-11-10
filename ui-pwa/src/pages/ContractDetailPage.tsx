@@ -143,7 +143,7 @@ export function ContractDetailPage() {
             format: 'money',
             tone: (row.open_violations_total ?? ledger?.violations_due ?? 0) > 0 ? 'warning' : 'success',
             icon: <IconAlert size={16} />,
-            hint: 'متابعة تشغيلية — بلا ترحيل محاسبي',
+            hint: 'متابعة تشغيلية',
           },
         ]}
       />

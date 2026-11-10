@@ -62,19 +62,19 @@ export function BookingsPage() {
       },
       {
         id: 'pending',
-        label: 'معلّق',
+        label: 'قيد المراجعة',
         attention: summary.pending > 0 ? ('warning' as const) : null,
-        attentionLabel: 'اعتماد معلّق',
+        attentionLabel: 'بانتظار اعتماد الإدارة',
       },
       {
         id: 'approved',
-        label: 'معتمد',
+        label: 'بانتظار التسليم',
         attention: attention.pickups_today > 0 ? ('warning' as const) : null,
         attentionLabel: 'تسليمات اليوم',
       },
       {
         id: 'active',
-        label: 'نشط',
+        label: 'تم التسليم',
         attention:
           attention.overdue_returns > 0
             ? ('critical' as const)
@@ -83,7 +83,8 @@ export function BookingsPage() {
               : null,
         attentionLabel: attention.overdue_returns > 0 ? 'عقود متأخرة' : 'استلامات اليوم',
       },
-      { id: 'completed', label: 'مكتمل' },
+      { id: 'completed', label: 'تم الاستلام' },
+      { id: 'cancelled', label: 'تم الإلغاء' },
     ],
     [summary.pending, summary.upcoming, summary.handover_today, attention.pickups_today, attention.overdue_returns, attention.returning_today],
   )
@@ -223,7 +224,7 @@ export function BookingsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العقود والحجوزات"
-        subtitle="تمديد = عقد جديد · تبديل عطل = عقد جديد · بلا رصيد دائن"
+        subtitle="العقود والحجوزات حسب الحالة المعتمدة"
         action={<Button onClick={() => openNewContract()}>عقد جديد</Button>}
         mobileFab
       />
@@ -233,9 +234,9 @@ export function BookingsPage() {
         label="ملخص العقود"
         items={[
           { id: 'total', label: 'الإجمالي', value: summary.total, icon: <IconClipboard size={16} /> },
-          { id: 'pending', label: 'معلّق', value: summary.pending, tone: 'warning', icon: <IconAlert size={16} /> },
-          { id: 'active', label: 'نشط', value: summary.active, tone: 'success', icon: <IconKey size={16} /> },
-          { id: 'approved', label: 'معتمد', value: summary.approved, tone: 'info', icon: <IconCheck size={16} /> },
+          { id: 'pending', label: 'قيد المراجعة', value: summary.pending, tone: 'warning', icon: <IconAlert size={16} /> },
+          { id: 'active', label: 'تم التسليم', value: summary.active, tone: 'success', icon: <IconKey size={16} /> },
+          { id: 'approved', label: 'بانتظار التسليم', value: summary.approved, tone: 'info', icon: <IconCheck size={16} /> },
         ]}
       />
 
