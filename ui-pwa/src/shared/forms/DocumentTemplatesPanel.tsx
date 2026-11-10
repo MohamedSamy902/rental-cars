@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { api, apiUpload, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { Button, TextField, useToast } from '@/shared/ui'
@@ -31,7 +31,7 @@ type TemplateRow = {
 const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
   contract: {
     title: 'عقد إيجار سيارة (نموذج المركز)',
-    hint: 'عدّل البنود والنصوص هنا. استخدم الحقول الجاهزة بالأسفل لإدراج بيانات العقد تلقائياً عند الطباعة.',
+    hint: 'عدّل البنود والنصوص كما تظهر في الطباعة. الحقول الجاهزة بالأسفل تُدرج بيانات العقد تلقائياً.',
   },
   handover_receipt: {
     title: 'قالب إيصال الاستلام والتأمين',
@@ -58,6 +58,59 @@ function shellPreview(type: TemplateType, title: string, body: string) {
 </style></head><body>${body}</body></html>`
 }
 
+/** يمنع تعديل الأختام/SVG حتى لا ينكسر القالب أثناء التحرير البصري. */
+function lockProtectedNodes(root: HTMLElement) {
+  root.querySelectorAll('svg, img, table thead, [data-rpm-lock], .rpm-stamp, .stamp, .seal').forEach((node) => {
+    if (node instanceof HTMLElement) {
+      node.contentEditable = 'false'
+      node.setAttribute('data-rpm-lock', '1')
+    }
+  })
+}
+
+function VisualBodyEditor({
+  html,
+  seed,
+  disabled,
+  onChange,
+  editorRef,
+}: {
+  html: string
+  seed: number
+  disabled: boolean
+  onChange: (nextHtml: string) => void
+  editorRef: RefObject<HTMLDivElement | null>
+}) {
+  useEffect(() => {
+    const el = editorRef.current
+    if (!el) return
+    el.innerHTML = html?.trim() ? html : '<p><br></p>'
+    lockProtectedNodes(el)
+  }, [seed, editorRef]) // eslint-disable-line react-hooks/exhaustive-deps -- seed remounts external content only
+
+  return (
+    <div
+      ref={editorRef}
+      className="rpm-template-visual"
+      contentEditable={!disabled}
+      suppressContentEditableWarning
+      role="textbox"
+      aria-multiline="true"
+      aria-label="محتوى القالب"
+      data-placeholder="اكتب بنود العقد هنا…"
+      onInput={(e) => {
+        const root = e.currentTarget
+        lockProtectedNodes(root)
+        onChange(root.innerHTML)
+      }}
+      onBlur={(e) => {
+        lockProtectedNodes(e.currentTarget)
+        onChange(e.currentTarget.innerHTML)
+      }}
+    />
+  )
+}
+
 export function DocumentTemplatesPanel() {
   const toast = useToast()
   const { can, isIntegrator } = useAuth()
@@ -74,6 +127,17 @@ export function DocumentTemplatesPanel() {
   const [saving, setSaving] = useState<TemplateType | null>(null)
   const [previewing, setPreviewing] = useState<TemplateType | null>(null)
   const [expanded, setExpanded] = useState<Partial<Record<TemplateType, boolean>>>({ contract: true })
+  const [codeMode, setCodeMode] = useState<Partial<Record<TemplateType, boolean>>>({})
+  const [editorSeed, setEditorSeed] = useState<Record<TemplateType, number>>({
+    contract: 0,
+    handover_receipt: 0,
+    owner_agreement: 0,
+  })
+  const visualRefs = {
+    contract: useRef<HTMLDivElement | null>(null),
+    handover_receipt: useRef<HTMLDivElement | null>(null),
+    owner_agreement: useRef<HTMLDivElement | null>(null),
+  }
   const textRefs = {
     contract: useRef<HTMLTextAreaElement | null>(null),
     handover_receipt: useRef<HTMLTextAreaElement | null>(null),
@@ -112,6 +176,11 @@ export function DocumentTemplatesPanel() {
         }
         setActive(nextActive)
         setDrafts(nextDrafts)
+        setEditorSeed({
+          contract: (nextActive.contract?.version ?? 0) + 1,
+          handover_receipt: (nextActive.handover_receipt?.version ?? 0) + 1,
+          owner_agreement: (nextActive.owner_agreement?.version ?? 0) + 1,
+        })
       })
       .catch((e) => {
         if (!cancelled) toast.error((e as ApiError).message || 'تعذّر تحميل القوالب.')
@@ -129,12 +198,19 @@ export function DocumentTemplatesPanel() {
       toast.error('لا صلاحية لتعديل قوالب المستندات.')
       return
     }
+    // التقط آخر HTML من المحرر البصري قبل الحفظ
+    const visual = visualRefs[type].current
+    let content = drafts[type].content
+    if (visual && !codeMode[type]) {
+      content = visual.innerHTML
+      setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content } }))
+    }
     setSaving(type)
     try {
       const fd = new FormData()
       fd.append('type', type)
       fd.append('title', drafts[type].title || TYPE_META[type].title)
-      fd.append('content', drafts[type].content)
+      fd.append('content', content)
       fd.append('format', 'html')
       const file = files[type]
       if (file) fd.append('file', file)
@@ -143,6 +219,7 @@ export function DocumentTemplatesPanel() {
       const row = json.data
       setActive((prev) => ({ ...prev, [type]: row }))
       setDrafts((prev) => ({ ...prev, [type]: { title: row.title, content: row.content } }))
+      setEditorSeed((prev) => ({ ...prev, [type]: prev[type] + 1 }))
       setFiles((prev) => ({ ...prev, [type]: null }))
       toast.success(json.message || 'تم حفظ القالب.')
     } catch (e) {
@@ -155,7 +232,8 @@ export function DocumentTemplatesPanel() {
   async function preview(type: TemplateType) {
     setPreviewing(type)
     try {
-      const content = drafts[type].content
+      const visual = visualRefs[type].current
+      const content = (!codeMode[type] && visual) ? visual.innerHTML : drafts[type].content
       const sampleMap: Record<string, string> = {}
       for (const p of placeholders) {
         sampleMap[p.key] = p.sample
@@ -175,21 +253,42 @@ export function DocumentTemplatesPanel() {
   }
 
   function insertToken(type: TemplateType, token: string, label: string) {
-    const el = textRefs[type].current
     const snippet = `{{${token}}}`
-    if (el) {
-      const start = el.selectionStart ?? el.value.length
-      const end = el.selectionEnd ?? el.value.length
-      const next = `${el.value.slice(0, start)}${snippet}${el.value.slice(end)}`
-      setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: next } }))
-      requestAnimationFrame(() => {
-        el.focus()
-        const pos = start + snippet.length
-        el.setSelectionRange(pos, pos)
-      })
-      toast.success(`أُدرج: ${label}`)
-      return
+    if (codeMode[type]) {
+      const el = textRefs[type].current
+      if (el) {
+        const start = el.selectionStart ?? el.value.length
+        const end = el.selectionEnd ?? el.value.length
+        const next = `${el.value.slice(0, start)}${snippet}${el.value.slice(end)}`
+        setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: next } }))
+        requestAnimationFrame(() => {
+          el.focus()
+          const pos = start + snippet.length
+          el.setSelectionRange(pos, pos)
+        })
+        toast.success(`أُدرج: ${label}`)
+        return
+      }
     }
+
+    const root = visualRefs[type].current
+    if (root && document.activeElement === root) {
+      const sel = window.getSelection()
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0)
+        range.deleteContents()
+        const node = document.createTextNode(snippet)
+        range.insertNode(node)
+        range.setStartAfter(node)
+        range.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(range)
+        setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: root.innerHTML } }))
+        toast.success(`أُدرج: ${label}`)
+        return
+      }
+    }
+
     setDrafts((prev) => ({
       ...prev,
       [type]: {
@@ -197,6 +296,7 @@ export function DocumentTemplatesPanel() {
         content: `${prev[type].content}${prev[type].content && !prev[type].content.endsWith('\n') ? ' ' : ''}${snippet}`,
       },
     }))
+    setEditorSeed((prev) => ({ ...prev, [type]: prev[type] + 1 }))
     toast.success(`أُدرج في النص: ${label}`)
   }
 
@@ -207,13 +307,14 @@ export function DocumentTemplatesPanel() {
   return (
     <div className="rpm-stack" style={{ gap: '1rem' }}>
       <p className="rpm-template-intro">
-        القالب هو شكل المستند المطبوع. عدّل النص من المربع بالأسفل، واضغط اسم الحقل لإدراج بيانات تُملأ وحدها عند الطباعة (اسم العميل، اللوحة، السعر…). استخدم «معاينة طباعة» قبل الحفظ.
+        عدّل نص العقد كما يظهر للطباعة — بدون أكواد. اضغط اسم الحقل لإدراج بيانات تُملأ وحدها عند الطباعة (اسم العميل، اللوحة، السعر…). جرّب «معاينة طباعة» قبل الحفظ.
       </p>
 
       {(['contract', 'handover_receipt', 'owner_agreement'] as TemplateType[]).map((type) => {
         const meta = TYPE_META[type]
         const row = active[type]
         const isOpen = Boolean(expanded[type])
+        const showCode = Boolean(codeMode[type])
         return (
           <section key={type} className="rpm-panel">
             <div className="rpm-panel__head" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -267,7 +368,7 @@ export function DocumentTemplatesPanel() {
                 <div className="rpm-field">
                   <span className="rpm-field__label">حقول تُملأ تلقائياً عند الطباعة</span>
                   <span className="rpm-field__hint">
-                    اضغط الاسم لإدراجه عند المؤشر. عند الطباعة يتحول إلى بيانات العقد الحقيقية.
+                    ضع المؤشر داخل النص ثم اضغط الاسم. عند الطباعة يتحول إلى بيانات العقد الحقيقية.
                   </span>
                   <div className="rpm-template-vars">
                     {groupedPlaceholders.map(({ group, items }) => (
@@ -294,18 +395,63 @@ export function DocumentTemplatesPanel() {
                 </div>
 
                 <div className="rpm-field">
-                  <span className="rpm-field__label">محتوى القالب</span>
-                  <span className="rpm-field__hint">
-                    نص القالب للتعديل. المعاينة تظهر الشكل النهائي للطباعة.
-                  </span>
-                  <textarea
-                    ref={textRefs[type]}
-                    className="rpm-template-source"
-                    disabled={!canEdit}
-                    value={drafts[type].content}
-                    onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))}
-                    rows={16}
-                  />
+                  <div className="rpm-template-editor-head">
+                    <div>
+                      <span className="rpm-field__label">محتوى القالب</span>
+                      <span className="rpm-field__hint">
+                        {showCode
+                          ? 'وضع متقدم: تعديل كود HTML — للمُدمج فقط عند الحاجة.'
+                          : 'عدّل النص والبنود مباشرة كما ستظهر في الورقة المطبوعة.'}
+                      </span>
+                    </div>
+                    {isIntegrator ? (
+                      <button
+                        type="button"
+                        className="rpm-template-linkish"
+                        onClick={() => {
+                          const next = !showCode
+                          if (!next) {
+                            // من الكود → البصري: أعد زرع المحتوى
+                            setEditorSeed((prev) => ({ ...prev, [type]: prev[type] + 1 }))
+                          } else {
+                            const visual = visualRefs[type].current
+                            if (visual) {
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [type]: { ...prev[type], content: visual.innerHTML },
+                              }))
+                            }
+                          }
+                          setCodeMode((prev) => ({ ...prev, [type]: next }))
+                        }}
+                      >
+                        {showCode ? 'العودة للتعديل العادي' : 'تعديل متقدم (كود)'}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {showCode ? (
+                    <textarea
+                      ref={textRefs[type]}
+                      className="rpm-template-source"
+                      disabled={!canEdit}
+                      value={drafts[type].content}
+                      onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))}
+                      rows={16}
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <VisualBodyEditor
+                      html={drafts[type].content}
+                      seed={editorSeed[type]}
+                      disabled={!canEdit}
+                      editorRef={visualRefs[type]}
+                      onChange={(nextHtml) => setDrafts((prev) => ({
+                        ...prev,
+                        [type]: { ...prev[type], content: nextHtml },
+                      }))}
+                    />
+                  )}
                 </div>
 
                 <div className="rpm-field">
@@ -314,7 +460,9 @@ export function DocumentTemplatesPanel() {
                     type="file"
                     accept=".docx,.html,.htm,.md,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/markdown,text/plain"
                     disabled={!canEdit}
-                    onChange={(e) => setFiles((prev) => ({ ...prev, [type]: e.target.files?.[0] || null }))}
+                    onChange={(e) => {
+                      setFiles((prev) => ({ ...prev, [type]: e.target.files?.[0] || null }))
+                    }}
                     style={{ marginBlockStart: '0.35rem', width: '100%' }}
                   />
                   {files[type] ? (
