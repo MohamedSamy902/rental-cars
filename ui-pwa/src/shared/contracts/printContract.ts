@@ -41,6 +41,9 @@ type PrintContract = Record<string, unknown> & {
   damage_fee?: number | null
   other_fees?: number | null
   other_fees_description?: string | null
+  has_delivery_service?: boolean | null
+  delivery_service_fee?: number | null
+  delivery_service_notes?: string | null
   discount?: number | null
   final_total?: number | null
   odometer_out?: number | null
@@ -208,6 +211,11 @@ function contractBody(tenant: PrintTenant, c: PrintContract) {
       <tr><th>النهاية المخططة</th><td>${formatDate(c.planned_ends_at)}</td></tr>
       <tr><th>السعر اليومي</th><td>${formatMoney(c.frozen_daily_rate)}</td></tr>
       <tr><th>التأمين النقدي</th><td>${formatMoney(c.frozen_agreed_deposit || 0)}</td></tr>
+      <tr><th>خدمة تسليم واستلام السيارة</th><td>${
+        (c.has_delivery_service || (c.delivery_service_fee ?? 0) > 0)
+          ? `${formatMoney(c.delivery_service_fee || 0)}${c.delivery_service_notes ? ` · ${esc(c.delivery_service_notes)}` : ''}`
+          : '—'
+      }</td></tr>
       <tr><th>الإجمالي النهائي</th><td>${c.final_total != null ? formatMoney(c.final_total) : '—'}</td></tr>
     </table>
     ${terms ? `<h2>بنود وشروط العقد</h2><div class="terms">${esc(terms)}</div>` : ''}

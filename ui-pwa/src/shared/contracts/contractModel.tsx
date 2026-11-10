@@ -62,6 +62,13 @@ export type Contract = {
   final_total?: number
   period_rent?: number
   damage_fee?: number
+  other_fees?: number
+  other_fees_description?: string | null
+  has_delivery_service?: boolean
+  delivery_service_fee?: number
+  delivery_service_notes?: string | null
+  frozen_operating_insurance_fee?: number | null
+  discount?: number
   excess_km_amount?: number
   notes?: string | null
   balance_due_on?: string | null

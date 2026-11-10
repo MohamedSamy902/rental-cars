@@ -28,6 +28,7 @@ class MonthLedgerService
         '4100' => 'كيلومترات زيادة',
         '4200' => 'أضرار',
         '4300' => 'رسوم تشغيل',
+        '4400' => 'خدمة تسليم واستلام',
     ];
 
     public function __construct(private readonly AccountingService $accounting) {}

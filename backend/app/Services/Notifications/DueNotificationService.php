@@ -1062,6 +1062,7 @@ class DueNotificationService
                 + (int) ($contract->excess_km_amount ?? 0)
                 + (int) $contract->damage_fee
                 + (int) $contract->other_fees
+                + (int) ($contract->delivery_service_fee ?? 0)
                 + (int) ($contract->frozen_operating_insurance_fee ?? 0));
         }
 

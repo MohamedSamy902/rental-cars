@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, DateField, MediaUpload, NumberField, useToast,
+  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, DateField, MediaUpload, NumberField, SwitchField, useToast,
 } from '@/shared/ui'
 import { toApiDateTime, formatMoney } from '@/shared/lib/format'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
@@ -19,9 +19,14 @@ type Vehicle = {
   accessories?: Accessory[]
 }
 
+const DEFAULT_DELIVERY_FEE = 1000
+
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
   daily_rate: '', deposit: '', odometer: '', notes: '',
+  has_delivery_service: false,
+  delivery_service_fee: String(DEFAULT_DELIVERY_FEE),
+  delivery_service_notes: '',
   payment_amount: '', payment_method: 'cash', payment_notes: '', balance_due_on: '',
 }
 
@@ -217,6 +222,13 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           deposit: form.deposit ? Number(form.deposit) : undefined,
           odometer: form.odometer !== '' ? Number(form.odometer) : undefined,
           accessory_ids: accessoryIds,
+          has_delivery_service: form.has_delivery_service,
+          delivery_service_fee: form.has_delivery_service
+            ? Number(form.delivery_service_fee || 0)
+            : 0,
+          delivery_service_notes: form.has_delivery_service
+            ? (form.delivery_service_notes || undefined)
+            : undefined,
           payment_amount: paid,
           payment_method: form.payment_method || 'cash',
           payment_notes: form.payment_notes || undefined,
@@ -253,11 +265,16 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     return Math.max(1, Math.ceil(ms / 86400000))
   }, [form.starts_at, form.planned_ends_at])
 
-  const estimatedTotal = useMemo(() => {
+  const rentEstimate = useMemo(() => {
     const rate = Number(form.daily_rate || 0)
     if (!estimatedDays || !rate) return 0
     return estimatedDays * rate
   }, [estimatedDays, form.daily_rate])
+
+  const deliveryFee = form.has_delivery_service ? Math.max(0, Number(form.delivery_service_fee || 0)) : 0
+  const depositEstimate = Math.max(0, Number(form.deposit || 0))
+  const estimatedTotal = rentEstimate + deliveryFee
+  const dueWithDepositLabel = rentEstimate + deliveryFee + depositEstimate
 
   const paidNow = Number(form.payment_amount || 0)
   const remainingBalance = Math.max(0, estimatedTotal - paidNow)
@@ -391,19 +408,53 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             hint="يُحدَّث عداد العربية عند الحفظ"
           />
 
-          {estimatedDays > 0 && estimatedTotal > 0 ? (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <SwitchField
+              label="خدمة تسليم واستلام"
+              checked={form.has_delivery_service}
+              onChange={(checked) => setForm({
+                ...form,
+                has_delivery_service: checked,
+                delivery_service_fee: checked
+                  ? (form.delivery_service_fee || String(DEFAULT_DELIVERY_FEE))
+                  : form.delivery_service_fee,
+              })}
+            />
+          </div>
+          {form.has_delivery_service ? (
+            <>
+              <MoneyField
+                label="مبلغ الخدمة (ج.م)"
+                required
+                value={form.delivery_service_fee}
+                error={errors.delivery_service_fee}
+                onChange={(e) => setForm({ ...form, delivery_service_fee: e.target.value })}
+                hint={`الافتراضي ${formatMoney(DEFAULT_DELIVERY_FEE)}`}
+              />
+              <TextField
+                label="ملاحظات التسليم/المكان"
+                value={form.delivery_service_notes}
+                error={errors.delivery_service_notes}
+                placeholder="مثال: تسليم مطار القاهرة، استلام من الشيخ زايد..."
+                onChange={(e) => setForm({ ...form, delivery_service_notes: e.target.value })}
+              />
+            </>
+          ) : null}
+
+          {estimatedDays > 0 && rentEstimate > 0 ? (
             <div className="rpm-inline-box" style={{ margin: 0, gridColumn: '1 / -1' }}>
-              <p className="rpm-inline-box__title">حساب الإيجار</p>
+              <p className="rpm-inline-box__title">ملخص المستحق</p>
               <p style={{ margin: 0 }}>
-                {estimatedDays} يوم × {formatMoney(Number(form.daily_rate || 0))} = <strong>{formatMoney(estimatedTotal)}</strong>
+                قيمة الإيجار {formatMoney(rentEstimate)}
+                {deliveryFee > 0 ? ` + خدمة تسليم واستلام ${formatMoney(deliveryFee)}` : ''}
+                {depositEstimate > 0 ? ` + التأمين ${formatMoney(depositEstimate)}` : ''}
+                {' = '}
+                <strong>{formatMoney(dueWithDepositLabel)}</strong>
               </p>
-              {paidNow > 0 ? (
-                <p className="muted" style={{ marginBlockStart: '0.35rem' }}>
-                  مدفوع الآن {formatMoney(paidNow)} · المتبقي على العميل {formatMoney(remainingBalance)}
-                </p>
-              ) : (
-                <p className="muted" style={{ marginBlockStart: '0.35rem' }}>دفعة عند الإنشاء مطلوبة — لا تأجير بلا دفع</p>
-              )}
+              <p className="muted" style={{ marginBlockStart: '0.35rem' }}>
+                إجمالي بنود العقد (بدون التأمين) {formatMoney(estimatedTotal)}
+                {paidNow > 0 ? ` · مدفوع الآن ${formatMoney(paidNow)} · المتبقي ${formatMoney(remainingBalance)}` : ' · دفعة عند الإنشاء مطلوبة'}
+              </p>
             </div>
           ) : null}
 
@@ -413,7 +464,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             value={form.payment_amount}
             error={errors.payment_amount}
             onChange={(e) => setForm({ ...form, payment_amount: e.target.value })}
-            hint="مطلوبة · أكبر من صفر · لا تتجاوز إجمالي الإيجار"
+            hint="مطلوبة · أكبر من صفر · لا تتجاوز إجمالي العقد التقديري (بدون التأمين)"
           />
           <SelectField
             label="طريقة الدفعة"

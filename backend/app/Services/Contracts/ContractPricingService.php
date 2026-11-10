@@ -74,7 +74,8 @@ class ContractPricingService
     }
 
     /**
-     * Final total = period rent − discount + excess km + damages + operating insurance + other fees.
+     * Final total = period rent − discount + excess km + damages + operating insurance
+     * + other fees + delivery/pick-up service fee.
      * Cash deposit is outside this total. No separate late fee / fuel differential.
      *
      * @param  array{
@@ -83,7 +84,8 @@ class ContractPricingService
      *     excess_km_fee?: int|float,
      *     damage_fee?: int|float,
      *     operating_insurance_fee?: int|float,
-     *     other_fees?: int|float
+     *     other_fees?: int|float,
+     *     delivery_service_fee?: int|float
      * }  $parts
      */
     public function finalTotal(array $parts): float
@@ -94,7 +96,48 @@ class ContractPricingService
         $damage = (float) ($parts['damage_fee'] ?? 0);
         $operating = (float) ($parts['operating_insurance_fee'] ?? 0);
         $other = (float) ($parts['other_fees'] ?? 0);
+        $delivery = (float) ($parts['delivery_service_fee'] ?? 0);
 
-        return $period - $discount + $excess + $damage + $operating + $other;
+        return $period - $discount + $excess + $damage + $operating + $other + $delivery;
+    }
+
+    /**
+     * Normalize delivery toggle + fee + notes from request/create payloads.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{has_delivery_service: bool, delivery_service_fee: int, delivery_service_notes: ?string}
+     */
+    public function normalizeDeliveryService(array $data, bool $defaultEnabled = false, int $defaultFee = 0, ?string $defaultNotes = null): array
+    {
+        $enabled = array_key_exists('has_delivery_service', $data)
+            ? filter_var($data['has_delivery_service'], FILTER_VALIDATE_BOOLEAN)
+            : $defaultEnabled;
+
+        if (! $enabled) {
+            return [
+                'has_delivery_service' => false,
+                'delivery_service_fee' => 0,
+                'delivery_service_notes' => null,
+            ];
+        }
+
+        $fee = array_key_exists('delivery_service_fee', $data)
+            ? max(0, (int) $data['delivery_service_fee'])
+            : max(0, $defaultFee);
+        $notes = array_key_exists('delivery_service_notes', $data)
+            ? $data['delivery_service_notes']
+            : $defaultNotes;
+        if (is_string($notes)) {
+            $notes = trim($notes);
+            $notes = $notes === '' ? null : mb_substr($notes, 0, 255);
+        } else {
+            $notes = null;
+        }
+
+        return [
+            'has_delivery_service' => true,
+            'delivery_service_fee' => $fee,
+            'delivery_service_notes' => $notes,
+        ];
     }
 }

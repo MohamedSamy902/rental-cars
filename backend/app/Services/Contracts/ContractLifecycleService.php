@@ -110,6 +110,7 @@ class ContractLifecycleService
                 : (int) ($ops['default_excess_km_rate'] ?? self::DEFAULT_EXCESS_KM_RATE);
 
             $accessories = $this->resolveAccessoriesSnapshot($vehicle, $data['accessory_ids'] ?? null);
+            $delivery = $this->pricing->normalizeDeliveryService($data);
 
             if (array_key_exists('odometer', $data) && $data['odometer'] !== null) {
                 $odo = (int) $data['odometer'];
@@ -136,6 +137,9 @@ class ContractLifecycleService
                 'discount' => $data['discount'] ?? 0,
                 'other_fees' => $data['other_fees'] ?? 0,
                 'other_fees_description' => $data['other_fees_description'] ?? null,
+                'has_delivery_service' => $delivery['has_delivery_service'],
+                'delivery_service_fee' => $delivery['delivery_service_fee'],
+                'delivery_service_notes' => $delivery['delivery_service_notes'],
                 'sales_user_id' => $userId,
                 'notes' => $data['notes'] ?? null,
                 'balance_due_on' => $data['balance_due_on'] ?? null,
@@ -423,6 +427,19 @@ class ContractLifecycleService
                 'notes' => array_key_exists('notes', $data) ? $data['notes'] : $locked->notes,
                 'accessories_json' => $accessories,
             ]);
+            if (
+                array_key_exists('has_delivery_service', $data)
+                || array_key_exists('delivery_service_fee', $data)
+                || array_key_exists('delivery_service_notes', $data)
+            ) {
+                $delivery = $this->pricing->normalizeDeliveryService(
+                    $data,
+                    (bool) $locked->has_delivery_service,
+                    (int) ($locked->delivery_service_fee ?? 0),
+                    $locked->delivery_service_notes,
+                );
+                $locked->fill($delivery);
+            }
             $locked->save();
 
             if (array_key_exists('balance_due_on', $data)) {
@@ -648,6 +665,7 @@ class ContractLifecycleService
                 'damage_fee' => $damageFee,
                 'operating_insurance_fee' => (int) ($locked->frozen_operating_insurance_fee ?? 0),
                 'other_fees' => (int) $locked->other_fees,
+                'delivery_service_fee' => (int) ($locked->delivery_service_fee ?? 0),
             ]);
             $finalInt = (int) round($final);
             if ($finalInt < 0) {
@@ -829,6 +847,9 @@ class ContractLifecycleService
             'deposit' => $source->frozen_agreed_deposit,
             'operating_insurance_fee' => $source->frozen_operating_insurance_fee,
             'min_days' => $source->frozen_min_days ?? $source->min_days,
+            'has_delivery_service' => (bool) $source->has_delivery_service,
+            'delivery_service_fee' => (int) ($source->delivery_service_fee ?? 0),
+            'delivery_service_notes' => $source->delivery_service_notes,
             'notes' => trim(($source->notes ? $source->notes."\n" : '').'تمديد من '.$source->number),
             'extended_from_contract_id' => $source->id,
         ], $userId, true);

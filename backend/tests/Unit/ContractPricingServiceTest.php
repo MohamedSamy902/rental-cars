@@ -76,4 +76,29 @@ class ContractPricingServiceTest extends TestCase
 
         $this->assertSame(3125.0, $total);
     }
+
+    public function test_final_total_includes_delivery_service_fee(): void
+    {
+        $total = $this->pricing->finalTotal([
+            'period_rent' => 3000,
+            'discount' => 0,
+            'delivery_service_fee' => 1000,
+            'other_fees' => 0,
+        ]);
+
+        $this->assertSame(4000.0, $total);
+    }
+
+    public function test_normalize_delivery_service_clears_when_disabled(): void
+    {
+        $normalized = $this->pricing->normalizeDeliveryService([
+            'has_delivery_service' => false,
+            'delivery_service_fee' => 1000,
+            'delivery_service_notes' => 'مطار',
+        ]);
+
+        $this->assertFalse($normalized['has_delivery_service']);
+        $this->assertSame(0, $normalized['delivery_service_fee']);
+        $this->assertNull($normalized['delivery_service_notes']);
+    }
 }

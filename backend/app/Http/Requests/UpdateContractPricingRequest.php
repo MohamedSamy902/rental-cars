@@ -26,6 +26,7 @@ class UpdateContractPricingRequest extends FormRequest
             'deposit',
             'discount',
             'other_fees',
+            'delivery_service_fee',
         ];
     }
 
@@ -42,6 +43,9 @@ class UpdateContractPricingRequest extends FormRequest
             'discount' => ['required', 'integer', 'min:0'],
             'other_fees' => ['required', 'integer', 'min:0'],
             'other_fees_description' => ['nullable', 'string', 'max:500'],
+            'has_delivery_service' => ['sometimes', 'boolean'],
+            'delivery_service_fee' => ['required_if:has_delivery_service,true', 'nullable', 'integer', 'min:0'],
+            'delivery_service_notes' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -58,6 +62,9 @@ class UpdateContractPricingRequest extends FormRequest
             'discount' => 'الخصم',
             'other_fees' => 'رسوم أخرى',
             'other_fees_description' => 'وصف الرسوم الأخرى',
+            'has_delivery_service' => 'خدمة تسليم واستلام',
+            'delivery_service_fee' => 'مبلغ خدمة التسليم والاستلام',
+            'delivery_service_notes' => 'ملاحظات التسليم/المكان',
         ];
     }
 
@@ -77,6 +84,7 @@ class UpdateContractPricingRequest extends FormRequest
             'deposit.min' => 'لا يجوز أن يكون التأمين النقدي سالباً.',
             'discount.required' => 'الخصم مطلوب.',
             'other_fees.required' => 'الرسوم الأخرى مطلوبة.',
+            'delivery_service_fee.required_if' => 'حدّد مبلغ خدمة التسليم والاستلام عند تفعيلها.',
         ];
     }
 }
