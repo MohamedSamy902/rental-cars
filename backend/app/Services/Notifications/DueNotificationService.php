@@ -30,6 +30,9 @@ use Illuminate\Support\Facades\Schema;
 /**
  * يمسح الشروط القائمة ويرسل إشعاراً أول مرة، ثم تذكيراً كل 24 ساعة
  * لنفس القاعدة ونفس السجل إلى أن يزول السبب.
+ *
+ * عند تفعيل التوزيع: الإرسال فقط داخل نافذة يومية (افتراضي 13→01)
+ * وكل تنبيه يُربط بساعة ثابتة عبر hash حتى لا تنزل الدفعة كلها دفعة واحدة.
  */
 class DueNotificationService
 {
@@ -38,6 +41,11 @@ class DueNotificationService
     public const REMINDER_HOURS = 24;
 
     public const LEAD_KM = 500;
+
+    /** افتراضي الإنتاج: من 1 ظهر لمدة 12 ساعة حتى قبل 1 بالليل */
+    public const DEFAULT_SPREAD_START_HOUR = 13;
+
+    public const DEFAULT_SPREAD_HOURS = 12;
 
     /** @var array<string, Collection<int, User>> */
     private array $recipientCache = [];
@@ -148,6 +156,10 @@ class DueNotificationService
 
     private function dispatchIfDue(DueAlert $alert): int
     {
+        if (! $this->isAllowedInCurrentSpreadSlot($alert)) {
+            return 0;
+        }
+
         $reminder = NotificationReminder::query()->firstOrNew([
             'rule_key' => $alert->ruleKey,
             'subject_type' => $alert->subjectType,
@@ -199,6 +211,73 @@ class DueNotificationService
         $reminder->save();
 
         return $sent;
+    }
+
+    /**
+     * هل يُسمح بإرسال هذا التنبيه في الساعة الحالية ضمن نافذة التوزيع؟
+     */
+    public function isAllowedInCurrentSpreadSlot(DueAlert $alert, ?Carbon $at = null): bool
+    {
+        if (! $this->spreadEnabled()) {
+            return true;
+        }
+
+        $at ??= now();
+        $slot = $this->currentSpreadSlot($at);
+        if ($slot === null) {
+            return false;
+        }
+
+        return $this->alertSpreadSlot($alert) === $slot;
+    }
+
+    public function spreadEnabled(): bool
+    {
+        return (bool) config('notifications.spread_enabled', true);
+    }
+
+    public function spreadStartHour(): int
+    {
+        $hour = (int) config('notifications.spread_start_hour', self::DEFAULT_SPREAD_START_HOUR);
+
+        return max(0, min(23, $hour));
+    }
+
+    public function spreadHours(): int
+    {
+        $hours = (int) config('notifications.spread_hours', self::DEFAULT_SPREAD_HOURS);
+
+        return max(1, min(24, $hours));
+    }
+
+    /**
+     * رقم الساعة داخل النافذة (0 … spreadHours-1) أو null خارج النافذة.
+     */
+    public function currentSpreadSlot(?Carbon $at = null): ?int
+    {
+        $at ??= now();
+        $start = $this->spreadStartHour();
+        $span = $this->spreadHours();
+        $hour = (int) $at->timezone(config('app.timezone'))->format('G');
+
+        for ($offset = 0; $offset < $span; $offset++) {
+            if (($start + $offset) % 24 === $hour) {
+                return $offset;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * slot ثابت لنفس القاعدة/السجل عشان التذكير يفضل على نفس الساعة تقريباً.
+     */
+    public function alertSpreadSlot(DueAlert $alert): int
+    {
+        $key = $alert->ruleKey.'|'.$alert->subjectType.'|'.$alert->subjectId;
+        $hash = crc32($key);
+
+        return (int) ($hash % $this->spreadHours());
     }
 
     /**

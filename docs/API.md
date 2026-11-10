@@ -280,10 +280,13 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 ### `GET /qr?type=vehicle&id={id}` أو `type=customer`
 ```json
-{ "data": { "qr": "https://.../showroom?vehicle=1", "label": "هيونداي إلنترا · أ ب ج 1234" } }
+{ "data": { "qr": "https://.../qr/vehicles/1", "label": "هيونداي إلنترا · أ ب ج 1234" } }
 ```
 
 أصل الرابط = `PUBLIC_APP_URL`، أو `APP_URL` إن لم يكن `localhost` / `127.0.0.1`. لا يُؤخذ من ترويسة الطلب. `type=customer` يبقى خلف `customers.view`.
+
+### `GET /public/vehicles/{id}/qr-card` (عام — بلا توكن)
+بطاقة الزائر بعد مسح QR: مركز (اسم، هاتف، عنوان، لوجو عام إن وُجد، سوشيال) + `current_renter` (اسم/هاتف) عند عقد `active`، وإلا `is_rented: false`. يتضمن `credit` (اسم المطوّر + واتساب). بلا أرقام قومية ولا مبالغ.
 
 ---
 
@@ -674,7 +677,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | GET | `/notifications/unread-count` | `{ "unread": N }` |
 | POST | `/notifications/{id}/read` | تعليم مقروء (مالك الإشعار فقط — حماية IDOR) |
 
-الماسح `php artisan notifications:scan` يشتغل كل ساعة من `schedule:run` (Cron على cPanel). يرسل الإشعار الأول عند تحقق الشرط ثم تذكيراً كل ٢٤ ساعة لنفس السجل ونفس القاعدة: بداية حجز معلّق/معتمد أو نهاية عقد نشط قبلها بيومين، والمستحقات المالية (عقد، تأمين، مالك، راتب معتمد، مخالفة)، ونقص المخزون، والمستندات، والصيانة. Web Push يُرسل مع نفس الصف إن وُجد VAPID.
+الماسح `php artisan notifications:scan` يشتغل كل ساعة من `schedule:run` (Cron على cPanel). يرسل الإشعار الأول عند تحقق الشرط ثم تذكيراً كل ٢٤ ساعة لنفس السجل ونفس القاعدة، مع **توزيع على نافذة ١٣:٠٠→٠١:٠٠** (١٢ شريحة) حتى لا تتجمّع كل التنبيهات في دقيقة واحدة. خارج النافذة لا إرسال. يشمل: بداية حجز معلّق/معتمد أو نهاية عقد نشط قبلها بيومين، والمستحقات المالية (عقد، تأمين، مالك، راتب معتمد، مخالفة)، ونقص المخزون، والمستندات، والصيانة. Web Push يُرسل مع نفس الصف إن وُجد VAPID.
 
 ### Web Push (موبايل)
 صلاحية `notifications.view` · يحتاج VAPID في `.env` (`php artisan push:vapid --write`) وHTTPS. `VAPID_SUBJECT` لازم يكون `https://` لنفس الموقع؛ عنوان `mailto` على نطاق غير عام (مثل `.local`) يرفضه آيفون بـ 403.
@@ -697,7 +700,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | عقود | `/contracts*` | `/bookings` |
 | تقويم | عبر contracts | `/calendar` |
 | معرض | `/showroom` | `/showroom` |
-| QR | `/qr` | من تفاصيل مركبة |
+| QR | `/qr` · `/public/vehicles/{id}/qr-card` | `/qr/vehicles/{id}` (تفاصيل إن مسجّل · بطاقة زائر إن لا) |
 | فحص/توقيع | handover/return | Bookings sheet |
 | وديعة | `/contracts/.../deposit*` | Bookings |
 | عملاء/سوداء | `/customers` | `/customers` |

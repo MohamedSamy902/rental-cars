@@ -35,6 +35,7 @@ import { ChatPage } from '@/pages/ChatPage'
 import { CustomerDetailPage } from '@/pages/CustomerDetailPage'
 import { EmployeeDetailPage } from '@/pages/EmployeeDetailPage'
 import { ProfilePage } from '@/pages/ProfilePage'
+import { VehicleQrPage } from '@/pages/VehicleQrPage'
 import type { ReactNode } from 'react'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -58,6 +59,7 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/qr/vehicles/:id" element={<VehicleQrPage />} />
               <Route
                 element={
                   <Protected>
