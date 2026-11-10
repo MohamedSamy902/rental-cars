@@ -169,6 +169,7 @@ class ContractController extends Controller
             'payment_amount' => ['nullable', 'integer', 'min:0'],
             'payment_method' => ['nullable', 'string', 'in:cash,card,transfer'],
             'payment_reference' => ['nullable', 'string', 'max:100'],
+            'balance_due_on' => ['nullable', 'date', 'after_or_equal:today'],
             'accessories' => ['nullable', 'array'],
             'accessories.*.name' => ['required_with:accessories', 'string'],
             'accessories.*.expected_qty' => ['nullable', 'integer', 'min:0'],

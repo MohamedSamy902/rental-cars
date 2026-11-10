@@ -387,9 +387,10 @@ class DueNotificationService
         $horizon = now()->copy()->addDays(self::LEAD_DAYS);
         $contracts = Contract::query()
             ->with(['customer:id,full_name'])
-            ->whereIn('status', ['approved', 'active', 'completed'])
+            ->whereIn('status', ['pending', 'approved', 'active', 'completed'])
             ->where(function ($query) use ($horizon) {
-                $query->whereNotNull('final_total')
+                $query->whereNotNull('balance_due_on')
+                    ->orWhereNotNull('final_total')
                     ->orWhereNotNull('period_rent')
                     ->orWhere(function ($nearEnd) use ($horizon) {
                         $nearEnd->where('status', 'active')->where('planned_ends_at', '<=', $horizon);
@@ -418,13 +419,23 @@ class DueNotificationService
                 continue;
             }
 
+            // تاريخ تحصيل المتبقي: يبدأ التنبيه قبل الموعد بيومين ويستمر حتى السداد الكامل.
+            if ($contract->balance_due_on) {
+                if (! $this->dateDue($contract->balance_due_on)) {
+                    continue;
+                }
+            }
+
             $who = $contract->customer?->full_name ?: 'العميل';
+            $dueLabel = $contract->balance_due_on
+                ? ' · استحقاق '.$contract->balance_due_on->toDateString()
+                : '';
             $alerts[] = new DueAlert(
                 ruleKey: 'contract_balance',
                 subjectType: 'contract',
                 subjectId: (int) $contract->id,
                 title: "مبلغ مستحق على العقد {$contract->number}",
-                body: "متبقي {$this->money($balance)} على {$who} من أصل {$this->money($obligation)}.",
+                body: "متبقي {$this->money($balance)} على {$who} من أصل {$this->money($obligation)}{$dueLabel}.",
                 linkType: 'contract',
                 linkId: (int) $contract->id,
                 permissions: ['payments.view', 'contracts.view'],

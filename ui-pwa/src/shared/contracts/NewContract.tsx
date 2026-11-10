@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import {
-  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, MediaUpload, NumberField, useToast,
+  Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, DateField, MediaUpload, NumberField, useToast,
 } from '@/shared/ui'
 import { toApiDateTime, formatMoney } from '@/shared/lib/format'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
@@ -22,7 +22,7 @@ type Vehicle = {
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
   daily_rate: '', deposit: '', odometer: '', notes: '',
-  payment_amount: '', payment_method: 'cash', payment_notes: '',
+  payment_amount: '', payment_method: 'cash', payment_notes: '', balance_due_on: '',
 }
 
 const emptyCustomer = {
@@ -186,6 +186,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           payment_amount: form.payment_amount !== '' ? Number(form.payment_amount) : undefined,
           payment_method: form.payment_method || 'cash',
           payment_notes: form.payment_notes || undefined,
+          balance_due_on: form.balance_due_on || undefined,
           notes: form.notes || undefined,
         },
       })
@@ -389,11 +390,21 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               { value: 'transfer', label: 'تحويل' },
             ]}
           />
+          {remainingBalance > 0 ? (
+            <DateField
+              label="تاريخ تحصيل باقي المبلغ"
+              required={paidNow > 0}
+              value={form.balance_due_on}
+              error={errors.balance_due_on}
+              onChange={(e) => setForm({ ...form, balance_due_on: e.target.value })}
+              hint="يصل إشعار قبل الموعد بيومين ويتكرر حتى استلام الباقي بالكامل"
+            />
+          ) : null}
           <TextField
-            label="ملاحظة الدفعة / موعد المتبقي"
+            label="ملاحظة الدفعة"
             value={form.payment_notes}
             onChange={(e) => setForm({ ...form, payment_notes: e.target.value })}
-            hint="مثال: الباقي عند التسليم"
+            hint="اختياري — نص حر على إيصال الدفعة"
           />
 
           {availableAccessories.length > 0 ? (

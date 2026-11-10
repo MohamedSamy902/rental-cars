@@ -21,7 +21,7 @@ class Contract extends Model
         'excess_km_amount', 'period_rent', 'discount', 'damage_fee', 'other_fees',
         'other_fees_description', 'final_total', 'extended_from_contract_id',
         'swapped_from_contract_id', 'swap_reason', 'sales_user_id', 'cancel_reason',
-        'notes', 'accessories_json', 'branch_id',
+        'notes', 'balance_due_on', 'accessories_json', 'branch_id',
     ];
 
     protected function casts(): array
@@ -30,6 +30,7 @@ class Contract extends Model
             'starts_at' => 'datetime',
             'planned_ends_at' => 'datetime',
             'actual_ends_at' => 'datetime',
+            'balance_due_on' => 'date',
             'customer_id' => 'integer',
             'vehicle_id' => 'integer',
             'guarantor_customer_id' => 'integer',

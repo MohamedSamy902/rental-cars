@@ -99,6 +99,7 @@ class AccountingController extends Controller
             'link_type' => ['required', 'string', 'in:contract,customer,deposit,vehicle'],
             'link_id' => ['required', 'integer'],
             'notes' => ['nullable', 'string'],
+            'balance_due_on' => ['nullable', 'date', 'after_or_equal:today'],
         ], [
             'method.required' => 'الطريقة مطلوبة.',
             'link_id.required' => 'معرّف الربط مطلوب.',
@@ -108,6 +109,7 @@ class AccountingController extends Controller
             'direction' => 'الاتجاه',
             'link_type' => 'نوع الربط',
             'link_id' => 'معرّف الربط',
+            'balance_due_on' => 'تاريخ تحصيل المتبقي',
         ]);
 
         try {

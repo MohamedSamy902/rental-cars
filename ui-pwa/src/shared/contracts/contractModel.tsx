@@ -64,6 +64,7 @@ export type Contract = {
   damage_fee?: number
   excess_km_amount?: number
   notes?: string | null
+  balance_due_on?: string | null
   created_by?: string | null
   sales_user?: { id: number; name: string } | null
   vehicle_id?: number
@@ -99,7 +100,7 @@ export type Contract = {
 
 export type VehicleOption = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number; odometer?: number }
 
-export type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposit' | 'deduct' | 'refund' | null
+export type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposit' | 'deduct' | 'refund' | 'collect' | null
 
 export const statusLabel: Record<string, string> = {
   pending: 'معلّق', approved: 'معتمد', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغى',
@@ -121,6 +122,7 @@ export const actionTitle: Record<Exclude<ActionKind, null>, string> = {
   deposit: 'قبض التأمين النقدي',
   deduct: 'خصم من التأمين',
   refund: 'رد متبقي التأمين',
+  collect: 'تحصيل دفعة من المتبقي',
 }
 
 export const inspectionTypeLabel: Record<string, string> = {
@@ -199,6 +201,12 @@ export function contractMenu(
   }
   if ((b.status === 'approved' || b.status === 'active') && !b.deposit && can('deposits.collect')) {
     items.push({ id: 'deposit', label: 'قبض تأمين', icon: <IconCash size={16} />, onSelect: () => handlers.openAction('deposit') })
+  }
+  if (
+    (b.status === 'pending' || b.status === 'approved' || b.status === 'active' || b.status === 'completed')
+    && can('payments.create')
+  ) {
+    items.push({ id: 'collect', label: 'تحصيل متبقي', icon: <IconWallet size={16} />, onSelect: () => handlers.openAction('collect') })
   }
   if ((b.status === 'approved' || b.status === 'active' || b.status === 'completed') && can('contracts_extend.execute')) {
     items.push({ id: 'extend', label: 'تمديد', icon: <IconCalendar size={16} />, onSelect: () => handlers.openAction('extend') })

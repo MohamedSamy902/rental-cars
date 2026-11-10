@@ -1,5 +1,5 @@
 import {
-  Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, MediaUpload,
+  Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, MediaUpload, DateField,
 } from '@/shared/ui'
 import { civilDateOnly } from '@/shared/lib/dates'
 import { formatMoney } from '@/shared/lib/format'
@@ -22,6 +22,7 @@ type Form = {
   deduct_reason: string
   payment_amount: string
   payment_method: string
+  balance_due_on: string
 }
 
 type Props = {
@@ -148,6 +149,52 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
               value={form.payment_method}
               onChange={(e) => patch({ payment_method: e.target.value })}
             />
+            {Number(form.payment_amount || 0) > 0 && Number(form.payment_amount || 0) < estimatedTotal ? (
+              <DateField
+                label="تاريخ تحصيل باقي المبلغ"
+                required
+                value={form.balance_due_on}
+                onChange={(e) => patch({ balance_due_on: e.target.value })}
+                hint="إشعار قبل الموعد بيومين حتى اكتمال السداد"
+              />
+            ) : null}
+          </>
+        ) : null}
+        {action === 'collect' ? (
+          <>
+            <p className="muted">
+              المتبقي الحالي: {formatMoney(selected?.ledger?.balance || 0)}
+              {selected?.balance_due_on ? ` · استحقاق ${selected.balance_due_on}` : ''}
+            </p>
+            <MoneyField
+              label="المبلغ المحصّل الآن"
+              required
+              value={form.payment_amount}
+              onChange={(e) => patch({ payment_amount: e.target.value })}
+            />
+            <SelectField
+              label="طريقة التحصيل"
+              options={[
+                { value: 'cash', label: 'نقدي' },
+                { value: 'card', label: 'بطاقة' },
+                { value: 'transfer', label: 'تحويل' },
+              ]}
+              value={form.payment_method}
+              onChange={(e) => patch({ payment_method: e.target.value })}
+            />
+            {Number(form.payment_amount || 0) > 0
+              && Number(form.payment_amount || 0) < (selected?.ledger?.balance || 0) ? (
+                <DateField
+                  label="تاريخ تحصيل الباقي التالي"
+                  required
+                  value={form.balance_due_on}
+                  onChange={(e) => patch({ balance_due_on: e.target.value })}
+                  hint="يُحدَّث موعد الاستحقاق ويُعاد التنبيه قبلها بيومين"
+                />
+              ) : (
+                <p className="muted">إن سدّدت المتبقي بالكامل يُغلق التنبيه تلقائياً.</p>
+              )}
+            <TextAreaField label="ملاحظة" value={form.notes} onChange={(e) => patch({ notes: e.target.value })} />
           </>
         ) : null}
         {action === 'cancel' ? (

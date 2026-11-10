@@ -17,8 +17,16 @@
   bottom: auto;
   overflow: hidden;
   overscroll-behavior: contain;
+  /* Opaque so underlying page never peeks through translucent keyboard gaps */
+  background: var(--overlay);
   /* Fallback when JS has not run yet */
   max-height: 100dvh;
+}
+
+.rpm-sheet-root[data-keyboard='open'] .rpm-sheet-wrap {
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
 }
 
 .rpm-sheet-backdrop {
@@ -288,10 +296,15 @@
   /* Extra body pad on mobile so last inputs clear browser chrome / dock */
   .rpm-sheet__body {
     --sheet-body-extra: 1.5rem;
+    scroll-padding-bottom: calc(1.25rem + var(--safe-bottom, 0px) + 1.5rem);
   }
 
   .rpm-sheet__foot {
     padding-block-end: calc(1.1rem + var(--safe-bottom, 0px) + 0.5rem);
+  }
+
+  .rpm-sheet-root[data-keyboard='open'] .rpm-sheet__body {
+    scroll-padding-bottom: 5rem;
   }
 }
 

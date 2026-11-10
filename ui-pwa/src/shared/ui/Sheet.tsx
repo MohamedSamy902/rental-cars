@@ -125,10 +125,16 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
       root.style.setProperty('--vv-height', `${height}px`)
       root.style.setProperty('--vv-top', `${offsetTop}px`)
       root.style.setProperty('--sheet-max-h', `${sheetMax}px`)
+      root.dataset.keyboard = keyboardOpen ? 'open' : 'closed'
+      const foot = root.querySelector('.rpm-sheet__foot') as HTMLElement | null
+      if (foot) {
+        root.style.setProperty('--sheet-foot-h', `${Math.round(foot.getBoundingClientRect().height)}px`)
+      }
       // Keep page scroll locked to the visual viewport origin on iOS.
       if (offsetTop > 0 || (vv && vv.pageTop > 0)) {
         window.scrollTo(0, 0)
       }
+      pinSheetScroll(root.querySelector('.rpm-sheet') as HTMLElement | null)
     }
 
     sync()
@@ -148,6 +154,8 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
       root.style.removeProperty('--vv-height')
       root.style.removeProperty('--vv-top')
       root.style.removeProperty('--sheet-max-h')
+      root.style.removeProperty('--sheet-foot-h')
+      delete root.dataset.keyboard
     }
   }, [])
 
@@ -172,9 +180,12 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
     const reveal = (target: HTMLElement) => {
       const run = () => {
         pinSheetScroll(sheetEl())
+        const root = rootRef.current
+        const keyboardOpen = root?.dataset.keyboard === 'open'
         const bodyRect = body.getBoundingClientRect()
         const targetRect = target.getBoundingClientRect()
-        const pad = 20
+        // Extra room above the sticky-feeling foot + iOS accessory bar.
+        const pad = keyboardOpen ? 72 : 28
         if (targetRect.bottom > bodyRect.bottom - pad) {
           body.scrollTop += targetRect.bottom - bodyRect.bottom + pad
         } else if (targetRect.top < bodyRect.top + pad) {
@@ -183,13 +194,16 @@ function SheetLayer({ title, onClose, children, footer, closeLabel = 'إلغاء
         pinSheetScroll(sheetEl())
       }
       window.setTimeout(run, 50)
-      window.setTimeout(run, 320)
+      window.setTimeout(run, 180)
+      window.setTimeout(run, 360)
     }
     const onFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement | null
       if (!target || !body.contains(target) || !isField(target)) return
       // Immediate pin: browser may scroll `.rpm-sheet` synchronously on focus.
       pinSheetScroll(sheetEl())
+      // Re-measure vv after focus — iOS often opens the keyboard a frame later.
+      window.dispatchEvent(new Event('resize'))
       if (!shouldRevealField(target)) return
       reveal(target)
     }

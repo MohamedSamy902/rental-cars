@@ -8,7 +8,7 @@ const emptyForm = {
   replacement_vehicle_id: '', method: 'cash', receipt_number: '',
   notes: '', damage_position: '', damage_description: '',
   damage_photo_path: '', deduct_amount: '', deduct_reason: '',
-  payment_amount: '', payment_method: 'cash',
+  payment_amount: '', payment_method: 'cash', balance_due_on: '',
 }
 
 export function useContractLifecycle(onMutated?: () => void) {
@@ -32,21 +32,27 @@ export function useContractLifecycle(onMutated?: () => void) {
       const v = await api<{ data: VehicleOption[] }>('/vehicles?per_page=100')
       setVehicles(v.data)
     }
-    if (kind === 'return' && (contract.open_violations === undefined || contract.open_violations_total === undefined)) {
+    if (
+      kind === 'return'
+      || kind === 'collect'
+      || (kind === 'handover' && (contract.ledger?.balance === undefined))
+    ) {
       try {
         const dossier = await api<{ data: Contract }>(`/contracts/${contract.id}`)
         setSelected({
           ...contract,
-          open_violations: dossier.data.open_violations ?? [],
+          ...dossier.data,
+          open_violations: dossier.data.open_violations ?? contract.open_violations ?? [],
           open_violations_total: dossier.data.open_violations_total
             ?? dossier.data.ledger?.violations_due
+            ?? contract.open_violations_total
             ?? 0,
           open_violations_count: dossier.data.open_violations?.length
             ?? contract.open_violations_count
             ?? 0,
         })
       } catch {
-        /* الشيت يعمل بإجمالي القائمة إن وُجد */
+        /* الشيت يعمل ببيانات القائمة إن وُجدت */
       }
     }
   }
@@ -78,6 +84,7 @@ export function useContractLifecycle(onMutated?: () => void) {
             notes: actionForm.notes || undefined,
             payment_amount: actionForm.payment_amount ? Number(actionForm.payment_amount) : undefined,
             payment_method: actionForm.payment_method || 'cash',
+            balance_due_on: actionForm.balance_due_on || undefined,
           },
         })
         toast.success('تم التسليم وتفعيل العقد.')
@@ -149,6 +156,20 @@ export function useContractLifecycle(onMutated?: () => void) {
           json: { method: actionForm.method, receipt_number: actionForm.receipt_number },
         })
         toast.success('تم رد متبقي التأمين.')
+      } else if (action === 'collect') {
+        await api('/accounting/payments', {
+          method: 'POST',
+          json: {
+            amount: Number(actionForm.payment_amount),
+            method: actionForm.payment_method || 'cash',
+            direction: 'in',
+            link_type: 'contract',
+            link_id: selected.id,
+            notes: actionForm.notes || undefined,
+            balance_due_on: actionForm.balance_due_on || undefined,
+          },
+        })
+        toast.success('تم تسجيل التحصيل.')
       }
       closeAction()
       onMutated?.()
