@@ -5,6 +5,18 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://rpmrentcar.com/api/:path*"
+    },
+    {
+      "source": "/sanctum/:path*",
+      "destination": "https://rpmrentcar.com/sanctum/:path*"
+    },
+    {
+      "source": "/up",
+      "destination": "https://rpmrentcar.com/up"
+    },
+    {
       "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }

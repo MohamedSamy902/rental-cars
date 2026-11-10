@@ -1,0 +1,24 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Authorization / Sanctum
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Laravel API + health + sanctum + private media
+    RewriteRule ^api(/.*)?$ index.php [L,QSA]
+    RewriteRule ^up$ index.php [L,QSA]
+    RewriteRule ^sanctum(/.*)?$ index.php [L,QSA]
+    RewriteRule ^storage(/.*)?$ index.php [L,QSA]
+
+    # باقي المسارات → فرونت Vercel (الفرونت مش على cPanel)
+    RewriteRule ^(.*)$ https://rental-cars-theta-beryl.vercel.app/$1 [R=302,L]
+</IfModule>
+
+Options -Indexes
