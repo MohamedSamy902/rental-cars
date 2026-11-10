@@ -77,6 +77,17 @@ class AccountingMonthLedgerTest extends TestCase
             $ledger['summary']['rent_revenue'] + 300 - 250,
             $ledger['summary']['net_operating'],
         );
+
+        $overview = $this->getJson('/api/accounting/overview')->assertOk()->json('data.months');
+        $current = collect($overview)->first(
+            fn (array $m) => (int) $m['year'] === $year && (int) $m['month'] === $month
+        );
+        $this->assertNotNull($current);
+        $this->assertSame($ledger['summary']['rent_revenue'], $current['rent_revenue']);
+        $this->assertSame($ledger['summary']['fees_revenue'], $current['fees_revenue']);
+        $this->assertSame($ledger['summary']['expenses'], $current['expenses']);
+        $this->assertSame($ledger['summary']['net_operating'], $current['net_operating']);
+
         $this->assertSame('عميل الشهر', $ledger['rents'][0]['customer']);
         $this->assertSame('أضرار', $ledger['fees'][0]['kind']);
         $this->assertSame([], $ledger['audit']);

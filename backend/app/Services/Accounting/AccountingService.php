@@ -12,6 +12,7 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\MonthLock;
 use App\Models\Payment;
+use App\Models\PayrollPayout;
 use App\Models\Vehicle;
 use App\Services\Contracts\ContractLedgerMath;
 use App\Services\Contracts\ContractPricingService;
@@ -795,22 +796,37 @@ class AccountingService
             $year = (int) $dt->format('Y');
             $month = (int) $dt->format('n');
             $lock = MonthLock::query()->where(compact('year', 'month'))->first();
-            $rentCredit = JournalLine::query()
+            $rentCredit = (int) JournalLine::query()
                 ->whereHas('account', fn ($q) => $q->where('code', '4000'))
                 ->whereHas('entry', function ($q) use ($year, $month) {
                     $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
                 })
                 ->sum('credit');
+            $feesCredit = (int) JournalLine::query()
+                ->whereHas('account', fn ($q) => $q->whereIn('code', ['4100', '4200', '4300']))
+                ->whereHas('entry', function ($q) use ($year, $month) {
+                    $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
+                })
+                ->sum('credit');
+            $expensesTotal = (int) Expense::query()
+                ->whereYear('spent_on', $year)
+                ->whereMonth('spent_on', $month)
+                ->sum('amount');
+            $payrollPaid = (int) PayrollPayout::query()
+                ->whereYear('paid_on', $year)
+                ->whereMonth('paid_on', $month)
+                ->sum('amount');
             $months[] = [
                 'year' => $year,
                 'month' => $month,
                 'label' => $dt->translatedFormat('F Y'),
                 'locked' => $lock?->isLocked() ?? false,
-                'rent_revenue' => (int) $rentCredit,
-                'expenses' => (int) Expense::query()
-                    ->whereYear('spent_on', $year)
-                    ->whereMonth('spent_on', $month)
-                    ->sum('amount'),
+                'rent_revenue' => $rentCredit,
+                'fees_revenue' => $feesCredit,
+                'expenses' => $expensesTotal,
+                'payroll_paid' => $payrollPaid,
+                // صافي الربح التشغيلي = إيجار مثبت + رسوم − مصروفات − رواتب مصروفة
+                'net_operating' => $rentCredit + $feesCredit - $expensesTotal - $payrollPaid,
                 'completed_contracts' => Contract::query()
                     ->where('status', 'completed')
                     ->whereYear('actual_ends_at', $year)

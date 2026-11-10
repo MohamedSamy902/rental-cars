@@ -502,7 +502,7 @@ Query:
 
 | Method | Path |
 |--------|------|
-| GET | `/accounting/overview` | شهور · حسابات · مدفوعات |
+| GET | `/accounting/overview` | شهور (إيراد إيجار · رسوم · مصروفات · رواتب · `net_operating` صافي الربح · عقود مكتملة) · حسابات · مدفوعات |
 | GET | `/accounting/months/{year}/{month}` | دفتر الشهر: إيجار · رسوم · مصروفات · تأمينات · مدفوعات عملاء · رواتب · مخالفات متابعة · سجل إقفال |
 | POST | `/accounting/lock-month` | `{ year, month }` |
 | POST | `/accounting/reopen-month` | `{ year, month, reason }` |
