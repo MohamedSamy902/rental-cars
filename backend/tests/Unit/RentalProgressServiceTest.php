@@ -112,9 +112,9 @@ class RentalProgressServiceTest extends TestCase
     {
         $customer = Customer::query()->create([
             'full_name' => 'عميل اختبار',
-            'phone' => '01012345678',
+            'phone' => '010'.random_int(10000000, 99999999),
             'birth_date' => '1990-01-01',
-            'license_number' => 'L-1',
+            'license_number' => 'L-'.uniqid(),
             'license_expires_on' => $licenseExpires ?? now()->addYear()->toDateString(),
             'status' => 'active',
         ]);

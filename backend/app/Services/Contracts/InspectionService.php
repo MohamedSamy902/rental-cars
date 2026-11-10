@@ -5,6 +5,7 @@ namespace App\Services\Contracts;
 use App\Models\Inspection;
 use App\Models\InspectionDamage;
 use DomainException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -24,6 +25,10 @@ class InspectionService
     {
         if (! in_array($payload['type'], ['handover', 'return'], true)) {
             throw new DomainException('نوع الفحص غير صالح.');
+        }
+
+        if (Inspection::query()->where('contract_id', $contractId)->where('type', $payload['type'])->exists()) {
+            throw new DomainException('تم تسجيل هذا الفحص مسبقاً.');
         }
 
         // Signature canvas removed from close/handover modals — keep optional for legacy clients.
@@ -48,7 +53,19 @@ class InspectionService
             $attrs['fuel_level'] = null;
         }
 
-        $inspection = Inspection::query()->create($attrs);
+        try {
+            $inspection = Inspection::query()->create($attrs);
+        } catch (UniqueConstraintViolationException $e) {
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
+            throw new DomainException('تم تسجيل هذا الفحص مسبقاً.');
+        } catch (\Throwable $e) {
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
+            throw $e;
+        }
 
         foreach ($payload['damages'] ?? [] as $damage) {
             InspectionDamage::query()->create([

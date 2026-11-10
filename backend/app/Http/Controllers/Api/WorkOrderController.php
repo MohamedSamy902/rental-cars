@@ -49,7 +49,6 @@ class WorkOrderController extends Controller
             'opened_at' => ['nullable', 'date'],
             'odometer' => ['required', 'integer', 'min:0'],
             'puts_in_maintenance' => ['nullable', 'boolean'],
-            'force_after_resolution' => ['nullable', 'boolean'],
             'labor_cost' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
             'next_service_on' => ['nullable', 'date', 'required_without:next_service_odometer', 'prohibits:next_service_odometer'],

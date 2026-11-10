@@ -162,6 +162,12 @@ bash scripts/build-production.sh
    ```
 6. فعّل **Backup** يومي في cPanel.
 
+على الإنتاج بعد `migrate --seed` (صلاحيات وأدوار فقط بلا مستخدمين تجريبيين) أنشئ المدير بـ:
+
+```bash
+php artisan rpm:create-admin --name="مدير" --email="admin@example.com" --phone="01000000000" --password="كلمة-قوية"
+```
+
 ### ٣٫٦ تحقق بعد الرفع
 
 | فحص | متوقع |

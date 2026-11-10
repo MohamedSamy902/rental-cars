@@ -133,6 +133,8 @@ class PayrollService
                 }
             }
 
+            $this->accounting->postSalaryAdvance($advance, $userId);
+
             AuditLog::query()->create([
                 'user_id' => $userId,
                 'action' => 'salary_advance_recorded',
@@ -154,6 +156,7 @@ class PayrollService
 
         DB::transaction(function () use ($advance, $line, $userId) {
             $snapshot = $advance->only(['employee_id', 'amount', 'advanced_on']);
+            $this->accounting->postSalaryAdvanceVoid($advance, $userId);
             $advance->delete();
 
             if ($line) {
@@ -197,7 +200,7 @@ class PayrollService
         $this->accounting->assertMonthOpen((int) $paidOn->format('Y'), (int) $paidOn->format('n'));
 
         return DB::transaction(function () use ($line, $run, $amount, $paidOn, $data, $userId) {
-            PayrollPayout::query()->create([
+            $payout = PayrollPayout::query()->create([
                 'payroll_line_id' => $line->id,
                 'amount' => $amount,
                 'paid_on' => $paidOn->toDateString(),
@@ -205,6 +208,15 @@ class PayrollService
                 'paid_by' => $userId,
                 'notes' => $data['notes'] ?? null,
             ]);
+            $this->accounting->postPayrollPayout($payout, $userId);
+            if ((int) $line->advances > 0) {
+                $this->accounting->postPayrollAdvanceApply(
+                    (int) $line->id,
+                    (int) $line->advances,
+                    $paidOn->toDateString(),
+                    $userId,
+                );
+            }
 
             $line->paid_amount += $amount;
             $line->carried_over = $line->remaining();

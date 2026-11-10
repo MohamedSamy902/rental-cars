@@ -32,7 +32,7 @@ class WorkOrderService
     public function open(array $data, array $lines = [], ?int $userId = null): WorkOrder
     {
         return DB::transaction(function () use ($data, $lines, $userId) {
-            $vehicle = Vehicle::query()->findOrFail($data['vehicle_id']);
+            $vehicle = Vehicle::query()->whereKey($data['vehicle_id'])->lockForUpdate()->firstOrFail();
 
             if (! empty($data['puts_in_maintenance'])) {
                 $conflicts = $vehicle->contracts()
@@ -107,6 +107,7 @@ class WorkOrderService
                 ->where('remaining', '>', 0)
                 ->orderBy('received_on')
                 ->orderBy('id')
+                ->lockForUpdate()
                 ->get(['id', 'remaining', 'unit_cost'])
                 ->map(fn ($b) => [
                     'id' => $b->id,

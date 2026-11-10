@@ -90,7 +90,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/{employee}', [EmployeeController::class, 'show']);
     });
-    Route::middleware('permission:hr.salaries,hr.view')->group(function () {
+    Route::middleware('permission:hr.salaries|sensitive.view_salaries')->group(function () {
         Route::get('/payroll', [PayrollController::class, 'index']);
     });
     Route::middleware('permission:hr.create,hr.salaries')->group(function () {
@@ -172,6 +172,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/contracts', [ContractController::class, 'store'])->middleware('permission:contracts.create');
     Route::get('/contracts/{contract}', [ContractController::class, 'show'])->middleware('permission:contracts.view');
     Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve'])->middleware('permission:contracts.approve');
+    Route::post('/contracts/{contract}/pricing', [ContractController::class, 'updatePricing'])->middleware('permission:contracts_price.override');
     Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->middleware('permission:contracts_cancel.approve');

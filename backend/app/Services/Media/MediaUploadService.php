@@ -47,21 +47,27 @@ class MediaUploadService
         $name = now()->format('YmdHis').'_'.Str::lower(Str::random(12)).'.'.$ext;
         $relative = 'media/'.$collection.'/'.$name;
 
-        Storage::disk((string) config('uploads.disk', 'local'))->putFileAs('media/'.$collection, $file, $name);
+        $disk = (string) config('uploads.disk', 'local');
+        Storage::disk($disk)->putFileAs('media/'.$collection, $file, $name);
 
-        return MediaFile::query()->create([
-            'disk' => (string) config('uploads.disk', 'local'),
-            'path' => $relative,
-            'original_name' => Str::limit($file->getClientOriginalName(), 180, ''),
-            'mime_type' => $mime,
-            'kind' => $kind === 'document' ? 'document' : $kind,
-            'collection' => $collection,
-            'purpose' => $meta['purpose'] ?? null,
-            'size_bytes' => (int) $file->getSize(),
-            'attachable_type' => $meta['attachable_type'] ?? null,
-            'attachable_id' => $meta['attachable_id'] ?? null,
-            'uploaded_by' => $userId,
-        ]);
+        try {
+            return MediaFile::query()->create([
+                'disk' => $disk,
+                'path' => $relative,
+                'original_name' => Str::limit($file->getClientOriginalName(), 180, ''),
+                'mime_type' => $mime,
+                'kind' => $kind === 'document' ? 'document' : $kind,
+                'collection' => $collection,
+                'purpose' => $meta['purpose'] ?? null,
+                'size_bytes' => (int) $file->getSize(),
+                'attachable_type' => $meta['attachable_type'] ?? null,
+                'attachable_id' => $meta['attachable_id'] ?? null,
+                'uploaded_by' => $userId,
+            ]);
+        } catch (\Throwable $e) {
+            Storage::disk($disk)->delete($relative);
+            throw $e;
+        }
     }
 
     public function delete(MediaFile $media): void
