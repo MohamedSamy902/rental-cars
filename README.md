@@ -198,7 +198,8 @@ bash scripts/deploy-cpanel-ssh.sh
 | `CPANEL_SSH_HOST` | `rpmrentcar.com` |
 | `CPANEL_SSH_USER` | `rpmrentcar` |
 | `CPANEL_SSH_KEY` | المفتاح الخاص PEM كاملاً |
-| `CPANEL_SSH_PORT` | `22` (اختياري) |
+| `CPANEL_SSH_PORT` | `8090` |
+| `CPANEL_PHP_BIN` | `/opt/cpanel/ea-php84/root/usr/bin/php` |
 
 أول رفع: من Actions شغّل **Deploy · cPanel** يدوياً بـ `confirm=deploy` و`seed_first` إن لزم، بعد ما يكون `.env` جاهز على السيرفر. بعدها أي push على `main` يكفي.
 ---

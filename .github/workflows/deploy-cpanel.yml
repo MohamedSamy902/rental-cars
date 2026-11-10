@@ -8,7 +8,9 @@ name: Deploy · cPanel
 #   CPANEL_SSH_HOST=rpmrentcar.com
 #   CPANEL_SSH_USER=rpmrentcar
 #   CPANEL_SSH_KEY=مفتاح خاص PEM كامل
-# اختياري: CPANEL_SSH_PORT · CPANEL_APP_DIR · CPANEL_PUBLIC_DIR
+#   CPANEL_SSH_PORT=8090
+#   CPANEL_PHP_BIN=/opt/cpanel/ea-php84/root/usr/bin/php
+# اختياري: CPANEL_APP_DIR · CPANEL_PUBLIC_DIR
 
 on:
   push:
@@ -114,9 +116,11 @@ jobs:
           SKIP_BUILD: '1'
           RUN_MIGRATE: '1'
           PUBLIC_MODE: 'api'
+          PHP_BIN: ${{ secrets.CPANEL_PHP_BIN }}
           SEED_FIRST: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.seed_first == true && '1' || '0' }}
         run: |
           export CPANEL_SSH_PORT="${CPANEL_SSH_PORT:-22}"
           export CPANEL_APP_DIR="${CPANEL_APP_DIR:-rpm}"
           export CPANEL_PUBLIC_DIR="${CPANEL_PUBLIC_DIR:-public_html}"
+          export PHP_BIN="${PHP_BIN:-/opt/cpanel/ea-php84/root/usr/bin/php}"
           bash scripts/deploy-cpanel-ssh.sh
