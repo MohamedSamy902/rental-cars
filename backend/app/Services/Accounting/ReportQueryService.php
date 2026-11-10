@@ -26,6 +26,14 @@ class ReportQueryService
     public function trialBalance(?Carbon $from = null, ?Carbon $to = null): array
     {
         $this->accounting->ensureChartOfAccounts();
+        // رحّل إثبات الإيجار لآخر ١٢ شهراً حتى لا يظهر الميزان/الدخل فارغاً بلا قيود
+        $sync = [];
+        for ($i = 0; $i < 12; $i++) {
+            $dt = now()->startOfMonth()->subMonths($i);
+            $sync[] = [(int) $dt->format('Y'), (int) $dt->format('n')];
+        }
+        $this->accounting->syncRentRecognition($sync);
+
         $from = $from?->copy()->startOfDay();
         $to = $to?->copy()->endOfDay();
 
@@ -68,11 +76,17 @@ class ReportQueryService
         foreach ($rows as $row) {
             if ($row['type'] === 'income') {
                 $amount = (int) $row['credit'] - (int) $row['debit'];
+                if ($amount === 0) {
+                    continue;
+                }
                 $income[] = [...$row, 'amount' => $amount];
                 $incomeTotal += $amount;
             }
             if ($row['type'] === 'expense') {
                 $amount = (int) $row['debit'] - (int) $row['credit'];
+                if ($amount === 0) {
+                    continue;
+                }
                 $expenses[] = [...$row, 'amount' => $amount];
                 $expenseTotal += $amount;
             }

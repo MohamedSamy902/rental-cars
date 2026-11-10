@@ -7,7 +7,7 @@ import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { printHtmlDocument } from '@/utils/printHtml'
 import {
   PageHeader, SkeletonBlock, ErrorState, MetricCardGrid, FilterBar, Button, Sheet, SelectField, StatusPill,
-  IconCash, IconReturn, IconTrend, IconWallet, IconClipboard, IconCheck, IconUsers, IconBan, IconAlert,
+  IconCash, IconTrend, IconWallet, IconClipboard, IconCheck, IconUsers, IconBan, IconAlert,
   type BadgeTone,
 } from '@/shared/ui'
 import './pages.css'
@@ -281,9 +281,8 @@ export function ReportsPage() {
             label="المؤشرات المالية"
             mobile="wrap"
             items={[
-              { id: 'receivables', label: 'ذمم عقود', value: data.receivables, format: 'money', tone: 'warning', icon: <IconWallet size={16} /> },
+              { id: 'receivables', label: 'مبالغ مؤجلة السداد', value: data.receivables, format: 'money', tone: 'warning', icon: <IconWallet size={16} /> },
               { id: 'in', label: 'مقبوضات', value: data.payments_in, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
-              { id: 'out', label: 'مدفوع للعملاء', value: data.payments_out, format: 'money', icon: <IconReturn size={16} /> },
               { id: 'expected', label: 'إيراد متوقع (نشط)', value: data.expected_revenue_active, format: 'money', tone: 'info', icon: <IconTrend size={16} /> },
             ]}
           />
@@ -374,13 +373,16 @@ export function ReportsPage() {
         <section className="rpm-panel rp-section">
           <div className="rpm-panel__head"><h3>ميزان مراجعة</h3></div>
           <div className="rp-section__body">
+            {trial.every((r) => r.debit === 0 && r.credit === 0) ? (
+              <p className="muted">لا قيود مرحّلة بعد — يظهر الرصيد بعد إثبات الإيجار أو تسجيل مصروف/دفعة مرحّلة.</p>
+            ) : null}
             <div className="rp-table-scroll">
               <table className="rpm-table rpm-table--stack">
                 <thead>
                   <tr><th>الحساب</th><th>النوع</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr>
                 </thead>
                 <tbody>
-                  {trial.map((r) => (
+                  {trial.filter((r) => r.debit !== 0 || r.credit !== 0).map((r) => (
                     <tr key={r.code}>
                       <td data-label="الحساب"><strong className="rpm-table__primary">{r.code} · {r.name}</strong></td>
                       <td data-label="النوع"><span className="rp-account-type">{accountTypeLabel[r.type] || r.type}</span></td>
@@ -416,6 +418,11 @@ export function ReportsPage() {
               <table className="rpm-table rpm-table--stack">
                 <thead><tr><th>البند</th><th>النوع</th><th>المبلغ</th></tr></thead>
                 <tbody>
+                  {income.income.length === 0 && income.expenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} data-label="البند">لا بنود دخل/مصروف مرحّلة في الفترة.</td>
+                    </tr>
+                  ) : null}
                   {income.income.map((r) => (
                     <tr key={`i-${r.code}`}>
                       <td data-label="البند">{r.code} · {r.name}</td>

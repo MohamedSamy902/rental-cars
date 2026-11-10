@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\Accounting\AccountingService;
 use App\Services\Accounting\MonthLedgerService;
+use App\Services\Dashboard\HomeDailyCashService;
 use App\Support\PaginationInput;
+use Carbon\Carbon;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,11 +18,32 @@ class AccountingController extends Controller
     public function __construct(
         private readonly AccountingService $accounting,
         private readonly MonthLedgerService $ledger,
+        private readonly HomeDailyCashService $dailyCash,
     ) {}
 
     public function overview(): JsonResponse
     {
         return response()->json(['data' => $this->accounting->overview()]);
+    }
+
+    public function dailyCash(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'date' => ['nullable', 'date'],
+        ]);
+        $day = isset($data['date'])
+            ? Carbon::parse($data['date'], config('app.timezone', 'Africa/Cairo'))
+            : now();
+
+        $user = $request->user();
+        abort_unless($user !== null, 401);
+
+        $cash = $this->dailyCash->forUser($user, $day, HomeDailyCashService::ACCOUNTS_LIMIT);
+        if ($cash === null) {
+            return response()->json(['message' => 'ليست لديك صلاحية لعرض حركة الفلوس.'], 403);
+        }
+
+        return response()->json(['data' => $cash]);
     }
 
     public function month(int $year, int $month): JsonResponse

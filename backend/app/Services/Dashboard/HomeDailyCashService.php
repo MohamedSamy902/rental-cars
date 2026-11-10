@@ -4,18 +4,22 @@ namespace App\Services\Dashboard;
 
 use App\Models\Deposit;
 use App\Models\Expense;
+use App\Models\OwnerPayout;
 use App\Models\Payment;
+use App\Models\PayrollPayout;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * سجل حركة الفلوس ليوم واحد على لوحة اليوم — مقبوضات/مدفوعات + مصروفات.
- * مفلتر بصلاحيات المستخدم (payments/accounting · expenses).
+ * سجل حركة الفلوس ليوم واحد — مقبوضات/مدفوعات + مصروفات (+ رواتب/ملاك عند الصلاحية).
+ * مفلتر بصلاحيات المستخدم (payments/accounting · expenses · hr · owners).
  */
 class HomeDailyCashService
 {
     public const LIMIT = 40;
+
+    public const ACCOUNTS_LIMIT = 120;
 
     /**
      * @return array{
@@ -24,7 +28,7 @@ class HomeDailyCashService
      *   entries: list<array<string,mixed>>
      * }|null
      */
-    public function forUser(?User $user, ?Carbon $day = null): ?array
+    public function forUser(?User $user, ?Carbon $day = null, int $limit = self::LIMIT): ?array
     {
         if (! $user) {
             return null;
@@ -33,20 +37,23 @@ class HomeDailyCashService
         $canPayments = $this->can($user, 'payments.view') || $this->can($user, 'accounting.view');
         $canExpenses = $this->can($user, 'expenses.view');
         $canContracts = $this->can($user, 'contracts.view');
-        if (! $canPayments && ! $canExpenses) {
+        $canPayroll = $this->can($user, 'hr.salaries') || $this->can($user, 'hr.payroll_approve') || $this->can($user, 'accounting.view');
+        $canOwners = $this->can($user, 'owners.view') || $this->can($user, 'owners.payout') || $this->can($user, 'accounting.view');
+        if (! $canPayments && ! $canExpenses && ! $canPayroll && ! $canOwners) {
             return null;
         }
 
         $day = ($day ? $day->copy() : now())->timezone(config('app.timezone', 'Africa/Cairo'))->startOfDay();
         $dateKey = $day->toDateString();
         $entries = [];
+        $fetchLimit = max($limit, self::LIMIT);
 
         if ($canPayments) {
             $payments = Payment::query()
                 ->whereDate('paid_at', $dateKey)
                 ->orderByDesc('paid_at')
                 ->orderByDesc('id')
-                ->limit(self::LIMIT)
+                ->limit($fetchLimit)
                 ->get();
 
             $depositIds = $payments->where('link_type', 'deposit')->pluck('link_id')->filter()->map(fn ($id) => (int) $id)->all();
@@ -76,7 +83,7 @@ class HomeDailyCashService
                 ->with(['vehicle:id,brand,model,plate'])
                 ->whereDate('spent_on', $dateKey)
                 ->orderByDesc('id')
-                ->limit(self::LIMIT)
+                ->limit($fetchLimit)
                 ->get();
 
             foreach ($expenses as $e) {
@@ -94,6 +101,51 @@ class HomeDailyCashService
             }
         }
 
+        if ($canPayroll) {
+            $payouts = PayrollPayout::query()
+                ->with('line.employee:id,name')
+                ->whereDate('paid_on', $dateKey)
+                ->orderByDesc('id')
+                ->limit($fetchLimit)
+                ->get();
+            foreach ($payouts as $p) {
+                $entries[] = [
+                    'id' => 'payroll:'.$p->id,
+                    'source' => 'payroll',
+                    'direction' => 'out',
+                    'amount' => (int) $p->amount,
+                    'title' => 'صرف راتب',
+                    'subtitle' => trim(($p->line?->employee?->name ?: 'موظف').($p->method ? ' · '.$p->method : '')),
+                    'method' => $p->method,
+                    'at' => $p->paid_on?->startOfDay()->toIso8601String(),
+                    'href' => '/hr',
+                ];
+            }
+        }
+
+        if ($canOwners) {
+            $ownerPays = OwnerPayout::query()
+                ->with(['owner:id,full_name', 'vehicle:id,plate,brand,model'])
+                ->whereDate('paid_on', $dateKey)
+                ->orderByDesc('id')
+                ->limit($fetchLimit)
+                ->get();
+            foreach ($ownerPays as $p) {
+                $plate = $p->vehicle?->plate ?: trim(($p->vehicle?->brand ?? '').' '.($p->vehicle?->model ?? ''));
+                $entries[] = [
+                    'id' => 'owner_payout:'.$p->id,
+                    'source' => 'owner_payout',
+                    'direction' => 'out',
+                    'amount' => (int) $p->amount,
+                    'title' => 'صرف لمالك',
+                    'subtitle' => trim(($p->owner?->full_name ?: 'مالك').($plate !== '' ? ' · '.$plate : '').($p->payment_method ? ' · '.$p->payment_method : '')),
+                    'method' => $p->payment_method,
+                    'at' => $p->paid_on?->startOfDay()->toIso8601String(),
+                    'href' => $p->owner_id ? '/owners/'.$p->owner_id : '/owners',
+                ];
+            }
+        }
+
         usort($entries, function (array $a, array $b) {
             $ta = $a['at'] ?? '';
             $tb = $b['at'] ?? '';
@@ -104,7 +156,7 @@ class HomeDailyCashService
             return ($b['id'] ?? '') <=> ($a['id'] ?? '');
         });
 
-        $entries = array_slice($entries, 0, self::LIMIT);
+        $entries = array_slice($entries, 0, $limit);
 
         $in = 0;
         $out = 0;

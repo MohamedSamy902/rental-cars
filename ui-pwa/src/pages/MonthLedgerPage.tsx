@@ -4,7 +4,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, BackNavButton, MetricCardGrid, StatusPill, SkeletonBlock, ErrorState, Sheet, TextField, useToast,
-  IconCash, IconReceipt, IconWallet, IconTrend, IconReturn, IconBriefcase, IconAlert, IconKey,
+  IconCash, IconReceipt, IconWallet, IconTrend, IconBriefcase, IconAlert, IconKey,
 } from '@/shared/ui'
 import './pages.css'
 import './MonthLedgerPage.css'
@@ -181,7 +181,6 @@ export function MonthLedgerPage() {
     data.deposits.received.forEach((r) => push('تأمين مقبوض', r))
     data.deposits.returned.forEach((r) => push('تأمين مردود', r))
     data.deposits.deductions.forEach((r) => push('خصم تأمين', r))
-    data.client_payouts.forEach((r) => push('مدفوع للعميل', r))
     data.payroll.forEach((r) => push('راتب', r))
     data.violations.forEach((r) => push('مخالفة (متابعة)', r))
     downloadCsv(`rpm-${data.year}-${String(data.month).padStart(2, '0')}.csv`, ['النوع', 'التاريخ', 'العقد', 'الطرف', 'المبلغ', 'مرجع'], rows)
@@ -221,25 +220,24 @@ export function MonthLedgerPage() {
       <MetricCardGrid
         label="ملخص الشهر"
         items={[
-          { id: 'rent', label: 'إيراد الإيجار', value: s.rent_revenue, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
+          { id: 'rent', label: 'إيرادات الإيجار', value: s.rent_revenue, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
           { id: 'fees', label: 'رسوم وأضرار', value: s.fees_revenue, format: 'money', icon: <IconTrend size={16} /> },
           { id: 'exp', label: 'المصروفات', value: s.expenses, format: 'money', tone: 'warning', icon: <IconReceipt size={16} /> },
           { id: 'pay', label: 'رواتب مصروفة', value: s.payroll_paid, format: 'money', icon: <IconBriefcase size={16} /> },
           { id: 'net', label: 'صافي الربح', value: s.net_operating, format: 'money', tone: s.net_operating >= 0 ? 'success' : 'danger', icon: <IconWallet size={16} /> },
           { id: 'dep', label: 'تأمينات مقبوضة', value: s.deposits_received, format: 'money', icon: <IconKey size={16} /> },
-          { id: 'out', label: 'مدفوع للعملاء', value: s.client_payouts, format: 'money', icon: <IconReturn size={16} /> },
           { id: 'viol', label: 'مخالفات متابعة', value: s.violations_tracked ?? 0, format: 'money', tone: 'warning', icon: <IconAlert size={16} /> },
         ]}
       />
 
       <section className="rpm-panel">
         <div className="rpm-panel__head">
-          <h3>إيراد الإيجار المثبت</h3>
+          <h3>إيرادات الإيجار</h3>
           <p className="muted" style={{ margin: 0 }}>
-            قيود إثبات الإيجار (حساب 4000) لهذا الشهر — حصة الإيجار المكتسبة مرحّلة محاسبياً، وليست قبضاً نقدياً
+            حصة هذا الشهر فقط من إجمالي الإيجار (مثال: عقد ٥٠٠٠ يُوزَّع ٢٠٠٠ على نوفمبر و٣٠٠٠ على ديسمبر)
           </p>
         </div>
-        <MoneyRows rows={data.rents} empty="لا قيود إثبات إيجار لهذا الشهر" render={(r) => ({
+        <MoneyRows rows={data.rents} empty="لا إيرادات إيجار لهذا الشهر" render={(r) => ({
           title: r.contract ? `${r.contract} · ${r.customer || ''}` : (r.narration || 'قيد إيجار'),
           sub: `${when(r.date)} · ${r.vehicle || ''}`.trim(),
         })} />
@@ -277,14 +275,6 @@ export function MonthLedgerPage() {
         <MoneyRows rows={data.deposits.returned} empty="لا رد تأمين" render={(r) => ({
           title: `${r.contract || ''} · ${r.customer || ''}`,
           sub: `${when(r.date)} · ${r.receipt || r.method || ''}`,
-        })} />
-      </section>
-
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>مدفوعات للعملاء</h3></div>
-        <MoneyRows rows={data.client_payouts} empty="لا مدفوعات للعملاء" render={(r) => ({
-          title: r.notes || r.reference || 'مدفوع',
-          sub: `${when(r.date)} · ${r.method || ''} · ${r.link_type || ''}`,
         })} />
       </section>
 
