@@ -103,7 +103,8 @@ export function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [devices, setDevices] = useState(0)
   const [pushEnabled, setPushEnabled] = useState(false)
-  const [thisDeviceOn, setThisDeviceOn] = useState(false)
+  const [deviceOn, setDeviceOn] = useState(false)
+  const [allowTest, setAllowTest] = useState(false)
   const [busy, setBusy] = useState(false)
   const [bannerOpen, setBannerOpen] = useState(() => {
     const pref = readBannerPref()
@@ -137,20 +138,20 @@ export function NotificationsPage() {
 
   async function loadPushStatus() {
     try {
-      const [res, localOn] = await Promise.all([
-        api<{ enabled: boolean; devices: number }>('/push/status'),
-        hasLocalPushSubscription(),
-      ])
+      const res = await api<{ enabled: boolean; devices: number; allow_test?: boolean }>('/push/status')
       setPushEnabled(res.enabled)
       setDevices(res.devices)
-      setThisDeviceOn(localOn)
-      if (readBannerPref() === null && res.enabled && localOn) {
+      setAllowTest(Boolean(res.allow_test))
+      const localOn = await hasLocalPushSubscription()
+      setDeviceOn(localOn)
+      if (readBannerPref() === null && res.enabled && (localOn || res.devices > 0)) {
         setBannerOpen(false)
       }
     } catch {
       setPushEnabled(false)
       setDevices(0)
-      setThisDeviceOn(false)
+      setDeviceOn(false)
+      setAllowTest(false)
     }
   }
 
@@ -209,6 +210,7 @@ export function NotificationsPage() {
   }
 
   async function onTestPush() {
+    if (!allowTest) return
     setBusy(true)
     try {
       // Ensure this browser is subscribed before sending (iPhone / first-run).
@@ -254,11 +256,11 @@ export function NotificationsPage() {
     ? 'غير مدعوم على هذا المتصفح'
     : !pushEnabled
       ? 'السيرفر غير جاهز'
-      : thisDeviceOn
-        ? (devices > 1 ? `مفعّل على هذا الجهاز · ${devices} أجهزة` : 'مفعّل على هذا الجهاز')
+      : deviceOn
+        ? `مفعّل على هذا الجهاز${devices > 1 ? ` · ${devices} أجهزة للحساب` : ''}`
         : devices > 0
-          ? `أجهزة أخرى مفعّلة · ${devices}`
-          : 'غير مفعّل على هذا الجهاز'
+          ? `جاهز · ${devices} جهاز آخر على الحساب`
+          : 'جاهز — لم يُفعَّل على هذا الجهاز'
 
   return (
     <div className="rpm-stack nf">
@@ -277,7 +279,7 @@ export function NotificationsPage() {
           aria-controls="nf-push-panel"
         >
           <span className="nf-push__lead">
-            <span className={`nf-push__pulse ${pushEnabled && thisDeviceOn ? 'is-on' : ''}`.trim()} aria-hidden />
+            <span className={`nf-push__pulse ${deviceOn ? 'is-on' : ''}`.trim()} aria-hidden />
             <span className="nf-push__title">إشعارات الموبايل</span>
             <span className="nf-push__status">{pushStatusLabel}</span>
           </span>
@@ -290,14 +292,19 @@ export function NotificationsPage() {
               <p className="nf-push__hint">هذا المتصفح لا يدعم Web Push.</p>
             ) : null}
             <div className="nf-push__actions">
-              {pushEnabled && supported && !thisDeviceOn ? (
-                <Button size="sm" loading={busy} onClick={() => void onEnablePush()}>تفعيل على هذا الجهاز</Button>
-              ) : null}
-              {pushEnabled && supported && thisDeviceOn ? (
-                <>
-                  <Button size="sm" variant="secondary" loading={busy} onClick={() => void onTestPush()}>إرسال تجربة</Button>
-                  <Button size="sm" variant="secondary" loading={busy} onClick={() => void onDisablePush()}>إيقاف هذا الجهاز</Button>
-                </>
+              {deviceOn ? (
+                <Button size="sm" variant="secondary" loading={busy} onClick={() => void onDisablePush()}>
+                  إيقاف على هذا الجهاز
+                </Button>
+              ) : (
+                <Button size="sm" loading={busy} onClick={() => void onEnablePush()} disabled={!pushEnabled || !supported}>
+                  تفعيل على هذا الجهاز
+                </Button>
+              )}
+              {allowTest ? (
+                <Button size="sm" variant="secondary" loading={busy} onClick={() => void onTestPush()}>
+                  إرسال تجربة
+                </Button>
               ) : null}
             </div>
           </div>
