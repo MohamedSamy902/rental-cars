@@ -55,7 +55,7 @@ class EmployeeShowTest extends TestCase
         $res->assertJsonPath('data.advances.0.amount', 500);
         $this->assertArrayHasKey('petty_cash', $res->json('data'));
         $this->assertArrayHasKey('payroll_history', $res->json('data'));
-        $this->assertArrayHasKey('evaluations', $res->json('data'));
+        $this->assertArrayNotHasKey('evaluations', $res->json('data'));
         $this->assertArrayHasKey('assignments', $res->json('data'));
     }
 }

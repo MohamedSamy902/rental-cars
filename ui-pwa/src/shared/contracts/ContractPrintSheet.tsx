@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Sheet, Button, TextAreaField, useToast } from '@/shared/ui'
+import { Sheet, Button, useToast } from '@/shared/ui'
 import { type ApiError } from '@/shared/api/client'
 import {
   commitPrintDocument,
@@ -11,7 +11,7 @@ import {
   type PrintPayload,
 } from './printContract'
 
-/** Open the edit-before-print sheet for a contract document. */
+/** Open the preview-before-print sheet for a contract document. */
 export function useContractPrint() {
   const [target, setTarget] = useState<{ id: number; kind: PrintDocKind } | null>(null)
   const openPrint = (id: number, kind: PrintDocKind = 'contract') => setTarget({ id, kind })
@@ -40,8 +40,8 @@ const kindTitle: Record<PrintDocKind, string> = {
 }
 
 /**
- * Preview + optional one-off edit before printing a contract document.
- * Edits apply to this print only and do not change the shared template.
+ * Preview before printing a contract document.
+ * Raw HTML source editing is not shown to operators — templates are edited in settings only.
  */
 export function ContractPrintSheet({ open, contractId, kind = 'contract', onClose }: Props) {
   const toast = useToast()
@@ -49,8 +49,6 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
   const [printing, setPrinting] = useState(false)
   const [payload, setPayload] = useState<PrintPayload | null>(null)
   const [bodyHtml, setBodyHtml] = useState('')
-  const [baselineBody, setBaselineBody] = useState('')
-  const [showSource, setShowSource] = useState(kind === 'contract')
 
   useEffect(() => {
     if (!open || !contractId) return
@@ -58,8 +56,6 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
     setLoading(true)
     setPayload(null)
     setBodyHtml('')
-    setBaselineBody('')
-    setShowSource(kind === 'contract')
     void loadContractPrintPayload(contractId)
       .then((data) => {
         if (cancelled) return
@@ -67,7 +63,6 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
         const body = extractPrintableBody(full)
         setPayload(data)
         setBodyHtml(body)
-        setBaselineBody(body)
       })
       .catch((e) => {
         if (!cancelled) toast.error((e as ApiError).message || 'تعذّر تجهيز مستند الطباعة.')
@@ -85,7 +80,6 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
     return number ? `${kindTitle[kind]} · ${number}` : kindTitle[kind]
   }, [kind, payload])
 
-  const dirty = bodyHtml !== baselineBody
   const previewHtml = payload
     ? wrapEditedPrintHtml(kind, title, bodyHtml)
     : ''
@@ -95,7 +89,7 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
     setPrinting(true)
     try {
       const html = wrapEditedPrintHtml(kind, title, bodyHtml)
-      await commitPrintDocument(contractId, kind, payload, html, { editedBeforePrint: dirty })
+      await commitPrintDocument(contractId, kind, payload, html, { editedBeforePrint: false })
       onClose()
     } catch (e) {
       toast.error((e as ApiError).message || 'تعذّرت الطباعة.')
@@ -107,20 +101,12 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
   return (
     <Sheet
       open={open}
-      title={`طباعة ${kindTitle[kind]}`}
+      title={`معاينة ${kindTitle[kind]}`}
       onClose={onClose}
       closeLabel="إغلاق"
       footer={
         <div className="rpm-actions-row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={loading || !dirty}
-            onClick={() => setBodyHtml(baselineBody)}
-          >
-            استعادة القالب
-          </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>إلغاء</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>إغلاق</Button>
           <Button type="button" loading={printing} disabled={loading || !payload} onClick={() => void handlePrint()}>
             طباعة
           </Button>
@@ -134,54 +120,34 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
       ) : (
         <div className="rpm-stack" style={{ gap: '0.85rem' }}>
           <p className="muted" style={{ margin: 0 }}>
-            البيانات تُملأ تلقائياً من العقد. يمكنك تعديل النص لهذا العقد فقط قبل الطباعة — التعديل لا يغيّر القالب العام في الإعدادات.
-            {dirty ? ' · تم تعديل النسخة الحالية.' : ''}
+            معاينة المستند بعد تعبئة بيانات العقد. لتعديل القالب العام استخدم الإعدادات.
           </p>
 
-          <div className="rpm-actions-row" style={{ gap: '0.5rem' }}>
-            <Button
-              type="button"
-              size="sm"
-              variant={showSource ? 'secondary' : 'primary'}
-              onClick={() => setShowSource(false)}
-            >
-              معاينة
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={showSource ? 'primary' : 'secondary'}
-              onClick={() => setShowSource(true)}
-            >
-              تعديل النص
-            </Button>
-          </div>
-
-          {showSource ? (
-            <TextAreaField
-              label="نص المستند (قابل للتعديل لهذه الطباعة فقط)"
-              value={bodyHtml}
-              onChange={(e) => setBodyHtml(e.target.value)}
-              hint="أضف أو احذف أو عدّل أي بند أو بيان لهذا العميل فقط، ثم اضغط طباعة."
-              rows={18}
-            />
-          ) : (
-            <div
+          <div
+            className="rpm-print-preview"
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              overflow: 'auto',
+              background: '#fff',
+              minHeight: 280,
+              maxInlineSize: '100%',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            <iframe
+              title="معاينة الطباعة"
+              srcDoc={previewHtml}
               style={{
-                border: '1px solid var(--border)',
-                borderRadius: 12,
-                overflow: 'hidden',
+                width: '100%',
+                minHeight: 'min(70vh, 720px)',
+                height: '70vh',
+                border: 0,
                 background: '#fff',
-                minHeight: 320,
+                display: 'block',
               }}
-            >
-              <iframe
-                title="معاينة الطباعة"
-                srcDoc={previewHtml}
-                style={{ width: '100%', height: '70vh', border: 0, background: '#fff' }}
-              />
-            </div>
-          )}
+            />
+          </div>
         </div>
       )}
     </Sheet>

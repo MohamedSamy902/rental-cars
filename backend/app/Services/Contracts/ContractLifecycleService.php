@@ -301,56 +301,13 @@ class ContractLifecycleService
     }
 
     /**
-     * تعديل أسعار بعد الاعتماد — يتطلب صلاحية contracts_price.override.
+     * تعديل أسعار بعد الإنشاء — موقوف: لا يُسمح بتعديل حقول العقد المالية بعد الإنشاء.
      *
      * @param  array<string, mixed>  $data
      */
     public function updateFrozenPricing(Contract $contract, array $data, ?int $userId = null): Contract
     {
-        return DB::transaction(function () use ($contract, $data, $userId) {
-            /** @var Contract $locked */
-            $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
-            if (! in_array($locked->status, ['approved', 'active'], true)) {
-                throw new DomainException('تعديل الأسعار متاح للعقود المعتمدة أو النشطة فقط.');
-            }
-
-            $before = [
-                'frozen_daily_rate' => $locked->frozen_daily_rate,
-                'frozen_daily_km_allowance' => $locked->frozen_daily_km_allowance,
-                'frozen_excess_km_rate' => $locked->frozen_excess_km_rate,
-                'frozen_agreed_deposit' => $locked->frozen_agreed_deposit,
-                'discount' => $locked->discount,
-                'other_fees' => $locked->other_fees,
-            ];
-
-            $locked->fill([
-                'frozen_daily_rate' => $data['daily_rate'] ?? $locked->frozen_daily_rate,
-                'frozen_daily_km_allowance' => $data['daily_km_allowance'] ?? $locked->frozen_daily_km_allowance,
-                'frozen_excess_km_rate' => $data['excess_km_rate'] ?? $locked->frozen_excess_km_rate,
-                'frozen_agreed_deposit' => $data['deposit'] ?? $locked->frozen_agreed_deposit,
-                'discount' => $data['discount'] ?? $locked->discount,
-                'other_fees' => $data['other_fees'] ?? $locked->other_fees,
-                'other_fees_description' => $data['other_fees_description'] ?? $locked->other_fees_description,
-            ])->save();
-
-            AuditLog::query()->create([
-                'user_id' => $userId,
-                'action' => 'price_override',
-                'record_type' => Contract::class,
-                'record_id' => $locked->id,
-                'before' => $before,
-                'after' => [
-                    'frozen_daily_rate' => $locked->frozen_daily_rate,
-                    'frozen_daily_km_allowance' => $locked->frozen_daily_km_allowance,
-                    'frozen_excess_km_rate' => $locked->frozen_excess_km_rate,
-                    'frozen_agreed_deposit' => $locked->frozen_agreed_deposit,
-                    'discount' => $locked->discount,
-                    'other_fees' => $locked->other_fees,
-                ],
-            ]);
-
-            return $locked->fresh(['customer', 'vehicle', 'deposit']);
-        });
+        throw new DomainException('لا يمكن تعديل أسعار العقد بعد الإنشاء.');
     }
 
     /**

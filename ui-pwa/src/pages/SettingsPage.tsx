@@ -105,12 +105,14 @@ export function SettingsPage() {
 
   if (!data) return <SkeletonBlock rows={5} />
 
+  const canEditSettings = can('settings.update') || isIntegrator
+
   return (
     <div className="rpm-stack">
       <PageHeader
         title="الإعدادات"
         subtitle="إعدادات التشغيل اليومية للمعرض"
-        action={<Button loading={saving} onClick={() => void save()}>حفظ</Button>}
+        action={canEditSettings ? <Button loading={saving} onClick={() => void save()}>حفظ</Button> : null}
       />
 
       <section className="rpm-panel">
@@ -132,10 +134,11 @@ export function SettingsPage() {
         </div>
       </section>
 
+      {canEditSettings ? (
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>قالب وبنود العقد والطباعة</h3></div>
         <p className="muted" style={{ marginBlockEnd: '0.75rem' }}>
-          بيانات ترويسة عقد الإيجار المطبوع (الشركة · المفوض · السجل). البنود القانونية الأحد عشر تُعدَّل من «قوالب العقود والمستندات» أدناه، ويمكن تعديل نسخة عقد واحد فقط قبل الطباعة دون تغيير القالب.
+          بيانات ترويسة عقد الإيجار المطبوع (الشركة · المفوض · السجل). البنود القانونية تُعدَّل من «قوالب العقود والمستندات» أدناه بواسطة من يملك صلاحية تعديل الإعدادات فقط.
         </p>
         <div className="rpm-form-grid">
           <TextField label="اسم الشركة على المطبوعات" value={centerName} onChange={(e) => setCenterName(e.target.value)} />
@@ -149,7 +152,7 @@ export function SettingsPage() {
             label="قيمة السيارة الافتراضية في العقد (ج.م)"
             value={defaultVehicleValue}
             onChange={(e) => setDefaultVehicleValue(e.target.value)}
-            hint="تُملأ في البند السادس؛ يمكن تعديلها لعقد واحد قبل الطباعة"
+            hint="تُملأ في بنود العقد المطبوع من القالب"
           />
           <MediaUpload
             label="شعار الشركة على المطبوعات"
@@ -163,7 +166,7 @@ export function SettingsPage() {
             label="بنود إضافية اختيارية"
             value={contractTerms}
             onChange={(e) => setContractTerms(e.target.value)}
-            hint="نص حر يُلحق بعد البنود الأحد عشر في القالب الافتراضي (اختياري)"
+            hint="نص حر يُلحق بعد البنود في القالب الافتراضي (اختياري)"
           />
           <TextAreaField
             label="ملاحظات التذييل"
@@ -173,13 +176,23 @@ export function SettingsPage() {
           />
         </div>
       </section>
+      ) : (
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>الطباعة</h3></div>
+        <p className="muted" style={{ margin: 0 }}>
+          معاينة وطباعة العقود تتم من شاشة العقد. تعديل قوالب المستندات متاح لمن يملك صلاحية تعديل الإعدادات فقط.
+        </p>
+      </section>
+      )}
 
+      {canEditSettings ? (
       <section className="rpm-stack" style={{ gap: '0.75rem' }}>
         <header className="rpm-panel__head" style={{ margin: 0 }}>
           <h3 style={{ margin: 0 }}>قوالب العقود والمستندات</h3>
         </header>
         <DocumentTemplatesPanel />
       </section>
+      ) : null}
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>التشغيل والعقود</h3></div>

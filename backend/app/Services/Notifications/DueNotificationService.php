@@ -5,9 +5,7 @@ namespace App\Services\Notifications;
 use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\Deposit;
-use App\Models\Employee;
 use App\Models\EmployeeAssignment;
-use App\Models\Evaluation;
 use App\Models\InventoryItem;
 use App\Models\NotificationReminder;
 use App\Models\Payment;
@@ -112,7 +110,6 @@ class DueNotificationService
             $this->consumableAlerts($scanned),
             $this->tireAndBatteryAlerts($scanned),
             $this->assignmentAlerts($scanned),
-            $this->evaluationAlerts($scanned),
         );
     }
 
@@ -1047,44 +1044,6 @@ class DueNotificationService
                 linkType: 'employee',
                 linkId: (int) $assignment->employee_id,
                 permissions: ['hr.view', 'hr.custody'],
-            );
-        }
-
-        return $alerts;
-    }
-
-    /**
-     * تقييم معلّق = موظف على رأس العمل بلا أي تقييم مسجّل.
-     * الفترة في الشاشة نص حر، فلا تُفترض دورة شهرية حتى لا يتكرر التنبيه بلا حالة معلّقة.
-     *
-     * @param  list<string>  $scanned
-     * @return list<DueAlert>
-     */
-    private function evaluationAlerts(array &$scanned): array
-    {
-        if (! Schema::hasTable('employees') || ! Schema::hasTable('evaluations')) {
-            return [];
-        }
-
-        $this->mark($scanned, 'evaluation_due');
-
-        $done = Evaluation::query()->pluck('employee_id')->map(fn ($id) => (int) $id)->unique()->all();
-        $employees = Employee::query()
-            ->where('status', 'active')
-            ->when($done !== [], fn ($query) => $query->whereNotIn('id', $done))
-            ->get();
-
-        $alerts = [];
-        foreach ($employees as $employee) {
-            $alerts[] = new DueAlert(
-                ruleKey: 'evaluation_due',
-                subjectType: 'employee',
-                subjectId: (int) $employee->id,
-                title: "تقييم معلّق: {$employee->name}",
-                body: 'لا يوجد تقييم مسجّل لهذا الموظف.',
-                linkType: 'employee',
-                linkId: (int) $employee->id,
-                permissions: ['hr.view'],
             );
         }
 

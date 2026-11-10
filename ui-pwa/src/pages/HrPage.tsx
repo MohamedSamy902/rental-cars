@@ -6,7 +6,7 @@ import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  PageHeader, FilterBar, Button, Sheet, NumberField, TextAreaField, SelectField, MoneyField, TextField,
+  PageHeader, FilterBar, Button, Sheet, TextAreaField, SelectField, MoneyField, TextField,
   useToast, EmptyState, SkeletonBlock, StatusPill, MetricCardGrid,
   IconBriefcase, IconWallet, IconCash, IconTrend,
 } from '@/shared/ui'
@@ -35,14 +35,6 @@ type Payroll = {
   status: string
   total_amount: number
   lines?: Line[]
-}
-
-type Evaluation = {
-  id: number
-  score: number
-  period?: string | null
-  notes?: string | null
-  employee?: { name: string }
 }
 
 type Advance = {
@@ -83,11 +75,20 @@ const ASSIGNABLE_TYPE_LABELS: Record<string, string> = {
   car: 'عربية خدمة',
   petty_cash: 'عهدة نقدية',
   customer: 'مستند / بيانات عميل',
+  InventoryItem: 'قطعة مخزون',
+  'App\\Models\\InventoryItem': 'قطعة مخزون',
+  Vehicle: 'عربية خدمة',
+  'App\\Models\\Vehicle': 'عربية خدمة',
+  PettyCashAccount: 'عهدة نقدية',
+  'App\\Models\\PettyCashAccount': 'عهدة نقدية',
 }
 
 function assignableTypeLabel(raw?: string | null): string {
   const key = (raw || 'manual').trim()
-  return ASSIGNABLE_TYPE_LABELS[key] || key
+  if (ASSIGNABLE_TYPE_LABELS[key]) return ASSIGNABLE_TYPE_LABELS[key]
+  const base = key.includes('\\') ? key.split('\\').pop()! : key.includes('/') ? key.split('/').pop()! : key
+  if (base && ASSIGNABLE_TYPE_LABELS[base]) return ASSIGNABLE_TYPE_LABELS[base]
+  return 'تسليم عهدة'
 }
 
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -96,7 +97,7 @@ function periodLabel(year: number, month: number) {
   return `${monthNames[month - 1] ?? month} ${year}`
 }
 
-const HrPageTabs = ['all', 'advances', 'payroll', 'custody', 'evals'] as const
+const HrPageTabs = ['all', 'advances', 'payroll', 'custody'] as const
 
 export function HrPage() {
   const toast = useToast()
@@ -107,18 +108,15 @@ export function HrPage() {
   const canCustody = can('hr.custody') || can('hr.view')
   const now = useMemo(() => new Date(), [])
   const [payrolls, setPayrolls] = useState<Payroll[]>([])
-  const [evals, setEvals] = useState<Evaluation[]>([])
   const [employees, setEmployees] = useState<{ id: number; name: string }[]>([])
   const [advances, setAdvances] = useState<Advance[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [pettyByEmployee, setPettyByEmployee] = useState<Record<number, PettyCashAccount>>({})
   const [loading, setLoading] = useState(true)
-  const [evalOpen, setEvalOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
   const [payoutLine, setPayoutLine] = useState<Line | null>(null)
   const [saving, setSaving] = useState(false)
-  const [evalForm, setEvalForm] = useState({ employee_id: '', score: '4', period: '', notes: '' })
   const [advanceForm, setAdvanceForm] = useState({
     employee_id: '', amount: '', advanced_on: todayCivilIso(), method: 'cash', notes: '',
   })
@@ -141,9 +139,6 @@ export function HrPage() {
           api<{ data: Payroll[] }>('/payroll').then((p) => { setPayrolls(p.data) }).catch(() => { setPayrolls([]) }),
         )
       }
-      tasks.push(
-        api<{ data: Evaluation[] }>('/evaluations').then((e) => { setEvals(e.data) }).catch(() => { setEvals([]) }),
-      )
       if (canAdvances || canSalaries) {
         tasks.push(
           api<{ data: Advance[] }>(`/salary-advances?year=${now.getFullYear()}&month=${now.getMonth() + 1}`)
@@ -201,27 +196,6 @@ export function HrPage() {
     }
   }
 
-  async function saveEval() {
-    setSaving(true)
-    try {
-      await api('/evaluations', {
-        method: 'POST',
-        json: {
-          employee_id: Number(evalForm.employee_id),
-          score: Number(evalForm.score),
-          period: evalForm.period || undefined,
-          notes: evalForm.notes || undefined,
-        },
-      })
-      toast.success('تم حفظ التقييم.')
-      setEvalOpen(false)
-      await load()
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   async function saveAdvance() {
     setSaving(true)
@@ -365,7 +339,6 @@ export function HrPage() {
         attention: pendingAck > 0 ? ('critical' as const) : null,
         attentionLabel: 'بانتظار تأكيد استلام الأدمن',
       }] : []),
-      { id: 'evals', label: 'التقييمات' },
     ],
     [stats.advanceCount, stats.draftCount, stats.remaining, canAdvances, canSalaries, canCustody, pendingAck],
   )
@@ -374,12 +347,11 @@ export function HrPage() {
     <div className="rpm-stack hr-page">
       <PageHeader
         title="الموارد البشرية"
-        subtitle="سلف · كشف الرواتب · تسليم العهد والأصول · التقييمات"
+        subtitle="سلف · كشف الرواتب · تسليم العهد والأصول"
         action={
           <>
             {canAdvances ? <Button variant="secondary" onClick={() => setAdvanceOpen(true)}>سلفة</Button> : null}
             {canCustody ? <Button variant="secondary" onClick={() => setAssignOpen(true)}>تسليم عهدة</Button> : null}
-            <Button variant="secondary" onClick={() => setEvalOpen(true)}>تقييم</Button>
             {canSalaries ? <Button onClick={() => void draftPayroll()}>إعداد رواتب الشهر</Button> : null}
           </>
         }
@@ -557,27 +529,6 @@ export function HrPage() {
       </section>
       ) : null}
 
-      {chip === 'all' || chip === 'evals' ? (
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>التقييمات</h3></div>
-        <div className="rpm-card-list">
-          {evals.map((ev) => (
-            <article key={ev.id} className="rpm-card hr-card">
-              <div className="rpm-card__row"><strong>{ev.employee?.name || '—'}</strong><span>{ev.score}/5</span></div>
-              <p className="muted">{ev.period || '—'} · {ev.notes || ''}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-      ) : null}
-
-      <Sheet open={evalOpen} title="تقييم موظف" onClose={() => setEvalOpen(false)} footer={<><Button loading={saving} onClick={() => void saveEval()}>حفظ</Button><Button variant="secondary" onClick={() => setEvalOpen(false)}>إلغاء</Button></>}>
-        <div className="rpm-form-grid">
-          <SelectField label="الموظف" required value={evalForm.employee_id} onChange={(e) => setEvalForm({ ...evalForm, employee_id: e.target.value })} options={employees.map((e) => ({ value: String(e.id), label: e.name }))} />
-          <NumberField label="الدرجة (1-5)" required value={evalForm.score} onChange={(e) => setEvalForm({ ...evalForm, score: e.target.value })} />
-          <TextAreaField label="ملاحظات" value={evalForm.notes} onChange={(e) => setEvalForm({ ...evalForm, notes: e.target.value })} />
-        </div>
-      </Sheet>
 
       <Sheet open={advanceOpen} title="تسجيل سلفة" onClose={() => setAdvanceOpen(false)} footer={<><Button loading={saving} onClick={() => void saveAdvance()}>حفظ السلفة</Button><Button variant="secondary" onClick={() => setAdvanceOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">

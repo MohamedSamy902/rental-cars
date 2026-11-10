@@ -4,9 +4,9 @@ import { api, type ApiError } from '@/shared/api/client'
 import { civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import {
-  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, NumberField, SelectField, SwitchField,
+  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, SwitchField,
   useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid,
-  IconWallet, IconCash, IconTrend, IconBadge,
+  IconWallet, IconCash, IconTrend,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -59,12 +59,6 @@ type PettyCash = {
   is_active: boolean
 } | null
 
-type Evaluation = {
-  id: number
-  score: number
-  period?: string | null
-  notes?: string | null
-}
 
 type PayrollRow = {
   id: number
@@ -83,7 +77,6 @@ type Dossier = {
   advances: Advance[]
   assignments: Assignment[]
   petty_cash: PettyCash
-  evaluations: Evaluation[]
   payroll_history: PayrollRow[]
 }
 
@@ -98,7 +91,6 @@ export function EmployeeDetailPage() {
   const [accountOpen, setAccountOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
-  const [evalOpen, setEvalOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', job_title: '', hired_on: '', base_salary: '', status: 'active' })
@@ -107,7 +99,6 @@ export function EmployeeDetailPage() {
   const [passwordForm, setPasswordForm] = useState({ password: '', password_confirmation: '' })
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
   const [advanceForm, setAdvanceForm] = useState({ amount: '', advanced_on: todayCivilIso(), method: 'cash', notes: '' })
-  const [evalForm, setEvalForm] = useState({ score: '5', period: '', notes: '' })
   const [assignForm, setAssignForm] = useState({ notes: '', handed_on: todayCivilIso() })
 
   async function load() {
@@ -251,29 +242,6 @@ export function EmployeeDetailPage() {
     }
   }
 
-  async function saveEval() {
-    if (!data) return
-    setSaving(true)
-    try {
-      await api('/evaluations', {
-        method: 'POST',
-        json: {
-          employee_id: data.employee.id,
-          score: Number(evalForm.score),
-          period: evalForm.period || null,
-          notes: evalForm.notes || null,
-        },
-      })
-      toast.success('تم تسجيل التقييم.')
-      setEvalOpen(false)
-      setEvalForm({ score: '5', period: '', notes: '' })
-      await load()
-    } catch (e) {
-      toast.error((e as ApiError).message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   async function saveAssignment() {
     if (!data) return
@@ -318,7 +286,7 @@ export function EmployeeDetailPage() {
     )
   }
 
-  const { employee: emp, user, advances, assignments, petty_cash: petty, evaluations, payroll_history: payroll } = data
+  const { employee: emp, user, advances, assignments, petty_cash: petty, payroll_history: payroll } = data
   const openAdvances = advances.reduce((s, a) => s + Number(a.amount || 0), 0)
 
   return (
@@ -331,7 +299,6 @@ export function EmployeeDetailPage() {
             <BackNavButton to="/staff" label="رجوع للموظفين" />
             <Button variant="secondary" onClick={() => setEditOpen(true)}>تعديل الموظف</Button>
             <Button variant="secondary" onClick={() => setAdvanceOpen(true)}>إضافة سلفة</Button>
-            <Button variant="secondary" onClick={() => setEvalOpen(true)}>تسجيل تقييم</Button>
             <Button onClick={() => setAssignOpen(true)}>تسليم عهدة</Button>
           </>
         }
@@ -343,7 +310,6 @@ export function EmployeeDetailPage() {
           { id: 'salary', label: 'الراتب الأساسي', value: emp.base_salary, format: 'money', icon: <IconCash size={16} /> },
           { id: 'advances', label: 'سلف مفتوحة', value: openAdvances, format: 'money', tone: openAdvances > 0 ? 'warning' : 'success', icon: <IconTrend size={16} /> },
           { id: 'petty', label: 'رصيد العهدة', value: petty?.balance ?? 0, format: 'money', icon: <IconWallet size={16} /> },
-          { id: 'evals', label: 'عدد التقييمات', value: evaluations.length, icon: <IconBadge size={16} /> },
         ]}
       />
 
@@ -481,22 +447,6 @@ export function EmployeeDetailPage() {
         )}
       </section>
 
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>التقييمات</h3></div>
-        {evaluations.length === 0 ? <p className="muted">لا تقييمات بعد.</p> : (
-          <div className="rpm-card-list">
-            {evaluations.map((ev) => (
-              <article key={ev.id} className="rpm-card">
-                <div className="rpm-card__row">
-                  <strong>درجة {ev.score}</strong>
-                  <span className="muted">{ev.period || '—'}</span>
-                </div>
-                {ev.notes ? <p className="muted">{ev.notes}</p> : null}
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
 
       <Sheet
         open={editOpen}
@@ -606,18 +556,6 @@ export function EmployeeDetailPage() {
         </div>
       </Sheet>
 
-      <Sheet
-        open={evalOpen}
-        title="تسجيل تقييم"
-        onClose={() => setEvalOpen(false)}
-        footer={<><Button loading={saving} onClick={() => void saveEval()}>حفظ</Button><Button variant="secondary" onClick={() => setEvalOpen(false)}>إلغاء</Button></>}
-      >
-        <div className="rpm-form-grid">
-          <NumberField label="الدرجة (1-5)" required min={1} max={5} value={evalForm.score} onChange={(e) => setEvalForm({ ...evalForm, score: e.target.value })} />
-          <TextField label="الفترة" value={evalForm.period} onChange={(e) => setEvalForm({ ...evalForm, period: e.target.value })} hint="مثال: Q1 2026" />
-          <TextAreaField label="ملاحظات" value={evalForm.notes} onChange={(e) => setEvalForm({ ...evalForm, notes: e.target.value })} />
-        </div>
-      </Sheet>
 
       <Sheet
         open={assignOpen}

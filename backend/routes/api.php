@@ -65,13 +65,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::put('/integrator/tenant', [OperationsController::class, 'updateIntegrator'])
         ->middleware('integrator');
 
-    // Document print templates (RSD §١٧) — view for settings/print consumers; mutate for admins.
+    // Document print templates — raw content only for settings.update (print uses filled /contracts/{id}/print).
     Route::get('/document-templates', [DocumentTemplateController::class, 'index'])
-        ->middleware('permission:settings.view|settings.update|contracts.print');
+        ->middleware('permission:settings.update');
     Route::post('/document-templates', [DocumentTemplateController::class, 'store'])
         ->middleware('permission:settings.update');
     Route::post('/document-templates/preview', [DocumentTemplateController::class, 'preview'])
-        ->middleware('permission:settings.view|settings.update');
+        ->middleware('permission:settings.update');
 
     Route::middleware('permission:staff.view')->group(function () {
         Route::get('/staff', [StaffController::class, 'index']);
@@ -170,7 +170,6 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/contracts', [ContractController::class, 'store'])->middleware('permission:contracts.create');
     Route::get('/contracts/{contract}', [ContractController::class, 'show'])->middleware('permission:contracts.view');
     Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve'])->middleware('permission:contracts.approve');
-    Route::post('/contracts/{contract}/pricing', [ContractController::class, 'updatePricing'])->middleware('permission:contracts_price.override');
     Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->middleware('permission:contracts_cancel.approve');
@@ -255,9 +254,6 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/chat', [CollaborationController::class, 'chatIndex'])->middleware('permission:chat.view');
         Route::post('/chat', [CollaborationController::class, 'chatStore'])->middleware('permission:chat.create');
     });
-    Route::middleware(['feature:evaluations', 'permission:hr.view'])->get('/evaluations', [CollaborationController::class, 'evaluationsIndex']);
-    Route::middleware(['feature:evaluations', 'permission:hr.create'])->post('/evaluations', [CollaborationController::class, 'evaluationsStore']);
-
     Route::post('/ocr/review', [CollaborationController::class, 'ocrReview'])
         ->middleware('permission:customers.create,customers.update');
 

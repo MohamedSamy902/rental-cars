@@ -227,7 +227,7 @@ export function AuditLogsPage() {
                     || r.user_name
                     || (r.user_id ? `مستخدم #${r.user_id}` : 'النظام')}
                 </span>
-                {r.action ? <span className="audit-log-card__action">{r.action}</span> : null}
+                {!r.summary && r.action ? <span className="audit-log-card__action">{r.action}</span> : null}
               </div>
             </article>
           ))}
