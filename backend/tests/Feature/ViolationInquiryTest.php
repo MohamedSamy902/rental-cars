@@ -11,6 +11,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleOwner;
 use App\Models\VehicleViolationInquiry;
 use App\Services\Accounting\AccountingService;
+use App\Services\Violations\ViolationInquiryService;
 use App\Support\PermissionCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -108,14 +109,17 @@ class ViolationInquiryTest extends TestCase
         ]);
     }
 
-    public function test_pending_list_and_mark_resets_daily(): void
+    public function test_pending_list_mark_and_sticky_until_reset(): void
     {
+        $this->assertFalse(ViolationInquiryService::AUTO_DAILY_RESET);
+
         $pending = $this->getJson('/api/violation-inquiries?filter=pending')
             ->assertOk()
             ->json('data');
         $ids = collect($pending)->pluck('vehicle_id')->all();
         $this->assertContains($this->vehicle->id, $ids);
         $this->assertContains($this->rented->id, $ids);
+        $this->assertFalse($this->getJson('/api/violation-inquiries?filter=pending')->json('meta.auto_daily_reset'));
 
         $this->postJson("/api/violation-inquiries/{$this->vehicle->id}/mark")
             ->assertOk()
@@ -141,7 +145,7 @@ class ViolationInquiryTest extends TestCase
             ->all();
         $this->assertContains($this->vehicle->id, $done);
 
-        // يوم سابق لا يمنع ظهور العربية كبانتظار اليوم
+        // مع إيقاف الإرجاع اليومي: علامة يوم سابق تُبقي العربية خارج «لم يُستعلم»
         VehicleViolationInquiry::query()->where('vehicle_id', $this->rented->id)->delete();
         VehicleViolationInquiry::query()->create([
             'vehicle_id' => $this->rented->id,
@@ -151,7 +155,16 @@ class ViolationInquiryTest extends TestCase
         $stillPending = collect($this->getJson('/api/violation-inquiries?filter=pending')->json('data'))
             ->pluck('vehicle_id')
             ->all();
-        $this->assertContains($this->rented->id, $stillPending);
+        $this->assertNotContains($this->rented->id, $stillPending);
+
+        $reset = $this->postJson('/api/violation-inquiries/reset-all')->assertOk()->json('data');
+        $this->assertGreaterThanOrEqual(2, (int) $reset['cleared']);
+
+        $pendingAgain = collect($this->getJson('/api/violation-inquiries?filter=pending')->json('data'))
+            ->pluck('vehicle_id')
+            ->all();
+        $this->assertContains($this->vehicle->id, $pendingAgain);
+        $this->assertContains($this->rented->id, $pendingAgain);
     }
 
     public function test_rented_today_filter(): void
@@ -167,7 +180,6 @@ class ViolationInquiryTest extends TestCase
     {
         $role = Role::query()->where('name', 'sales')->firstOrFail();
         $sales = User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
-        // امنح عرض المخالفات فقط
         $permIds = \App\Models\Permission::query()
             ->whereIn('key', ['violations.view', 'violations.update'])
             ->pluck('id');

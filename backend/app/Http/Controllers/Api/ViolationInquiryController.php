@@ -47,7 +47,23 @@ class ViolationInquiryController extends Controller
 
         return response()->json([
             'data' => $row,
-            'message' => 'تم تسجيل الاستعلام لليوم.',
+            'message' => ViolationInquiryService::AUTO_DAILY_RESET
+                ? 'تم تسجيل الاستعلام لليوم.'
+                : 'تم تسجيل الاستعلام.',
+        ]);
+    }
+
+    public function resetAll(Request $request): JsonResponse
+    {
+        abort_unless($request->user() !== null, 401);
+
+        $result = $this->inquiries->resetAll();
+
+        return response()->json([
+            'data' => $result,
+            'message' => $result['cleared'] > 0
+                ? "أُعيد {$result['cleared']} لوحة لبانتظار الاستعلام."
+                : 'لا علامات استعلام لإعادتها.',
         ]);
     }
 }

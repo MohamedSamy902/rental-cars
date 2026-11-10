@@ -54,7 +54,7 @@ function contractLabel(c: ContractOption): string {
 }
 
 const statusLabel: Record<string, string> = {
-  new: 'جديدة', assigned: 'مسندة', confirmed: 'مؤكّد السداد', paid: 'مدفوعة للجهة',
+  new: 'جديدة', assigned: 'مسندة', confirmed: 'تم السداد', paid: 'مدفوعة للجهة',
 }
 
 const emptyForm = () => ({
@@ -354,18 +354,21 @@ export function ViolationsPage() {
             />
           ))}
           {editing ? (
-            <SelectField
-              label="الحالة"
-              value={form.status}
-              error={fieldErrors.status}
-              options={[
-                { value: 'new', label: statusLabel.new },
-                { value: 'assigned', label: statusLabel.assigned },
-                { value: 'confirmed', label: statusLabel.confirmed },
-                { value: 'paid', label: statusLabel.paid },
-              ]}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
-            />
+            <>
+              <SelectField
+                label="الحالة"
+                value={form.status}
+                error={fieldErrors.status}
+                options={[
+                  { value: 'new', label: statusLabel.new },
+                  { value: 'assigned', label: statusLabel.assigned },
+                  { value: 'confirmed', label: statusLabel.confirmed },
+                  { value: 'paid', label: statusLabel.paid },
+                ]}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                hint="تم السداد = العميل سدّد للمركز · مدفوعة للجهة = سُدّدت للمخالفات/المرور"
+              />
+            </>
           ) : null}
           {editing?.created_by_name || editing?.creator?.name ? (
             <p className="muted" style={{ margin: 0 }}>رفعها: {editing.created_by_name || editing.creator?.name}</p>

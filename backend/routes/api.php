@@ -248,6 +248,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment'])->middleware('permission:violations.update');
 
     Route::get('/violation-inquiries', [ViolationInquiryController::class, 'index'])->middleware('permission:violations.view');
+    Route::post('/violation-inquiries/reset-all', [ViolationInquiryController::class, 'resetAll'])->middleware('permission:violations.update');
     Route::post('/violation-inquiries/{vehicle}/mark', [ViolationInquiryController::class, 'mark'])->middleware('permission:violations.update');
 
     Route::middleware(['feature:chat'])->group(function () {

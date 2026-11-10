@@ -10,20 +10,26 @@ use Illuminate\Support\Carbon;
 
 /**
  * قائمة استعلام المخالفات اليومي على لوحات الأسطول — بلا ترحيل محاسبي.
+ *
+ * ملاحظة موقّتة: AUTO_DAILY_RESET=false يوقف اعتبار «يوم جديد = إعادة الكل للانتظار»؛
+ * الاستعلام يبقى حتى POST reset-all. لا يوجد كرون جوب لهذا السلوك — كان تاريخيّاً فقط.
  */
 class ViolationInquiryService
 {
     /**
-     * @return array{data: list<array<string, mixed>>, meta: array<string, int>}
+     * عند true: تعليم يوم سابق لا يغني عن اليوم (سلوك RSD الأصلي).
+     * موقّت false: العلامة تبقى عبر الأيام حتى إعادة يدوية.
+     */
+    public const AUTO_DAILY_RESET = false;
+
+    /**
+     * @return array{data: list<array<string, mixed>>, meta: array<string, mixed>}
      */
     public function list(string $filter, ?string $search, bool $canViewNationalId, ?Carbon $on = null): array
     {
         $day = ($on ?? now())->toDateString();
 
-        $inquiredIds = VehicleViolationInquiry::query()
-            ->whereDate('inquired_on', $day)
-            ->pluck('vehicle_id')
-            ->all();
+        $inquiredIds = $this->inquiredVehicleIds($day);
 
         $rentedIds = Contract::query()
             ->where('status', 'active')
@@ -66,15 +72,9 @@ class ViolationInquiryService
 
         $vehicles = $q->get();
 
-        $inquiryByVehicle = VehicleViolationInquiry::query()
-            ->with('inquirer:id,name')
-            ->whereDate('inquired_on', $day)
-            ->whereIn('vehicle_id', $vehicles->pluck('id')->all() ?: [0])
-            ->get()
-            ->keyBy('vehicle_id');
+        $inquiryByVehicle = $this->latestInquiriesFor($vehicles->pluck('id')->all() ?: [0], $day);
 
         $rentedSet = array_fill_keys($rentedIds, true);
-        $inquiredSet = array_fill_keys($inquiredIds, true);
 
         $data = $vehicles->map(function (Vehicle $v) use ($canViewNationalId, $inquiryByVehicle, $rentedSet, $day) {
             $inquiry = $inquiryByVehicle->get($v->id);
@@ -92,7 +92,7 @@ class ViolationInquiryService
                 'owner_national_id' => $this->maskNationalId($owner?->national_id, $canViewNationalId),
                 'rented_today' => isset($rentedSet[$v->id]),
                 'inquired_today' => $inquiry !== null,
-                'inquired_on' => $day,
+                'inquired_on' => $inquiry?->inquired_on?->toDateString() ?? $day,
                 'inquired_by' => $inquiry?->inquired_by,
                 'inquired_by_name' => $inquiry?->inquirer?->name,
                 'inquired_at' => $inquiry?->created_at?->toIso8601String(),
@@ -107,6 +107,7 @@ class ViolationInquiryService
                 'done_today' => count($inquiredIds),
                 'pending' => max(0, Vehicle::query()->where('is_active', true)->count() - count($inquiredIds)),
                 'rented_today' => count($rentedIds),
+                'auto_daily_reset' => self::AUTO_DAILY_RESET,
             ],
         ];
     }
@@ -117,10 +118,17 @@ class ViolationInquiryService
     public function mark(Vehicle $vehicle, User $user, ?string $notes = null, ?Carbon $on = null): array
     {
         $day = ($on ?? now())->toDateString();
-        $already = VehicleViolationInquiry::query()
-            ->where('vehicle_id', $vehicle->id)
-            ->whereDate('inquired_on', $day)
-            ->exists();
+
+        if (self::AUTO_DAILY_RESET) {
+            $already = VehicleViolationInquiry::query()
+                ->where('vehicle_id', $vehicle->id)
+                ->whereDate('inquired_on', $day)
+                ->exists();
+        } else {
+            $already = VehicleViolationInquiry::query()
+                ->where('vehicle_id', $vehicle->id)
+                ->exists();
+        }
         if ($already) {
             throw new \DomainException('تم تسجيل الاستعلام مسبقاً.');
         }
@@ -163,11 +171,63 @@ class ViolationInquiryService
             ),
             'rented_today' => $rentedToday,
             'inquired_today' => true,
-            'inquired_on' => $day,
+            'inquired_on' => $row->inquired_on?->toDateString() ?? $day,
             'inquired_by' => $row->inquired_by,
             'inquired_by_name' => $row->inquirer?->name,
             'inquired_at' => $row->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * يعيد كل اللوحات لبانتظار الاستعلام (يمسح علامات الدورة الحالية).
+     *
+     * @return array{cleared: int, auto_daily_reset: bool}
+     */
+    public function resetAll(?Carbon $on = null): array
+    {
+        $day = ($on ?? now())->toDateString();
+        $q = VehicleViolationInquiry::query();
+        if (self::AUTO_DAILY_RESET) {
+            $q->whereDate('inquired_on', $day);
+        }
+        $cleared = $q->delete();
+
+        return [
+            'cleared' => (int) $cleared,
+            'auto_daily_reset' => self::AUTO_DAILY_RESET,
+        ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function inquiredVehicleIds(string $day): array
+    {
+        $q = VehicleViolationInquiry::query();
+        if (self::AUTO_DAILY_RESET) {
+            $q->whereDate('inquired_on', $day);
+        }
+
+        return $q->pluck('vehicle_id')->unique()->values()->all();
+    }
+
+    /**
+     * @param  list<int>  $vehicleIds
+     * @return \Illuminate\Support\Collection<int, VehicleViolationInquiry>
+     */
+    private function latestInquiriesFor(array $vehicleIds, string $day)
+    {
+        $q = VehicleViolationInquiry::query()
+            ->with('inquirer:id,name')
+            ->whereIn('vehicle_id', $vehicleIds);
+        if (self::AUTO_DAILY_RESET) {
+            $q->whereDate('inquired_on', $day);
+        }
+
+        return $q->orderByDesc('inquired_on')
+            ->get()
+            ->unique('vehicle_id')
+            ->keyBy('vehicle_id');
     }
 
     private function maskNationalId(?string $nid, bool $canView): ?string
