@@ -20,6 +20,10 @@ return [
         'CENTER_PUBLIC_ADDRESS',
         '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة'
     ),
+    'center_public_map_url' => env(
+        'CENTER_PUBLIC_MAP_URL',
+        'https://maps.app.goo.gl/7xn2CMaJ3socdB6r9?g_st=ic'
+    ),
     'center_public_tagline' => env('CENTER_PUBLIC_TAGLINE', 'لخدمات رجال الأعمال'),
 
 ];

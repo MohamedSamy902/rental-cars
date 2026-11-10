@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { BrandLogo, Button, useToast } from '@/shared/ui'
@@ -93,9 +93,18 @@ function AuthInput({ label, icon, type, value, autoComplete, error, onChange, tr
   )
 }
 
+function safeNextPath(raw: string | null): string {
+  if (!raw) return '/'
+  const path = raw.trim()
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) return '/'
+  return path
+}
+
 export function LoginPage() {
   const { user, loading, login } = useAuth()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const nextPath = safeNextPath(params.get('next'))
   const toast = useToast()
   const demo = devDemoPrefill()
   const [loginId, setLoginId] = useState(() => readRememberedLogin() || demo?.login || '')
@@ -106,7 +115,7 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState('')
 
-  if (!loading && user) return <Navigate to="/" replace />
+  if (!loading && user) return <Navigate to={nextPath} replace />
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -117,7 +126,7 @@ export function LoginPage() {
       await login(loginId, password)
       persistRememberedLogin(remember, loginId.trim())
       toast.success('مرحباً بك في آر بي إم')
-      navigate('/')
+      navigate(nextPath)
     } catch (err) {
       const apiErr = err as ApiError
       const topMessage = apiErr.message || 'تعذّر الدخول. تحقق من الموبايل/البريد وكلمة المرور.'

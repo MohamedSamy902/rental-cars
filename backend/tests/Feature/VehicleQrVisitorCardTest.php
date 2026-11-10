@@ -65,6 +65,7 @@ class VehicleQrVisitorCardTest extends TestCase
         $res->assertJsonPath('data.center.name', 'مركز آر بي إم')
             ->assertJsonPath('data.center.phone', '01125253888')
             ->assertJsonPath('data.center.address', 'حدائق حلوان — القاهرة')
+            ->assertJsonPath('data.center.map_url', 'https://maps.app.goo.gl/7xn2CMaJ3socdB6r9?g_st=ic')
             ->assertJsonPath('data.center.tagline', 'لخدمات رجال الأعمال')
             ->assertJsonPath('data.center.social.facebook', 'https://facebook.com/rpm')
             ->assertJsonPath('data.is_rented', false)
