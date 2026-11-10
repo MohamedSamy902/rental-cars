@@ -1255,7 +1255,7 @@ export function VehicleDetailPage() {
             <Fact label="بداية العقد" value={shortDate(v.owner_agreement_starts_on)} />
             <Fact label="نهاية العقد" value={shortDate(v.owner_agreement_ends_on)} />
           </div>
-          <div className="vd-no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBlockStart: '0.75rem' }}>
+          <div className="vd-no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBlockStart: '0.75rem', alignItems: 'center' }}>
             <Button
               size="sm"
               variant="secondary"
@@ -1269,8 +1269,6 @@ export function VehicleDetailPage() {
             >
               طباعة عقد المالك
             </Button>
-            <Link className="rpm-link-btn" to={v.owner ? `/owners/${v.owner.id}` : '/owners'}>{v.owner ? 'ملف المالك' : 'صفحة الملاك'}</Link>
-          <div className="vd-no-print" style={{ marginBlockStart: '0.85rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
             <Link className="rpm-link-btn" to={`/owners/${v.owner.id}`}>ملف المالك</Link>
             {canUpdateVehicle ? (
               <Button size="sm" loading={custodyIssuing} onClick={() => void issueCustodyAgreement()}>

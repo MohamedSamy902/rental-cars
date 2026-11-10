@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
-import { PageHeader, FilterBar, SkeletonBlock, EmptyState, Button, Badge, useToast } from '@/shared/ui'
+import { PageHeader, FilterBar, SkeletonBlock, EmptyState, Button, Badge, useToast, IconChevronDown } from '@/shared/ui'
 import { disableWebPush, enableWebPush, hasLocalPushSubscription, pushSupported, sendTestPush } from '@/shared/push/webPush'
 import './pages.css'
 import './NotificationsPage.css'
@@ -252,14 +252,15 @@ export function NotificationsPage() {
   }, [visibleRows])
 
   const supported = pushSupported()
-  const pushStatusLabel = !supported
+  const otherDevices = deviceOn ? Math.max(0, devices - 1) : devices
+  const pushBadge = !supported
     ? 'غير مدعوم على هذا المتصفح'
     : !pushEnabled
       ? 'السيرفر غير جاهز'
-      : deviceOn
-        ? `مفعّل على هذا الجهاز${devices > 1 ? ` · ${devices} أجهزة للحساب` : ''}`
-        : devices > 0
-          ? `جاهز · ${devices} جهاز آخر على الحساب`
+      : otherDevices > 0
+        ? `أجهزة أخرى مفعلة: ${otherDevices}`
+        : deviceOn
+          ? 'مفعّل على هذا الجهاز'
           : 'جاهز — لم يُفعَّل على هذا الجهاز'
 
   return (
@@ -271,42 +272,55 @@ export function NotificationsPage() {
       />
 
       <section className={`nf-push ${bannerOpen ? 'is-open' : 'is-collapsed'}`.trim()} aria-label="إشعارات الموبايل">
-        <button
-          type="button"
-          className="nf-push__bar"
-          onClick={toggleBanner}
-          aria-expanded={bannerOpen}
-          aria-controls="nf-push-panel"
-        >
-          <span className="nf-push__lead">
+        <div className="nf-push__bar">
+          <div className="nf-push__lead">
             <span className={`nf-push__pulse ${deviceOn ? 'is-on' : ''}`.trim()} aria-hidden />
             <span className="nf-push__title">إشعارات الموبايل</span>
-            <span className="nf-push__status">{pushStatusLabel}</span>
-          </span>
-          <span className="nf-push__chevron" aria-hidden>{bannerOpen ? '⌃' : '⌄'}</span>
-        </button>
+            <span className="nf-push__status">{pushBadge}</span>
+          </div>
+          <div className="nf-push__end">
+            {deviceOn ? (
+              <Button size="sm" variant="secondary" loading={busy} onClick={() => void onDisablePush()}>
+                إيقاف على هذا الجهاز
+              </Button>
+            ) : (
+              <Button size="sm" loading={busy} onClick={() => void onEnablePush()} disabled={!pushEnabled || !supported}>
+                تفعيل على هذا الجهاز
+              </Button>
+            )}
+            <button
+              type="button"
+              className="nf-push__toggle"
+              onClick={toggleBanner}
+              aria-expanded={bannerOpen}
+              aria-controls="nf-push-panel"
+              aria-label={bannerOpen ? 'طي إعدادات الإشعارات' : 'توسيع إعدادات الإشعارات'}
+            >
+              <IconChevronDown size={18} className="nf-push__chevron-icon" />
+            </button>
+          </div>
+        </div>
 
         {bannerOpen ? (
           <div id="nf-push-panel" className="nf-push__panel">
             {!supported ? (
               <p className="nf-push__hint">هذا المتصفح لا يدعم Web Push.</p>
-            ) : null}
-            <div className="nf-push__actions">
-              {deviceOn ? (
-                <Button size="sm" variant="secondary" loading={busy} onClick={() => void onDisablePush()}>
-                  إيقاف على هذا الجهاز
-                </Button>
-              ) : (
-                <Button size="sm" loading={busy} onClick={() => void onEnablePush()} disabled={!pushEnabled || !supported}>
-                  تفعيل على هذا الجهاز
-                </Button>
-              )}
-              {allowTest ? (
+            ) : (
+              <p className="nf-push__hint">
+                {deviceOn
+                  ? 'هذا الجهاز يستقبل إشعارات الدفع. يمكنك إيقافها من الشريط أعلاه أو إرسال تجربة.'
+                  : pushEnabled
+                    ? 'فعّل الإشعارات على هذا الجهاز من الشريط أعلاه لاستقبال التنبيهات فوراً.'
+                    : 'السيرفر غير جاهز لاستقبال اشتراكات الدفع بعد.'}
+              </p>
+            )}
+            {allowTest ? (
+              <div className="nf-push__actions">
                 <Button size="sm" variant="secondary" loading={busy} onClick={() => void onTestPush()}>
                   إرسال تجربة
                 </Button>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>

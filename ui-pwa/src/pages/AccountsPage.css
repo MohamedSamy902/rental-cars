@@ -1,23 +1,78 @@
-.ac-daily__head {
+/* Daily cash movement — consistent vertical rhythm */
+.ac-daily {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
 }
 
-.ac-daily__head .rpm-field {
-  min-width: 11rem;
+.ac-daily__intro {
+  margin: 0;
+  margin-block-end: 4px;
+}
+
+.ac-daily__intro h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ac-daily__intro .muted {
+  margin-block: 0.35rem 0;
+}
+
+.ac-daily__date {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 0;
+}
+
+.ac-daily__date .rpm-field {
+  min-width: min(100%, 14rem);
+  max-width: 18rem;
+  margin: 0;
+  gap: 6px;
+}
+
+.ac-daily__kpis.rpm-metrics,
+.ac-daily__kpis.rpm-metrics--wrap {
+  gap: 12px;
+}
+
+.ac-daily__empty {
   margin: 0;
 }
 
+.ac-daily__entries {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .ac-daily__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm, 12px);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   text-decoration: none;
   color: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .ac-daily__row:hover {
   background: var(--surface-hover, color-mix(in srgb, var(--brand) 6%, transparent));
+  border-color: var(--border-strong);
+}
+
+.ac-daily__row .muted {
+  margin-block: 0.2rem 0;
 }
 
 .ac-months {
