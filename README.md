@@ -182,39 +182,25 @@ bash scripts/deploy-cpanel-ssh.sh
 
 ---
 
-## ٤) CI / CD (GitHub Actions)
+## ٤) CI / CD — نشر تلقائي من `main`
 
-| Workflow | الملف | ماذا يفعل |
-|----------|--------|-----------|
-| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | PHPUnit + Lint + Build · وعلى `main` يصدر Artifact كامل `rpm-cpanel-full` |
-| **Deploy · cPanel** | [`.github/workflows/deploy-cpanel.yml`](.github/workflows/deploy-cpanel.yml) | نشر يدوي (`confirm=deploy`) عبر **SSH rsync للفرونت والباك** |
+| الجزء | أين يُنشر | متى |
+|--------|-----------|-----|
+| **فرونت** | Vercel (`ui-pwa`) | تلقائي عند push على `main` (ربط GitHub في Vercel) |
+| **باك / API** | cPanel `~/rpm` + `public_html` | تلقائي عبر [`.github/workflows/deploy-cpanel.yml`](.github/workflows/deploy-cpanel.yml) عند push على `main` |
 
-### أسرار النشر (Settings → Secrets → Actions)
+الفرونت على Vercel ينادي `https://rpmrentcar.com/api/*` عبر Rewrite في `ui-pwa/vercel.json`.
 
-**SSH — مفضّل (يرفع الكل):**
+### أسرار GitHub (مرة واحدة) — Settings → Secrets → Actions
 
-| السر | مثال |
-|------|------|
-| `CPANEL_SSH_HOST` | `your-domain.com` |
-| `CPANEL_SSH_USER` | مستخدم cPanel |
-| `CPANEL_SSH_KEY` | مفتاح خاص PEM كامل |
+| السر | قيمة مثال |
+|------|-----------|
+| `CPANEL_SSH_HOST` | `rpmrentcar.com` |
+| `CPANEL_SSH_USER` | `rpmrentcar` |
+| `CPANEL_SSH_KEY` | المفتاح الخاص PEM كاملاً |
 | `CPANEL_SSH_PORT` | `22` (اختياري) |
-| `CPANEL_APP_DIR` | `rpm` (اختياري) |
-| `CPANEL_PUBLIC_DIR` | `public_html` (اختياري) |
 
-**FTP — بديل لـ `public_html` فقط** إن لم يتوفر SSH في Actions:
-
-| السر | مثال |
-|------|------|
-| `CPANEL_FTP_HOST` | `ftp.yourdomain.com` |
-| `CPANEL_FTP_USER` | مستخدم FTP |
-| `CPANEL_FTP_PASSWORD` | كلمة مرور FTP |
-| `CPANEL_FTP_REMOTE_DIR` | `/public_html/` |
-| `CPANEL_FTP_PORT` | `21` (اختياري) |
-
-شغّل **Deploy · cPanel** من Actions واكتب `deploy` للتأكيد. لأول تثبيت يمكن تفعيل خيار `seed_first`.
-
-لفتح النشر التلقائي عند كل push على `main`: ألغِ تعليق قسم `push:` داخل `deploy-cpanel.yml`.
+أول رفع: من Actions شغّل **Deploy · cPanel** يدوياً بـ `confirm=deploy` و`seed_first` إن لزم، بعد ما يكون `.env` جاهز على السيرفر. بعدها أي push على `main` يكفي.
 ---
 
 ## ٥) الهيكل

@@ -1,23 +1,18 @@
 name: Deploy · cPanel
 
-# نشر كامل (فرونت + باك + vendor) إلى cPanel.
-# المسار المفضّل: SSH + rsync (بلا Node على السيرفر).
-# بديل: FTP للمحتوى العام فقط إن لم يتوفر SSH.
+# نشر تلقائي عند الدفع على main:
+#   فرونت → Vercel (من ربط GitHub، منفصل عن هذا الـ workflow)
+#   باك   → cPanel عبر SSH (هذا الملف) · PUBLIC_MODE=api
 #
 # أسرار GitHub → Settings → Secrets and variables → Actions:
-#   SSH (مفضّل):
-#     CPANEL_SSH_HOST
-#     CPANEL_SSH_USER
-#     CPANEL_SSH_KEY          مفتاح خاص PEM كامل
-#     CPANEL_SSH_PORT         اختياري (22)
-#     CPANEL_APP_DIR          اختياري (rpm)
-#     CPANEL_PUBLIC_DIR       اختياري (public_html)
-#   FTP (بديل إن لم تُضبط أسرار SSH):
-#     CPANEL_FTP_HOST / CPANEL_FTP_USER / CPANEL_FTP_PASSWORD
-#     CPANEL_FTP_REMOTE_DIR   مثال /public_html/
-#     CPANEL_FTP_PORT         اختياري (21)
+#   CPANEL_SSH_HOST=rpmrentcar.com
+#   CPANEL_SSH_USER=rpmrentcar
+#   CPANEL_SSH_KEY=مفتاح خاص PEM كامل
+# اختياري: CPANEL_SSH_PORT · CPANEL_APP_DIR · CPANEL_PUBLIC_DIR
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       confirm:
@@ -29,9 +24,6 @@ on:
         required: false
         type: boolean
         default: false
-  # فعّل النشر التلقائي بإلغاء التعليق:
-  # push:
-  #   branches: [main]
 
 concurrency:
   group: deploy-cpanel
@@ -49,7 +41,7 @@ jobs:
           exit 1
 
   build:
-    name: Build full bundle
+    name: Build bundle
     needs: [guard]
     runs-on: ubuntu-latest
     steps:
@@ -68,7 +60,7 @@ jobs:
           coverage: none
           tools: composer
 
-      - name: Build production package (front + back + vendor)
+      - name: Build production package
         run: bash scripts/build-production.sh
 
       - uses: actions/upload-artifact@v4
@@ -78,12 +70,9 @@ jobs:
           retention-days: 7
 
   deploy-ssh:
-    name: SSH rsync (front + back)
+    name: Deploy API to cPanel (SSH)
     needs: [build]
     runs-on: ubuntu-latest
-    environment: production
-    # يتخطّى تلقائياً إن لم تُضبط أسرار SSH (لا تفشل الـ workflow)
-    continue-on-error: false
     steps:
       - name: Require SSH secrets
         env:
@@ -92,24 +81,18 @@ jobs:
           K: ${{ secrets.CPANEL_SSH_KEY }}
         run: |
           if [ -z "$H" ] || [ -z "$U" ] || [ -z "$K" ]; then
-            echo "لم تُضبط أسرار SSH (CPANEL_SSH_HOST / USER / KEY)."
-            echo "أضفها من Settings → Secrets، أو استخدم FTP كبديل."
-            echo "skip=1" >> "$GITHUB_ENV"
-          else
-            echo "skip=0" >> "$GITHUB_ENV"
+            echo "::error::أضف أسرار CPANEL_SSH_HOST و CPANEL_SSH_USER و CPANEL_SSH_KEY ثم أعد التشغيل."
+            exit 1
           fi
 
       - uses: actions/checkout@v4
-        if: env.skip == '0'
 
       - uses: actions/download-artifact@v4
-        if: env.skip == '0'
         with:
           name: rpm-cpanel-full
           path: dist
 
       - name: Prepare SSH key
-        if: env.skip == '0'
         env:
           KEY: ${{ secrets.CPANEL_SSH_KEY }}
           HOST: ${{ secrets.CPANEL_SSH_HOST }}
@@ -121,7 +104,6 @@ jobs:
           ssh-keyscan -p "${PORT:-22}" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy via SSH
-        if: env.skip == '0'
         env:
           CPANEL_SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
           CPANEL_SSH_USER: ${{ secrets.CPANEL_SSH_USER }}
@@ -131,62 +113,10 @@ jobs:
           CPANEL_PUBLIC_DIR: ${{ secrets.CPANEL_PUBLIC_DIR }}
           SKIP_BUILD: '1'
           RUN_MIGRATE: '1'
-          SEED_FIRST: ${{ github.event.inputs.seed_first == 'true' && '1' || '0' }}
+          PUBLIC_MODE: 'api'
+          SEED_FIRST: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.seed_first == true && '1' || '0' }}
         run: |
           export CPANEL_SSH_PORT="${CPANEL_SSH_PORT:-22}"
           export CPANEL_APP_DIR="${CPANEL_APP_DIR:-rpm}"
           export CPANEL_PUBLIC_DIR="${CPANEL_PUBLIC_DIR:-public_html}"
           bash scripts/deploy-cpanel-ssh.sh
-
-  deploy-ftp-fallback:
-    name: FTP upload (public only fallback)
-    needs: [build, deploy-ssh]
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Decide FTP fallback
-        env:
-          SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
-          FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
-        run: |
-          if [ -n "$SSH_HOST" ]; then
-            echo "SSH مضبوط — تخطّي FTP."
-            echo "run_ftp=0" >> "$GITHUB_ENV"
-          elif [ -z "$FTP_HOST" ]; then
-            echo "لا SSH ولا FTP — أضف أسرار CPANEL_SSH_* (مفضّل) أو CPANEL_FTP_*."
-            exit 1
-          else
-            echo "run_ftp=1" >> "$GITHUB_ENV"
-          fi
-
-      - uses: actions/download-artifact@v4
-        if: env.run_ftp == '1'
-        with:
-          name: rpm-cpanel-full
-          path: dist
-
-      - name: Deploy public_html via FTP
-        if: env.run_ftp == '1'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.CPANEL_FTP_HOST }}
-          username: ${{ secrets.CPANEL_FTP_USER }}
-          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
-          port: ${{ secrets.CPANEL_FTP_PORT || 21 }}
-          local-dir: ./dist/cpanel/
-          server-dir: ${{ secrets.CPANEL_FTP_REMOTE_DIR || '/public_html/' }}
-          dangerous-clean-slate: false
-          exclude: |
-            **/.env
-            **/storage/logs/**
-            **/storage/app/private/**
-            **/storage/framework/sessions/**
-            **/.git*
-            **/node_modules/**
-
-      - name: Notice — Laravel app path
-        if: env.run_ftp == '1'
-        run: |
-          echo "FTP رفع public_html فقط."
-          echo "ارفع dist/cpanel-app/ إلى ~/rpm عبر SSH أو File Manager في أول مرة،"
-          echo "أو أضف أسرار CPANEL_SSH_* للنشر الكامل التلقائي."
