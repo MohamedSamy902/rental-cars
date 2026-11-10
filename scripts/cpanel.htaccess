@@ -1,13 +1,13 @@
+# الفرونت (SPA) أولاً — منع ظهور صفحة Laravel الترحيبية على /
+DirectoryIndex index.html
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
     </IfModule>
 
     RewriteEngine On
-
-    # HTTPS (اختياري — فعّله بعد تثبيت شهادة SSL)
-    # RewriteCond %{HTTPS} off
-    # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    RewriteBase /
 
     # Authorization / Sanctum
     RewriteCond %{HTTP:Authorization} .
@@ -15,28 +15,22 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # لا تُعَد كتابة front controller بعد التوجيه الداخلي
+    # لا تُعاد معالجة front controller
     RewriteRule ^index\.php$ - [L]
 
-    # Laravel API + health + sanctum cookie routes
-    RewriteRule ^api(/.*)?$ index.php [L,QSA]
-    RewriteRule ^up$ index.php [L,QSA]
-    RewriteRule ^sanctum(/.*)?$ index.php [L,QSA]
-    RewriteRule ^storage(/.*)?$ index.php [L,QSA]
+    # Laravel API + health + sanctum + media
+    RewriteRule ^(api|up|sanctum|storage)(/.*)?$ index.php [L,QSA]
 
-    # ملفات الواجهة الثابتة كما هي
-    RewriteCond %{REQUEST_FILENAME} -f [OR]
-    RewriteCond %{REQUEST_FILENAME} -d
+    # ملفات ثابتة موجودة فعلاً (assets, favicon, …)
+    RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
 
-    # باقي المسارات → SPA على نفس الدومين (بلا تحويل لـ Vercel)
+    # باقي المسارات → SPA على نفس الدومين
     RewriteRule ^ index.html [L]
 </IfModule>
 
-# منع تصفح المجلدات
 Options -Indexes
 
-# كاش للأصول المبنية
 <IfModule mod_expires.c>
     ExpiresActive On
     ExpiresByType text/css "access plus 7 days"
