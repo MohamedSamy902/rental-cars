@@ -168,7 +168,14 @@ class VehicleClientRefinementsTest extends TestCase
             'tracker_sim_recharge_cycle_days' => 30,
         ]);
 
-        $res = $this->getJson('/api/vehicles?status=sim_recharge&within_days=14')->assertOk();
+        // التبويب الافتراضي: كل الشرائح
+        $all = $this->getJson('/api/vehicles?status=sim_recharge')->assertOk();
+        $allIds = collect($all->json('data'))->pluck('id')->all();
+        $this->assertContains($due->id, $allIds);
+        $this->assertContains($later->id, $allIds);
+
+        // مستحق فقط خلال ١٤ يوماً
+        $res = $this->getJson('/api/vehicles?status=sim_recharge&due_only=1&within_days=14')->assertOk();
         $ids = collect($res->json('data'))->pluck('id')->all();
         $this->assertContains($due->id, $ids);
         $this->assertNotContains($later->id, $ids);
@@ -177,13 +184,21 @@ class VehicleClientRefinementsTest extends TestCase
         $this->assertSame(now()->addDays(5)->toDateString(), $row['tracker_sim_next_recharge_on'] ?? null);
         $this->assertGreaterThanOrEqual(1, (int) $res->json('summary.sim_recharge'));
 
-        $this->putJson("/api/vehicles/{$due->id}", [
-            'tracker_sim_last_recharged_on' => now()->toDateString(),
-            'tracker_sim_next_recharge_on' => now()->addDays(30)->toDateString(),
-            'tracker_sim_recharge_cycle_days' => 30,
+        $this->postJson("/api/vehicles/{$due->id}/sim-recharge", [
+            'amount' => 75,
+            'recharged_on' => now()->toDateString(),
+            'next_recharge_on' => now()->addDays(30)->toDateString(),
+            'notes' => 'فودافون',
         ])->assertOk()
             ->assertJsonPath('data.tracker_sim_last_recharged_on', now()->toDateString())
-            ->assertJsonPath('data.tracker_sim_next_recharge_on', now()->addDays(30)->toDateString());
+            ->assertJsonPath('data.tracker_sim_last_recharge_amount', 75)
+            ->assertJsonPath('data.tracker_sim_next_recharge_on', now()->addDays(30)->toDateString())
+            ->assertJsonPath('recharge.amount', 75);
+
+        $log = $this->getJson("/api/vehicles/{$due->id}/sim-recharges")->assertOk()->json('data');
+        $this->assertNotEmpty($log);
+        $this->assertSame(75, $log[0]['amount']);
+        $this->assertSame('فودافون', $log[0]['notes']);
     }
 
     public function test_license_expiring_filter_lists_vehicles_within_window(): void

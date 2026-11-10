@@ -141,6 +141,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/consumable-templates', [VehicleAssetController::class, 'storeTemplate'])->middleware('permission:vehicles.update,maintenance.create');
     Route::get('/vehicles/{vehicle}', [VehicleController::class, 'show'])->middleware('permission:vehicles.view');
     Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->middleware('permission:vehicles.update');
+    Route::post('/vehicles/{vehicle}/sim-recharge', [VehicleController::class, 'recordSimRecharge'])->middleware('permission:vehicles.update');
+    Route::get('/vehicles/{vehicle}/sim-recharges', [VehicleController::class, 'simRechargeLog'])->middleware('permission:vehicles.view');
     Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->middleware('permission:vehicles.archive');
     Route::post('/vehicles/{vehicle}/documents', [OperationsController::class, 'storeVehicleDocument'])
         ->middleware('permission:vehicles.update');

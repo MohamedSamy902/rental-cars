@@ -8,6 +8,7 @@ import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable,
   useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench, IconEdit,
+  Sheet, MoneyField, DateField, TextAreaField,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
@@ -53,6 +54,7 @@ type Vehicle = {
   tracker_device_number?: string | null
   tracker_sim_number?: string | null
   tracker_sim_last_recharged_on?: string | null
+  tracker_sim_last_recharge_amount?: number | null
   tracker_sim_next_recharge_on?: string | null
   tracker_sim_recharge_cycle_days?: number | null
   notes?: string | null
@@ -101,6 +103,7 @@ export function VehiclesPage() {
   const [withinDays, setWithinDays] = useState(2)
   const [licenseWithinDays, setLicenseWithinDays] = useState(LICENSE_EXPIRING_DEFAULT_DAYS)
   const [simWithinDays, setSimWithinDays] = useState(SIM_RECHARGE_DEFAULT_DAYS)
+  const [simDueOnly, setSimDueOnly] = useState(false)
   const [agreementWithinDays, setAgreementWithinDays] = useState(OWNER_AGREEMENT_DEFAULT_DAYS)
   const [customDays, setCustomDays] = useState('')
   const [licenseCustomDays, setLicenseCustomDays] = useState('')
@@ -111,6 +114,13 @@ export function VehiclesPage() {
   const beginRequest = useLatestRequest()
   const [open, setOpen] = useState(false)
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null)
+  const [simTarget, setSimTarget] = useState<Vehicle | null>(null)
+  const [simAmount, setSimAmount] = useState('')
+  const [simRechargedOn, setSimRechargedOn] = useState(todayIso())
+  const [simNextOn, setSimNextOn] = useState('')
+  const [simNotes, setSimNotes] = useState('')
+  const [simSaving, setSimSaving] = useState(false)
+  const [simFieldErrors, setSimFieldErrors] = useState<Record<string, string>>({})
 
   const chips = useMemo(
     () => [
@@ -185,7 +195,10 @@ export function VehiclesPage() {
       if (nextChip !== 'all') qs.set('status', nextChip)
       if (nextChip === 'expiring') qs.set('within_days', String(days))
       if (nextChip === 'license_expiring') qs.set('within_days', String(licenseDays))
-      if (nextChip === 'sim_recharge') qs.set('within_days', String(simDays))
+      if (nextChip === 'sim_recharge' && simDueOnly) {
+        qs.set('due_only', '1')
+        qs.set('within_days', String(simDays))
+      }
       if (nextChip === 'owner_agreement_expiring') qs.set('within_days', String(agreementDays))
       const res = await api<{
         data: Vehicle[]
@@ -222,7 +235,7 @@ export function VehiclesPage() {
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 250)
     return () => window.clearTimeout(t)
-  }, [search, chip, withinDays, licenseWithinDays, simWithinDays, agreementWithinDays, page])
+  }, [search, chip, withinDays, licenseWithinDays, simWithinDays, simDueOnly, agreementWithinDays, page])
 
   const columns: DataColumn<Vehicle>[] = useMemo(() => {
     if (chip === 'owner_agreement_expiring') {
@@ -272,7 +285,7 @@ export function VehiclesPage() {
       return [
         {
           id: 'plate',
-          header: 'رقم العربية',
+          header: 'العربية',
           cell: (v) => (
             <>
               <strong className="rpm-table__primary tabular-nums">{v.plate}</strong>
@@ -286,24 +299,28 @@ export function VehiclesPage() {
           id: 'sim',
           header: 'رقم الشريحة',
           cell: (v) => (
-            <strong className="tabular-nums">{v.tracker_sim_number || '—'}</strong>
+            <strong className="tabular-nums" dir="ltr">{v.tracker_sim_number || '—'}</strong>
           ),
           sortValue: (v) => v.tracker_sim_number || '',
         },
         {
           id: 'last_recharge',
           header: 'آخر شحن',
-          cell: (v) => (v.tracker_sim_last_recharged_on ? formatDate(v.tracker_sim_last_recharged_on) : '—'),
+          cell: (v) => (
+            <>
+              <strong>{v.tracker_sim_last_recharged_on ? formatDate(v.tracker_sim_last_recharged_on) : '—'}</strong>
+              {v.tracker_sim_last_recharge_amount != null ? (
+                <span className="rpm-table__sub">{formatMoney(v.tracker_sim_last_recharge_amount)}</span>
+              ) : null}
+            </>
+          ),
           sortValue: (v) => v.tracker_sim_last_recharged_on || '',
         },
         {
           id: 'next_recharge',
           header: 'الشحن القادم',
           cell: (v) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-              <strong>{v.tracker_sim_next_recharge_on ? formatDate(v.tracker_sim_next_recharge_on) : '—'}</strong>
-              <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
-            </div>
+            <strong>{v.tracker_sim_next_recharge_on ? formatDate(v.tracker_sim_next_recharge_on) : '—'}</strong>
           ),
           sortValue: (v) => v.tracker_sim_next_recharge_on || '',
           mobile: 'badge',
@@ -401,25 +418,56 @@ export function VehiclesPage() {
     }
   }
 
-  async function markSimRecharged(v: Vehicle) {
+  function openSimRecharge(v: Vehicle) {
     const cycle = v.tracker_sim_recharge_cycle_days && v.tracker_sim_recharge_cycle_days > 0
       ? v.tracker_sim_recharge_cycle_days
       : 30
     const last = todayIso()
-    const next = addDaysIso(last, cycle)
+    setSimTarget(v)
+    setSimAmount(v.tracker_sim_last_recharge_amount != null ? String(v.tracker_sim_last_recharge_amount) : '')
+    setSimRechargedOn(last)
+    setSimNextOn(addDaysIso(last, cycle))
+    setSimNotes('')
+    setSimFieldErrors({})
+  }
+
+  async function saveSimRecharge() {
+    if (!simTarget) return
+    const amount = Number(simAmount)
+    const errors: Record<string, string> = {}
+    if (!Number.isFinite(amount) || amount < 1) errors.amount = 'أدخل مبلغ الشحن.'
+    if (!simRechargedOn) errors.recharged_on = 'تاريخ الشحن مطلوب.'
+    if (!simNextOn) errors.next_recharge_on = 'ميعاد الشحن القادم مطلوب.'
+    if (simRechargedOn && simNextOn && simNextOn < simRechargedOn) {
+      errors.next_recharge_on = 'الميعاد القادم لا يسبق تاريخ الشحن.'
+    }
+    setSimFieldErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
+    setSimSaving(true)
     try {
-      await api(`/vehicles/${v.id}`, {
-        method: 'PUT',
+      const res = await api<{ message?: string }>(`/vehicles/${simTarget.id}/sim-recharge`, {
+        method: 'POST',
         json: {
-          tracker_sim_last_recharged_on: last,
-          tracker_sim_next_recharge_on: next,
-          tracker_sim_recharge_cycle_days: cycle,
+          amount: Math.round(amount),
+          recharged_on: simRechargedOn,
+          next_recharge_on: simNextOn,
+          notes: simNotes.trim() || null,
         },
       })
-      toast.success(`تم تسجيل الشحن · القادم ${formatDate(next)}`)
+      toast.success(res.message || `تم تسجيل الشحن · القادم ${formatDate(simNextOn)}`)
+      setSimTarget(null)
       void load()
     } catch (e) {
-      toast.error((e as ApiError).message || 'تعذّر تسجيل الشحن.')
+      const err = e as ApiError
+      if (err.errors) {
+        const next: Record<string, string> = {}
+        for (const [k, msgs] of Object.entries(err.errors)) next[k] = msgs[0] || err.message
+        setSimFieldErrors(next)
+      }
+      toast.error(err.message || 'تعذّر تسجيل الشحن.')
+    } finally {
+      setSimSaving(false)
     }
   }
 
@@ -446,9 +494,9 @@ export function VehiclesPage() {
       })
       items.push({
         id: 'mark-sim',
-        label: 'سجّل شحن اليوم',
+        label: 'شحن الشريحة',
         icon: <IconCheck size={16} />,
-        onSelect: () => void markSimRecharged(v),
+        onSelect: () => openSimRecharge(v),
       })
     }
     items.push(
@@ -617,38 +665,62 @@ export function VehiclesPage() {
       ) : null}
 
       {chip === 'sim_recharge' ? (
-        <div className="vh-expiring-bar" role="group" aria-label="نافذة قرب شحن شريحة التتبع">
-          <span className="vh-expiring-bar__label">خلال:</span>
+        <div className="vh-expiring-bar" role="group" aria-label="فلتر شرائح التتبع">
+          <span className="vh-expiring-bar__label">عرض:</span>
           <div className="vh-expiring-bar__pills">
-            {SIM_RECHARGE_PRESETS.map((d) => (
-              <Button
-                key={d}
-                type="button"
-                size="sm"
-                variant={simWithinDays === d && simCustomDays === '' ? 'accent' : 'secondary'}
-                onClick={() => { setSimWithinDays(d); setSimCustomDays(''); setPage(1) }}
-              >
-                {d} يوماً
-              </Button>
-            ))}
+            <Button
+              type="button"
+              size="sm"
+              variant={!simDueOnly ? 'accent' : 'secondary'}
+              onClick={() => { setSimDueOnly(false); setPage(1) }}
+            >
+              كل الشرائح
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={simDueOnly ? 'accent' : 'secondary'}
+              onClick={() => { setSimDueOnly(true); setPage(1) }}
+            >
+              مستحق قريباً
+            </Button>
           </div>
-          <span className="vh-expiring-bar__sep" aria-hidden />
-          <label className="vh-expiring-bar__custom">
-            <span className="vh-expiring-bar__custom-label">مخصص:</span>
-            <input
-              className="vh-expiring-bar__input"
-              type="number"
-              min={0}
-              max={90}
-              value={simCustomDays}
-              placeholder={String(simWithinDays)}
-              onChange={(e) => setSimCustomDays(e.target.value)}
-              onBlur={() => { if (simCustomDays !== '') applySimCustomDays() }}
-              onKeyDown={(e) => { if (e.key === 'Enter') applySimCustomDays() }}
-              aria-label="عدد أيام قرب شحن الشريحة"
-            />
-            <span className="vh-expiring-bar__unit">يوم</span>
-          </label>
+          {simDueOnly ? (
+            <>
+              <span className="vh-expiring-bar__sep" aria-hidden />
+              <span className="vh-expiring-bar__label">خلال:</span>
+              <div className="vh-expiring-bar__pills">
+                {SIM_RECHARGE_PRESETS.map((d) => (
+                  <Button
+                    key={d}
+                    type="button"
+                    size="sm"
+                    variant={simWithinDays === d && simCustomDays === '' ? 'accent' : 'secondary'}
+                    onClick={() => { setSimWithinDays(d); setSimCustomDays(''); setPage(1) }}
+                  >
+                    {d} يوماً
+                  </Button>
+                ))}
+              </div>
+              <span className="vh-expiring-bar__sep" aria-hidden />
+              <label className="vh-expiring-bar__custom">
+                <span className="vh-expiring-bar__custom-label">مخصص:</span>
+                <input
+                  className="vh-expiring-bar__input"
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={simCustomDays}
+                  placeholder={String(simWithinDays)}
+                  onChange={(e) => setSimCustomDays(e.target.value)}
+                  onBlur={() => { if (simCustomDays !== '') applySimCustomDays() }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applySimCustomDays() }}
+                  aria-label="عدد أيام قرب شحن الشريحة"
+                />
+                <span className="vh-expiring-bar__unit">يوم</span>
+              </label>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -738,6 +810,60 @@ export function VehiclesPage() {
           void load()
         }}
       />
+
+      <Sheet
+        open={!!simTarget}
+        title={simTarget ? `شحن شريحة · ${simTarget.plate}` : 'شحن الشريحة'}
+        onClose={() => setSimTarget(null)}
+        footer={
+          <>
+            <Button loading={simSaving} onClick={() => void saveSimRecharge()}>حفظ الشحن</Button>
+            <Button variant="secondary" onClick={() => setSimTarget(null)}>إلغاء</Button>
+          </>
+        }
+      >
+        <div className="rpm-form-grid">
+          {simTarget?.tracker_sim_number ? (
+            <p className="muted" style={{ margin: 0 }} dir="ltr">
+              الشريحة: {simTarget.tracker_sim_number}
+            </p>
+          ) : null}
+          <MoneyField
+            label="مبلغ الشحن"
+            required
+            value={simAmount}
+            error={simFieldErrors.amount}
+            onChange={(e) => setSimAmount(e.target.value)}
+          />
+          <DateField
+            label="تاريخ الشحن"
+            required
+            value={simRechargedOn}
+            error={simFieldErrors.recharged_on}
+            onChange={(e) => {
+              const last = e.target.value
+              const cycle = simTarget?.tracker_sim_recharge_cycle_days && simTarget.tracker_sim_recharge_cycle_days > 0
+                ? simTarget.tracker_sim_recharge_cycle_days
+                : 30
+              setSimRechargedOn(last)
+              if (last) setSimNextOn(addDaysIso(last, cycle))
+            }}
+          />
+          <DateField
+            label="ميعاد الشحن القادم"
+            required
+            value={simNextOn}
+            error={simFieldErrors.next_recharge_on}
+            onChange={(e) => setSimNextOn(e.target.value)}
+            hint="يُحدَّث تنبيه الشحن القادم وفق هذا التاريخ"
+          />
+          <TextAreaField
+            label="ملاحظة"
+            value={simNotes}
+            onChange={(e) => setSimNotes(e.target.value)}
+          />
+        </div>
+      </Sheet>
     </div>
   )
 }
