@@ -167,6 +167,12 @@ export function ContractDetailPage() {
             { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },
             { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },
             { label: 'التأمين المتفق', value: formatMoney(row.frozen_agreed_deposit || 0) },
+            {
+              label: 'تاريخ تحصيل المتبقي',
+              value: row.balance_due_on
+                ? formatDate(row.balance_due_on)
+                : ((ledger?.balance ?? 0) > 0 ? 'غير محدّد' : '—'),
+            },
             { label: 'أنشأه', value: row.created_by || row.sales_user?.name || '—' },
             { label: 'عداد الخروج', value: row.odometer_out != null ? `${formatNumber(row.odometer_out)} كم` : '—' },
             { label: 'عداد العودة', value: row.odometer_in != null ? `${formatNumber(row.odometer_in)} كم` : '—' },

@@ -132,6 +132,7 @@ class ContractLifecycleService
                 'other_fees_description' => $data['other_fees_description'] ?? null,
                 'sales_user_id' => $userId,
                 'notes' => $data['notes'] ?? null,
+                'balance_due_on' => $data['balance_due_on'] ?? null,
                 'accessories_json' => $accessories,
                 'extended_from_contract_id' => $data['extended_from_contract_id'] ?? null,
                 'swapped_from_contract_id' => $data['swapped_from_contract_id'] ?? null,
@@ -161,6 +162,7 @@ class ContractLifecycleService
                     'link_type' => 'contract',
                     'link_id' => $contract->id,
                     'notes' => $data['payment_notes'] ?? 'دفعة عند إنشاء الحجز',
+                    'balance_due_on' => $data['balance_due_on'] ?? null,
                 ], $userId);
 
                 AuditLog::query()->create([
@@ -172,12 +174,38 @@ class ContractLifecycleService
                         'number' => $contract->number,
                         'amount' => $paymentAmount,
                         'method' => $data['payment_method'] ?? 'cash',
+                        'balance_due_on' => $data['balance_due_on'] ?? null,
                     ],
                 ]);
+            } else {
+                $this->syncBalanceDueOn($contract, $data['balance_due_on'] ?? null);
             }
 
-            return $contract->load(['customer', 'vehicle', 'salesUser:id,name']);
+            return $contract->fresh()->load(['customer', 'vehicle', 'salesUser:id,name']);
         });
+    }
+
+    /**
+     * يضبط أو يمسح تاريخ تحصيل المتبقي حسب الرصيد الحالي.
+     */
+    public function syncBalanceDueOn(Contract $contract, mixed $dueOn = null): void
+    {
+        $remaining = app(ContractLedgerMath::class)->remainingCollectible($contract->fresh());
+        if ($remaining < 1) {
+            if ($contract->balance_due_on !== null) {
+                $contract->balance_due_on = null;
+                $contract->save();
+            }
+
+            return;
+        }
+
+        if ($dueOn === null || $dueOn === '') {
+            return;
+        }
+
+        $contract->balance_due_on = Carbon::parse((string) $dueOn)->toDateString();
+        $contract->save();
     }
 
     /**
@@ -412,6 +440,7 @@ class ContractLifecycleService
                     'link_type' => 'contract',
                     'link_id' => $locked->id,
                     'notes' => 'دفعة عند التسليم'.($paymentAmount > 0 ? ' (جزئية أو كاملة)' : ''),
+                    'balance_due_on' => $inspection['balance_due_on'] ?? null,
                 ], $userId);
 
                 AuditLog::query()->create([
@@ -1086,29 +1115,44 @@ class ContractLifecycleService
 
     private function nextNumber(): string
     {
+        $maxExisting = 0;
+        foreach (Contract::query()->withTrashed()->pluck('number') as $number) {
+            if (is_string($number) && preg_match('/(\d+)$/', $number, $m)) {
+                $maxExisting = max($maxExisting, (int) $m[1]);
+            }
+        }
+
+        $seq = $maxExisting + 1;
+
         if (Schema::hasTable('contract_number_sequences')) {
             $row = DB::table('contract_number_sequences')->where('id', 1)->lockForUpdate()->first();
             if (! $row) {
-                DB::table('contract_number_sequences')->insert(['id' => 1, 'next_value' => 2, 'updated_at' => now(), 'created_at' => now()]);
-                $seq = 1;
+                $seq = max(1, $seq);
+                DB::table('contract_number_sequences')->insert([
+                    'id' => 1,
+                    'next_value' => $seq + 1,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]);
             } else {
-                $seq = (int) $row->next_value;
+                $seq = max($seq, (int) $row->next_value);
                 DB::table('contract_number_sequences')->where('id', 1)->update([
                     'next_value' => $seq + 1,
                     'updated_at' => now(),
                 ]);
             }
-
-            return 'CNT-'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
         }
 
-        $last = Contract::query()->withTrashed()->orderByDesc('id')->lockForUpdate()->value('number');
-        $seq = 1;
-        if (is_string($last) && preg_match('/(\d+)$/', $last, $m)) {
-            $seq = ((int) $m[1]) + 1;
-        }
+        do {
+            $candidate = 'CNT-'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
+            $exists = Contract::query()->withTrashed()->where('number', $candidate)->exists();
+            if (! $exists) {
+                return $candidate;
+            }
+            $seq++;
+        } while ($seq < $maxExisting + 10000);
 
-        return 'CNT-'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
+        throw new DomainException('تعذّر توليد رقم عقد فريد. أعد المحاولة.');
     }
 
     private function notifyLifecycle(string $title, string $body, Contract $contract, ?int $actorId = null): void

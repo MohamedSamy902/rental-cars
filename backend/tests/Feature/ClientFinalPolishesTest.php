@@ -210,6 +210,7 @@ class ClientFinalPolishesTest extends TestCase
             'odometer_out' => 10060,
             'payment_amount' => 500,
             'payment_method' => 'cash',
+            'balance_due_on' => now()->addDays(5)->toDateString(),
         ])->assertOk()->json('data');
 
         $this->assertSame('active', $handover['status']);

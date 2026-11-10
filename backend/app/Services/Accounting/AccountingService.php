@@ -15,6 +15,7 @@ use App\Models\Payment;
 use App\Models\Vehicle;
 use App\Services\Contracts\ContractLedgerMath;
 use App\Services\Contracts\ContractPricingService;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -548,6 +549,11 @@ class AccountingService
                         sprintf('المبلغ يتجاوز المتبقي على العقد (%d ج.م).', $remaining)
                     );
                 }
+                $afterPay = $remaining - $amount;
+                $dueOn = $data['balance_due_on'] ?? null;
+                if ($afterPay > 0 && ($dueOn === null || $dueOn === '')) {
+                    throw new DomainException('حدد تاريخ تحصيل باقي المبلغ قبل تسجيل دفعة جزئية.');
+                }
             }
 
             $payment = Payment::query()->create([
@@ -566,6 +572,20 @@ class AccountingService
             $methodKey = $this->methods->canonical((string) $payment->method);
             if ($linkType === 'contract' && $linkId && ! in_array($methodKey, ['credit', 'deposit'], true)) {
                 $this->postPaymentJournal($payment, $userId);
+            }
+
+            if ($linkType === 'contract' && $linkId && $data['direction'] === 'in') {
+                $fresh = Contract::query()->whereKey($linkId)->lockForUpdate()->first();
+                if ($fresh) {
+                    $left = $this->ledgerMath->remainingCollectible($fresh);
+                    if ($left < 1) {
+                        $fresh->balance_due_on = null;
+                        $fresh->save();
+                    } elseif (! empty($data['balance_due_on'])) {
+                        $fresh->balance_due_on = Carbon::parse((string) $data['balance_due_on'])->toDateString();
+                        $fresh->save();
+                    }
+                }
             }
 
             return $payment;

@@ -75,6 +75,7 @@ class StoreContractRequest extends FormRequest
             'payment_method' => ['nullable', 'string', 'in:cash,card,transfer'],
             'payment_reference' => ['nullable', 'string', 'max:100'],
             'payment_notes' => ['nullable', 'string', 'max:500'],
+            'balance_due_on' => ['nullable', 'date', 'after_or_equal:today'],
             'extended_from_contract_id' => [
                 'nullable',
                 Rule::exists('contracts', 'id')->whereNull('deleted_at'),
@@ -111,6 +112,7 @@ class StoreContractRequest extends FormRequest
             'accessory_ids' => 'المستلزمات',
             'payment_amount' => 'مبلغ الدفعة',
             'payment_method' => 'طريقة الدفع',
+            'balance_due_on' => 'تاريخ تحصيل المتبقي',
             'extended_from_contract_id' => 'عقد التمديد السابق',
             'swapped_from_contract_id' => 'عقد التبديل السابق',
             'swap_reason' => 'سبب التبديل',
