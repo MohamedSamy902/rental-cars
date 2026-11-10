@@ -38,6 +38,13 @@
   line-height: 1.45;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+}
+
+.rpm-detail__item dd .rpm-phone-actions {
+  width: 100%;
 }
 
 .rpm-detail__item dd .rpm-badge {

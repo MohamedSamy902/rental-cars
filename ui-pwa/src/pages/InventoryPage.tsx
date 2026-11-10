@@ -146,14 +146,28 @@ export function InventoryPage() {
   }
 
   async function saveBatch() {
+    const quantity = Number(batchForm.quantity)
+    const unitCost = Number(batchForm.unit_cost)
+    if (!batchForm.inventory_item_id) {
+      toast.error('اختر الصنف.')
+      return
+    }
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      toast.error('الكمية يجب أن تكون ١ على الأقل.')
+      return
+    }
+    if (!Number.isFinite(unitCost) || unitCost < 1) {
+      toast.error('سعر الوحدة مطلوب ويجب أن يكون أكبر من صفر.')
+      return
+    }
     try {
       await api('/inventory/batches', {
         method: 'POST',
         json: {
           ...batchForm,
           inventory_item_id: Number(batchForm.inventory_item_id),
-          quantity: Number(batchForm.quantity),
-          unit_cost: Number(batchForm.unit_cost),
+          quantity,
+          unit_cost: unitCost,
         },
       })
       toast.success('تم إدخال الدفعة (FIFO).')

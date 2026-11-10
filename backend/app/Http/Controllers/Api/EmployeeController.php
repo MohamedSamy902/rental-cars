@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\EmployeeAssignment;
-use App\Models\Evaluation;
 use App\Models\PayrollLine;
 use App\Models\PettyCashAccount;
 use App\Models\SalaryAdvance;
@@ -70,12 +69,6 @@ class EmployeeController extends Controller
             ->where('employee_id', $employee->id)
             ->first();
 
-        $evaluations = Evaluation::query()
-            ->where('employee_id', $employee->id)
-            ->latest('id')
-            ->limit(30)
-            ->get();
-
         $payrollHistory = PayrollLine::query()
             ->with(['run:id,year,month,status', 'payouts'])
             ->where('employee_id', $employee->id)
@@ -121,7 +114,6 @@ class EmployeeController extends Controller
                 'advances' => $advances,
                 'assignments' => $assignments,
                 'petty_cash' => $petty,
-                'evaluations' => $evaluations,
                 'payroll_history' => $payrollHistory,
             ],
         ]);

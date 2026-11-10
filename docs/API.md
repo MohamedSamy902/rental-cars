@@ -326,6 +326,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/contracts` | إنشاء → `pending` |
 | GET | `/contracts/{id}` | تفاصيل + deposit + inspections |
 | POST | `/contracts/{id}/approve` | → `approved` + تثبيت أسعار |
+| ~~POST `/contracts/{id}/pricing`~~ | **ملغى** — لا تعديل أسعار بعد الإنشاء |
 | POST | `/contracts/{id}/handover` | → `active` + فحص تسليم |
 | POST | `/contracts/{id}/return` | → `completed` + إجمالي نهائي |
 | POST | `/contracts/{id}/cancel` | → `cancelled` (قبل التسليم) |
@@ -586,7 +587,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | PUT | `/inventory/items/{id}` | تعديل صنف (اسم · كود اختياري · تصنيف · وحدة · حد تنبيه) |
 | POST | `/inventory/batches` | دفعة استلام |
 
-**Batch:** `inventory_item_id`, `received_on`, `quantity`, `unit_cost`, اختياري `supplier`, `payment_method`, `from_petty_cash`, `reference`, `notes`
+**Batch:** `inventory_item_id`, `received_on`, `quantity`, `unit_cost` (**مطلوب ≥ ١**)، اختياري `supplier`, `payment_method`, `from_petty_cash`, `reference`, `notes`
 
 ---
 
@@ -801,7 +802,7 @@ password: password
 | GET | `/vehicles/recommend` | العربيات المتاحة في الفترة (بلا أوزان/درجات) |
 | GET/POST | `/vehicles/{id}/tires|batteries|downtime|consumables` | أصول المركبة ٦٫٩–٦٫١١ · ١٤٫١ |
 | GET/POST | `/consumable-templates` | قوالب قطع استهلاكية |
-| GET/POST | `/evaluations` | خلف `feature:evaluations` |
+| ~~GET/POST `/evaluations`~~ | **موقوف** — لا مسارات؛ التقييمات خارج التشغيل |
 | GET/POST | `/chat` | خلف `feature:chat` · حد 100/يوم |
 | POST | `/ocr/review` | مراجعة حقول داخلية بلا إرسال خارجي |
 | POST | `/print-snapshots` | حفظ نسخة وقت الطباعة |

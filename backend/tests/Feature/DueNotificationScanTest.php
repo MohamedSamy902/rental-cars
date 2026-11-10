@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\Employee;
-use App\Models\Evaluation;
 use App\Models\InventoryBatch;
 use App\Models\InventoryItem;
 use App\Models\Notification;
@@ -312,27 +311,13 @@ class DueNotificationScanTest extends TestCase
         $this->assertSame(1, $this->titlesLike('مستحق مالك لم يُصرف: مالك التنبيه'));
         $this->assertSame(1, $this->titlesLike('راتب لم يُصرف: راتب معلّق'));
         $this->assertSame(0, $this->titlesLike('راتب لم يُصرف: راتب مسودة'));
-        $this->assertSame(1, $this->titlesLike('تقييم معلّق: راتب معلّق'));
+        $this->assertSame(0, $this->titlesLike('تقييم معلّق:'));
+        $this->assertSame(0, NotificationReminder::query()->where('rule_key', 'evaluation_due')->count());
         $this->assertSame(1, $this->titlesLike('شحن شريحة تتبع قريب'));
         $this->assertSame(1, NotificationReminder::query()->where('rule_key', 'tracker_sim_recharge')->count());
         $this->assertSame(1, $this->titlesLike('عقد مالك يقترب من الانتهاء'));
         $this->assertSame(1, NotificationReminder::query()->where('rule_key', 'owner_agreement_end')->count());
         $this->assertSame(0, $this->titlesLike('سيارة متاحة لطلب انتظار'));
-
-        Evaluation::query()->create([
-            'employee_id' => $unpaidEmployee->id,
-            'evaluator_id' => $this->admin->id,
-            'score' => 4,
-            'period' => now()->format('Y-m'),
-        ]);
-        Evaluation::query()->create([
-            'employee_id' => $draftEmployee->id,
-            'evaluator_id' => $this->admin->id,
-            'score' => 3,
-            'period' => 'ملاحظة',
-        ]);
-        app(DueNotificationService::class)->scan();
-        $this->assertSame(0, NotificationReminder::query()->where('rule_key', 'evaluation_due')->count());
     }
 
     public function test_only_users_with_the_domain_permission_are_notified(): void

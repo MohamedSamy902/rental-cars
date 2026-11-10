@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { useAuth } from '@/shared/auth/AuthContext'
 import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -71,8 +70,6 @@ const emptyForm = {
 
 export function OwnerDetailPage() {
   const { id } = useParams()
-  const { can } = useAuth()
-  const canAccrue = can('owners.accrue') || can('owners.payout')
   const [searchParams, setSearchParams] = useSearchParams()
   const toast = useToast()
   const { openNewContract } = useNewContract()
@@ -81,6 +78,7 @@ export function OwnerDetailPage() {
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [printingAgreementId, setPrintingAgreementId] = useState<number | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [payoutOpen, setPayoutOpen] = useState(false)
   const [payoutForm, setPayoutForm] = useState({
@@ -139,17 +137,17 @@ export function OwnerDetailPage() {
     }
   }
 
-  async function onAccrue() {
-    if (!owner) return
-    setSaving(true)
+  async function printOwnerAgreement(vehicleId: number) {
+    setPrintingAgreementId(vehicleId)
     try {
-      await api(`/owners/${owner.id}/accruals`, { method: 'POST', json: {} })
-      toast.success('تم ترحيل الاستحقاق حتى الشهر الحالي.')
-      await load()
+      const res = await api<{ data: { html: string } }>(`/vehicles/${vehicleId}/owner-agreement/print`)
+      const { printHtmlDocument } = await import('@/utils/printHtml')
+      const { shellOwnerAgreementHtml } = await import('@/shared/contracts/ownerAgreementPrint')
+      printHtmlDocument(shellOwnerAgreementHtml(res.data.html))
     } catch (e) {
-      toast.error((e as ApiError).message)
+      toast.error((e as ApiError).message || 'تعذّرت طباعة عقد المالك.')
     } finally {
-      setSaving(false)
+      setPrintingAgreementId(null)
     }
   }
 
@@ -197,7 +195,6 @@ export function OwnerDetailPage() {
           <>
             <BackNavButton to="/owners" label="رجوع للملاك" />
             <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
-            {canAccrue ? <Button variant="secondary" loading={saving} onClick={() => void onAccrue()}>ترحيل الاستحقاق</Button> : null}
             <Button onClick={() => setPayoutOpen(true)}>صرف مستحقات</Button>
           </>
         }
@@ -215,8 +212,8 @@ export function OwnerDetailPage() {
 
       <DetailList
         rows={[
-          { label: 'الهاتف', value: owner.phone ? <PhoneActions phone={owner.phone} name={owner.full_name} /> : '—' },
-          { label: 'هاتف بديل', value: owner.phone_alt ? <PhoneActions phone={owner.phone_alt} name={owner.full_name} /> : '—' },
+          { label: 'الهاتف', value: owner.phone ? <PhoneActions phone={owner.phone} name={owner.full_name} compact /> : '—' },
+          { label: 'هاتف بديل', value: owner.phone_alt ? <PhoneActions phone={owner.phone_alt} name={owner.full_name} compact /> : '—' },
           { label: 'الرقم القومي', value: owner.national_id || '—' },
           { label: 'الحالة', value: <StatusPill status={owner.is_active ? 'active' : 'cancelled'} label={owner.is_active ? 'نشط' : 'موقوف'} /> },
           { label: 'ملاحظات', value: owner.notes || '—', wide: true },
@@ -245,7 +242,15 @@ export function OwnerDetailPage() {
                 </div>
                 <p className="muted">{v.code} · {v.plate} · منذ {formatDate(v.owner_since)}</p>
                 <div className="rpm-card__actions">
-                  <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد جديد</Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={printingAgreementId === v.id}
+                    onClick={() => void printOwnerAgreement(v.id)}
+                  >
+                    طباعة عقد المالك
+                  </Button>
+                  <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد تأجير جديد</Button>
                   <Button size="sm" variant="secondary" onClick={() => setWoVehicle({ id: v.id, label })}>أمر صيانة</Button>
                   <Button size="sm" variant="secondary" onClick={() => setExpVehicle({ id: v.id, label })}>مصروف</Button>
                 </div>

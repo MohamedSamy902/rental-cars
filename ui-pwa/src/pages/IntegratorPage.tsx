@@ -13,7 +13,6 @@ const FLAG_LABELS: Record<string, string> = {
   showroom: 'وضع المعرض',
   department_notice: 'إخطار القسم',
   chat: 'المحادثة',
-  evaluations: 'التقييمات',
   hr: 'الموارد البشرية',
 }
 
@@ -36,15 +35,16 @@ export function IntegratorPage() {
         setPrintFooter(r.data?.print_footer || '')
         setMultiBranch(Boolean(r.data?.multi_branch))
         setBrand(r.data?.colors?.brand || '#0D9488')
+        const incoming = { ...(r.data?.feature_flags || {}) } as Flags
+        delete incoming.evaluations
         setFlags({
           inventory: true,
           petty_cash: true,
           showroom: true,
           department_notice: true,
           chat: true,
-          evaluations: true,
           hr: true,
-          ...(r.data?.feature_flags || {}),
+          ...incoming,
         })
       })
       .finally(() => setLoading(false))

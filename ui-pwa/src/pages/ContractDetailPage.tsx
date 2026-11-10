@@ -106,7 +106,7 @@ export function ContractDetailPage() {
           <p>{vehicleLabel}</p>
           {row.customer?.phone ? (
             <div className="cd-identity__phone">
-              <PhoneActions phone={row.customer.phone} name={row.customer.full_name} />
+              <PhoneActions phone={row.customer.phone} name={row.customer.full_name} compact />
             </div>
           ) : null}
           <RentalProgressBar progress={row.progress} />
@@ -157,7 +157,7 @@ export function ContractDetailPage() {
               value: (
                 <span className="rpm-inline-stack">
                   {row.customer?.full_name || '—'}
-                  {row.customer?.phone ? <PhoneActions phone={row.customer.phone} name={row.customer.full_name} /> : null}
+                  {row.customer?.phone ? <PhoneActions phone={row.customer.phone} name={row.customer.full_name} compact /> : null}
                 </span>
               ),
               wide: true,

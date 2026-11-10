@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ExtendContractRequest;
 use App\Http\Requests\StoreContractRequest;
-use App\Http\Requests\UpdateContractPricingRequest;
 use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\DocumentTemplate;
@@ -147,17 +146,6 @@ class ContractController extends Controller
         }
 
         return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم اعتماد العقد وتثبيت الأسعار.']);
-    }
-
-    public function updatePricing(UpdateContractPricingRequest $request, Contract $contract): JsonResponse
-    {
-        try {
-            $contract = $this->lifecycle->updateFrozenPricing($contract, $request->validated(), $request->user()?->id);
-        } catch (DomainException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم تعديل الأسعار مع تسجيل في سجل التدقيق.']);
     }
 
     public function handover(Request $request, Contract $contract): JsonResponse

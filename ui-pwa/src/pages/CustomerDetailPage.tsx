@@ -183,8 +183,8 @@ export function CustomerDetailPage() {
       <DetailList
         rows={[
           { label: 'الحالة', value: statusPill },
-          { label: 'الهاتف', value: <PhoneActions phone={customer.phone} name={customer.full_name} /> },
-          { label: 'هاتف بديل', value: customer.phone_alt ? <PhoneActions phone={customer.phone_alt} name={customer.full_name} /> : '—' },
+          { label: 'الهاتف', value: <PhoneActions phone={customer.phone} name={customer.full_name} compact /> },
+          { label: 'هاتف بديل', value: customer.phone_alt ? <PhoneActions phone={customer.phone_alt} name={customer.full_name} compact /> : '—' },
           { label: 'البريد', value: customer.email || '—' },
           { label: 'الرقم القومي', value: customer.national_id || '—' },
           { label: 'تاريخ الميلاد', value: formatDate(customer.birth_date) },

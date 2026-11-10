@@ -263,30 +263,39 @@ class QaV2FixTicketsTest extends TestCase
         ])->assertStatus(401);
     }
 
-    public function test_b08_evaluation_score_five_accepted_eighty_rejected(): void
+    public function test_b08_evaluations_endpoints_are_retired(): void
     {
-        $emp = $this->postJson('/api/employees', [
-            'name' => 'موظف تقييم',
-            'job_title' => 'سائق',
-            'hired_on' => '2026-01-01',
-            'base_salary' => 5000,
-        ]);
-        if ($emp->status() === 404 || $emp->status() === 405) {
-            $this->markTestSkipped('employees store route unavailable in this build');
-        }
-        $employeeId = $emp->assertCreated()->json('data.id');
-
+        $this->getJson('/api/evaluations')->assertNotFound();
         $this->postJson('/api/evaluations', [
-            'employee_id' => $employeeId,
-            'score' => 80,
-            'period' => 'QA',
-        ])->assertStatus(422);
-
-        $this->postJson('/api/evaluations', [
-            'employee_id' => $employeeId,
+            'employee_id' => 1,
             'score' => 5,
             'period' => 'QA',
-            'notes' => 'ok',
+        ])->assertNotFound();
+    }
+
+    public function test_b09_inventory_batch_rejects_zero_unit_cost(): void
+    {
+        $itemId = $this->postJson('/api/inventory/items', [
+            'name' => 'QA-PRICE',
+            'category' => 'زيوت',
+            'unit' => 'لتر',
+            'reorder_level' => 1,
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson('/api/inventory/batches', [
+            'inventory_item_id' => $itemId,
+            'received_on' => '2026-11-02',
+            'quantity' => 2,
+            'unit_cost' => 0,
+            'supplier' => 'QA',
+        ])->assertStatus(422);
+
+        $this->postJson('/api/inventory/batches', [
+            'inventory_item_id' => $itemId,
+            'received_on' => '2026-11-02',
+            'quantity' => 2,
+            'unit_cost' => 15,
+            'supplier' => 'QA',
         ])->assertCreated();
     }
 

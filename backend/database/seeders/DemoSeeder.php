@@ -160,7 +160,6 @@ class DemoSeeder extends Seeder
                 'showroom' => true,
                 'department_notice' => true,
                 'chat' => true,
-                'evaluations' => true,
                 'hr' => true,
             ],
             'print_footer' => 'مركز آر بي إم للتأجير — نسخة داخلية',

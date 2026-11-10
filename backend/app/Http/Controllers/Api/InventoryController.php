@@ -86,13 +86,15 @@ class InventoryController extends Controller
             'inventory_item_id' => ['required', 'exists:inventory_items,id'],
             'received_on' => ['required', 'date'],
             'quantity' => ['required', 'integer', 'min:1'],
-            'unit_cost' => ['required', 'integer', 'min:0'],
+            'unit_cost' => ['required', 'integer', 'min:1'],
             'supplier' => ['nullable', 'string'],
             'payment_method' => ['nullable', 'string'],
             'from_petty_cash' => ['nullable', 'boolean'],
             'reference' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
-        ], [], [
+        ], [
+            'unit_cost.min' => 'سعر الوحدة مطلوب ويجب أن يكون أكبر من صفر.',
+        ], [
             'inventory_item_id' => 'الصنف',
             'quantity' => 'الكمية',
             'unit_cost' => 'سعر الوحدة',

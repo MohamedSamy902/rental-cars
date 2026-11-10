@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ChatMessage;
-use App\Models\Evaluation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,33 +48,6 @@ class CollaborationController extends Controller
         ])->load('user:id,name');
 
         return response()->json(['data' => $row, 'message' => 'تم إرسال الرسالة.'], 201);
-    }
-
-    public function evaluationsIndex(): JsonResponse
-    {
-        return response()->json([
-            'data' => Evaluation::query()->with('employee')->latest('id')->limit(100)->get(),
-        ]);
-    }
-
-    public function evaluationsStore(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'employee_id' => ['required', 'exists:employees,id'],
-            'score' => ['required', 'integer', 'min:1', 'max:5'],
-            'period' => ['nullable', 'string', 'max:40'],
-            'notes' => ['nullable', 'string'],
-        ], [], [
-            'employee_id' => 'الموظف',
-            'score' => 'الدرجة',
-        ]);
-
-        $row = Evaluation::query()->create([
-            ...$data,
-            'evaluator_id' => $request->user()?->id,
-        ])->load('employee');
-
-        return response()->json(['data' => $row, 'message' => 'تم حفظ التقييم.'], 201);
     }
 
     /**

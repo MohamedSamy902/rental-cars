@@ -140,11 +140,6 @@ class BusinessGapsTest extends TestCase
             ->assertJsonPath('data.status', 'approved');
 
         $this->postJson('/api/chat', ['body' => 'مرحبا بالفريق'])->assertCreated();
-        $this->postJson('/api/evaluations', [
-            'employee_id' => $employee->id,
-            'score' => 4,
-            'period' => now()->format('Y-m'),
-        ])->assertCreated();
 
         $this->postJson('/api/ocr/review', [
             'source' => 'national_id',

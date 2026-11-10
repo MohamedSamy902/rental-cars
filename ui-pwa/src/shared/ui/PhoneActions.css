@@ -1,7 +1,7 @@
 .rpm-phone-actions {
   display: inline-flex;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
@@ -25,14 +25,14 @@
   font-weight: 600;
   text-decoration: none;
   line-height: 1.2;
-  white-space: nowrap;
+  max-inline-size: 100%;
+  min-inline-size: 0;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .rpm-phone-actions__call {
-  min-inline-size: 0;
   /* Hug content — do not grow and shove WhatsApp under the FAB */
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   overflow: hidden;
   color: #0f766e;
   background: color-mix(in srgb, #0d9488 12%, transparent);
@@ -63,6 +63,8 @@
   letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-inline-size: 0;
 }
 
 .rpm-phone-actions--compact .rpm-phone-actions__call,
@@ -70,6 +72,7 @@
   padding-block: 0.28rem;
   padding-inline: 0.45rem;
   font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .rpm-phone-actions--compact .rpm-phone-actions__wa {
@@ -82,9 +85,13 @@
 
 @media (max-width: 640px) {
   .rpm-phone-actions {
-    flex-wrap: nowrap;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 6px;
     width: 100%;
+  }
+
+  .rpm-phone-actions__call {
+    flex: 1 1 8rem;
   }
 
   .rpm-phone-actions__call,
@@ -92,5 +99,11 @@
     padding-block: 0.28rem;
     padding-inline: 0.4rem;
     font-size: 0.74rem;
+  }
+
+  /* Force compact treatment: hide long labels that overflow fold/narrow covers */
+  .rpm-phone-actions:not(.rpm-phone-actions--compact) .rpm-phone-actions__call > span:not(.rpm-phone-actions__number),
+  .rpm-phone-actions:not(.rpm-phone-actions--compact) .rpm-phone-actions__wa > span {
+    display: none;
   }
 }
