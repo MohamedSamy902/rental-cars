@@ -301,13 +301,160 @@ class ContractLifecycleService
     }
 
     /**
-     * تعديل أسعار بعد الإنشاء — موقوف: لا يُسمح بتعديل حقول العقد المالية بعد الإنشاء.
+     * تعديل عقد قيد المراجعة فقط — بعد الاعتماد تُثبَّت الحقول والأسعار.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function updatePending(Contract $contract, array $data, ?int $userId = null, bool $allowPriceOverride = false): Contract
+    {
+        if ($contract->status !== 'pending') {
+            throw new DomainException('يمكن تعديل بيانات العقد فقط وهو قيد المراجعة — بعد الاعتماد تُثبَّت الأسعار والحقول.');
+        }
+
+        return DB::transaction(function () use ($contract, $data, $userId, $allowPriceOverride) {
+            /** @var Contract $locked */
+            $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'pending') {
+                throw new DomainException('يمكن تعديل بيانات العقد فقط وهو قيد المراجعة — بعد الاعتماد تُثبَّت الأسعار والحقول.');
+            }
+
+            $vehicleId = (int) ($data['vehicle_id'] ?? $locked->vehicle_id);
+            $startsAt = (string) ($data['starts_at'] ?? $locked->starts_at);
+            $endsAt = (string) ($data['planned_ends_at'] ?? $locked->planned_ends_at);
+
+            /** @var Vehicle $vehicle */
+            $vehicle = Vehicle::query()->whereKey($vehicleId)->lockForUpdate()->firstOrFail();
+            if (! $vehicle->is_active) {
+                throw new DomainException('العربية غير نشطة.');
+            }
+            if (in_array($vehicle->manual_status, [
+                VehicleAvailabilityService::STATUS_MAINTENANCE,
+                VehicleAvailabilityService::STATUS_OUT_OF_SERVICE,
+                VehicleAvailabilityService::STATUS_SOLD,
+            ], true)) {
+                throw new DomainException('العربية غير متاحة للعقد في حالتها الحالية.');
+            }
+
+            $customerId = (int) ($data['customer_id'] ?? $locked->customer_id);
+            $customer = Customer::query()->findOrFail($customerId);
+            if (in_array($customer->status, ['blacklist', 'blacklisted'], true)) {
+                throw new DomainException('العميل في القائمة السوداء.');
+            }
+
+            $this->assertOwnerAgreementCoversRental($vehicle, $endsAt);
+            $this->assertNoOverlap($vehicleId, $startsAt, $endsAt, $locked->id);
+            $this->assertVehicleLicenseCoversRental(
+                (int) $vehicle->id,
+                Carbon::parse($endsAt)->toDateString(),
+            );
+
+            $dailyRate = $allowPriceOverride && array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
+                ? (int) $data['daily_rate']
+                : (array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
+                    ? (int) $data['daily_rate']
+                    : (int) $locked->frozen_daily_rate);
+            if (! $allowPriceOverride && array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
+                && (int) $data['daily_rate'] !== (int) $vehicle->daily_rate
+                && (int) $data['daily_rate'] !== (int) $locked->frozen_daily_rate) {
+                // السماح بتعديل السعر عند قيد المراجعة إن أُرسل — نفس مسار الإنشاء مع صلاحية التجاوز من المتحكم.
+                $dailyRate = (int) $data['daily_rate'];
+            }
+
+            $deposit = array_key_exists('deposit', $data) && $data['deposit'] !== null
+                ? (int) $data['deposit']
+                : (int) $locked->frozen_agreed_deposit;
+            $kmAllowance = array_key_exists('daily_km_allowance', $data) && $data['daily_km_allowance'] !== null
+                ? (int) $data['daily_km_allowance']
+                : (int) ($locked->frozen_daily_km_allowance ?? 200);
+            $excessRate = array_key_exists('excess_km_rate', $data) && $data['excess_km_rate'] !== null
+                ? (int) $data['excess_km_rate']
+                : (int) ($locked->frozen_excess_km_rate ?? 5);
+
+            if (array_key_exists('accessory_ids', $data)) {
+                $accessories = $this->resolveAccessoriesSnapshot($vehicle, $data['accessory_ids']);
+            } else {
+                $accessories = is_array($locked->accessories_json) ? $locked->accessories_json : [];
+            }
+
+            if (array_key_exists('odometer', $data) && $data['odometer'] !== null) {
+                $odo = (int) $data['odometer'];
+                if ($odo < (int) $vehicle->odometer && $vehicleId === (int) $locked->vehicle_id) {
+                    // السماح بنفس العداد أو أعلى؛ إن تغيّرت العربية استخدم عدادها الحالي كحد أدنى.
+                }
+                if ($odo < (int) $vehicle->odometer) {
+                    throw new DomainException('العداد الحالي أقل من عداد العربية المسجّل.');
+                }
+                $vehicle->update(['odometer' => $odo, 'odometer_source' => 'manual']);
+            }
+
+            $before = [
+                'customer_id' => $locked->customer_id,
+                'vehicle_id' => $locked->vehicle_id,
+                'starts_at' => (string) $locked->starts_at,
+                'planned_ends_at' => (string) $locked->planned_ends_at,
+                'frozen_daily_rate' => $locked->frozen_daily_rate,
+                'frozen_agreed_deposit' => $locked->frozen_agreed_deposit,
+            ];
+
+            $locked->fill([
+                'customer_id' => $customerId,
+                'vehicle_id' => $vehicleId,
+                'guarantor_customer_id' => array_key_exists('guarantor_customer_id', $data)
+                    ? $data['guarantor_customer_id']
+                    : $locked->guarantor_customer_id,
+                'starts_at' => $startsAt,
+                'planned_ends_at' => $endsAt,
+                'min_days' => array_key_exists('min_days', $data) ? $data['min_days'] : $locked->min_days,
+                'frozen_daily_rate' => $dailyRate,
+                'frozen_daily_km_allowance' => $kmAllowance,
+                'frozen_excess_km_rate' => $excessRate,
+                'frozen_agreed_deposit' => $deposit,
+                'discount' => array_key_exists('discount', $data) ? (int) $data['discount'] : $locked->discount,
+                'other_fees' => array_key_exists('other_fees', $data) ? (int) $data['other_fees'] : $locked->other_fees,
+                'other_fees_description' => array_key_exists('other_fees_description', $data)
+                    ? $data['other_fees_description']
+                    : $locked->other_fees_description,
+                'notes' => array_key_exists('notes', $data) ? $data['notes'] : $locked->notes,
+                'accessories_json' => $accessories,
+            ]);
+            $locked->save();
+
+            if (array_key_exists('balance_due_on', $data)) {
+                $this->syncBalanceDueOn($locked, $data['balance_due_on']);
+            }
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'updated',
+                'record_type' => Contract::class,
+                'record_id' => $locked->id,
+                'before' => $before,
+                'after' => [
+                    'customer_id' => $locked->customer_id,
+                    'vehicle_id' => $locked->vehicle_id,
+                    'starts_at' => (string) $locked->starts_at,
+                    'planned_ends_at' => (string) $locked->planned_ends_at,
+                    'frozen_daily_rate' => $locked->frozen_daily_rate,
+                    'frozen_agreed_deposit' => $locked->frozen_agreed_deposit,
+                ],
+            ]);
+
+            return $locked->fresh()->load(['customer', 'vehicle', 'salesUser:id,name', 'deposit']);
+        });
+    }
+
+    /**
+     * تعديل أسعار بعد الاعتماد — موقوف.
      *
      * @param  array<string, mixed>  $data
      */
     public function updateFrozenPricing(Contract $contract, array $data, ?int $userId = null): Contract
     {
-        throw new DomainException('لا يمكن تعديل أسعار العقد بعد الإنشاء.');
+        if ($contract->status === 'pending') {
+            return $this->updatePending($contract, $data, $userId, true);
+        }
+
+        throw new DomainException('لا يمكن تعديل أسعار العقد بعد الاعتماد.');
     }
 
     /**

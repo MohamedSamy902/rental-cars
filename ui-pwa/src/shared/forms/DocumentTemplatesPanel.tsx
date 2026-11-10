@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { api, apiUpload, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
-import { Button, TextAreaField, TextField, useToast } from '@/shared/ui'
+import { Button, TextField, useToast } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
 import { shellRentalContractHtml } from '@/shared/contracts/rentalContractPrint'
+import './DocumentTemplatesPanel.css'
 
 type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement'
 
@@ -13,6 +14,7 @@ type Placeholder = {
   aliases: string[]
   label: string
   sample: string
+  group?: string
 }
 
 type TemplateRow = {
@@ -29,7 +31,7 @@ type TemplateRow = {
 const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
   contract: {
     title: 'عقد إيجار سيارة (نموذج المركز)',
-    hint: 'نموذج عقد الإيجار بين المركز والمستأجر (مطابق للنموذج الورقي). عدّل البنود هنا لكل العقود، أو عدّل نسخة عقد واحد فقط من شاشة الطباعة قبل الإرسال للطابعة.',
+    hint: 'عدّل النص كما يظهر للطباعة. الحقول الزرقاء تُستبدل تلقائياً ببيانات كل عقد.',
   },
   handover_receipt: {
     title: 'قالب إيصال الاستلام والتأمين',
@@ -37,9 +39,11 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
   },
   owner_agreement: {
     title: 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
-    hint: 'عقد قانوني متعدد الصفحات يُملأ تلقائياً ببيانات المركز والمالك والعربية عند الحفظ/الطباعة، وقابل للتعديل هنا.',
+    hint: 'يُملأ تلقائياً ببيانات المركز والمالك والعربية عند الحفظ/الطباعة.',
   },
 }
+
+const GROUP_ORDER = ['المركز', 'العميل', 'العربية', 'العقد', 'التأمين', 'المالك', 'أخرى']
 
 function shellPreview(type: TemplateType, title: string, body: string) {
   if (type === 'owner_agreement') {
@@ -54,12 +58,58 @@ function shellPreview(type: TemplateType, title: string, body: string) {
   h1{margin:0 0 4px;font-size:22px} h2{margin:20px 0 8px;font-size:16px}
   .muted{color:#64748b} table{width:100%;border-collapse:collapse;margin-top:12px}
   td,th{border:1px solid #cbd5e1;padding:8px;text-align:start} th{background:#f8fafc;width:32%}
-  .foot{margin-top:24px;color:#64748b;font-size:12px}
-  .terms{margin-top:20px;white-space:pre-wrap;font-size:13px;line-height:1.7}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;color:#0f766e;font-size:12px}
-  .print-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
-  .print-logo{width:96px;height:auto;object-fit:contain}
 </style></head><body>${body}</body></html>`
+}
+
+function VisualHtmlEditor({
+  value,
+  disabled,
+  onChange,
+  editorRef,
+}: {
+  value: string
+  disabled?: boolean
+  onChange: (html: string) => void
+  editorRef: MutableRefObject<HTMLDivElement | null>
+}) {
+  const skipNext = useRef(false)
+
+  useEffect(() => {
+    const el = editorRef.current
+    if (!el) return
+    if (skipNext.current) {
+      skipNext.current = false
+      return
+    }
+    if (el.innerHTML !== value) {
+      el.innerHTML = value || ''
+    }
+  }, [value, editorRef])
+
+  return (
+    <div
+      ref={editorRef}
+      className="rpm-template-editor"
+      contentEditable={!disabled}
+      suppressContentEditableWarning
+      dir="rtl"
+      role="textbox"
+      aria-multiline="true"
+      aria-label="محتوى القالب"
+      onInput={() => {
+        const el = editorRef.current
+        if (!el) return
+        skipNext.current = true
+        onChange(el.innerHTML)
+      }}
+      onBlur={() => {
+        const el = editorRef.current
+        if (!el) return
+        skipNext.current = true
+        onChange(el.innerHTML)
+      }}
+    />
+  )
 }
 
 export function DocumentTemplatesPanel() {
@@ -77,8 +127,28 @@ export function DocumentTemplatesPanel() {
   const [files, setFiles] = useState<Partial<Record<TemplateType, File | null>>>({})
   const [saving, setSaving] = useState<TemplateType | null>(null)
   const [previewing, setPreviewing] = useState<TemplateType | null>(null)
-  /** All template editors start collapsed — page was too long when fully open. */
-  const [expanded, setExpanded] = useState<Partial<Record<TemplateType, boolean>>>({})
+  const [expanded, setExpanded] = useState<Partial<Record<TemplateType, boolean>>>({ contract: true })
+  const [showSource, setShowSource] = useState<Partial<Record<TemplateType, boolean>>>({})
+  const contractEditorRef = useRef<HTMLDivElement | null>(null)
+  const handoverEditorRef = useRef<HTMLDivElement | null>(null)
+  const ownerEditorRef = useRef<HTMLDivElement | null>(null)
+  const editorRefs: Record<TemplateType, MutableRefObject<HTMLDivElement | null>> = {
+    contract: contractEditorRef,
+    handover_receipt: handoverEditorRef,
+    owner_agreement: ownerEditorRef,
+  }
+
+  const groupedPlaceholders = useMemo(() => {
+    const map = new Map<string, Placeholder[]>()
+    for (const p of placeholders) {
+      const g = p.group || 'أخرى'
+      if (!map.has(g)) map.set(g, [])
+      map.get(g)!.push(p)
+    }
+    return GROUP_ORDER
+      .filter((g) => map.has(g))
+      .map((g) => ({ group: g, items: map.get(g)! }))
+  }, [placeholders])
 
   useEffect(() => {
     let cancelled = false
@@ -143,9 +213,6 @@ export function DocumentTemplatesPanel() {
   async function preview(type: TemplateType) {
     setPreviewing(type)
     try {
-      // Persist draft content temporarily via preview endpoint sample vars (does not publish).
-      // If draft differs from active, send override variables only — preview uses active DB template.
-      // So we first save? No — for unsaved draft preview, render locally with sample placeholders.
       const content = drafts[type].content
       const sampleMap: Record<string, string> = {}
       for (const p of placeholders) {
@@ -157,12 +224,7 @@ export function DocumentTemplatesPanel() {
         return v != null ? String(v).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch)) : `{{${key}}}`
       })
       printHtmlDocument(shellPreview(type, TYPE_META[type].title, rendered))
-
-      // Also hit server preview for active published version (optional confirmation).
-      await api('/document-templates/preview', {
-        method: 'POST',
-        json: { type },
-      }).catch(() => undefined)
+      await api('/document-templates/preview', { method: 'POST', json: { type } }).catch(() => undefined)
     } catch (e) {
       toast.error((e as ApiError).message || 'تعذّر معاينة القالب.')
     } finally {
@@ -170,14 +232,35 @@ export function DocumentTemplatesPanel() {
     }
   }
 
-  function insertToken(type: TemplateType, token: string) {
+  function insertToken(type: TemplateType, token: string, label: string) {
+    const el = editorRefs[type].current
+    const snippet = `{{${token}}}`
+    if (el && document.activeElement === el) {
+      el.focus()
+      const ok = document.execCommand('insertText', false, snippet)
+      if (!ok) {
+        const sel = window.getSelection()
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0)
+          range.deleteContents()
+          range.insertNode(document.createTextNode(snippet))
+          range.collapse(false)
+        } else {
+          el.innerHTML = `${el.innerHTML}${snippet}`
+        }
+      }
+      setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: el.innerHTML } }))
+      toast.success(`أُدرج: ${label}`)
+      return
+    }
     setDrafts((prev) => ({
       ...prev,
       [type]: {
         ...prev[type],
-        content: `${prev[type].content}${prev[type].content.endsWith('\n') || !prev[type].content ? '' : ' '}{{${token}}}`,
+        content: `${prev[type].content}${prev[type].content && !prev[type].content.endsWith('\n') ? ' ' : ''}${snippet}`,
       },
     }))
+    toast.success(`أُدرج في النص: ${label}`)
   }
 
   if (loading) {
@@ -187,41 +270,14 @@ export function DocumentTemplatesPanel() {
   return (
     <div className="rpm-stack" style={{ gap: '1rem' }}>
       <p className="muted" style={{ margin: 0 }}>
-        خصّص قوالب الطباعة بعناصر ديناميكية مثل{' '}
-        <code>{'{{اسم_العميل}}'}</code> و<code>{'{{رقم_اللوحة}}'}</code>. الحفظ ينشر إصداراً جديداً ويصبح فوراً
-        القالب النشط لكل المستخدمين عند الطباعة.
+        القالب هو شكل المستند المطبوع. عدّل النص مباشرة كما تراه، واضغط على اسم الحقل بالأسفل لإدراج بيانات تُملأ وحدها عند طباعة كل عقد (اسم العميل، اللوحة، السعر…).
       </p>
-
-      <div className="rpm-panel" style={{ padding: '0.85rem 1rem' }}>
-        <strong style={{ display: 'block', marginBlockEnd: '0.55rem' }}>المتغيرات المتاحة</strong>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-          {placeholders.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className="rpm-chip"
-              title={`${p.label} · مثال: ${p.sample}`}
-              onClick={() => insertToken('contract', p.aliases[0] || p.key)}
-              disabled={!canEdit}
-              style={{
-                border: '1px solid var(--border)',
-                background: 'var(--surface-2, var(--surface))',
-                borderRadius: 999,
-                padding: '0.25rem 0.65rem',
-                fontSize: '0.78rem',
-                cursor: canEdit ? 'pointer' : 'default',
-              }}
-            >
-              {`{{${p.aliases[0] || p.key}}}`}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {(['contract', 'handover_receipt', 'owner_agreement'] as TemplateType[]).map((type) => {
         const meta = TYPE_META[type]
         const row = active[type]
         const isOpen = Boolean(expanded[type])
+        const sourceMode = Boolean(showSource[type])
         return (
           <section key={type} className="rpm-panel">
             <div className="rpm-panel__head" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -254,35 +310,89 @@ export function DocumentTemplatesPanel() {
                 </p>
               </button>
               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  loading={previewing === type}
-                  onClick={() => void preview(type)}
-                >
-                  معاينة
+                <Button size="sm" variant="secondary" loading={previewing === type} onClick={() => void preview(type)}>
+                  معاينة طباعة
                 </Button>
-                <Button
-                  size="sm"
-                  loading={saving === type}
-                  disabled={!canEdit || !isOpen}
-                  onClick={() => void save(type)}
-                >
+                <Button size="sm" loading={saving === type} disabled={!canEdit || !isOpen} onClick={() => void save(type)}>
                   حفظ ونشر
                 </Button>
               </div>
             </div>
 
             {isOpen ? (
-              <div className="rpm-form-grid" style={{ marginBlockStart: '0.75rem' }}>
+              <div className="rpm-stack" style={{ gap: '0.85rem', marginBlockStart: '0.75rem' }}>
                 <TextField
                   label="عنوان القالب"
                   value={drafts[type].title}
                   disabled={!canEdit}
                   onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], title: e.target.value } }))}
                 />
+
                 <div className="rpm-field">
-                  <span className="rpm-field__label">رفع ملف Word / HTML / Markdown (اختياري)</span>
+                  <span className="rpm-field__label">حقول تُملأ تلقائياً عند الطباعة</span>
+                  <span className="rpm-field__hint">
+                    هذه ليست نصوصاً ثابتة — اضغط الاسم لإدراجه في مكان المؤشر داخل المحرر. عند الطباعة يتحول إلى بيانات العقد الحقيقية.
+                  </span>
+                  <div className="rpm-template-vars">
+                    {groupedPlaceholders.map(({ group, items }) => (
+                      <div key={group} className="rpm-template-vars__group">
+                        <strong className="rpm-template-vars__group-title">{group}</strong>
+                        <div className="rpm-template-vars__chips">
+                          {items.map((p) => (
+                            <button
+                              key={p.key}
+                              type="button"
+                              className="rpm-template-vars__chip"
+                              title={`مثال عند الطباعة: ${p.sample}`}
+                              disabled={!canEdit}
+                              onClick={() => insertToken(type, p.aliases[0] || p.key, p.label)}
+                            >
+                              <span className="rpm-template-vars__chip-label">{p.label}</span>
+                              <span className="rpm-template-vars__chip-sample">مثال: {p.sample}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rpm-field">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span className="rpm-field__label">محتوى القالب</span>
+                    <button
+                      type="button"
+                      className="rpm-linkish"
+                      onClick={() => setShowSource((prev) => ({ ...prev, [type]: !prev[type] }))}
+                      style={{ background: 'none', border: 0, color: 'var(--accent, #0f766e)', cursor: 'pointer', fontSize: '0.82rem' }}
+                    >
+                      {sourceMode ? 'العودة للتعديل المرئي' : 'عرض المصدر (للمتقدمين)'}
+                    </button>
+                  </div>
+                  <span className="rpm-field__hint">
+                    عدّل النص والبنود مباشرة. لا تحتاج كتابة أكواد — استخدم الحقول أعلاه للإدراج.
+                  </span>
+                  {sourceMode ? (
+                    <textarea
+                      className="rpm-template-source"
+                      dir="rtl"
+                      disabled={!canEdit}
+                      value={drafts[type].content}
+                      onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))}
+                      rows={16}
+                    />
+                  ) : (
+                    <VisualHtmlEditor
+                      value={drafts[type].content}
+                      disabled={!canEdit}
+                      editorRef={editorRefs[type]}
+                      onChange={(html) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: html } }))}
+                    />
+                  )}
+                </div>
+
+                <div className="rpm-field">
+                  <span className="rpm-field__label">استبدال من ملف (اختياري)</span>
                   <input
                     type="file"
                     accept=".docx,.html,.htm,.md,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/markdown,text/plain"
@@ -296,13 +406,6 @@ export function DocumentTemplatesPanel() {
                     </p>
                   ) : null}
                 </div>
-                <TextAreaField
-                  label="محتوى القالب (HTML / Markdown مع المتغيرات)"
-                  value={drafts[type].content}
-                  disabled={!canEdit}
-                  onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))}
-                  hint="اترك الحقول فارغة في المحتوى لتبقى كما هي؛ استخدم {{المتغير}} للإحلال الديناميكي."
-                />
               </div>
             ) : null}
           </section>

@@ -311,7 +311,6 @@ class ContractController extends Controller
                     'print_tax_info' => $ops['print_tax_info'] ?? null,
                     'print_signer_name' => $ops['print_signer_name'] ?? null,
                     'company_tagline' => $ops['company_tagline'] ?? null,
-                    'default_contract_vehicle_value' => $ops['default_contract_vehicle_value'] ?? null,
                     'contract_terms' => $ops['contract_terms'] ?? null,
                 ],
                 'contract' => $payload,
