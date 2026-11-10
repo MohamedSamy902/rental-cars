@@ -66,6 +66,19 @@ export async function enableWebPush(): Promise<{ ok: true } | { ok: false; messa
   return { ok: true }
 }
 
+/** هل هذا المتصفح/الجهاز مشترك حالياً في Web Push؟ */
+export async function hasLocalPushSubscription(): Promise<boolean> {
+  if (!pushSupported()) return false
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/')
+    if (!reg) return false
+    const sub = await reg.pushManager.getSubscription()
+    return Boolean(sub?.endpoint)
+  } catch {
+    return false
+  }
+}
+
 export async function disableWebPush(): Promise<void> {
   if (!pushSupported()) return
   const reg = await navigator.serviceWorker.getRegistration('/')
