@@ -5,19 +5,67 @@
   line-height: 1.6;
 }
 
+.rpm-template-editor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-block-end: 0.45rem;
+}
+
+.rpm-template-visual {
+  width: 100%;
+  min-height: 22rem;
+  max-height: min(70vh, 44rem);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.15rem;
+  font-family: 'Cairo', 'IBM Plex Sans Arabic', Tahoma, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.75;
+  background: var(--surface);
+  color: var(--text);
+  direction: rtl;
+  outline: none;
+}
+
+.rpm-template-visual:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.rpm-template-visual:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+}
+
+.rpm-template-visual [data-rpm-lock],
+.rpm-template-visual svg,
+.rpm-template-visual img {
+  user-select: none;
+  outline: none;
+}
+
+.rpm-template-visual p {
+  margin: 0 0 0.65rem;
+}
+
 .rpm-template-source {
   width: 100%;
   min-height: 18rem;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.9rem 1rem;
-  font-family: var(--font-body);
-  font-size: 0.88rem;
-  line-height: 1.7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.65;
   resize: vertical;
   background: var(--surface);
   color: var(--text);
-  direction: rtl;
+  direction: ltr;
+  text-align: start;
 }
 
 .rpm-template-source:focus {
@@ -94,6 +142,18 @@
   cursor: pointer;
   font-size: 0.82rem;
   padding: 0;
+}
+
+[data-theme='dark'] .rpm-template-visual {
+  background: #12141a;
+  border-color: color-mix(in srgb, #fff 14%, transparent);
+  color: #f4f6f8;
+}
+
+[data-theme='dark'] .rpm-template-source {
+  background: #0f1117;
+  color: #e8eaed;
+  border-color: color-mix(in srgb, #fff 14%, transparent);
 }
 
 [data-theme='dark'] .rpm-template-vars__chip {
