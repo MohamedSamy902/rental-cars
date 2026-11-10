@@ -163,13 +163,14 @@ export function AccountsPage() {
       />
 
       <section className="rpm-panel ac-daily">
-        <div className="rpm-panel__head ac-daily__head">
-          <div>
-            <h3>حركة الفلوس اليومية</h3>
-            <p className="muted" style={{ margin: 0 }}>
-              كل ما له علاقة بفلوس في النظام لهذا اليوم (قبض · مصروف · راتب · مالك…)
-            </p>
-          </div>
+        <header className="ac-daily__intro">
+          <h3>حركة الفلوس اليومية</h3>
+          <p className="muted">
+            كل ما له علاقة بفلوس في النظام لهذا اليوم (قبض · مصروف · راتب · مالك…)
+          </p>
+        </header>
+
+        <div className="ac-daily__date">
           <DateField
             label="التاريخ"
             value={cashDate}
@@ -183,6 +184,7 @@ export function AccountsPage() {
         {!dailyLoading && daily ? (
           <>
             <MetricCardGrid
+              className="ac-daily__kpis"
               label={`ملخص ${daily.date}`}
               mobile="wrap"
               items={[
@@ -193,9 +195,9 @@ export function AccountsPage() {
               ]}
             />
             {daily.entries.length === 0 ? (
-              <p className="muted">لا حركة فلوس في هذا التاريخ.</p>
+              <p className="muted ac-daily__empty">لا حركة فلوس في هذا التاريخ.</p>
             ) : (
-              <div className="rpm-dense-list">
+              <div className="ac-daily__entries">
                 {daily.entries.map((row) => {
                   const body = (
                     <>
@@ -214,11 +216,11 @@ export function AccountsPage() {
                     </>
                   )
                   return row.href ? (
-                    <Link key={row.id} to={row.href} className="rpm-dense-row ac-daily__row">
+                    <Link key={row.id} to={row.href} className="ac-daily__row">
                       {body}
                     </Link>
                   ) : (
-                    <div key={row.id} className="rpm-dense-row">
+                    <div key={row.id} className="ac-daily__row">
                       {body}
                     </div>
                   )
