@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { apiUrl, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
-import { BrandLogo, SkeletonBlock, PhoneActions } from '@/shared/ui'
+import { BrandLogo, SkeletonBlock, telHref, whatsappHref } from '@/shared/ui'
 import './VehicleQrPage.css'
 
 type QrCard = {
@@ -15,6 +15,7 @@ type QrCard = {
   }
   center: {
     name: string
+    tagline?: string | null
     phone?: string | null
     address?: string | null
     logo_url?: string | null
@@ -32,6 +33,10 @@ const SOCIAL_LABELS: Record<string, string> = {
   twitter: 'إكس',
   youtube: 'يوتيوب',
   snapchat: 'سناب شات',
+}
+
+function mapsHref(address: string): string {
+  return `https://maps.google.com/?q=${encodeURIComponent(address)}`
 }
 
 export function VehicleQrPage() {
@@ -88,9 +93,21 @@ export function VehicleQrPage() {
     return <Navigate to="/login" replace />
   }
 
+  const vehicleLabel = card
+    ? [
+        [card.vehicle.brand, card.vehicle.model].filter(Boolean).join(' '),
+        card.vehicle.plate,
+      ].filter(Boolean).join(' · ')
+    : ''
+
   return (
     <div className="vqr">
-      <div className="vqr__glow" aria-hidden />
+      <div className="vqr__atmosphere" aria-hidden>
+        <span className="vqr__beam vqr__beam--a" />
+        <span className="vqr__beam vqr__beam--b" />
+        <span className="vqr__road" />
+      </div>
+
       <div className="vqr__shell">
         {loading ? <SkeletonBlock rows={6} /> : null}
 
@@ -103,8 +120,8 @@ export function VehicleQrPage() {
 
         {!loading && card ? (
           <>
-            <header className="vqr__brand">
-              <div className="vqr__logo-band">
+            <header className="vqr__hero">
+              <div className="vqr__logo-stage">
                 {card.center.logo_url ? (
                   <img
                     className="vqr__tenant-logo"
@@ -116,67 +133,87 @@ export function VehicleQrPage() {
                   <BrandLogo variant="full" bare />
                 )}
               </div>
+              <p className="vqr__eyebrow">تأجير سيارات</p>
               <h1 className="vqr__center-name">{card.center.name}</h1>
-              {(card.vehicle.brand || card.vehicle.model || card.vehicle.plate) ? (
-                <p className="vqr__vehicle-line">
-                  {[card.vehicle.brand, card.vehicle.model].filter(Boolean).join(' ')}
-                  {card.vehicle.plate ? ` · ${card.vehicle.plate}` : ''}
-                </p>
+              {card.center.tagline ? (
+                <p className="vqr__tagline">{card.center.tagline}</p>
+              ) : null}
+              {vehicleLabel ? (
+                <p className="vqr__vehicle-line">{vehicleLabel}</p>
               ) : null}
             </header>
 
-            <section className="vqr__section" aria-label="بيانات المركز">
-              <h2>بيانات المركز</h2>
-              {card.center.phone ? (
-                <div className="vqr__row">
-                  <span className="vqr__label">الهاتف</span>
-                  <PhoneActions phone={card.center.phone} name={card.center.name} />
-                </div>
-              ) : null}
-              {card.center.address ? (
-                <div className="vqr__row">
-                  <span className="vqr__label">العنوان</span>
-                  <p className="vqr__value">{card.center.address}</p>
-                </div>
-              ) : null}
-              {Object.keys(card.center.social).length > 0 ? (
-                <ul className="vqr__social">
-                  {Object.entries(card.center.social).map(([key, href]) => (
-                    <li key={key}>
-                      <a href={href} target="_blank" rel="noopener noreferrer">
-                        {SOCIAL_LABELS[key] || key}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {!card.center.phone && !card.center.address && Object.keys(card.center.social).length === 0 ? (
-                <p className="vqr__muted">تواصل مع المركز عبر قنواته المعتادة.</p>
-              ) : null}
-            </section>
+            {(card.center.phone || card.center.address) ? (
+              <section className="vqr__promo" aria-label="تواصل مع المركز">
+                {card.center.phone ? (
+                  <div className="vqr__cta-row">
+                    <a className="vqr__cta vqr__cta--call" href={telHref(card.center.phone)}>
+                      <span className="vqr__cta-kicker">اتصل الآن</span>
+                      <strong dir="ltr">{card.center.phone}</strong>
+                    </a>
+                    <a
+                      className="vqr__cta vqr__cta--wa"
+                      href={whatsappHref(card.center.phone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span className="vqr__cta-kicker">واتساب</span>
+                      <strong>راسل المركز</strong>
+                    </a>
+                  </div>
+                ) : null}
+
+                {card.center.address ? (
+                  <a
+                    className="vqr__address"
+                    href={mapsHref(card.center.address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span className="vqr__address-label">العنوان</span>
+                    <span className="vqr__address-value">{card.center.address}</span>
+                    <span className="vqr__address-hint">افتح على الخريطة</span>
+                  </a>
+                ) : null}
+              </section>
+            ) : null}
+
+            {Object.keys(card.center.social).length > 0 ? (
+              <nav className="vqr__social" aria-label="حسابات المركز">
+                {Object.entries(card.center.social).map(([key, href]) => (
+                  <a key={key} href={href} target="_blank" rel="noopener noreferrer">
+                    {SOCIAL_LABELS[key] || key}
+                  </a>
+                ))}
+              </nav>
+            ) : null}
 
             {card.is_rented && card.current_renter ? (
-              <section className="vqr__section vqr__section--renter" aria-label="المستأجر الحالي">
-                <h2>المستأجر الحالي</h2>
-                <div className="vqr__row">
-                  <span className="vqr__label">الاسم</span>
-                  <p className="vqr__value">{card.current_renter.full_name}</p>
-                </div>
+              <section className="vqr__renter" aria-label="المستأجر الحالي">
+                <p className="vqr__renter-label">المستأجر الحالي</p>
+                <p className="vqr__renter-name">{card.current_renter.full_name}</p>
                 {card.current_renter.phone ? (
-                  <div className="vqr__row">
-                    <span className="vqr__label">الهاتف</span>
-                    <PhoneActions phone={card.current_renter.phone} name={card.current_renter.full_name} />
+                  <div className="vqr__cta-row vqr__cta-row--compact">
+                    <a className="vqr__cta vqr__cta--call" href={telHref(card.current_renter.phone)}>
+                      <span className="vqr__cta-kicker">اتصال</span>
+                      <strong dir="ltr">{card.current_renter.phone}</strong>
+                    </a>
+                    <a
+                      className="vqr__cta vqr__cta--wa"
+                      href={whatsappHref(card.current_renter.phone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span className="vqr__cta-kicker">واتساب</span>
+                      <strong>مراسلة</strong>
+                    </a>
                   </div>
                 ) : null}
               </section>
-            ) : (
-              <section className="vqr__section vqr__section--idle" aria-label="حالة التأجير">
-                <p className="vqr__idle">العربية غير مؤجَّرة حالياً.</p>
-              </section>
-            )}
+            ) : null}
 
             <footer className="vqr__credit">
-              <span>تم بواسطة</span>{' '}
+              <span>تم بواسطة</span>
               <a
                 href={card.credit.whatsapp_url}
                 target="_blank"
