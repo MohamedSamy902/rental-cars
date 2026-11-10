@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\RecordTrackerSimRechargeRequest;
 use App\Http\Requests\StoreVehicleRequest;
 use App\Http\Requests\UpdateVehicleRequest;
 use App\Models\Contract;
@@ -150,10 +151,15 @@ class VehicleController extends Controller
                         ->whereDate('expires_on', '<=', $until);
                 });
             } elseif ($status === 'sim_recharge') {
-                $within = max(0, (int) $request->integer('within_days', 14));
-                $until = now()->addDays($within)->toDateString();
-                $q->whereNotNull('tracker_sim_next_recharge_on')
-                    ->whereDate('tracker_sim_next_recharge_on', '<=', $until);
+                // تبويب الشرائح: كل العربيات ذات رقم شريحة؛ due_only=1 يصفّي المستحقة خلال within_days
+                $q->whereNotNull('tracker_sim_number')
+                    ->where('tracker_sim_number', '!=', '');
+                if ($request->boolean('due_only')) {
+                    $within = max(0, (int) $request->integer('within_days', 14));
+                    $until = now()->addDays($within)->toDateString();
+                    $q->whereNotNull('tracker_sim_next_recharge_on')
+                        ->whereDate('tracker_sim_next_recharge_on', '<=', $until);
+                }
             } elseif ($status === 'owner_agreement_expiring') {
                 $within = max(0, (int) $request->integer('within_days', 30));
                 $until = now()->addDays($within)->toDateString();
@@ -517,6 +523,37 @@ class VehicleController extends Controller
         return response()->json(['message' => 'تم أرشفة العربية.']);
     }
 
+    public function recordSimRecharge(RecordTrackerSimRechargeRequest $request, Vehicle $vehicle): JsonResponse
+    {
+        try {
+            $result = $this->vehicles->recordTrackerSimRecharge(
+                $vehicle,
+                $request->validated(),
+                $request->user(),
+            );
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => $this->present($result['vehicle'], $request->user()),
+            'recharge' => [
+                'id' => $result['recharge']->id,
+                'amount' => (int) $result['recharge']->amount,
+                'recharged_on' => $result['recharge']->recharged_on?->toDateString(),
+                'next_recharge_on' => $result['recharge']->next_recharge_on?->toDateString(),
+            ],
+            'message' => 'تم تسجيل شحن الشريحة.',
+        ]);
+    }
+
+    public function simRechargeLog(Request $request, Vehicle $vehicle): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->vehicles->trackerSimRechargeLog($vehicle),
+        ]);
+    }
+
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): JsonResponse
     {
         try {
@@ -613,6 +650,9 @@ class VehicleController extends Controller
             'tracker_device_number' => $v->tracker_device_number,
             'tracker_sim_number' => $v->tracker_sim_number,
             'tracker_sim_last_recharged_on' => $v->tracker_sim_last_recharged_on?->toDateString(),
+            'tracker_sim_last_recharge_amount' => $v->tracker_sim_last_recharge_amount !== null
+                ? (int) $v->tracker_sim_last_recharge_amount
+                : null,
             'tracker_sim_next_recharge_on' => $v->tracker_sim_next_recharge_on?->toDateString(),
             'tracker_sim_recharge_cycle_days' => $v->tracker_sim_recharge_cycle_days !== null
                 ? (int) $v->tracker_sim_recharge_cycle_days

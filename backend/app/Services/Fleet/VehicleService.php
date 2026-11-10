@@ -4,12 +4,14 @@ namespace App\Services\Fleet;
 
 use App\Models\DocumentTemplate;
 use App\Models\PrintSnapshot;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleAddonCatalog;
 use App\Models\VehicleBrand;
 use App\Models\VehicleDocument;
 use App\Models\VehicleDocumentHistory;
 use App\Models\VehicleOwner;
+use App\Models\VehicleTrackerSimRecharge;
 use App\Services\Documents\DocumentTemplateService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -575,6 +577,82 @@ class VehicleService
                 'category' => $a->category,
                 'default_qty' => $a->default_qty,
                 'required_each_rental' => $a->required_each_rental,
+            ])
+            ->all();
+    }
+
+    /**
+     * يسجّل شحن شريحة التتبع: يحدّث العربية ويضيف سطراً في سجل الشحن.
+     *
+     * @param  array{amount:int,recharged_on?:string,next_recharge_on:string,notes?:?string}  $data
+     * @return array{vehicle: Vehicle, recharge: VehicleTrackerSimRecharge}
+     */
+    public function recordTrackerSimRecharge(Vehicle $vehicle, array $data, ?User $actor = null): array
+    {
+        $sim = trim((string) ($vehicle->tracker_sim_number ?? ''));
+        if ($sim === '') {
+            throw new DomainException('لا يوجد رقم شريحة تتبع على هذه العربية.');
+        }
+
+        $rechargedOn = (string) ($data['recharged_on'] ?? now()->toDateString());
+        $nextOn = (string) $data['next_recharge_on'];
+        $amount = (int) $data['amount'];
+        if ($amount < 1) {
+            throw new DomainException('مبلغ الشحن يجب أن يكون أكبر من صفر.');
+        }
+        if ($nextOn < $rechargedOn) {
+            throw new DomainException('موعد الشحن القادم لا يمكن أن يسبق تاريخ الشحن.');
+        }
+
+        return DB::transaction(function () use ($vehicle, $amount, $rechargedOn, $nextOn, $data, $actor) {
+            $cycle = (int) ($vehicle->tracker_sim_recharge_cycle_days ?: 30);
+            $fromDates = max(1, (int) round(
+                (strtotime($nextOn) - strtotime($rechargedOn)) / 86400
+            ));
+
+            $vehicle->forceFill([
+                'tracker_sim_last_recharged_on' => $rechargedOn,
+                'tracker_sim_last_recharge_amount' => $amount,
+                'tracker_sim_next_recharge_on' => $nextOn,
+                'tracker_sim_recharge_cycle_days' => $fromDates > 0 ? $fromDates : $cycle,
+            ])->save();
+
+            $row = VehicleTrackerSimRecharge::query()->create([
+                'vehicle_id' => $vehicle->id,
+                'amount' => $amount,
+                'recharged_on' => $rechargedOn,
+                'next_recharge_on' => $nextOn,
+                'created_by' => $actor?->id,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            return [
+                'vehicle' => $vehicle->fresh(['owner', 'documents', 'accessories']) ?? $vehicle,
+                'recharge' => $row,
+            ];
+        });
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function trackerSimRechargeLog(Vehicle $vehicle, int $limit = 40): array
+    {
+        return VehicleTrackerSimRecharge::query()
+            ->with('creator:id,name')
+            ->where('vehicle_id', $vehicle->id)
+            ->orderByDesc('recharged_on')
+            ->orderByDesc('id')
+            ->limit(max(1, min(100, $limit)))
+            ->get()
+            ->map(fn (VehicleTrackerSimRecharge $r) => [
+                'id' => $r->id,
+                'amount' => (int) $r->amount,
+                'recharged_on' => $r->recharged_on?->toDateString(),
+                'next_recharge_on' => $r->next_recharge_on?->toDateString(),
+                'notes' => $r->notes,
+                'created_by_name' => $r->creator?->name,
+                'created_at' => $r->created_at?->toIso8601String(),
             ])
             ->all();
     }

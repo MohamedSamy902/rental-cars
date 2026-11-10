@@ -16,7 +16,8 @@ class Vehicle extends Model
         'category', 'engine_capacity', 'transmission', 'fuel_type', 'seats', 'odometer',
         'odometer_source', 'daily_rate', 'default_deposit',
         'purchase_value_estimate', 'tracker_device_number', 'tracker_sim_number',
-        'tracker_sim_last_recharged_on', 'tracker_sim_next_recharge_on', 'tracker_sim_recharge_cycle_days',
+        'tracker_sim_last_recharged_on', 'tracker_sim_last_recharge_amount',
+        'tracker_sim_next_recharge_on', 'tracker_sim_recharge_cycle_days',
         'notes', 'is_active', 'manual_status', 'branch_id',
         'owner_id', 'owner_monthly_amount', 'owner_since',
         'owner_agreement_starts_on', 'owner_agreement_ends_on',
@@ -35,9 +36,15 @@ class Vehicle extends Model
             'owner_agreement_starts_on' => 'date:Y-m-d',
             'owner_agreement_ends_on' => 'date:Y-m-d',
             'tracker_sim_last_recharged_on' => 'date:Y-m-d',
+            'tracker_sim_last_recharge_amount' => 'integer',
             'tracker_sim_next_recharge_on' => 'date:Y-m-d',
             'tracker_sim_recharge_cycle_days' => 'integer',
         ];
+    }
+
+    public function trackerSimRecharges(): HasMany
+    {
+        return $this->hasMany(VehicleTrackerSimRecharge::class);
     }
 
     public function owner(): BelongsTo

@@ -243,7 +243,9 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | وصف |
 |--------|------|-----|
-| GET | `/vehicles` | قائمة + summary — `status=license_expiring` (٣٠) · `sim_recharge` (١٤) · `owner_agreement_expiring` (٣٠) · حقول `license_expires_on` · `tracker_sim_*` · `owner_agreement_*` · `summary.*` |
+| GET | `/vehicles` | قائمة + summary — `status=sim_recharge` = كل العربيات بشريحة؛ `due_only=1&within_days=N` للمستحقة · `license_expiring` · `owner_agreement_expiring` · `tracker_sim_*` بما فيها `tracker_sim_last_recharge_amount` |
+| POST | `/vehicles/{id}/sim-recharge` | `{ amount, recharged_on?, next_recharge_on, notes? }` — يسجّل شحن الشريحة + سجل |
+| GET | `/vehicles/{id}/sim-recharges` | سجل شحنات الشريحة |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |
 | POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية من نموذج العربية |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
