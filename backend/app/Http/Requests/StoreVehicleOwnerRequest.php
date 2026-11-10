@@ -31,11 +31,11 @@ class StoreVehicleOwnerRequest extends FormRequest
     {
         return [
             'full_name' => ['required', 'string', 'max:200'],
-            'phone' => ['nullable', 'string', 'max:30', new EgyptianPhone],
+            'phone' => ['required', 'string', 'max:30', new EgyptianPhone],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
-            'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId],
-            'id_front_path' => ['nullable', 'string', 'max:500'],
-            'id_back_path' => ['nullable', 'string', 'max:500'],
+            'national_id' => ['required', 'string', 'max:30', new EgyptianNationalId],
+            'id_front_path' => ['required', 'string', 'max:500'],
+            'id_back_path' => ['required', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
         ];

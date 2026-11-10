@@ -71,6 +71,8 @@ class ContractLifecycleTest extends TestCase
     public function test_full_happy_path_approve_handover_return_and_reports(): void
     {
         $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'starts_at' => now()->toIso8601String(),
@@ -116,6 +118,8 @@ class ContractLifecycleTest extends TestCase
     public function test_cancel_before_handover_is_allowed(): void
     {
         $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'starts_at' => now()->addDay()->toIso8601String(),
@@ -131,6 +135,8 @@ class ContractLifecycleTest extends TestCase
     public function test_overlap_is_rejected(): void
     {
         $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'starts_at' => '2026-11-01T10:00:00',
@@ -138,6 +144,8 @@ class ContractLifecycleTest extends TestCase
         ])->assertCreated();
 
         $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'starts_at' => '2026-11-03T10:00:00',

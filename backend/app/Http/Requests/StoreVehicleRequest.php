@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
+use App\Rules\EgyptianNationalId;
+use App\Rules\EgyptianPhone;
 use App\Support\DigitNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -83,7 +85,7 @@ class StoreVehicleRequest extends FormRequest
             'tracker_sim_recharge_cycle_days' => ['nullable', 'integer', 'min:1', 'max:365'],
             'color' => ['nullable', 'string', 'max:50'],
             'transmission' => ['nullable', 'string', 'max:50'],
-            'chassis_number' => ['nullable', 'string', 'max:100'],
+            'chassis_number' => ['required', 'string', 'min:5', 'max:32', 'regex:/^[A-Za-z0-9\-]+$/'],
             'engine_number' => ['nullable', 'string', 'max:100'],
             'engine_capacity' => ['nullable', 'string', 'max:50'],
             'seats' => ['nullable', 'integer', 'min:1', 'max:60'],
@@ -97,9 +99,11 @@ class StoreVehicleRequest extends FormRequest
             'owner_agreement_ends_on' => ['nullable', 'date', 'after_or_equal:owner_agreement_starts_on'],
             'owner_inline' => ['nullable', 'array'],
             'owner_inline.full_name' => ['required_with:owner_inline', 'string', 'max:150'],
-            'owner_inline.phone' => ['nullable', 'string', 'max:30'],
-            'owner_inline.phone_alt' => ['nullable', 'string', 'max:30'],
-            'owner_inline.national_id' => ['nullable', 'string', 'max:30'],
+            'owner_inline.phone' => ['required_with:owner_inline', 'string', 'max:30', new EgyptianPhone],
+            'owner_inline.phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
+            'owner_inline.national_id' => ['required_with:owner_inline', 'string', 'max:30', new EgyptianNationalId],
+            'owner_inline.id_front_path' => ['required_with:owner_inline', 'string', 'max:500'],
+            'owner_inline.id_back_path' => ['required_with:owner_inline', 'string', 'max:500'],
             'owner_inline.notes' => ['nullable', 'string'],
             'addon_ids' => ['nullable', 'array'],
             'addon_ids.*' => ['integer', 'exists:vehicle_addon_catalog,id'],
@@ -130,11 +134,16 @@ class StoreVehicleRequest extends FormRequest
             'odometer' => 'العداد الفعلي',
             'daily_rate' => 'الإيجار اليومي',
             'default_deposit' => 'التأمين النقدي',
+            'chassis_number' => 'رقم الشاسيه',
             'owner_id' => 'المالك',
             'owner_monthly_amount' => 'المبلغ الشهري للمالك',
             'owner_since' => 'تاريخ بدء الملكية',
             'owner_agreement_starts_on' => 'بداية عقد المالك',
             'owner_agreement_ends_on' => 'نهاية عقد المالك',
+            'owner_inline.phone' => 'هاتف المالك',
+            'owner_inline.national_id' => 'الرقم القومي للمالك',
+            'owner_inline.id_front_path' => 'وجه بطاقة المالك',
+            'owner_inline.id_back_path' => 'ظهر بطاقة المالك',
             'notes' => 'الملاحظات',
         ];
     }
@@ -157,6 +166,8 @@ class StoreVehicleRequest extends FormRequest
             'odometer.required' => 'العداد الفعلي مطلوب.',
             'daily_rate.required' => 'الإيجار اليومي مطلوب.',
             'default_deposit.required' => 'التأمين النقدي مطلوب.',
+            'chassis_number.required' => 'رقم الشاسيه مطلوب.',
+            'chassis_number.regex' => 'رقم الشاسيه يقبل حروفاً إنجليزية وأرقاماً وشرطة فقط.',
         ];
     }
 }

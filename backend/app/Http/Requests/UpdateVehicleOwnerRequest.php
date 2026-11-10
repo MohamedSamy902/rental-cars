@@ -30,12 +30,12 @@ class UpdateVehicleOwnerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'full_name' => ['sometimes', 'string', 'max:200'],
-            'phone' => ['nullable', 'string', 'max:30', new EgyptianPhone],
+            'full_name' => ['sometimes', 'required', 'string', 'max:200'],
+            'phone' => ['sometimes', 'required', 'string', 'max:30', new EgyptianPhone],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
-            'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId],
-            'id_front_path' => ['nullable', 'string', 'max:500'],
-            'id_back_path' => ['nullable', 'string', 'max:500'],
+            'national_id' => ['sometimes', 'required', 'string', 'max:30', new EgyptianNationalId],
+            'id_front_path' => ['sometimes', 'required', 'string', 'max:500'],
+            'id_back_path' => ['sometimes', 'required', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
         ];

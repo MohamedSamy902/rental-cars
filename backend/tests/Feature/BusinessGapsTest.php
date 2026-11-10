@@ -63,6 +63,8 @@ class BusinessGapsTest extends TestCase
             'odometer' => 1000, 'daily_rate' => 800, 'default_deposit' => 2000, 'is_active' => true,
         ]);
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->toIso8601String(),
@@ -91,6 +93,8 @@ class BusinessGapsTest extends TestCase
             'odometer' => 1000, 'daily_rate' => 800, 'default_deposit' => 2000, 'is_active' => true,
         ]);
         $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->toIso8601String(),

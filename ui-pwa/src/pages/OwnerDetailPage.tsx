@@ -124,6 +124,10 @@ export function OwnerDetailPage() {
 
   async function onUpdate() {
     if (!owner) return
+    if (!form.phone.trim() || !form.national_id.trim() || !form.id_front_path.trim() || !form.id_back_path.trim()) {
+      toast.error('الموبايل والرقم القومي وصور البطاقة (وش وضهر) مطلوبة')
+      return
+    }
     setSaving(true)
     try {
       await api(`/owners/${owner.id}`, { method: 'PUT', json: form })
@@ -298,13 +302,13 @@ export function OwnerDetailPage() {
       <Sheet open={editing} title="تعديل المالك" onClose={() => setEditing(false)} footer={<><Button loading={saving} onClick={() => void onUpdate()}>حفظ</Button><Button variant="secondary" onClick={() => setEditing(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
           <TextField label="الاسم" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-          <TextField label="الهاتف" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <TextField label="الهاتف" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
-          <TextField label="الرقم القومي" value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+          <TextField label="الرقم القومي" required value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <SwitchField label="نشط" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
-          <MediaUpload label="بطاقة — وش" value={form.id_front_path || null} collection="owners_id" purpose="id_front" accept="image" onChange={(path) => setForm({ ...form, id_front_path: path || '' })} />
-          <MediaUpload label="بطاقة — ضهر" value={form.id_back_path || null} collection="owners_id" purpose="id_back" accept="image" onChange={(path) => setForm({ ...form, id_back_path: path || '' })} />
+          <MediaUpload label="بطاقة — وش" required value={form.id_front_path || null} collection="owners_id" purpose="id_front" accept="image" onChange={(path) => setForm({ ...form, id_front_path: path || '' })} />
+          <MediaUpload label="بطاقة — ضهر" required value={form.id_back_path || null} collection="owners_id" purpose="id_back" accept="image" onChange={(path) => setForm({ ...form, id_back_path: path || '' })} />
         </div>
       </Sheet>
 

@@ -3,8 +3,11 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
+use App\Models\Vehicle;
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreContractRequest extends FormRequest
 {
@@ -34,6 +37,7 @@ class StoreContractRequest extends FormRequest
             'discount',
             'other_fees',
             'odometer',
+            'payment_amount',
             'extended_from_contract_id',
             'swapped_from_contract_id',
         ];
@@ -71,7 +75,7 @@ class StoreContractRequest extends FormRequest
             'odometer' => ['nullable', 'integer', 'min:0'],
             'accessory_ids' => ['nullable', 'array'],
             'accessory_ids.*' => ['integer', 'exists:vehicle_accessories,id'],
-            'payment_amount' => ['nullable', 'integer', 'min:0'],
+            'payment_amount' => ['required', 'integer', 'min:1'],
             'payment_method' => ['nullable', 'string', 'in:cash,card,transfer'],
             'payment_reference' => ['nullable', 'string', 'max:100'],
             'payment_notes' => ['nullable', 'string', 'max:500'],
@@ -86,6 +90,51 @@ class StoreContractRequest extends FormRequest
             ],
             'swap_reason' => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $v): void {
+            if ($v->errors()->isNotEmpty()) {
+                return;
+            }
+            $paid = (int) $this->input('payment_amount', 0);
+            if ($paid < 1) {
+                $v->errors()->add('payment_amount', 'دفعة عند الإنشاء مطلوبة ولا يجوز أن تكون صفراً أو سالبة.');
+
+                return;
+            }
+
+            $starts = $this->input('starts_at');
+            $ends = $this->input('planned_ends_at');
+            $rate = $this->input('daily_rate');
+            if ($rate === null || $rate === '') {
+                $vehicleId = (int) $this->input('vehicle_id');
+                $rate = Vehicle::query()->whereKey($vehicleId)->value('daily_rate');
+            }
+            $rate = (int) $rate;
+            if (! $starts || ! $ends || $rate < 1) {
+                return;
+            }
+
+            try {
+                $a = Carbon::parse((string) $starts);
+                $b = Carbon::parse((string) $ends);
+            } catch (\Throwable) {
+                return;
+            }
+            if ($b->lte($a)) {
+                return;
+            }
+            $days = max(1, (int) ceil($a->diffInSeconds($b) / 86400));
+            $total = $days * $rate;
+            if ($paid > $total) {
+                $v->errors()->add(
+                    'payment_amount',
+                    sprintf('مبلغ الدفعة لا يجوز أن يتجاوز إجمالي الإيجار (%d ج.م).', $total)
+                );
+            }
+        });
     }
 
     /**
@@ -144,6 +193,8 @@ class StoreContractRequest extends FormRequest
             'discount.min' => 'لا يجوز أن يكون الخصم سالباً.',
             'other_fees.integer' => 'يجب أن تكون الرسوم الأخرى عدداً صحيحاً.',
             'other_fees.min' => 'لا يجوز أن تكون الرسوم الأخرى سالبة.',
+            'payment_amount.required' => 'دفعة عند الإنشاء مطلوبة — لا تأجير بلا دفع.',
+            'payment_amount.min' => 'دفعة عند الإنشاء يجب أن تكون أكبر من صفر.',
             'extended_from_contract_id.exists' => 'عقد التمديد السابق غير صالح.',
             'swapped_from_contract_id.exists' => 'عقد التبديل السابق غير صالح.',
         ];

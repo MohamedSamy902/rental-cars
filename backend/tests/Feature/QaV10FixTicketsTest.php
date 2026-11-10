@@ -63,12 +63,16 @@ class QaV10FixTicketsTest extends TestCase
 
         Sanctum::actingAs($this->admin());
         $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->addDays(10)->format('Y-m-d H:i:s'),
             'planned_ends_at' => now()->addDays(12)->format('Y-m-d H:i:s'),
         ])->assertCreated();
         $contractId = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->subHours(2)->format('Y-m-d H:i:s'),
@@ -119,7 +123,7 @@ class QaV10FixTicketsTest extends TestCase
         $this->assertStringNotContainsString('CNT-', (string) json_encode($hidden, JSON_UNESCAPED_UNICODE));
         $this->assertStringNotContainsString('عقد #'.$contractId, (string) json_encode($hidden, JSON_UNESCAPED_UNICODE));
         $this->assertStringContainsString('قبض تأمين نقدي', (string) json_encode($hidden['entries'], JSON_UNESCAPED_UNICODE));
-        $this->assertSame(1100, $hidden['totals']['in']);
+        $this->assertSame(1102, $hidden['totals']['in']);
         $this->assertSame(200, $hidden['totals']['out']);
         foreach ($hidden['entries'] as $entry) {
             if (($entry['source'] ?? '') === 'payment') {

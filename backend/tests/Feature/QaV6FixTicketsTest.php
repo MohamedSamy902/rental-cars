@@ -54,6 +54,8 @@ class QaV6FixTicketsTest extends TestCase
         $customer = $this->customer();
 
         $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $ended->id,
             'starts_at' => '2026-11-20 10:00:00',
@@ -61,6 +63,8 @@ class QaV6FixTicketsTest extends TestCase
         ])->assertStatus(422)->assertJsonPath('message', 'عقد المالك لهذه العربية ينتهي في 2026-08-31 — لا يمكن تأجيرها بعد هذا التاريخ');
 
         $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $open->id,
             'starts_at' => '2026-12-12 10:00:00',

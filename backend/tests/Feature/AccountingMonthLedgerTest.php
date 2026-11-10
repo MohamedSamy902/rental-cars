@@ -44,6 +44,8 @@ class AccountingMonthLedgerTest extends TestCase
         ]);
 
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->startOfDay()->toIso8601String(),

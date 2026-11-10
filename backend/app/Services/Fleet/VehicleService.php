@@ -34,6 +34,8 @@ class VehicleService
                     'phone' => $ownerInline['phone'] ?? null,
                     'phone_alt' => $ownerInline['phone_alt'] ?? null,
                     'national_id' => $ownerInline['national_id'] ?? null,
+                    'id_front_path' => $ownerInline['id_front_path'] ?? null,
+                    'id_back_path' => $ownerInline['id_back_path'] ?? null,
                     'notes' => $ownerInline['notes'] ?? null,
                     'is_active' => true,
                 ]);
@@ -45,7 +47,7 @@ class VehicleService
 
             $data['plate'] = $this->normalizePlate($data);
             $this->assertUniquePlate($data['plate']);
-            $this->assertChassisEngine($data);
+            $this->assertChassisEngine($data, null, true);
 
             if (empty($data['code'])) {
                 $data['code'] = $this->nextInternalCode();
@@ -345,14 +347,19 @@ class VehicleService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function assertChassisEngine(array $data, ?Vehicle $existing = null): void
+    public function assertChassisEngine(array $data, ?Vehicle $existing = null, bool $requireChassis = false): void
     {
         foreach (['chassis_number' => 'رقم الشاسيه', 'engine_number' => 'رقم المحرك'] as $key => $label) {
-            if (! array_key_exists($key, $data)) {
+            $mustHave = $requireChassis && $key === 'chassis_number';
+            if (! array_key_exists($key, $data) && ! $mustHave) {
                 continue;
             }
             $value = trim((string) ($data[$key] ?? ''));
             if ($value === '') {
+                if ($mustHave) {
+                    throw new DomainException('رقم الشاسيه مطلوب.');
+                }
+
                 continue;
             }
             if (! preg_match('/^[A-Za-z0-9\-]+$/', $value)) {

@@ -51,6 +51,8 @@ class QaV9FixTicketsTest extends TestCase
         Sanctum::actingAs($this->admin());
 
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $original->id,
             'starts_at' => now()->subDay()->toIso8601String(),
@@ -139,6 +141,8 @@ class QaV9FixTicketsTest extends TestCase
 
         [$customer, $vehicle] = $this->rentalPair();
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => '2026-11-08 08:00:00',

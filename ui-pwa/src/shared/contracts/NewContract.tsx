@@ -170,7 +170,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
 
   async function onSave() {
     setErrors({})
-    const paid = form.payment_amount !== '' ? Number(form.payment_amount) : 0
+    const paidRaw = form.payment_amount.trim()
+    const paid = paidRaw !== '' ? Number(paidRaw) : NaN
     const rate = Number(form.daily_rate || 0)
     let days = 0
     if (form.starts_at && form.planned_ends_at) {
@@ -181,8 +182,23 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       }
     }
     const total = days && rate ? days * rate : 0
+    if (!Number.isFinite(paid) || paid < 1) {
+      setErrors({ payment_amount: 'دفعة عند الإنشاء مطلوبة وأكبر من صفر' })
+      toast.error('لا تأجير بلا دفع — أدخل دفعة عند الإنشاء')
+      return
+    }
+    if (paid < 0) {
+      setErrors({ payment_amount: 'لا يجوز مبلغ سالب' })
+      toast.error('لا يجوز مبلغ سالب')
+      return
+    }
+    if (total > 0 && paid > total) {
+      setErrors({ payment_amount: `لا يجوز أن تتجاوز الدفعة إجمالي الإيجار (${total} ج.م)` })
+      toast.error('الدفعة أكبر من إجمالي الإيجار')
+      return
+    }
     const left = Math.max(0, total - paid)
-    if (paid > 0 && left > 0 && !form.balance_due_on) {
+    if (left > 0 && !form.balance_due_on) {
       setErrors({ balance_due_on: 'حدد تاريخ تحصيل باقي المبلغ' })
       toast.error('حدد تاريخ تحصيل باقي المبلغ')
       return
@@ -201,7 +217,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           deposit: form.deposit ? Number(form.deposit) : undefined,
           odometer: form.odometer !== '' ? Number(form.odometer) : undefined,
           accessory_ids: accessoryIds,
-          payment_amount: form.payment_amount !== '' ? Number(form.payment_amount) : undefined,
+          payment_amount: paid,
           payment_method: form.payment_method || 'cash',
           payment_notes: form.payment_notes || undefined,
           balance_due_on: form.balance_due_on || undefined,
@@ -386,17 +402,18 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
                   مدفوع الآن {formatMoney(paidNow)} · المتبقي على العميل {formatMoney(remainingBalance)}
                 </p>
               ) : (
-                <p className="muted" style={{ marginBlockStart: '0.35rem' }}>يمكن تسجيل دفعة جزئية الآن أو لاحقاً عند التسليم</p>
+                <p className="muted" style={{ marginBlockStart: '0.35rem' }}>دفعة عند الإنشاء مطلوبة — لا تأجير بلا دفع</p>
               )}
             </div>
           ) : null}
 
           <MoneyField
             label="دفعة عند الإنشاء"
+            required
             value={form.payment_amount}
             error={errors.payment_amount}
             onChange={(e) => setForm({ ...form, payment_amount: e.target.value })}
-            hint="اختياري — يسجّل دفعة جزئية أو كاملة في دفتر العميل"
+            hint="مطلوبة · أكبر من صفر · لا تتجاوز إجمالي الإيجار"
           />
           <SelectField
             label="طريقة الدفعة"
@@ -408,10 +425,10 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               { value: 'transfer', label: 'تحويل' },
             ]}
           />
-          {remainingBalance > 0 ? (
+          {remainingBalance > 0 && paidNow > 0 ? (
             <DateField
               label="تاريخ تحصيل باقي المبلغ"
-              required={paidNow > 0}
+              required
               value={form.balance_due_on}
               error={errors.balance_due_on}
               onChange={(e) => setForm({ ...form, balance_due_on: e.target.value })}
