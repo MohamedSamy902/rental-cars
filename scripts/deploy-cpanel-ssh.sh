@@ -91,20 +91,28 @@ if [[ "$PUBLIC_MODE" == "spa" ]]; then
     "${REMOTE}:~/${CPANEL_PUBLIC_DIR}/"
 else
   echo "==> رفع نقطة دخول API فقط → ~/${CPANEL_PUBLIC_DIR}/ (الفرونت على Vercel)"
-  if [[ "$DRY_RUN" != "1" ]]; then
-    scp "${SCP_OPTS[@]}" \
-      "$ROOT/scripts/cpanel-index.php" \
-      "${REMOTE}:${CPANEL_PUBLIC_DIR}/index.php"
-    scp "${SCP_OPTS[@]}" \
-      "$ROOT/scripts/cpanel-api.htaccess" \
-      "${REMOTE}:${CPANEL_PUBLIC_DIR}/.htaccess"
-  fi
 fi
 
 if [[ "$DRY_RUN" == "1" ]]; then
   echo "==> انتهى dry-run"
   exit 0
 fi
+
+# فرض ملفات الدخول دائماً عبر scp (أوثق من rsync للملفات النقطية على بعض الاستضافات)
+echo "==> تثبيت index.php + .htaccess + راوتر /api احتياطي"
+scp "${SCP_OPTS[@]}" \
+  "$ROOT/scripts/cpanel-index.php" \
+  "${REMOTE}:${CPANEL_PUBLIC_DIR}/index.php"
+scp "${SCP_OPTS[@]}" \
+  "$ROOT/scripts/cpanel.htaccess" \
+  "${REMOTE}:${CPANEL_PUBLIC_DIR}/.htaccess"
+ssh "${SSH_OPTS[@]}" "$REMOTE" "mkdir -p \"\$HOME/${CPANEL_PUBLIC_DIR}/api\""
+scp "${SCP_OPTS[@]}" \
+  "$ROOT/scripts/cpanel-api-router.php" \
+  "${REMOTE}:${CPANEL_PUBLIC_DIR}/api/index.php"
+scp "${SCP_OPTS[@]}" \
+  "$ROOT/scripts/cpanel-api-dir.htaccess" \
+  "${REMOTE}:${CPANEL_PUBLIC_DIR}/api/.htaccess"
 
 echo "==> post-deploy على السيرفر"
 scp "${SCP_OPTS[@]}" \

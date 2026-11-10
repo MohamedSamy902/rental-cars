@@ -1,27 +1,15 @@
+# نسخة API-only — بدون Options (قد يلغي .htaccess على بعض cPanel)
+DirectoryIndex index.php
+
 <IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
-
     RewriteEngine On
+    RewriteBase /
 
-    # Authorization / Sanctum
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # مهم: بعد إعادة الكتابة الداخلية إلى index.php لا تُعاد للكatch-all
     RewriteRule ^index\.php$ - [L]
-
-    # Laravel API + health + sanctum + private media
-    RewriteRule ^api(/.*)?$ index.php [L,QSA]
-    RewriteRule ^up$ index.php [L,QSA]
-    RewriteRule ^sanctum(/.*)?$ index.php [L,QSA]
-    RewriteRule ^storage(/.*)?$ index.php [L,QSA]
-
-    # الصفحة الرئيسية والمسارات غير الـ API → فرونت Vercel
-    RewriteRule ^(.*)$ https://rental-cars-theta-beryl.vercel.app/$1 [R=302,L]
+    RewriteRule ^(api|up|sanctum|storage)(/.*)?$ /index.php/$1$2 [L,QSA]
 </IfModule>
-
-Options -Indexes
