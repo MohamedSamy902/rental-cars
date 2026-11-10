@@ -45,6 +45,18 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
 
 const GROUP_ORDER = ['المركز', 'العميل', 'العربية', 'العقد', 'التأمين', 'المالك', 'أخرى']
 
+/** عناصر زخرفية/ترويسة تُطوى في المحرر البصري حتى لا تعطل الكتابة. */
+const DECOR_SELECTORS = [
+  'header.rpm-lc-head',
+  'header.print-head',
+  '.rpm-lc-ribbon',
+  '.rpm-lc-stamp',
+  '.rpm-lc-float-ico',
+  '.page-break',
+  'svg',
+  'img',
+] as const
+
 function shellPreview(type: TemplateType, title: string, body: string) {
   if (type === 'owner_agreement') {
     return shellOwnerAgreementHtml(body, title)
@@ -58,14 +70,78 @@ function shellPreview(type: TemplateType, title: string, body: string) {
 </style></head><body>${body}</body></html>`
 }
 
-/** يمنع تعديل الأختام/SVG حتى لا ينكسر القالب أثناء التحرير البصري. */
-function lockProtectedNodes(root: HTMLElement) {
-  root.querySelectorAll('svg, img, table thead, [data-rpm-lock], .rpm-stamp, .stamp, .seal').forEach((node) => {
+function assetLabel(node: HTMLElement): string {
+  if (node.matches('header.rpm-lc-head, header.print-head')) return 'ترويسة العقد (محمية)'
+  if (node.matches('.rpm-lc-ribbon')) return 'شريط علوي (محمي)'
+  if (node.matches('.rpm-lc-stamp')) return 'ختم المركز (محمي)'
+  if (node.matches('.rpm-lc-float-ico')) return 'أيقونة تصميم (محمية)'
+  if (node.matches('.page-break')) return 'فاصل صفحة (محمي)'
+  if (node.matches('img')) return 'صورة / شعار (محمي)'
+  if (node.matches('svg')) return 'رسم تصميم (محمي)'
+  return 'عنصر تصميم (محمي)'
+}
+
+/** يطوي العناصر الزخرفية إلى شارات محمية ويحفظ أصلها لاستعادته عند الحفظ. */
+function prepareVisualHtml(html: string, assets: Map<string, string>): string {
+  const wrap = document.createElement('div')
+  wrap.innerHTML = html?.trim() ? html : '<p><br></p>'
+  assets.clear()
+  let seq = 0
+
+  for (const sel of DECOR_SELECTORS) {
+    const nodes = Array.from(wrap.querySelectorAll(sel))
+    for (const node of nodes) {
+      if (!(node instanceof HTMLElement)) continue
+      if (node.closest('[data-rpm-asset]')) continue
+      const id = `a${++seq}`
+      assets.set(id, node.outerHTML)
+      const chip = document.createElement('span')
+      chip.className = 'rpm-template-asset'
+      chip.contentEditable = 'false'
+      chip.setAttribute('data-rpm-asset', id)
+      chip.setAttribute('data-rpm-lock', '1')
+      chip.setAttribute('title', 'يظهر في الطباعة كما هو — غير قابل للتعديل هنا')
+      chip.textContent = assetLabel(node)
+      node.replaceWith(chip)
+    }
+  }
+
+  wrap.querySelectorAll('table thead, [data-rpm-lock]:not([data-rpm-asset])').forEach((node) => {
     if (node instanceof HTMLElement) {
       node.contentEditable = 'false'
       node.setAttribute('data-rpm-lock', '1')
     }
   })
+
+  return wrap.innerHTML
+}
+
+/** يعيد الرسوم/الترويسة الأصلية بدل شارات المحرر قبل الحفظ أو المعاينة. */
+function restoreVisualHtml(editedHtml: string, assets: Map<string, string>): string {
+  const wrap = document.createElement('div')
+  wrap.innerHTML = editedHtml
+  wrap.querySelectorAll('[data-rpm-asset]').forEach((node) => {
+    const id = node.getAttribute('data-rpm-asset')
+    const original = id ? assets.get(id) : null
+    if (!original) {
+      node.remove()
+      return
+    }
+    const tmp = document.createElement('div')
+    tmp.innerHTML = original
+    const el = tmp.firstElementChild
+    if (el) node.replaceWith(el)
+    else node.remove()
+  })
+  return wrap.innerHTML
+}
+
+function runEditorCommand(command: string, value?: string) {
+  try {
+    document.execCommand(command, false, value)
+  } catch {
+    /* contentEditable command unsupported in this browser — ignore */
+  }
 }
 
 function VisualBodyEditor({
@@ -74,40 +150,68 @@ function VisualBodyEditor({
   disabled,
   onChange,
   editorRef,
+  assetsRef,
 }: {
   html: string
   seed: number
   disabled: boolean
   onChange: (nextHtml: string) => void
   editorRef: RefObject<HTMLDivElement | null>
+  assetsRef: RefObject<Map<string, string>>
 }) {
   useEffect(() => {
     const el = editorRef.current
-    if (!el) return
-    el.innerHTML = html?.trim() ? html : '<p><br></p>'
-    lockProtectedNodes(el)
-  }, [seed, editorRef]) // eslint-disable-line react-hooks/exhaustive-deps -- seed remounts external content only
+    const assets = assetsRef.current
+    if (!el || !assets) return
+    el.innerHTML = prepareVisualHtml(html, assets)
+  }, [seed, editorRef, assetsRef]) // eslint-disable-line react-hooks/exhaustive-deps -- seed remounts external content only
+
+  function emitChange() {
+    const root = editorRef.current
+    const assets = assetsRef.current
+    if (!root || !assets) return
+    onChange(restoreVisualHtml(root.innerHTML, assets))
+  }
+
+  function focusEditor() {
+    editorRef.current?.focus()
+  }
 
   return (
-    <div
-      ref={editorRef}
-      className="rpm-template-visual"
-      contentEditable={!disabled}
-      suppressContentEditableWarning
-      role="textbox"
-      aria-multiline="true"
-      aria-label="محتوى القالب"
-      data-placeholder="اكتب بنود العقد هنا…"
-      onInput={(e) => {
-        const root = e.currentTarget
-        lockProtectedNodes(root)
-        onChange(root.innerHTML)
-      }}
-      onBlur={(e) => {
-        lockProtectedNodes(e.currentTarget)
-        onChange(e.currentTarget.innerHTML)
-      }}
-    />
+    <div className="rpm-template-editor">
+      <div className="rpm-template-toolbar" role="toolbar" aria-label="تنسيق النص">
+        <button type="button" className="rpm-template-toolbar__btn" disabled={disabled} title="غامق" onMouseDown={(e) => { e.preventDefault(); focusEditor(); runEditorCommand('bold') }}>
+          غامق
+        </button>
+        <button type="button" className="rpm-template-toolbar__btn" disabled={disabled} title="تسطير" onMouseDown={(e) => { e.preventDefault(); focusEditor(); runEditorCommand('underline') }}>
+          تسطير
+        </button>
+        <span className="rpm-template-toolbar__sep" aria-hidden />
+        <button type="button" className="rpm-template-toolbar__btn" disabled={disabled} title="قائمة مرقّمة" onMouseDown={(e) => { e.preventDefault(); focusEditor(); runEditorCommand('insertOrderedList') }}>
+          ١٬٢٬٣
+        </button>
+        <button type="button" className="rpm-template-toolbar__btn" disabled={disabled} title="قائمة نقطية" onMouseDown={(e) => { e.preventDefault(); focusEditor(); runEditorCommand('insertUnorderedList') }}>
+          • قائمة
+        </button>
+        <span className="rpm-template-toolbar__sep" aria-hidden />
+        <button type="button" className="rpm-template-toolbar__btn" disabled={disabled} title="إزالة التنسيق" onMouseDown={(e) => { e.preventDefault(); focusEditor(); runEditorCommand('removeFormat') }}>
+          مسح تنسيق
+        </button>
+      </div>
+
+      <div
+        ref={editorRef}
+        className="rpm-template-visual"
+        contentEditable={!disabled}
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        aria-label="محتوى القالب"
+        data-placeholder="اكتب بنود العقد هنا…"
+        onInput={emitChange}
+        onBlur={emitChange}
+      />
+    </div>
   )
 }
 
@@ -138,6 +242,11 @@ export function DocumentTemplatesPanel() {
     handover_receipt: useRef<HTMLDivElement | null>(null),
     owner_agreement: useRef<HTMLDivElement | null>(null),
   }
+  const assetsRefs = {
+    contract: useRef<Map<string, string>>(new Map()),
+    handover_receipt: useRef<Map<string, string>>(new Map()),
+    owner_agreement: useRef<Map<string, string>>(new Map()),
+  }
   const textRefs = {
     contract: useRef<HTMLTextAreaElement | null>(null),
     handover_receipt: useRef<HTMLTextAreaElement | null>(null),
@@ -155,6 +264,13 @@ export function DocumentTemplatesPanel() {
       .filter((g) => map.has(g))
       .map((g) => ({ group: g, items: map.get(g)! }))
   }, [placeholders])
+
+  function readVisualContent(type: TemplateType): string {
+    const visual = visualRefs[type].current
+    const assets = assetsRefs[type].current
+    if (visual && assets) return restoreVisualHtml(visual.innerHTML, assets)
+    return drafts[type].content
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -198,11 +314,8 @@ export function DocumentTemplatesPanel() {
       toast.error('لا صلاحية لتعديل قوالب المستندات.')
       return
     }
-    // التقط آخر HTML من المحرر البصري قبل الحفظ
-    const visual = visualRefs[type].current
-    let content = drafts[type].content
-    if (visual && !codeMode[type]) {
-      content = visual.innerHTML
+    const content = codeMode[type] ? drafts[type].content : readVisualContent(type)
+    if (!codeMode[type]) {
       setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content } }))
     }
     setSaving(type)
@@ -232,8 +345,7 @@ export function DocumentTemplatesPanel() {
   async function preview(type: TemplateType) {
     setPreviewing(type)
     try {
-      const visual = visualRefs[type].current
-      const content = (!codeMode[type] && visual) ? visual.innerHTML : drafts[type].content
+      const content = codeMode[type] ? drafts[type].content : readVisualContent(type)
       const sampleMap: Record<string, string> = {}
       for (const p of placeholders) {
         sampleMap[p.key] = p.sample
@@ -272,21 +384,37 @@ export function DocumentTemplatesPanel() {
     }
 
     const root = visualRefs[type].current
-    if (root && document.activeElement === root) {
+    if (root) {
+      root.focus()
       const sel = window.getSelection()
       if (sel && sel.rangeCount > 0) {
         const range = sel.getRangeAt(0)
-        range.deleteContents()
-        const node = document.createTextNode(snippet)
-        range.insertNode(node)
-        range.setStartAfter(node)
-        range.collapse(true)
-        sel.removeAllRanges()
-        sel.addRange(range)
-        setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: root.innerHTML } }))
-        toast.success(`أُدرج: ${label}`)
-        return
+        if (root.contains(range.commonAncestorContainer)) {
+          range.deleteContents()
+          const node = document.createTextNode(snippet)
+          range.insertNode(node)
+          range.setStartAfter(node)
+          range.collapse(true)
+          sel.removeAllRanges()
+          sel.addRange(range)
+          setDrafts((prev) => ({
+            ...prev,
+            [type]: { ...prev[type], content: restoreVisualHtml(root.innerHTML, assetsRefs[type].current) },
+          }))
+          toast.success(`أُدرج: ${label}`)
+          return
+        }
       }
+      // لا يوجد مؤشر داخل المحرر — ألحق في النهاية
+      const p = document.createElement('p')
+      p.textContent = snippet
+      root.appendChild(p)
+      setDrafts((prev) => ({
+        ...prev,
+        [type]: { ...prev[type], content: restoreVisualHtml(root.innerHTML, assetsRefs[type].current) },
+      }))
+      toast.success(`أُدرج في النص: ${label}`)
+      return
     }
 
     setDrafts((prev) => ({
@@ -307,7 +435,7 @@ export function DocumentTemplatesPanel() {
   return (
     <div className="rpm-stack" style={{ gap: '1rem' }}>
       <p className="rpm-template-intro">
-        عدّل نص العقد كما يظهر للطباعة — بدون أكواد. اضغط اسم الحقل لإدراج بيانات تُملأ وحدها عند الطباعة (اسم العميل، اللوحة، السعر…). جرّب «معاينة طباعة» قبل الحفظ.
+        محرّر نص خفيف للبنود والجمل — الرسوم والترويسة والختم تظهر كشارات محمية ولا تتكسر أثناء التعديل. استخدم «معاينة طباعة» لرؤية الشكل النهائي قبل الحفظ.
       </p>
 
       {(['contract', 'handover_receipt', 'owner_agreement'] as TemplateType[]).map((type) => {
@@ -401,7 +529,7 @@ export function DocumentTemplatesPanel() {
                       <span className="rpm-field__hint">
                         {showCode
                           ? 'وضع متقدم: تعديل كود HTML — للمُدمج فقط عند الحاجة.'
-                          : 'عدّل النص والبنود مباشرة كما ستظهر في الورقة المطبوعة.'}
+                          : 'محرّر نص للبنود — الأيقونات والترويسة والختم محمية ولن تتكسر أثناء الكتابة.'}
                       </span>
                     </div>
                     {isIntegrator ? (
@@ -411,16 +539,12 @@ export function DocumentTemplatesPanel() {
                         onClick={() => {
                           const next = !showCode
                           if (!next) {
-                            // من الكود → البصري: أعد زرع المحتوى
                             setEditorSeed((prev) => ({ ...prev, [type]: prev[type] + 1 }))
                           } else {
-                            const visual = visualRefs[type].current
-                            if (visual) {
-                              setDrafts((prev) => ({
-                                ...prev,
-                                [type]: { ...prev[type], content: visual.innerHTML },
-                              }))
-                            }
+                            setDrafts((prev) => ({
+                              ...prev,
+                              [type]: { ...prev[type], content: readVisualContent(type) },
+                            }))
                           }
                           setCodeMode((prev) => ({ ...prev, [type]: next }))
                         }}
@@ -446,6 +570,7 @@ export function DocumentTemplatesPanel() {
                       seed={editorSeed[type]}
                       disabled={!canEdit}
                       editorRef={visualRefs[type]}
+                      assetsRef={assetsRefs[type]}
                       onChange={(nextHtml) => setDrafts((prev) => ({
                         ...prev,
                         [type]: { ...prev[type], content: nextHtml },
