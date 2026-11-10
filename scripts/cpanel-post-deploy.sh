@@ -63,9 +63,13 @@ if ! grep -qE '^APP_KEY=base64:.+' .env; then
   "$PHP_BIN" artisan key:generate --force
 fi
 
+echo "==> مسح الكاش ثم إعادة البناء"
+"$PHP_BIN" artisan optimize:clear 2>/dev/null || true
 "$PHP_BIN" artisan config:clear 2>/dev/null || true
 "$PHP_BIN" artisan route:clear 2>/dev/null || true
 "$PHP_BIN" artisan view:clear 2>/dev/null || true
+"$PHP_BIN" artisan event:clear 2>/dev/null || true
+"$PHP_BIN" artisan cache:clear 2>/dev/null || true
 
 "$PHP_BIN" artisan migrate --force
 

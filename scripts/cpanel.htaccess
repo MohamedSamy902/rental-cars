@@ -25,3 +25,22 @@ DirectoryIndex index.html index.php
     # مسارات React → SPA
     RewriteRule . /index.html [L]
 </IfModule>
+
+# index.html و sw.js بدون كاش طويل — عشان التحديث يبان فوراً بعد كل Deploy
+<IfModule mod_headers.c>
+    <FilesMatch "^(index\.html|sw\.js)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
+# أصول Vite مُسمّاة بـ hash — كاش طويل آمن
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 30 days"
+    ExpiresByType application/javascript "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+</IfModule>
