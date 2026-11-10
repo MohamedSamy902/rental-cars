@@ -137,11 +137,12 @@
   letter-spacing: -0.02em;
   line-height: 1.2;
   text-wrap: balance;
+  color: #fff;
 }
 
 .vqr__tagline {
   margin: 0;
-  color: color-mix(in srgb, #fff 72%, transparent);
+  color: color-mix(in srgb, #fff 78%, transparent);
   font-size: 0.98rem;
 }
 
