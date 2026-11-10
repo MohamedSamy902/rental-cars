@@ -21,7 +21,7 @@ SKIP_BUILD="${SKIP_BUILD:-0}"
 RUN_MIGRATE="${RUN_MIGRATE:-1}"
 SEED_FIRST="${SEED_FIRST:-0}"
 DRY_RUN="${DRY_RUN:-0}"
-PUBLIC_MODE="${PUBLIC_MODE:-api}"
+PUBLIC_MODE="${PUBLIC_MODE:-spa}"
 # على cPanel غالباً: /opt/cpanel/ea-php84/root/usr/bin/php
 PHP_BIN="${PHP_BIN:-/opt/cpanel/ea-php84/root/usr/bin/php}"
 

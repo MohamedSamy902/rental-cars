@@ -1,8 +1,8 @@
 name: Deploy · cPanel
 
-# نشر تلقائي عند الدفع على main:
-#   فرونت → Vercel (من ربط GitHub، منفصل عن هذا الـ workflow)
-#   باك   → cPanel عبر SSH (هذا الملف) · PUBLIC_MODE=api
+# نشر تلقائي عند الدفع على main (فرونت + باك على cPanel):
+#   PUBLIC_MODE=spa → public_html فيه SPA + نقطة دخول Laravel
+#   (Vercel اختياري للمعاينة فقط — الإنتاج على rpmrentcar.com)
 #
 # أسرار GitHub → Settings → Secrets and variables → Actions:
 #   CPANEL_SSH_HOST=rpmrentcar.com
@@ -115,7 +115,7 @@ jobs:
           CPANEL_PUBLIC_DIR: ${{ secrets.CPANEL_PUBLIC_DIR }}
           SKIP_BUILD: '1'
           RUN_MIGRATE: '1'
-          PUBLIC_MODE: 'api'
+          PUBLIC_MODE: 'spa'
           PHP_BIN: ${{ secrets.CPANEL_PHP_BIN }}
           SEED_FIRST: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.seed_first == true && '1' || '0' }}
         run: |
