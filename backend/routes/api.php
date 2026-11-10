@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\SalaryAdvanceController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\VehicleAssetController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\VehicleCustodyAgreementController;
 use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\ViolationInquiryController;
@@ -130,6 +131,14 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/vehicles/{vehicle}/dossier', [VehicleController::class, 'dossier'])->middleware('permission:vehicles.view');
     Route::get('/vehicles/{vehicle}/owner-agreement/print', [VehicleController::class, 'ownerAgreementPrint'])
         ->middleware('permission:vehicles.view|vehicles.print|vehicles.update');
+    Route::get('/vehicles/{vehicle}/custody-agreements', [VehicleCustodyAgreementController::class, 'index'])
+        ->middleware('permission:vehicles.view');
+    Route::post('/vehicles/{vehicle}/custody-agreements', [VehicleCustodyAgreementController::class, 'store'])
+        ->middleware('permission:vehicles.update');
+    Route::get('/vehicles/{vehicle}/custody-agreements/{custodyAgreement}', [VehicleCustodyAgreementController::class, 'show'])
+        ->middleware('permission:vehicles.view');
+    Route::get('/vehicles/{vehicle}/custody-agreements/{custodyAgreement}/print', [VehicleCustodyAgreementController::class, 'print'])
+        ->middleware('permission:vehicles.view');
     Route::get('/vehicles/{vehicle}/document-history', [OperationsController::class, 'vehicleDocumentHistory'])
         ->middleware('permission:vehicles.view');
     Route::get('/vehicles/{vehicle}/assets', [VehicleAssetController::class, 'extras'])->middleware('permission:vehicles.view');

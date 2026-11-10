@@ -751,7 +751,18 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/owners/{id}/payouts` | `owners.payout` (حسّاسة) |
 | GET | `/owner-payouts` | `owners.view` |
 
-**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · عقد المالك (`owner_agreement_*`)
+**على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · حقول مدة عقد الاعتماد (`owner_agreement_*`)
+
+**عقد الاعتماد (custody agreement)** — بين المركز ومالك العربية عند اعتماد السيارة للتأجير (مستقل عن عقود العملاء):
+
+| Method | Path | صلاحية |
+|--------|------|--------|
+| GET | `/vehicles/{id}/custody-agreements` | `vehicles.view` |
+| POST | `/vehicles/{id}/custody-agreements` | `vehicles.update` — يصدر نسخة ثابتة من القالب النشط `custody_agreement` بعد ملء بيانات المركز/المالك/العربية/المدة |
+| GET | `/vehicles/{id}/custody-agreements/{aid}` | `vehicles.view` |
+| GET | `/vehicles/{id}/custody-agreements/{aid}/print` | `vehicles.view` — يعيد `html` المجمد عند الإصدار |
+
+`POST` يقبل اختيارياً `number` · `starts_on` · `ends_on` · `monthly_amount`؛ إن غابت تُؤخذ من حقول `owner_agreement_*` / `owner_monthly_amount` على العربية. تعديل قالب الإعدادات لاحقاً لا يغيّر النسخ الصادرة.
 
 **حقول المالك (عند الإنشاء):** اسم (مطلوب) · هاتف (مطلوب) · هاتف بديل · رقم قومي (مطلوب) · بطاقة وش (مطلوب) · بطاقة ضهر (مطلوب) · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
 
@@ -813,6 +824,8 @@ password: password
 | GET/POST | `/employee-assignments` · `…/acknowledge` | `hr.custody` — تأكيد استلام الأدمن |
 | GET | `/vehicles/recommend` | العربيات المتاحة في الفترة (بلا أوزان/درجات) |
 | GET/POST | `/vehicles/{id}/tires|batteries|downtime|consumables` | أصول المركبة ٦٫٩–٦٫١١ · ١٤٫١ |
+| GET/POST | `/vehicles/{id}/custody-agreements` · `…/{aid}/print` | عقد اعتماد مالك↔مركز · نسخة ثابتة قابلة للطباعة |
+| GET/POST | `/document-templates` · `/document-templates/preview` | قوالب العقد · إيصال الاستلام · **عقد الاعتماد** (`custody_agreement`) |
 | GET/POST | `/consumable-templates` | قوالب قطع استهلاكية |
 | ~~GET/POST `/evaluations`~~ | **موقوف** — لا مسارات؛ التقييمات خارج التشغيل |
 | GET/POST | `/chat` | خلف `feature:chat` · حد 100/يوم |
