@@ -1,5 +1,24 @@
 const TOKEN_KEY = 'rpm_token'
 
+/**
+ * أصل الـ API عند فصل الفرونت (Vercel) عن الباك (cPanel).
+ * فاضي = نفس الدومين (`/api/...`) — مناسب مع Vercel Rewrite أو رفع cPanel الموحّد.
+ * مثال: https://api.example.com  أو https://example.com
+ */
+export function apiOrigin(): string {
+  const raw = (import.meta.env.VITE_API_ORIGIN as string | undefined)?.trim() ?? ''
+  return raw.replace(/\/$/, '')
+}
+
+/** يبني رابط طلب API: `/login` → `/api/login` (+ أصل اختياري). */
+export function apiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path
+  const normalized = path.startsWith('/api/') || path === '/api'
+    ? path
+    : `/api${path.startsWith('/') ? path : `/${path}`}`
+  return `${apiOrigin()}${normalized}`
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -61,7 +80,7 @@ export async function api<T>(
   }
 
   const run = (async () => {
-    const res = await fetch(`/api${path}`, {
+    const res = await fetch(apiUrl(path), {
       ...options,
       method,
       headers,
@@ -112,7 +131,7 @@ export async function apiUpload<T>(
   }
 
   const run = (async () => {
-    const res = await fetch(`/api${path}`, {
+    const res = await fetch(apiUrl(path), {
       method: 'POST',
       headers,
       body: formData,
@@ -157,7 +176,7 @@ export async function apiBlob(path: string): Promise<Blob> {
         ? path
         : `/${path}`
 
-  const res = await fetch(`/api${normalized}`, { headers })
+  const res = await fetch(apiUrl(normalized), { headers })
   if (!res.ok) {
     const err: ApiError = {
       message: 'تعذّر تحميل الملف.',

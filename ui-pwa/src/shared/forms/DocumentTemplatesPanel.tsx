@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, type ApiError } from '@/shared/api/client'
+import { api, apiUpload, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { Button, TextAreaField, TextField, useToast } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
@@ -123,20 +123,8 @@ export function DocumentTemplatesPanel() {
       const file = files[type]
       if (file) fd.append('file', file)
 
-      const token = localStorage.getItem('rpm_token')
-      const res = await fetch('/api/document-templates', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: fd,
-      })
-      const json = await res.json()
-      if (!res.ok) {
-        throw Object.assign(new Error(json?.message || 'تعذّر حفظ القالب.'), { status: res.status, errors: json?.errors })
-      }
-      const row = json.data as TemplateRow
+      const json = await apiUpload<{ data: TemplateRow; message?: string }>('/document-templates', fd)
+      const row = json.data
       setActive((prev) => ({ ...prev, [type]: row }))
       setDrafts((prev) => ({ ...prev, [type]: { title: row.title, content: row.content } }))
       setFiles((prev) => ({ ...prev, [type]: null }))
