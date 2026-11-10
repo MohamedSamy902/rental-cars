@@ -8,7 +8,7 @@ import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
-  useToast, ErrorState, IconClipboard, IconAlert, IconCheck, IconKey, PhoneActions,
+  ErrorState, IconClipboard, IconAlert, IconCheck, IconKey, PhoneActions,
   type DataColumn,
 } from '@/shared/ui'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -26,7 +26,6 @@ type PageMeta = { current_page: number; last_page: number; total: number }
 const LIST_PER_PAGE = 50
 
 export function BookingsPage() {
-  const toast = useToast()
   const navigate = useNavigate()
   const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
