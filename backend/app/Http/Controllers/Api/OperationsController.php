@@ -121,7 +121,7 @@ class OperationsController extends Controller
             : 'أ/ محمد عبدالقادر';
         $tagline = is_string($ops['company_tagline'] ?? null) && trim((string) $ops['company_tagline']) !== ''
             ? trim((string) $ops['company_tagline'])
-            : 'لتجارة وإيجار أحدث أنواع السيارات';
+            : 'لتأجير وإيجار أحدث أنواع السيارات';
 
         $q = Contract::query()
             ->with([
@@ -181,6 +181,7 @@ class OperationsController extends Controller
                 'center_name' => $settings?->center_name ?: 'مركز آر بي إم للتأجير',
                 'signer_name' => $signer,
                 'tagline' => $tagline,
+                'logo_path' => $settings?->logo_path,
                 'phones' => array_values(array_filter([$phone, $phone2])),
                 'generated_at' => now()->toIso8601String(),
                 'filter' => $filter,

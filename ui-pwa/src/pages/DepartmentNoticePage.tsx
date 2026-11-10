@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, type ApiError } from '@/shared/api/client'
+import { api, getToken, type ApiError } from '@/shared/api/client'
 import {
   PageHeader, Button, SelectField, TextField, useToast, EmptyState, SkeletonBlock,
 } from '@/shared/ui'
@@ -27,36 +27,71 @@ type NoticePayload = {
   center_name?: string
   signer_name?: string
   tagline?: string
+  logo_path?: string | null
   phones?: string[]
   generated_at: string
   statements: StatementRow[]
 }
 
+function brandFallbackSrc() {
+  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'
+  return `${base}brand/rpm-logo.webp`
+}
+
+async function resolveLogoSrc(logoPath?: string | null): Promise<string> {
+  const fallback = brandFallbackSrc()
+  if (!logoPath) return fallback
+  try {
+    const path = logoPath.startsWith('/api/')
+      ? logoPath
+      : logoPath.startsWith('/media/')
+        ? `/api${logoPath}`
+        : logoPath.startsWith('http')
+          ? logoPath
+          : `/api${logoPath.startsWith('/') ? logoPath : `/${logoPath}`}`
+
+    if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:') || path.includes('/brand/')) {
+      return path
+    }
+
+    const headers: HeadersInit = { Accept: '*/*' }
+    const token = getToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(path, { headers })
+    if (!res.ok) return fallback
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  } catch {
+    return fallback
+  }
+}
+
 function cell(label: string, value: string): string {
   return `<tr>
-    <th style="width:32%;background:#f1f5f9;border:1px solid #94a3b8;padding:8px 10px;text-align:right;font-weight:700">${escapeHtml(label)}</th>
-    <td style="border:1px solid #94a3b8;padding:8px 10px;text-align:right">${escapeHtml(value || '—')}</td>
+    <th>${escapeHtml(label)}</th>
+    <td>${escapeHtml(value || '—')}</td>
   </tr>`
 }
 
-function statementHtml(row: StatementRow, meta: NoticePayload): string {
+function statementHtml(row: StatementRow, meta: NoticePayload & { logo_src: string }): string {
   const phones = (meta.phones || []).map((p) => `<span dir="ltr">${escapeHtml(p)}</span>`).join(' &nbsp;|&nbsp; ')
   const duration = row.rental_duration_days != null ? `${row.rental_duration_days} يوم` : '—'
+  const signer = meta.signer_name || 'أ/ محمد عبدالقادر'
+  const tagline = meta.tagline || 'لتأجير وإيجار أحدث أنواع السيارات'
   return `
-  <article class="sheet" style="break-inside:avoid;page-break-inside:avoid;margin:0 0 28px;padding:18px 16px;border:1px solid #cbd5e1;border-radius:8px">
-    <header style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;margin-bottom:14px">
-      <div style="text-align:right">
-        <div style="font-size:18px;font-weight:800">${escapeHtml(meta.signer_name || 'أ/ محمد عبدالقادر')}</div>
-        <div style="font-size:13px;color:#334155;margin-top:2px">${escapeHtml(meta.tagline || 'لتجارة وإيجار أحدث أنواع السيارات')}</div>
-        <div style="font-size:13px;margin-top:6px;color:#0f172a">${phones || '—'}</div>
+  <article class="sheet">
+    <header class="sheet-head">
+      <div class="sheet-brand">
+        <div class="signer">${escapeHtml(signer)}</div>
+        <div class="tagline">${escapeHtml(tagline)}</div>
+        <div class="phones">${phones || '—'}</div>
       </div>
-      <div style="text-align:left;min-width:110px">
-        <div style="font-size:20px;font-weight:900;letter-spacing:0.04em">RPM</div>
-        <div style="font-size:11px;color:#64748b">${escapeHtml(meta.center_name || '')}</div>
+      <div class="sheet-logo">
+        <img src="${escapeHtml(meta.logo_src)}" alt="شعار المركز" />
       </div>
     </header>
-    <h2 style="margin:0 0 12px;text-align:center;font-size:20px;font-weight:800">بيان سيارة مؤجرة</h2>
-    <table style="width:100%;border-collapse:collapse;font-size:14px">
+    <h2 class="sheet-title">بيان سيارة مؤجرة</h2>
+    <table class="sheet-table">
       ${cell('اسم المستأجر', row.renter_name || '—')}
       ${cell('الرقم القومي', row.national_id || '—')}
       ${cell('نوع السيارة', row.vehicle_type || '—')}
@@ -67,8 +102,8 @@ function statementHtml(row: StatementRow, meta: NoticePayload): string {
       ${cell('عنوان المستأجر', row.address || '—')}
       ${cell('الملاحظات', row.notes || '—')}
     </table>
-    <p style="margin:14px 0 18px;text-align:center;font-size:13px;color:#334155">بيان إيجار السيارة بالعرض للمتابعه و العلم</p>
-    <footer style="display:flex;justify-content:space-between;gap:16px;font-size:13px;font-weight:700;margin-top:8px">
+    <p class="sheet-note">بيان إيجار السيارة بالعرض للمتابعه و العلم</p>
+    <footer class="sheet-foot">
       <span>إدارة المعرض</span>
       <span>رئيس المباحث</span>
     </footer>
@@ -112,17 +147,65 @@ export function DepartmentNoticePage() {
     }
   }
 
-  function printNotice() {
+  async function printNotice() {
     if (!payload || !rows.length) return
     setPrinting(true)
     try {
-      const body = rows.map((r) => statementHtml(r, payload)).join('')
+      const logoSrc = await resolveLogoSrc(payload.logo_path)
+      const body = rows.map((r) => statementHtml(r, { ...payload, logo_src: logoSrc })).join('')
       printHtmlDocument(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>بيان سيارة مؤجرة</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet" />
       <style>
-        body{font-family:Tahoma,Arial,sans-serif;padding:18px;color:#0f172a;background:#fff}
-        @media print { body{padding:0} .sheet{border:none!important;margin:0 0 18mm!important} }
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body{
+          margin:0;
+          padding:18px;
+          color:#0f172a;
+          background:#fff;
+          font-family:'Cairo','IBM Plex Sans Arabic',Tahoma,sans-serif;
+          line-height:1.65;
+        }
+        .meta{text-align:center;color:#64748b;font-size:12px;margin:0 0 14px}
+        .sheet{
+          break-inside:avoid;page-break-inside:avoid;
+          margin:0 0 28px;padding:20px 18px;
+          border:1px solid #cbd5e1;border-radius:10px;
+        }
+        .sheet-head{
+          display:grid;
+          grid-template-columns:1fr 120px;
+          gap:16px;
+          align-items:center;
+          margin-bottom:16px;
+          padding-bottom:12px;
+          border-bottom:1px solid #e2e8f0;
+        }
+        .sheet-brand{text-align:right}
+        .signer{font-size:20px;font-weight:800;letter-spacing:0.01em}
+        .tagline{font-size:13.5px;color:#334155;margin-top:4px;font-weight:600}
+        .phones{font-size:13px;margin-top:8px;color:#0f172a}
+        .sheet-logo{text-align:left;display:flex;justify-content:flex-start;align-items:center}
+        .sheet-logo img{width:108px;height:auto;max-height:72px;object-fit:contain}
+        .sheet-title{margin:0 0 14px;text-align:center;font-size:22px;font-weight:800}
+        .sheet-table{width:100%;border-collapse:collapse;font-size:14px}
+        .sheet-table th,.sheet-table td{
+          border:1px solid #94a3b8;padding:9px 11px;text-align:right;vertical-align:top;
+        }
+        .sheet-table th{width:32%;background:#f1f5f9;font-weight:700}
+        .sheet-note{margin:16px 0 18px;text-align:center;font-size:13px;color:#334155}
+        .sheet-foot{
+          display:flex;justify-content:space-between;gap:16px;
+          font-size:13px;font-weight:700;margin-top:8px;
+        }
+        @media print {
+          body{padding:0}
+          .sheet{border:none!important;margin:0 0 18mm!important;border-radius:0}
+        }
       </style></head><body>
-      <p style="text-align:center;color:#64748b;font-size:12px;margin:0 0 12px">
+      <p class="meta">
         ${escapeHtml(payload.center_name || '')} · ${escapeHtml(payload.generated_at ? formatDateTime(payload.generated_at) : '')}
       </p>
       ${body || '<p>لا توجد بيانات</p>'}
@@ -139,7 +222,7 @@ export function DepartmentNoticePage() {
       <PageHeader
         title="إخطار القسم"
         subtitle="بيان سيارة مؤجرة للطباعة بنفس بيانات النموذج الورقي"
-        action={<Button onClick={() => printNotice()} loading={printing} disabled={!rows.length}>طباعة</Button>}
+        action={<Button onClick={() => void printNotice()} loading={printing} disabled={!rows.length}>طباعة</Button>}
       />
       <section className="rpm-panel">
         <div className="rpm-form-grid">
