@@ -103,11 +103,11 @@ function ymLabel(ym: string) {
 
 function contractStatusMeta(status: string): { label: string; tone: BadgeTone; key: string } {
   const key = (status || '').toLowerCase()
-  if (key === 'pending') return { label: 'معلّق', tone: 'warning', key: 'pending' }
-  if (key === 'approved' || key === 'confirmed') return { label: 'معتمد', tone: 'steel', key: 'approved' }
-  if (key === 'active' || key === 'handed_over') return { label: 'نشط / مسلّم', tone: 'success', key: 'active' }
-  if (key === 'completed' || key === 'returned' || key === 'closed') return { label: 'مكتمل', tone: 'muted', key: 'completed' }
-  if (key === 'cancelled' || key === 'canceled') return { label: 'ملغي', tone: 'danger', key: 'cancelled' }
+  if (key === 'pending') return { label: 'قيد المراجعة', tone: 'warning', key: 'pending' }
+  if (key === 'approved' || key === 'confirmed') return { label: 'بانتظار التسليم', tone: 'steel', key: 'approved' }
+  if (key === 'active' || key === 'handed_over') return { label: 'تم التسليم', tone: 'success', key: 'active' }
+  if (key === 'completed' || key === 'returned' || key === 'closed') return { label: 'تم الاستلام', tone: 'muted', key: 'completed' }
+  if (key === 'cancelled' || key === 'canceled') return { label: 'تم الإلغاء', tone: 'danger', key: 'cancelled' }
   return { label: status || '—', tone: 'muted', key: key || 'muted' }
 }
 

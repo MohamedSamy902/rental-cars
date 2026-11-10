@@ -17,10 +17,11 @@ type Contract = {
 }
 
 const statusLabel: Record<string, string> = {
-  pending: 'معلّق',
-  approved: 'معتمد',
-  active: 'نشط',
-  completed: 'مكتمل',
+  pending: 'قيد المراجعة',
+  approved: 'بانتظار التسليم',
+  active: 'تم التسليم',
+  completed: 'تم الاستلام',
+  cancelled: 'تم الإلغاء',
 }
 
 const WEEKDAYS = ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'] // سبت → جمعة
@@ -219,9 +220,9 @@ export function CalendarPage() {
             })}
           </div>
           <div className="cal-legend" aria-hidden>
-            <span><i className="cal-dot is-active" /> نشط</span>
-            <span><i className="cal-dot is-approved" /> معتمد</span>
-            <span><i className="cal-dot is-pending" /> معلّق</span>
+            <span><i className="cal-dot is-active" /> تم التسليم</span>
+            <span><i className="cal-dot is-approved" /> بانتظار التسليم</span>
+            <span><i className="cal-dot is-pending" /> قيد المراجعة</span>
           </div>
         </div>
       ) : null}

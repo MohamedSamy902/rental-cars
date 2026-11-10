@@ -100,8 +100,15 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
       if (!form.unit_price || Number(form.unit_price) < 0) next.unit_price = 'أدخل سعر الشراء.'
     }
     if (!form.quantity || Number(form.quantity) < 1) next.quantity = 'الكمية يجب أن تكون ١ فأكثر.'
-    if (!form.next_service_on) next.next_service_on = 'موعد الصيانة التالية إلزامي للتنبيه.'
-    if (!form.next_service_odometer) next.next_service_odometer = 'عداد الصيانة التالية إلزامي للتنبيه.'
+    const hasDate = Boolean(form.next_service_on)
+    const hasOdo = form.next_service_odometer !== ''
+    if (!hasDate && !hasOdo) {
+      next.next_service_on = 'حدّد موعد أو عداد الصيانة التالية (واحد فقط).'
+      next.next_service_odometer = 'حدّد موعد أو عداد الصيانة التالية (واحد فقط).'
+    } else if (hasDate && hasOdo) {
+      next.next_service_on = 'اختر واحداً فقط: موعد أو عداد.'
+      next.next_service_odometer = 'اختر واحداً فقط: موعد أو عداد.'
+    }
     setFieldErrors(next)
     return Object.keys(next).length === 0
   }
@@ -289,25 +296,33 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
         />
         <DateField
           label="موعد الصيانة التالية"
-          required
+          required={!form.next_service_odometer}
           error={fieldErrors.next_service_on}
           value={form.next_service_on}
           onChange={(e) => {
-            setForm({ ...form, next_service_on: e.target.value })
-            setFieldErrors((prev) => ({ ...prev, next_service_on: '' }))
+            setForm({
+              ...form,
+              next_service_on: e.target.value,
+              next_service_odometer: e.target.value ? '' : form.next_service_odometer,
+            })
+            setFieldErrors((prev) => ({ ...prev, next_service_on: '', next_service_odometer: '' }))
           }}
-          hint="يُستخدم لإشعار الفريق قبل الموعد"
+          hint="للقطع التي تتغيّر بالوقت — إشعار قبل الموعد بيومين · واحد من الاثنين فقط"
         />
         <NumberField
           label="عداد الصيانة التالية"
-          required
+          required={!form.next_service_on}
           error={fieldErrors.next_service_odometer}
           value={form.next_service_odometer}
           onChange={(e) => {
-            setForm({ ...form, next_service_odometer: e.target.value })
-            setFieldErrors((prev) => ({ ...prev, next_service_odometer: '' }))
+            setForm({
+              ...form,
+              next_service_odometer: e.target.value,
+              next_service_on: e.target.value !== '' ? '' : form.next_service_on,
+            })
+            setFieldErrors((prev) => ({ ...prev, next_service_on: '', next_service_odometer: '' }))
           }}
-          hint="يُستخدم لإشعار عند بلوغ العداد"
+          hint="للقطع التي تتغيّر بالكيلومتر — إشعار قبل ٥٠٠ كم · واحد من الاثنين فقط"
         />
       </div>
     </Sheet>

@@ -219,8 +219,8 @@ const tirePosLabel: Record<string, string> = {
 
 const statusLabel: Record<string, string> = {
   available: 'متاحة', reserved: 'محجوزة', rented: 'مؤجرة', maintenance: 'في صيانة',
-  out_of_service: 'خارج الخدمة', pending: 'قيد الانتظار', approved: 'معتمدة',
-  active: 'نشطة', completed: 'مكتملة', cancelled: 'ملغاة', open: 'مفتوحة',
+  out_of_service: 'خارج الخدمة', pending: 'قيد المراجعة', approved: 'بانتظار التسليم',
+  active: 'تم التسليم', completed: 'تم الاستلام', cancelled: 'تم الإلغاء', open: 'مفتوحة',
   in_progress: 'قيد التنفيذ', closed: 'مغلقة',
 }
 

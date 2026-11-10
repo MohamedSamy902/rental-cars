@@ -59,7 +59,7 @@ class ViolationController extends Controller
 
         return response()->json([
             'data' => $this->serialize($violation->fresh()->load(['vehicle', 'customer', 'contract', 'creator:id,name'])),
-            'message' => 'تم تسجيل المخالفة للمتابعة (بلا ترحيل محاسبي).',
+            'message' => 'تم تسجيل المخالفة للمتابعة.',
         ], 201);
     }
 

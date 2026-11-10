@@ -283,7 +283,7 @@ export function CustomersPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العملاء"
-        subtitle="بلا رصيد دائن على النظام · قائمة سوداء بصلاحية"
+        subtitle="عملاء الإيجار · قائمة سوداء بصلاحية"
         action={<Button onClick={() => setOpen(true)}>إضافة عميل</Button>}
         mobileFab
       />

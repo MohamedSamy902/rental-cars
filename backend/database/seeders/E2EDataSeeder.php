@@ -783,7 +783,7 @@ class E2EDataSeeder extends Seeder
                 'labor_cost' => 400,
                 'notes' => 'صيانة دورية — قيد التنفيذ',
                 'next_service_on' => now()->addMonths(3)->toDateString(),
-                'next_service_odometer' => 95000,
+                'next_service_odometer' => null,
             ])->save();
 
             if ($oil && ! WorkOrderLine::query()->where('work_order_id', $openWo->id)->where('description', 'زيت من المخزون')->exists()) {
@@ -834,7 +834,7 @@ class E2EDataSeeder extends Seeder
                 'parts_cost' => 650,
                 'labor_cost' => 250,
                 'notes' => 'تغيير فحمات — ممول من المخزون',
-                'next_service_on' => now()->addDays(40)->toDateString(),
+                'next_service_on' => null,
                 'next_service_odometer' => 106000,
             ],
         );
@@ -863,7 +863,7 @@ class E2EDataSeeder extends Seeder
                 'labor_cost' => 150,
                 'notes' => 'إصلاح بسيط ممول من عهدة الفني',
                 'next_service_on' => now()->addMonths(2)->toDateString(),
-                'next_service_odometer' => 23000,
+                'next_service_odometer' => null,
             ],
         );
         if (! WorkOrderLine::query()->where('work_order_id', $custodyWo->id)->exists()) {
@@ -890,7 +890,7 @@ class E2EDataSeeder extends Seeder
                 'parts_cost' => 0,
                 'labor_cost' => 0,
                 'notes' => 'فحص دوري مجدول — لا يحجز العربية',
-                'next_service_on' => now()->addMonths(6)->toDateString(),
+                'next_service_on' => null,
                 'next_service_odometer' => 35000,
             ],
         );

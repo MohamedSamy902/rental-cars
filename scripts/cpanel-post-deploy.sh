@@ -78,6 +78,9 @@ if [[ "$SEED_FIRST" == "1" ]]; then
   "$PHP_BIN" artisan db:seed --force
 fi
 
+echo "==> إثراء بيانات الديمو المتنوعة (idempotent)"
+"$PHP_BIN" artisan rpm:enrich-live-demo 2>/dev/null || echo "تنبيه: rpm:enrich-live-demo تُخطّي أو غير متاح بعد"
+
 "$PHP_BIN" artisan config:cache
 "$PHP_BIN" artisan route:cache
 "$PHP_BIN" artisan view:cache 2>/dev/null || true

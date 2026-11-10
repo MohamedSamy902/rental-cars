@@ -109,34 +109,84 @@ class OperationsController extends Controller
         abort_unless(($flags['department_notice'] ?? true) === true, 403, 'إخطار القسم غير مفعّل.');
 
         $filter = $request->string('filter', 'all')->toString();
-        $q = Customer::query()->orderBy('full_name');
+        $ops = is_array($settings?->operational) ? $settings->operational : [];
+        $phone = is_string($ops['print_phone'] ?? null) && trim((string) $ops['print_phone']) !== ''
+            ? trim((string) $ops['print_phone'])
+            : (string) config('rpm.center_public_phone', '01125253888');
+        $phone2 = is_string($ops['print_phone_alt'] ?? null) && trim((string) $ops['print_phone_alt']) !== ''
+            ? trim((string) $ops['print_phone_alt'])
+            : '01150666901';
+        $signer = is_string($ops['print_signer_name'] ?? null) && trim((string) $ops['print_signer_name']) !== ''
+            ? trim((string) $ops['print_signer_name'])
+            : 'أ/ محمد عبدالقادر';
+        $tagline = is_string($ops['company_tagline'] ?? null) && trim((string) $ops['company_tagline']) !== ''
+            ? trim((string) $ops['company_tagline'])
+            : 'لتجارة وإيجار أحدث أنواع السيارات';
+
+        $q = Contract::query()
+            ->with([
+                'customer:id,full_name,phone,national_id,address',
+                'vehicle:id,brand,model,plate,year',
+            ])
+            ->whereIn('status', ['pending', 'approved', 'active', 'completed'])
+            ->orderByDesc('starts_at');
 
         if ($filter === 'one') {
             $id = (int) $request->input('customer_id');
-            $q->whereKey($id);
+            $q->where('customer_id', $id);
         } elseif ($filter === 'today') {
-            $q->whereHas('contracts', fn ($c) => $c->whereDate('starts_at', now()->toDateString()));
+            $q->whereDate('starts_at', now()->toDateString());
         } elseif ($filter === 'week') {
-            $q->whereHas('contracts', fn ($c) => $c->whereBetween('starts_at', [now()->startOfWeek(), now()->endOfWeek()]));
+            $q->whereBetween('starts_at', [now()->startOfWeek(), now()->endOfWeek()]);
         } elseif ($filter === 'range') {
             $from = $request->date('from');
             $to = $request->date('to');
             if ($from && $to) {
-                $q->whereHas('contracts', fn ($c) => $c->whereBetween('starts_at', [$from, $to]));
+                $q->whereBetween('starts_at', [$from, $to]);
             }
         }
 
-        $rows = $q->limit(200)->get([
-            'id', 'full_name', 'phone', 'national_id', 'national_id_image_path', 'national_id_back_path',
-            'license_number', 'license_expires_on', 'license_image_path', 'license_back_path', 'birth_date', 'status',
-        ]);
+        $statements = $q->limit(200)->get()->map(function (Contract $c) {
+            $starts = $c->starts_at;
+            $ends = $c->actual_ends_at ?? $c->planned_ends_at;
+            $days = $c->approved_days ? (int) $c->approved_days : null;
+            if ($days === null && $starts && $ends && $ends->gt($starts)) {
+                $days = max(1, (int) ceil($starts->diffInSeconds($ends) / 86400));
+            }
+
+            $vehicleLabel = trim(implode(' ', array_filter([
+                $c->vehicle?->brand,
+                $c->vehicle?->model,
+                $c->vehicle?->year ? (string) $c->vehicle->year : null,
+            ])));
+
+            return [
+                'contract_id' => $c->id,
+                'contract_number' => $c->number,
+                'renter_name' => $c->customer?->full_name,
+                'national_id' => $c->customer?->national_id,
+                'vehicle_type' => $vehicleLabel !== '' ? $vehicleLabel : null,
+                'plate' => $c->vehicle?->plate,
+                'rental_duration_days' => $days,
+                'starts_on' => $starts?->toDateString(),
+                'ends_on' => $ends?->toDateString(),
+                'address' => $c->customer?->address,
+                'notes' => $c->notes,
+                'status' => $c->status,
+            ];
+        })->values();
 
         return response()->json([
             'data' => [
-                'center_name' => $settings?->center_name,
+                'center_name' => $settings?->center_name ?: 'مركز آر بي إم للتأجير',
+                'signer_name' => $signer,
+                'tagline' => $tagline,
+                'phones' => array_values(array_filter([$phone, $phone2])),
                 'generated_at' => now()->toIso8601String(),
                 'filter' => $filter,
-                'customers' => $rows,
+                'statements' => $statements,
+                // توافق خلفي للواجهات القديمة
+                'customers' => [],
             ],
         ]);
     }
