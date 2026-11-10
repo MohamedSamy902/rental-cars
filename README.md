@@ -186,10 +186,9 @@ bash scripts/deploy-cpanel-ssh.sh
 
 | الجزء | أين يُنشر | متى |
 |--------|-----------|-----|
-| **فرونت** | Vercel (`ui-pwa`) | تلقائي عند push على `main` (ربط GitHub في Vercel) |
-| **باك / API** | cPanel `~/rpm` + `public_html` | تلقائي عبر [`.github/workflows/deploy-cpanel.yml`](.github/workflows/deploy-cpanel.yml) عند push على `main` |
+| **فرونت + باك** | cPanel (`public_html` + `~/rpm`) على `https://rpmrentcar.com` | تلقائي عبر Deploy عند push على `main` |
 
-الفرونت على Vercel ينادي `https://rpmrentcar.com/api/*` عبر Rewrite في `ui-pwa/vercel.json`.
+Vercel يبقى للمعاينة فقط إن رغبت؛ الإنتاج على دومين cPanel بدون تحويل خارجي.
 
 ### أسرار GitHub (مرة واحدة) — Settings → Secrets → Actions
 

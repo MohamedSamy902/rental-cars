@@ -15,6 +15,9 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # لا تُعَد كتابة front controller بعد التوجيه الداخلي
+    RewriteRule ^index\.php$ - [L]
+
     # Laravel API + health + sanctum cookie routes
     RewriteRule ^api(/.*)?$ index.php [L,QSA]
     RewriteRule ^up$ index.php [L,QSA]
@@ -26,7 +29,7 @@
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
-    # باقي المسارات → SPA
+    # باقي المسارات → SPA على نفس الدومين (بلا تحويل لـ Vercel)
     RewriteRule ^ index.html [L]
 </IfModule>
 
