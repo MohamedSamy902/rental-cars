@@ -6,24 +6,29 @@ use App\Models\AuditLog;
 use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\Expense;
+use App\Models\JournalEntry;
 use App\Models\MonthLock;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\WorkOrder;
+use App\Services\Accounting\AccountingService;
+use App\Services\Contracts\ContractPricingService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * يُثرى قاعدة الديمو الحية ببيانات متنوعة (حالات عقود / صيانة موعد أو عداد / إقفال شهر)
  * بدون مسح البيانات الحالية — idempotent قدر الإمكان.
+ * يُرحِّل أيضاً إثبات الإيجار (قيود 4000) للعقود النشطة/المكتملة الناقصة حتى يظهر «إيراد إيجار» في الحسابات.
  */
 class EnrichLiveDemoCommand extends Command
 {
     protected $signature = 'rpm:enrich-live-demo';
 
-    protected $description = 'تعبئة بيانات تجريبية متنوعة على البيئة الحية (عقود بكل الحالات، صيانة XOR، سجل إقفال)';
+    protected $description = 'تعبئة بيانات تجريبية متنوعة على البيئة الحية (عقود بكل الحالات، صيانة XOR، سجل إقفال، ترحيل إيراد إيجار)';
 
-    public function handle(): int
+    public function handle(AccountingService $accounting, ContractPricingService $pricing): int
     {
         $actor = User::query()->orderBy('id')->first();
         if (! $actor) {
@@ -39,11 +44,16 @@ class EnrichLiveDemoCommand extends Command
             'expenses' => $this->ensureExpenses($actor->id),
             'payments' => $this->ensureSamplePayments($actor->id),
             'month_lock_audit' => $this->ensureMonthLockAudit($actor->id),
+            'period_rent_filled' => $this->ensurePeriodRent($pricing),
+            'rent_journals' => $this->ensureRentJournals($accounting, $actor->id),
         ];
 
         $this->info('تم إثراء البيانات التجريبية:');
         foreach ($created as $key => $count) {
             $this->line("  · {$key}: {$count}");
+        }
+        if (($created['rent_journals'] ?? 0) === 0 && ($created['contracts'] ?? 0) === 0) {
+            $this->comment('ملاحظة: الأصفار تعني أن العينات والقيود موجودة مسبقاً (الأمر لا يعيد الكتابة).');
         }
 
         return self::SUCCESS;
@@ -90,6 +100,8 @@ class EnrichLiveDemoCommand extends Command
             $customer = $customers[$i % $customers->count()];
             $starts = now()->addDays(($i * 3) - 10)->startOfDay();
             $ends = $starts->copy()->addDays(5);
+            $rate = (int) ($vehicle->daily_rate ?: 1000);
+            $periodRent = $rate * 5;
             Contract::query()->create([
                 'number' => 'DEMO-'.$status.'-'.now()->format('ymdHis').$i,
                 'customer_id' => $customer->id,
@@ -97,17 +109,79 @@ class EnrichLiveDemoCommand extends Command
                 'status' => $status,
                 'starts_at' => $starts,
                 'planned_ends_at' => $ends,
-                'actual_ends_at' => $status === 'completed' ? $ends->copy()->subDay() : null,
+                'actual_ends_at' => in_array($status, ['completed', 'active'], true) ? ($status === 'completed' ? $ends->copy()->subDay() : null) : null,
                 'approved_days' => 5,
-                'frozen_daily_rate' => (int) ($vehicle->daily_rate ?: 1000),
+                'frozen_daily_rate' => $rate,
                 'frozen_agreed_deposit' => (int) ($vehicle->default_deposit ?: 2000),
-                'final_total' => $status === 'completed' ? (int) ($vehicle->daily_rate ?: 1000) * 5 : null,
+                'period_rent' => in_array($status, ['active', 'completed'], true) ? $periodRent : null,
+                'final_total' => $status === 'completed' ? $periodRent : null,
                 'notes' => 'عينة ديمو — '.$status,
             ]);
             $created++;
         }
 
         return $created;
+    }
+
+    /**
+     * يملأ period_rent للعقود النشطة/المكتملة إن كان فارغاً حتى تُحسب شرائح الإيجار.
+     */
+    private function ensurePeriodRent(ContractPricingService $pricing): int
+    {
+        $n = 0;
+        Contract::query()
+            ->whereIn('status', ['active', 'completed'])
+            ->where(function ($q) {
+                $q->whereNull('period_rent')->orWhere('period_rent', '<=', 0);
+            })
+            ->orderBy('id')
+            ->limit(200)
+            ->get()
+            ->each(function (Contract $c) use ($pricing, &$n) {
+                $start = $c->starts_at;
+                $end = $c->actual_ends_at ?? $c->planned_ends_at;
+                $rate = (int) $c->frozen_daily_rate;
+                if (! $start || ! $end || $rate <= 0 || $end <= $start) {
+                    return;
+                }
+                $days = $pricing->countRentalDays($start, $end);
+                $rent = max(0, $days * $rate);
+                if ($rent <= 0) {
+                    return;
+                }
+                $c->period_rent = $rent;
+                if ($c->status === 'completed' && (int) ($c->final_total ?? 0) <= 0) {
+                    $c->final_total = $rent
+                        + (int) ($c->excess_km_fee ?? 0)
+                        + (int) ($c->damage_fee ?? 0)
+                        + (int) ($c->other_fees ?? 0)
+                        - (int) ($c->discount ?? 0);
+                }
+                $c->save();
+                $n++;
+            });
+
+        return $n;
+    }
+
+    /**
+     * يُثبت إيراد الإيجار (حساب 4000) لآخر 18 شهراً للعقود المتداخلة — يملأ بطاقات الحسابات.
+     */
+    private function ensureRentJournals(AccountingService $accounting, int $actorId): int
+    {
+        $accounting->ensureChartOfAccounts();
+        $before = JournalEntry::query()->where('source', 'like', 'rent_recog:%')->count();
+
+        DB::transaction(function () use ($accounting, $actorId) {
+            for ($i = 0; $i < 18; $i++) {
+                $cursor = now()->subMonthsNoOverflow($i);
+                $accounting->recognizeRentForMonth((int) $cursor->year, (int) $cursor->month, $actorId);
+            }
+        });
+
+        $after = JournalEntry::query()->where('source', 'like', 'rent_recog:%')->count();
+
+        return max(0, $after - $before);
     }
 
     private function ensureWorkOrdersXor(): int
