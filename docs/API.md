@@ -605,6 +605,9 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/violations` | تسجيل مع إسناد حيازة تلقائي إن أمكن |
 | PUT | `/violations/{id}` | تعديل (تاريخ · عقد · مبلغ · مكان · حالة · مرفق) |
 | POST | `/violations/{id}/confirm` | تأكيد سداد دون قيد |
+| GET | `/violation-inquiries` | قائمة استعلام اللوحات · `meta.auto_daily_reset` |
+| POST | `/violation-inquiries/{vehicle}/mark` | تعليم تم الاستعلام |
+| POST | `/violation-inquiries/reset-all` | إعادة كل اللوحات لبانتظار الاستعلام (يمسح العلامات) |
 
 ```json
 {

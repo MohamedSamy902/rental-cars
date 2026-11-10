@@ -29,6 +29,7 @@ type Meta = {
   done_today: number
   pending: number
   rented_today: number
+  auto_daily_reset?: boolean
 }
 
 const Tabs = ['pending', 'done_today', 'rented_today', 'all'] as const
@@ -76,7 +77,9 @@ export function ViolationInquiriesPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [markingId, setMarkingId] = useState<number | null>(null)
+  const [resetting, setResetting] = useState(false)
   const [chip, setChip] = useQueryTab({ allowed: Tabs, defaultValue: 'pending' })
+  const autoDailyReset = meta?.auto_daily_reset ?? false
 
   const chips = useMemo(
     () => [
@@ -84,9 +87,9 @@ export function ViolationInquiriesPage() {
         id: 'pending',
         label: 'لم يُستعلم',
         attention: (meta?.pending ?? 0) > 0 ? ('warning' as const) : null,
-        attentionLabel: `${meta?.pending ?? 0} بانتظار الاستعلام اليوم`,
+        attentionLabel: `${meta?.pending ?? 0} بانتظار الاستعلام`,
       },
-      { id: 'done_today', label: 'تم الاستعلام اليوم', attention: null },
+      { id: 'done_today', label: autoDailyReset ? 'تم الاستعلام اليوم' : 'تم الاستعلام', attention: null },
       {
         id: 'rented_today',
         label: 'مؤجرة اليوم',
@@ -95,7 +98,7 @@ export function ViolationInquiriesPage() {
       },
       { id: 'all', label: 'الكل' },
     ],
-    [meta],
+    [meta, autoDailyReset],
   )
 
   const load = useCallback(async () => {
@@ -140,12 +143,29 @@ export function ViolationInquiriesPage() {
         `/violation-inquiries/${row.vehicle_id}/mark`,
         { method: 'POST', json: {} },
       )
-      toast.success(res.message || 'تم تسجيل الاستعلام لليوم.')
+      toast.success(res.message || 'تم تسجيل الاستعلام.')
       await load()
     } catch (e) {
       toast.error((e as ApiError).message)
     } finally {
       setMarkingId(null)
+    }
+  }
+
+  async function resetAll() {
+    setResetting(true)
+    try {
+      const res = await api<{ data: { cleared: number }; message?: string }>(
+        '/violation-inquiries/reset-all',
+        { method: 'POST', json: {} },
+      )
+      toast.success(res.message || 'أُعيدت اللوحات لبانتظار الاستعلام.')
+      setChip('pending')
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message)
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -219,7 +239,21 @@ export function ViolationInquiriesPage() {
     <div className="rpm-stack viq-page">
       <PageHeader
         title="استعلامات عن المخالفات"
-        subtitle={`متابعة يومية للوحات — اليوم ${meta?.date || '…'} · يُعاد الاستعلام كل يوم`}
+        subtitle={
+          autoDailyReset
+            ? `متابعة يومية للوحات — اليوم ${meta?.date || '…'} · يُعاد الاستعلام كل يوم`
+            : `متابعة اللوحات — اليوم ${meta?.date || '…'} · الإرجاع اليومي التلقائي موقّف · استخدم «إعادة الكل للاستعلام»`
+        }
+        action={
+          <Button
+            variant="secondary"
+            loading={resetting}
+            disabled={resetting || (meta?.done_today ?? 0) === 0}
+            onClick={() => void resetAll()}
+          >
+            إعادة الكل للاستعلام
+          </Button>
+        }
       />
       <FilterBar
         search={search}
