@@ -21,7 +21,6 @@ type Ops = {
   print_tax_info?: string | null
   print_signer_name?: string | null
   company_tagline?: string | null
-  default_contract_vehicle_value?: string | null
   contract_terms?: string | null
 }
 
@@ -39,7 +38,6 @@ export function SettingsPage() {
   const [printTax, setPrintTax] = useState('')
   const [printSigner, setPrintSigner] = useState('')
   const [companyTagline, setCompanyTagline] = useState('')
-  const [defaultVehicleValue, setDefaultVehicleValue] = useState('')
   const [contractTerms, setContractTerms] = useState('')
   const [ops, setOps] = useState<Ops>({})
 
@@ -56,7 +54,6 @@ export function SettingsPage() {
       setPrintTax(operational.print_tax_info || '')
       setPrintSigner(operational.print_signer_name || '')
       setCompanyTagline(operational.company_tagline || 'لخدمات رجال الأعمال')
-      setDefaultVehicleValue(operational.default_contract_vehicle_value || '')
       setContractTerms(operational.contract_terms || '')
       setOps({
         default_daily_km: operational.default_daily_km ?? 200,
@@ -89,7 +86,6 @@ export function SettingsPage() {
           print_tax_info: printTax || null,
           print_signer_name: printSigner || null,
           company_tagline: companyTagline || null,
-          default_contract_vehicle_value: defaultVehicleValue || null,
           contract_terms: contractTerms || null,
           operational: ops,
         },
@@ -119,18 +115,6 @@ export function SettingsPage() {
         <div className="rpm-panel__head"><h3>المركز</h3></div>
         <div className="rpm-form-grid">
           <TextField label="اسم المركز" value={centerName} onChange={(e) => setCenterName(e.target.value)} />
-          <div className="rpm-dense-row">
-            <div>
-              <strong>تعدد الفروع</strong>
-              <p className="muted">{data.multi_branch ? 'مفعّل' : 'فرع واحد (الافتراضي)'}</p>
-            </div>
-          </div>
-          <div className="rpm-dense-row">
-            <div>
-              <strong>وضع المخزن</strong>
-              <p className="muted">{data.inventory_mode === 'unified' ? 'موحّد' : 'لكل فرع'}</p>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -148,12 +132,6 @@ export function SettingsPage() {
           <TextField label="عنوان الشركة" value={printAddress} onChange={(e) => setPrintAddress(e.target.value)} />
           <TextField label="السجل التجاري" value={printCr} onChange={(e) => setPrintCr(e.target.value)} />
           <TextField label="البطاقة الضريبية / الرقم الضريبي" value={printTax} onChange={(e) => setPrintTax(e.target.value)} />
-          <TextField
-            label="قيمة السيارة الافتراضية في العقد (ج.م)"
-            value={defaultVehicleValue}
-            onChange={(e) => setDefaultVehicleValue(e.target.value)}
-            hint="تُملأ في بنود العقد المطبوع من القالب"
-          />
           <MediaUpload
             label="شعار الشركة على المطبوعات"
             collection="tenant"

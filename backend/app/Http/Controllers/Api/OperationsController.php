@@ -203,7 +203,6 @@ class OperationsController extends Controller
             'print_tax_info' => ['nullable', 'string', 'max:200'],
             'print_signer_name' => ['nullable', 'string', 'max:200'],
             'company_tagline' => ['nullable', 'string', 'max:200'],
-            'default_contract_vehicle_value' => ['nullable', 'string', 'max:50'],
             'contract_terms' => ['nullable', 'string', 'max:20000'],
             'operational' => ['nullable', 'array'],
         ]);
@@ -221,7 +220,6 @@ class OperationsController extends Controller
             'print_tax_info',
             'print_signer_name',
             'company_tagline',
-            'default_contract_vehicle_value',
             'contract_terms',
         ] as $key) {
             if (array_key_exists($key, $data)) {
@@ -229,6 +227,7 @@ class OperationsController extends Controller
                 unset($data[$key]);
             }
         }
+        unset($ops['default_contract_vehicle_value']);
         $data['operational'] = $ops;
 
         $settings->fill($data)->save();

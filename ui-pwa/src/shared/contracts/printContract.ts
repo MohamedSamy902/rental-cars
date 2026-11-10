@@ -78,7 +78,6 @@ type PrintTenant = {
   print_tax_info?: string | null
   print_signer_name?: string | null
   company_tagline?: string | null
-  default_contract_vehicle_value?: string | null
   contract_terms?: string | null
   logo_src?: string | null
 }

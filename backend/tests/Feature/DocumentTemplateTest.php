@@ -160,7 +160,6 @@ class DocumentTemplateTest extends TestCase
                 'print_commercial_register' => '18766',
                 'print_signer_name' => 'محمد عبد القادر محمد عطية',
                 'company_tagline' => 'لخدمات رجال الأعمال',
-                'default_contract_vehicle_value' => '450000',
                 'default_daily_km' => 200,
                 'excess_km_rate' => 5,
             ],
@@ -192,6 +191,7 @@ class DocumentTemplateTest extends TestCase
             'odometer' => 22000,
             'daily_rate' => 900,
             'default_deposit' => 5000,
+            'purchase_value_estimate' => 450000,
             'is_active' => true,
         ]);
         $contract = Contract::query()->create([
