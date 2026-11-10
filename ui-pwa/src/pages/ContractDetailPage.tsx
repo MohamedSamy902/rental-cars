@@ -178,6 +178,13 @@ export function ContractDetailPage() {
             { label: 'عداد العودة', value: row.odometer_in != null ? `${formatNumber(row.odometer_in)} كم` : '—' },
             { label: 'كيلومترات زيادة', value: row.excess_km_amount ? formatMoney(row.excess_km_amount) : '—' },
             { label: 'رسوم أضرار', value: row.damage_fee ? formatMoney(row.damage_fee) : '—' },
+            {
+              label: 'خدمة تسليم واستلام',
+              value: row.has_delivery_service || (row.delivery_service_fee ?? 0) > 0
+                ? `${formatMoney(row.delivery_service_fee || 0)}${row.delivery_service_notes ? ` · ${row.delivery_service_notes}` : ''}`
+                : '—',
+              wide: true,
+            },
             { label: 'ملاحظات', value: row.notes || '—', wide: true },
           ]}
         />

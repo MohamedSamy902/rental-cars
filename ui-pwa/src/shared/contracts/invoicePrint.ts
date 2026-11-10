@@ -33,6 +33,9 @@ type InvoiceContract = {
   damage_fee?: number | null
   other_fees?: number | null
   other_fees_description?: string | null
+  has_delivery_service?: boolean | null
+  delivery_service_fee?: number | null
+  delivery_service_notes?: string | null
   discount?: number | null
   final_total?: number | null
   odometer_out?: number | null
@@ -112,10 +115,11 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
   const excessAmt = Number(c.excess_km_amount ?? 0)
   const other = Number(c.other_fees ?? 0)
   const damage = Number(c.damage_fee ?? 0)
+  const delivery = Number(c.delivery_service_fee ?? 0)
   const discount = Number(c.discount ?? 0)
   const total = c.final_total != null
     ? Number(c.final_total)
-    : Math.max(0, rent + excessAmt + other + damage - discount)
+    : Math.max(0, rent + excessAmt + other + damage + delivery - discount)
   const paidIn = (c.payments || []).filter((p) => p.direction === 'in').reduce((s, p) => s + Number(p.amount || 0), 0)
   const paidOut = (c.payments || []).filter((p) => p.direction === 'out').reduce((s, p) => s + Number(p.amount || 0), 0)
   const paidNet = paidIn - paidOut
@@ -134,8 +138,23 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
   const logo = tenant.logo_src || '/brand/rpm-logo.webp'
   const brand = tenant.center_name || 'RPM Rent A Car'
   const otherLabel = (c.other_fees_description || '').trim() || (other > 0 ? 'رسوم أخرى' : '')
+  const deliveryNotes = (c.delivery_service_notes || '').trim()
   const invNo = invoiceNumber(c.number)
   const invDate = formatDate(c.starts_at)
+
+  const deliveryRow = (delivery > 0 || c.has_delivery_service)
+    ? `<tr>
+        <td class="desc">خدمة تسليم واستلام السيارة${deliveryNotes ? ` · ${esc(deliveryNotes)}` : ''}</td>
+        <td class="num">1</td>
+        <td class="num">—</td>
+        <td class="num">${moneyOrBlank(delivery)}</td>
+      </tr>`
+    : `<tr>
+        <td class="desc">خدمة تسليم واستلام السيارة</td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+      </tr>`
 
   const otherRow = (other > 0 || damage > 0)
     ? `<tr>
@@ -245,6 +264,7 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
           <td class="num">—</td>
           <td class="num">${excessAmt ? moneyOrBlank(excessAmt) : ''}</td>
         </tr>
+        ${deliveryRow}
         ${otherRow}
         <tr class="totals">
           <td colspan="3">المبلغ الإجمالي / Total Amount</td>
