@@ -59,11 +59,12 @@ class ContractBalanceDueTest extends TestCase
         ]);
     }
 
-    public function test_partial_create_requires_balance_due_and_clears_when_settled(): void
+    public function test_partial_create_sets_balance_due_and_clears_when_settled(): void
     {
         $starts = now()->addDays(2)->startOfDay();
         $ends = $starts->copy()->addDays(3);
 
+        // بدون تاريخ: مسموح عبر الـ API (توافق المسارات القديمة) — الواجهة تُلزم بالحقل.
         $this->postJson('/api/contracts', [
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
@@ -71,12 +72,25 @@ class ContractBalanceDueTest extends TestCase
             'planned_ends_at' => $ends->toDateTimeString(),
             'payment_amount' => 500,
             'payment_method' => 'cash',
-        ])->assertStatus(422);
+        ])->assertCreated();
 
         $due = now()->addDays(7)->toDateString();
+        $vehicle2 = Vehicle::query()->create([
+            'code' => 'BAL-2',
+            'plate' => 'ب ل ق 2',
+            'brand' => 'MG',
+            'model' => 'RX5',
+            'year' => 2024,
+            'category' => 'SUV',
+            'fuel_type' => 'بنزين',
+            'odometer' => 5000,
+            'daily_rate' => 1000,
+            'default_deposit' => 2000,
+            'is_active' => true,
+        ]);
         $created = $this->postJson('/api/contracts', [
             'customer_id' => $this->customer->id,
-            'vehicle_id' => $this->vehicle->id,
+            'vehicle_id' => $vehicle2->id,
             'starts_at' => $starts->toDateTimeString(),
             'planned_ends_at' => $ends->toDateTimeString(),
             'payment_amount' => 500,

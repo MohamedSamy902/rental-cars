@@ -169,8 +169,26 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   }
 
   async function onSave() {
-    setSaving(true)
     setErrors({})
+    const paid = form.payment_amount !== '' ? Number(form.payment_amount) : 0
+    const rate = Number(form.daily_rate || 0)
+    let days = 0
+    if (form.starts_at && form.planned_ends_at) {
+      const a = new Date(form.starts_at)
+      const b = new Date(form.planned_ends_at)
+      if (!Number.isNaN(a.getTime()) && !Number.isNaN(b.getTime()) && b > a) {
+        days = Math.max(1, Math.ceil((b.getTime() - a.getTime()) / 86400000))
+      }
+    }
+    const total = days && rate ? days * rate : 0
+    const left = Math.max(0, total - paid)
+    if (paid > 0 && left > 0 && !form.balance_due_on) {
+      setErrors({ balance_due_on: 'حدد تاريخ تحصيل باقي المبلغ' })
+      toast.error('حدد تاريخ تحصيل باقي المبلغ')
+      return
+    }
+
+    setSaving(true)
     try {
       await api('/contracts', {
         method: 'POST',
