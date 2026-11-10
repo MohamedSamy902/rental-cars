@@ -171,13 +171,14 @@ class DocumentTemplateService
         $content = (string) $active->content;
         $title = (string) $active->title;
 
-        if (str_contains($content, 'rpm-paper-v2')) {
+        if (str_contains($content, 'rpm-paper-v3')) {
             return;
         }
 
         // Upgrade only templates we previously shipped — never overwrite a custom published body.
         $isLegacyShortTitle = in_array($title, ['قالب العقد الأساسي', 'قالب العقد'], true);
-        $looksLikeOurPriorDefault = str_contains($content, 'rpm-legal-contract')
+        $looksLikeOurPriorDefault = str_contains($content, 'rpm-paper-v2')
+            || str_contains($content, 'rpm-legal-contract')
             || (str_contains($content, 'بنود وشروط العقد') && str_contains($content, 'عقد تأجير'))
             || (str_contains($content, 'شروط التعاقد') && str_contains($content, 'rpm-lc-'));
         $isTinyLegacyStub = $isLegacyShortTitle && mb_strlen(strip_tags($content)) < 900;
@@ -642,29 +643,31 @@ class DocumentTemplateService
     private function defaultContractHtml(): string
     {
         return <<<'HTML'
-<article class="rpm-legal-contract rpm-paper-v2">
+<article class="rpm-legal-contract rpm-paper-v3">
+  <div class="rpm-lc-ribbon" aria-hidden="true"></div>
   <header class="rpm-lc-head">
     <div class="rpm-lc-badge rpm-lc-badge--contact">
       <div class="rpm-lc-signer-short">أ/ {{print_signer_name}}</div>
       <div class="rpm-lc-phone-pill">
-        <svg class="rpm-lc-ico-phone" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg>
-        <span dir="ltr">{{company_phone}}</span>
+        <span class="rpm-lc-phone-dot" aria-hidden="true">
+          <svg class="rpm-lc-ico-phone" viewBox="0 0 24 24"><path fill="#c40000" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg>
+        </span>
+        <span dir="ltr">/ {{company_phone}}</span>
       </div>
     </div>
     <div class="rpm-lc-badge rpm-lc-badge--title">
       <div class="rpm-lc-title-row">
         <svg class="rpm-lc-ico-handshake" viewBox="0 0 72 44" aria-hidden="true">
-          <path fill="#fff" d="M8 26c0-5 4-9 9-9h7l9-9 5 5-7 7h6c3 0 5 2 5 5v3H8v-2z"/>
-          <path fill="#fff" d="M64 26c0-5-4-9-9-9h-5l-4-4-5 5 6 6h-4c-3 0-5 2-5 5v3h26v-2z"/>
-          <rect x="22" y="24" width="28" height="7" rx="2" fill="#e10600"/>
-          <rect x="24" y="26" width="24" height="3" rx="1" fill="#fff"/>
+          <path fill="#fff" d="M10 28c0-4.5 3.5-8 8-8h6.5l8.5-8.5 4.2 4.2-6.8 6.8H38c2.8 0 5 2.2 5 5v4.5H10V28z"/>
+          <path fill="#fff" d="M62 28c0-4.5-3.5-8-8-8h-5l-3.8-3.8-4.2 4.2 5.5 5.5H42c-2.8 0-5 2.2-5 5v4.5h25V28z"/>
+          <rect x="22" y="25" width="28" height="8" rx="2.5" fill="#e10600"/>
+          <rect x="24" y="27.2" width="24" height="3.5" rx="1.2" fill="#fff"/>
         </svg>
         <span>عقد إيجار سيارة</span>
       </div>
     </div>
     <div class="rpm-lc-badge rpm-lc-badge--brand">
-      <img class="rpm-lc-logo" src="{{logo_src}}" alt="RPM" />
-      <div class="rpm-lc-swoosh" aria-hidden="true"></div>
+      <div class="rpm-lc-brand-mark">RPM<span class="rpm-lc-swoosh-thru" aria-hidden="true"></span></div>
       <div class="rpm-lc-tagline">{{company_tagline}}</div>
     </div>
   </header>
@@ -693,12 +696,12 @@ class DocumentTemplateService
     </p>
     <p>
       الجنسية : <span class="fill">{{customer_nationality}}</span>
-      صادر من : <span class="fill mid"></span>
+      . صادر من : <span class="fill mid"></span>
       تاريخ الصدور : <span class="fill"></span>
     </p>
     <p>
       رخصة رقم : <span class="fill mid" dir="ltr">{{customer_license}}</span>
-      صادر من : <span class="fill mid"></span>
+      . صادر من : <span class="fill mid"></span>
     </p>
     <p>محل إقامة المستأجر : <span class="fill wide">{{customer_address}}</span></p>
     <div class="rpm-lc-party-tag">( الطرف الثاني المستأجر )</div>
@@ -706,7 +709,13 @@ class DocumentTemplateService
 
   <section class="rpm-lc-block rpm-lc-block--icon">
     <div class="rpm-lc-float-ico rpm-lc-float-ico--car" aria-hidden="true">
-      <svg viewBox="0 0 64 40" fill="none"><path fill="#fff" d="M8 24l6-10h28l8 10H8zm4 8a4 4 0 110-8 4 4 0 010 8zm28 0a4 4 0 110-8 4 4 0 010 8z"/><path stroke="#fff" stroke-width="2" d="M6 24h52v4H6z"/></svg>
+      <svg viewBox="0 0 64 40" fill="none">
+        <path fill="#fff" d="M10 23l5.5-9h26l8 9H10z"/>
+        <path fill="#fff" d="M8 23h48v5.5H8z"/>
+        <circle cx="18" cy="30" r="4.2" fill="#111" stroke="#fff" stroke-width="2"/>
+        <circle cx="46" cy="30" r="4.2" fill="#111" stroke="#fff" stroke-width="2"/>
+        <path fill="#fff" d="M22 16.5h8.5l-2.2-3.5H24z"/>
+      </svg>
     </div>
     <p>
       أجر الطرف الأول إلى الطرف الثاني السيارة رقم : <span class="fill">{{vehicle_plate}}</span> ،
@@ -717,20 +726,24 @@ class DocumentTemplateService
       رقم الموتور : <span class="fill" dir="ltr">{{vehicle_engine}}</span> ،
       رقم الشاسية : <span class="fill" dir="ltr">{{vehicle_chassis}}</span> ،
       عداد الكيلو متر : <span class="fill">{{vehicle_odometer}}</span> ،
-      موبيل : <span class="fill" dir="ltr">{{customer_phone}}</span>
     </p>
+    <p>موبيل : <span class="fill" dir="ltr">{{customer_phone}}</span></p>
   </section>
 
   <section class="rpm-lc-block rpm-lc-block--icon">
     <div class="rpm-lc-float-ico rpm-lc-float-ico--cal" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="#fff" stroke-width="2"/><path stroke="#fff" stroke-width="2" d="M3 10h18M8 3v4M16 3v4"/><path fill="#fff" d="M7 13h3v3H7zm5 0h3v3h-3z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="5" width="18" height="16" rx="2.2" stroke="#fff" stroke-width="2"/>
+        <path stroke="#fff" stroke-width="2" d="M3 10h18M8 3v4M16 3v4"/>
+        <path fill="#fff" d="M7 13h3.2v3.2H7zm5 0h3.2v3.2H12z"/>
+      </svg>
     </div>
     <p>
       وذلك لمدة : <span class="fill">{{rental_duration}}</span>
       إبتداءً من : <span class="fill mid">{{start_date}}</span>
       إلى : <span class="fill mid">{{end_date}}</span>
     </p>
-    <p>. قابلة للتجديد بموافقة الطرفين .</p>
+    <p style="text-align:center">. قابلة للتجديد بموافقة الطرفين .</p>
   </section>
 
   <div class="rpm-lc-terms-wrap">
@@ -756,22 +769,29 @@ class DocumentTemplateService
 
   <footer class="rpm-lc-sign">
     <div class="rpm-lc-sign-col">
-      <div class="rpm-lc-party-tag">الطرف الثاني (المستأجر)</div>
+      <div class="rpm-lc-party-tag">الطرف الثاني ( المستأجر )</div>
       <p>الإسم : <span class="fill wide">{{customer_name}}</span></p>
       <p>الرقم القومي : <span class="fill mid" dir="ltr">{{customer_national_id}}</span></p>
       <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
     </div>
     <div class="rpm-lc-stamp">
       <div class="rpm-lc-stamp-ring">
-        <img src="{{logo_src}}" alt="" />
+        <svg class="rpm-lc-stamp-car" viewBox="0 0 64 28" aria-hidden="true">
+          <path fill="#111" d="M8 18l6-9h28l8 9H8z"/>
+          <path fill="#111" d="M6 18h52v4H6z"/>
+          <circle cx="16" cy="23" r="3.2" fill="#111"/>
+          <circle cx="48" cy="23" r="3.2" fill="#111"/>
+          <path fill="none" stroke="#111" stroke-width="1.4" d="M10 26c8 2 36 2 44 0"/>
+        </svg>
         <div class="stamp-rpm">RPM</div>
         <div class="stamp-en">Rent A Car</div>
-        <div>سجل تجاري {{company_cr}}</div>
+        <div class="stamp-ar-box">{{company_tagline}}</div>
+        <div class="stamp-cr">سجل تجاري رقم {{company_cr}}</div>
         <div class="stamp-stars" aria-hidden="true">★★★★★</div>
       </div>
     </div>
     <div class="rpm-lc-sign-col">
-      <div class="rpm-lc-party-tag">الطرف الأول (المؤجر)</div>
+      <div class="rpm-lc-party-tag">الطرف الأول ( المؤجر )</div>
       <p>الإسم : {{company_name}}</p>
       <p>ويمثله / {{print_signer_name}}</p>
       <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
