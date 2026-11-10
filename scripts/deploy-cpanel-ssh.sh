@@ -99,20 +99,15 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 # فرض ملفات الدخول دائماً عبر scp (أوثق من rsync للملفات النقطية على بعض الاستضافات)
-echo "==> تثبيت index.php + .htaccess + راوتر /api احتياطي"
+# مهم: لا تنشئ مجلد public_html/api — يحجب مسار /api/* عن rewrite الجذر
+echo "==> تثبيت index.php + .htaccess (بدون مجلد api)"
 scp "${SCP_OPTS[@]}" \
   "$ROOT/scripts/cpanel-index.php" \
   "${REMOTE}:${CPANEL_PUBLIC_DIR}/index.php"
 scp "${SCP_OPTS[@]}" \
   "$ROOT/scripts/cpanel.htaccess" \
   "${REMOTE}:${CPANEL_PUBLIC_DIR}/.htaccess"
-ssh "${SSH_OPTS[@]}" "$REMOTE" "mkdir -p \"\$HOME/${CPANEL_PUBLIC_DIR}/api\""
-scp "${SCP_OPTS[@]}" \
-  "$ROOT/scripts/cpanel-api-router.php" \
-  "${REMOTE}:${CPANEL_PUBLIC_DIR}/api/index.php"
-scp "${SCP_OPTS[@]}" \
-  "$ROOT/scripts/cpanel-api-dir.htaccess" \
-  "${REMOTE}:${CPANEL_PUBLIC_DIR}/api/.htaccess"
+ssh "${SSH_OPTS[@]}" "$REMOTE" "rm -rf \"\$HOME/${CPANEL_PUBLIC_DIR}/api\""
 
 echo "==> post-deploy على السيرفر"
 scp "${SCP_OPTS[@]}" \

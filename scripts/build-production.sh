@@ -87,9 +87,8 @@ fi
 cp -a "$ROOT/ui-pwa/dist/." "$OUT/"
 cp "$ROOT/scripts/cpanel-index.php" "$OUT/index.php"
 cp "$ROOT/scripts/cpanel.htaccess" "$OUT/.htaccess"
-mkdir -p "$OUT/api"
-cp "$ROOT/scripts/cpanel-api-router.php" "$OUT/api/index.php"
-cp "$ROOT/scripts/cpanel-api-dir.htaccess" "$OUT/api/.htaccess"
+# لا تنشئ مجلد api هنا — يمنع /api/* على Apache
+rm -rf "$OUT/api"
 # لا نترك .env في public
 rm -f "$OUT/.env" "$OUT/.env.example"
 
