@@ -38,12 +38,12 @@ class AccountingService
         $defs = [
             ['code' => '1000', 'name' => 'الصندوق', 'type' => 'asset'],
             ['code' => '1100', 'name' => 'البنك', 'type' => 'asset'],
-            ['code' => '1200', 'name' => 'ذمم العملاء', 'type' => 'asset'],
+            ['code' => '1200', 'name' => 'مبالغ مؤجلة السداد', 'type' => 'asset'],
             ['code' => '1300', 'name' => 'تأمينات نقدية محتجزة', 'type' => 'liability'],
             ['code' => '1400', 'name' => 'مخزون قطع وزيوت', 'type' => 'asset'],
             ['code' => '1500', 'name' => 'عهد موظفين', 'type' => 'asset'],
             ['code' => '2100', 'name' => 'مستحقات ملاك العربيات', 'type' => 'liability'],
-            ['code' => '4000', 'name' => 'إيراد الإيجار', 'type' => 'income'],
+            ['code' => '4000', 'name' => 'إيرادات الإيجار', 'type' => 'income'],
             ['code' => '4100', 'name' => 'إيراد كيلومترات زيادة', 'type' => 'income'],
             ['code' => '4200', 'name' => 'إيراد أضرار', 'type' => 'income'],
             ['code' => '4300', 'name' => 'إيراد رسوم تشغيل', 'type' => 'income'],
@@ -54,13 +54,31 @@ class AccountingService
 
         $rows = [];
         foreach ($defs as $def) {
-            $rows[] = Account::query()->firstOrCreate(
+            $rows[] = Account::query()->updateOrCreate(
                 ['code' => $def['code']],
                 [...$def, 'is_system' => true, 'is_active' => true],
             );
         }
 
         return $rows;
+    }
+
+    /**
+     * يرحّل إثبات الإيجار للشهور المطلوبة (idempotent) حتى تظهر الإيرادات/الميزان.
+     *
+     * @param  list<array{0:int,1:int}>  $yearMonths
+     */
+    public function syncRentRecognition(array $yearMonths, ?int $userId = null): void
+    {
+        foreach ($yearMonths as [$year, $month]) {
+            try {
+                DB::transaction(function () use ($year, $month, $userId) {
+                    $this->recognizeRentForMonth((int) $year, (int) $month, $userId);
+                });
+            } catch (DomainException) {
+                // شهر مقفل أو غير صالح — نتخطّاه
+            }
+        }
     }
 
     public function assertMonthOpen(int $year, int $month): void
@@ -791,6 +809,13 @@ class AccountingService
         $this->ensureChartOfAccounts();
 
         $months = [];
+        $toSync = [];
+        for ($i = 0; $i < 6; $i++) {
+            $dt = now()->startOfMonth()->subMonths($i);
+            $toSync[] = [(int) $dt->format('Y'), (int) $dt->format('n')];
+        }
+        $this->syncRentRecognition($toSync);
+
         for ($i = 0; $i < 6; $i++) {
             $dt = now()->startOfMonth()->subMonths($i);
             $year = (int) $dt->format('Y');

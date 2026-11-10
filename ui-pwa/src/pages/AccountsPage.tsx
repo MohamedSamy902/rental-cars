@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
-import { formatMoney } from '@/shared/lib/format'
+import { todayCivilIso } from '@/shared/lib/dates'
+import { formatMoney, formatDateTime } from '@/shared/lib/format'
 import {
   PageHeader, MetricCardGrid, Button, StatusPill, useToast,
-  SkeletonBlock, ErrorState, TextField, Sheet,
-  IconCash, IconReturn, IconLandmark,
+  SkeletonBlock, ErrorState, TextField, Sheet, DateField,
+  IconCash, IconLandmark, IconWallet,
 } from '@/shared/ui'
 import './pages.css'
 import './AccountsPage.css'
@@ -27,6 +28,24 @@ type MonthRow = {
 type Account = { id: number; code: string; name: string; type: string }
 type Payment = { id: number; amount: number; direction: string; method: string; paid_at: string; notes?: string; reference?: string }
 
+type DailyEntry = {
+  id: string
+  source: string
+  direction: 'in' | 'out' | string
+  amount: number
+  title: string
+  subtitle?: string | null
+  method?: string | null
+  at?: string | null
+  href?: string | null
+}
+
+type DailyCash = {
+  date: string
+  totals: { in: number; out: number; net: number; count: number }
+  entries: DailyEntry[]
+}
+
 function monthKey(m: MonthRow) {
   return `${m.year}-${String(m.month).padStart(2, '0')}`
 }
@@ -42,23 +61,27 @@ export function AccountsPage() {
   const [months, setMonths] = useState<MonthRow[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
-  const [totals, setTotals] = useState({ payments_in: 0, payments_out: 0 })
+  const [totals, setTotals] = useState({ payments_in: 0 })
   const [reopen, setReopen] = useState<MonthRow | null>(null)
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
+  const [cashDate, setCashDate] = useState(todayCivilIso())
+  const [daily, setDaily] = useState<DailyCash | null>(null)
+  const [dailyLoading, setDailyLoading] = useState(true)
+  const [dailyError, setDailyError] = useState('')
 
   async function load() {
     setLoading(true)
     setError('')
     try {
       const [overview, pay] = await Promise.all([
-        api<{ data: { months: MonthRow[]; accounts: Account[]; payments_in: number; payments_out: number } }>('/accounting/overview'),
+        api<{ data: { months: MonthRow[]; accounts: Account[]; payments_in: number } }>('/accounting/overview'),
         api<{ data: Payment[] }>('/accounting/payments?per_page=50'),
       ])
       setMonths(overview.data.months)
       setAccounts(overview.data.accounts)
-      setTotals({ payments_in: overview.data.payments_in, payments_out: overview.data.payments_out })
-      setPayments(pay.data)
+      setTotals({ payments_in: overview.data.payments_in })
+      setPayments(pay.data.filter((p) => p.direction === 'in'))
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
@@ -66,7 +89,23 @@ export function AccountsPage() {
     }
   }
 
+  async function loadDaily(date = cashDate) {
+    setDailyLoading(true)
+    setDailyError('')
+    try {
+      const qs = new URLSearchParams({ date })
+      const res = await api<{ data: DailyCash }>(`/accounting/daily-cash?${qs}`)
+      setDaily(res.data)
+    } catch (e) {
+      setDaily(null)
+      setDailyError((e as ApiError).message)
+    } finally {
+      setDailyLoading(false)
+    }
+  }
+
   useEffect(() => { void load() }, [])
+  useEffect(() => { void loadDaily(cashDate) }, [cashDate])
 
   async function lockMonth(m: MonthRow) {
     try {
@@ -104,17 +143,91 @@ export function AccountsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="الحسابات"
-        subtitle="توزيع الإيجار والرسوم والرواتب على الشهور · إقفال شهر مع سجل تدقيق"
+        subtitle="حركة الفلوس اليومية · إيرادات الإيجار حسب الشهر · إقفال مع سجل تدقيق"
       />
 
       <MetricCardGrid
         label="ملخص الحسابات"
         items={[
-          { id: 'in', label: 'مقبوضات / إيرادات', value: totals.payments_in ?? 0, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
-          { id: 'out', label: 'مدفوع للعملاء', value: totals.payments_out ?? 0, format: 'money', tone: 'warning', icon: <IconReturn size={16} /> },
+          { id: 'in', label: 'مقبوضات', value: totals.payments_in ?? 0, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
           { id: 'coa', label: 'دليل الحسابات', value: accounts.length ?? 0, icon: <IconLandmark size={16} /> },
+          {
+            id: 'day-net',
+            label: 'صافي اليوم',
+            value: daily?.totals.net ?? 0,
+            format: 'money',
+            tone: (daily?.totals.net ?? 0) >= 0 ? 'success' : 'warning',
+            icon: <IconWallet size={16} />,
+          },
         ]}
       />
+
+      <section className="rpm-panel ac-daily">
+        <div className="rpm-panel__head ac-daily__head">
+          <div>
+            <h3>حركة الفلوس اليومية</h3>
+            <p className="muted" style={{ margin: 0 }}>
+              كل ما له علاقة بفلوس في النظام لهذا اليوم (قبض · مصروف · راتب · مالك…)
+            </p>
+          </div>
+          <DateField
+            label="التاريخ"
+            value={cashDate}
+            onChange={(e) => setCashDate(e.target.value || todayCivilIso())}
+          />
+        </div>
+
+        {dailyLoading ? <SkeletonBlock rows={4} /> : null}
+        {dailyError ? <ErrorState title="تعذّر تحميل حركة اليوم" description={dailyError} /> : null}
+
+        {!dailyLoading && daily ? (
+          <>
+            <MetricCardGrid
+              label={`ملخص ${daily.date}`}
+              mobile="wrap"
+              items={[
+                { id: 'din', label: 'دخل', value: daily.totals.in, format: 'money', tone: 'success' },
+                { id: 'dout', label: 'خرج', value: daily.totals.out, format: 'money', tone: 'warning' },
+                { id: 'dnet', label: 'صافي', value: daily.totals.net, format: 'money', tone: daily.totals.net >= 0 ? 'success' : 'danger' },
+                { id: 'dcnt', label: 'بنود', value: daily.totals.count },
+              ]}
+            />
+            {daily.entries.length === 0 ? (
+              <p className="muted">لا حركة فلوس في هذا التاريخ.</p>
+            ) : (
+              <div className="rpm-dense-list">
+                {daily.entries.map((row) => {
+                  const body = (
+                    <>
+                      <div>
+                        <strong>
+                          {row.direction === 'in' ? 'دخل' : 'خرج'} · {row.title}
+                        </strong>
+                        <p className="muted">
+                          {row.subtitle || '—'}
+                          {row.at ? ` · ${formatDateTime(row.at)}` : ''}
+                        </p>
+                      </div>
+                      <strong className={`tabular-nums ${row.direction === 'in' ? 'ac-month__net--pos' : 'ac-month__net--neg'}`}>
+                        {formatMoney(row.amount)}
+                      </strong>
+                    </>
+                  )
+                  return row.href ? (
+                    <Link key={row.id} to={row.href} className="rpm-dense-row ac-daily__row">
+                      {body}
+                    </Link>
+                  ) : (
+                    <div key={row.id} className="rpm-dense-row">
+                      {body}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        ) : null}
+      </section>
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>الشهور</h3></div>
@@ -122,8 +235,8 @@ export function AccountsPage() {
           <div className="rpm-dense-list">
             <div className="rpm-dense-row">
               <div>
-                <strong>إيراد الإيجار</strong>
-                <p className="muted">لا شهور مرحّلة بعد — القيمة صفر</p>
+                <strong>إيرادات الإيجار</strong>
+                <p className="muted">لا شهور بعد — القيمة صفر</p>
               </div>
               <strong className="tabular-nums">{formatMoney(0)}</strong>
             </div>
@@ -138,7 +251,7 @@ export function AccountsPage() {
                 </header>
                 <dl className="ac-month__metrics">
                   <div>
-                    <dt>إيراد إيجار</dt>
+                    <dt>إيرادات الإيجار</dt>
                     <dd className="tabular-nums">{formatMoney(m.rent_revenue)}</dd>
                   </div>
                   <div>
@@ -188,13 +301,13 @@ export function AccountsPage() {
       </section>
 
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>آخر الحركات</h3></div>
+        <div className="rpm-panel__head"><h3>آخر المقبوضات</h3></div>
         {payments.length === 0 ? (
           <div className="rpm-dense-list">
             <div className="rpm-dense-row">
               <div>
-                <strong>لا حركات بعد</strong>
-                <p className="muted">تظهر هنا قبض/رد التأمين ومدفوعات العقود — القيمة صفر حالياً</p>
+                <strong>لا مقبوضات بعد</strong>
+                <p className="muted">تظهر هنا قبض التأمين ومدفوعات العقود</p>
               </div>
               <strong className="tabular-nums">{formatMoney(0)}</strong>
             </div>
@@ -204,7 +317,7 @@ export function AccountsPage() {
             {payments.slice(0, 20).map((p) => (
               <div key={p.id} className="rpm-dense-row">
                 <div>
-                  <strong>{p.direction === 'in' ? 'مقبوض' : 'مدفوع للعميل'} · {formatMoney(p.amount)}</strong>
+                  <strong>مقبوض · {formatMoney(p.amount)}</strong>
                   <p className="muted">{p.method} · {p.reference || '—'} · {p.notes || ''}</p>
                 </div>
               </div>

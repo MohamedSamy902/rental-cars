@@ -1,3 +1,25 @@
+.ac-daily__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ac-daily__head .rpm-field {
+  min-width: 11rem;
+  margin: 0;
+}
+
+.ac-daily__row {
+  text-decoration: none;
+  color: inherit;
+}
+
+.ac-daily__row:hover {
+  background: var(--surface-hover, color-mix(in srgb, var(--brand) 6%, transparent));
+}
+
 .ac-months {
   display: grid;
   gap: 0.75rem;

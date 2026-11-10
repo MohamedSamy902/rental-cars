@@ -223,6 +223,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::middleware('permission:owners.payout')->post('/owners/{owner}/payouts', [VehicleOwnerController::class, 'payout']);
 
     Route::get('/accounting/overview', [AccountingController::class, 'overview'])->middleware('permission:accounting.view');
+    Route::get('/accounting/daily-cash', [AccountingController::class, 'dailyCash'])->middleware('permission:accounting.view');
     Route::get('/accounting/months/{year}/{month}', [AccountingController::class, 'month'])
         ->whereNumber(['year', 'month'])
         ->middleware('permission:accounting.view');

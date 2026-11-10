@@ -42,6 +42,7 @@ class MonthLedgerService
         }
 
         $this->accounting->ensureChartOfAccounts();
+        $this->accounting->syncRentRecognition([[$year, $month]]);
         $start = CarbonImmutable::create($year, $month, 1)->startOfDay();
         $end = $start->endOfMonth()->endOfDay();
         $range = [$start, $end];
