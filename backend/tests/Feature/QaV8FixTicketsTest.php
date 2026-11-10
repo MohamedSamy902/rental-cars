@@ -194,7 +194,7 @@ class QaV8FixTicketsTest extends TestCase
     public function test_v8_04_vehicle_qr_uses_configured_public_origin(): void
     {
         $fixture = $this->fleetFixture();
-        $expected = 'https://fleet.example.test/showroom?vehicle='.$fixture['vehicle']->id;
+        $expected = 'https://fleet.example.test/qr/vehicles/'.$fixture['vehicle']->id;
 
         Sanctum::actingAs($this->userWith(['vehicles.view']));
         $this->getJson('/api/qr?type=customer&id='.$fixture['customer']->id)->assertStatus(403);

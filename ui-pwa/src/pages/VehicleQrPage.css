@@ -1,0 +1,192 @@
+.vqr {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: calc(1.25rem + var(--safe-top)) 1rem calc(1.5rem + var(--safe-bottom));
+  background:
+    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--action) 18%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--bg) 0%, var(--surface) 100%);
+  color: var(--text);
+}
+
+.vqr__glow {
+  pointer-events: none;
+  position: absolute;
+  inset: auto 10% 8% ;
+  height: 40%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--steel-soft) 35%, transparent), transparent);
+  filter: blur(24px);
+  opacity: 0.55;
+}
+
+.vqr__shell {
+  position: relative;
+  z-index: 1;
+  width: min(26.5rem, 100%);
+  display: grid;
+  gap: 1rem;
+  animation: vqr-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes vqr-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.vqr__brand {
+  text-align: center;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.vqr__logo-band {
+  display: grid;
+  justify-items: center;
+  padding: 1.35rem 1.25rem 1.1rem;
+  border-radius: var(--radius-xl);
+  background: #000;
+  border: 1px solid var(--border);
+}
+
+.vqr__logo-band .rpm-logo {
+  --logo-h: 64px;
+}
+
+.vqr__tenant-logo {
+  max-height: 72px;
+  max-width: min(220px, 70vw);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.vqr__center-name {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.35rem, 4.2vw, 1.7rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.vqr__vehicle-line {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.vqr__section {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  animation: vqr-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.08s;
+}
+
+.vqr__section h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.vqr__section--renter {
+  animation-delay: 0.14s;
+  border-color: color-mix(in srgb, var(--success-ink, var(--action)) 28%, var(--border));
+}
+
+.vqr__section--idle {
+  animation-delay: 0.14s;
+}
+
+.vqr__row {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.vqr__label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.vqr__value {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.vqr__muted,
+.vqr__idle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.vqr__social {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.vqr__social a {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  font-size: 0.88rem;
+}
+
+.vqr__credit {
+  text-align: center;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  animation: vqr-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.2s;
+}
+
+.vqr__credit a {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
+}
+
+.vqr__credit a:hover {
+  border-bottom-color: var(--text);
+}
+
+.vqr__state {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.vqr__link {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vqr__shell,
+  .vqr__section,
+  .vqr__credit {
+    animation: none;
+  }
+}

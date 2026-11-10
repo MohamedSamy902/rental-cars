@@ -17,6 +17,7 @@ use App\Models\VehicleDocumentHistory;
 use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
 use App\Services\Fleet\VehicleAvailabilityService;
+use App\Services\Fleet\VehicleQrVisitorService;
 use App\Services\Fleet\VehicleService;
 use App\Services\Operations\AuditNarrator;
 use App\Services\Operations\PettyCashLedgerService;
@@ -31,6 +32,7 @@ class OperationsController extends Controller
     public function __construct(
         private readonly VehicleAvailabilityService $availability,
         private readonly PettyCashLedgerService $pettyCashLedger,
+        private readonly VehicleQrVisitorService $qrVisitor,
     ) {}
 
     public function showroom(): JsonResponse
@@ -683,7 +685,7 @@ class OperationsController extends Controller
 
             return response()->json([
                 'data' => [
-                    'qr' => PublicAppUrl::to('/showroom?vehicle='.$v->id),
+                    'qr' => $this->qrVisitor->payloadUrl($v),
                     'label' => $v->brand.' '.$v->model.' · '.$v->plate,
                 ],
             ]);
@@ -700,6 +702,16 @@ class OperationsController extends Controller
                 'qr' => PublicAppUrl::to('/department-notice?customer_id='.$c->id),
                 'label' => $c->full_name,
             ],
+        ]);
+    }
+
+    /** بطاقة الرمز السريع للزائر — عامة بلا مصادقة (RSD ٦). */
+    public function vehicleQrVisitorCard(Vehicle $vehicle): JsonResponse
+    {
+        abort_unless($vehicle->is_active, 404);
+
+        return response()->json([
+            'data' => $this->qrVisitor->card($vehicle),
         ]);
     }
 

@@ -17,11 +17,11 @@ use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Services\Fleet\VehicleAssetService;
 use App\Services\Fleet\VehicleAvailabilityService;
+use App\Services\Fleet\VehicleQrVisitorService;
 use App\Services\Fleet\VehicleRecommendationService;
 use App\Services\Fleet\VehicleService;
 use App\Support\MaintenanceContractLabel;
 use App\Support\PaginationInput;
-use App\Support\PublicAppUrl;
 use App\Support\VehicleOwnerVisibility;
 use Carbon\Carbon;
 use DomainException;
@@ -37,6 +37,7 @@ class VehicleController extends Controller
         private readonly VehicleRecommendationService $recommendation,
         private readonly VehicleAssetService $assets,
         private readonly VehicleService $vehicles,
+        private readonly VehicleQrVisitorService $qrVisitor,
     ) {}
 
     public function catalogs(): JsonResponse
@@ -368,7 +369,7 @@ class VehicleController extends Controller
                 'notes' => $p->notes,
             ]);
 
-        $qr = PublicAppUrl::to('/showroom?vehicle='.$vehicle->id);
+        $qr = $this->qrVisitor->payloadUrl($vehicle);
         $qrLabel = trim($vehicle->brand.' '.$vehicle->model.' · '.$vehicle->plate);
 
         $user = $viewer;

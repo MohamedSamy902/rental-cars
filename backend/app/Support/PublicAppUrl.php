@@ -3,7 +3,7 @@
 namespace App\Support;
 
 /**
- * Absolute origin for links a phone must open (showroom QR).
+ * Absolute origin for links a phone must open (vehicle QR visitor card).
  *
  * The value comes from PUBLIC_APP_URL, then from APP_URL when that host is
  * not loopback. Request Host and X-Forwarded-* are never consulted, so a
