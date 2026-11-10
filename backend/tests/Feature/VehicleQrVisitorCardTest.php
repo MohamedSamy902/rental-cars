@@ -65,6 +65,7 @@ class VehicleQrVisitorCardTest extends TestCase
         $res->assertJsonPath('data.center.name', 'مركز آر بي إم')
             ->assertJsonPath('data.center.phone', '01125253888')
             ->assertJsonPath('data.center.address', 'حدائق حلوان — القاهرة')
+            ->assertJsonPath('data.center.tagline', 'لخدمات رجال الأعمال')
             ->assertJsonPath('data.center.social.facebook', 'https://facebook.com/rpm')
             ->assertJsonPath('data.is_rented', false)
             ->assertJsonPath('data.current_renter', null)
@@ -97,6 +98,22 @@ class VehicleQrVisitorCardTest extends TestCase
         $encoded = json_encode($res->json(), JSON_UNESCAPED_UNICODE);
         $this->assertStringNotContainsString('29501011234567', $encoded);
         $this->assertStringNotContainsString('CNT-QR-1', $encoded);
+    }
+
+    public function test_public_card_falls_back_to_config_contact_when_ops_empty(): void
+    {
+        TenantSetting::query()->first()?->update([
+            'operational' => [],
+        ]);
+
+        $this->getJson('/api/public/vehicles/'.$this->vehicle->id.'/qr-card')
+            ->assertOk()
+            ->assertJsonPath('data.center.phone', '01125253888')
+            ->assertJsonPath(
+                'data.center.address',
+                '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة'
+            )
+            ->assertJsonPath('data.center.tagline', 'لخدمات رجال الأعمال');
     }
 
     public function test_inactive_vehicle_is_hidden(): void

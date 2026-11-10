@@ -172,6 +172,9 @@ class DemoSeeder extends Seeder
                 'block_expired_vehicle_docs' => true,
                 'require_handover_signature' => true,
                 'require_return_signature_always' => false,
+                'print_phone' => '01125253888',
+                'print_address' => '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة',
+                'company_tagline' => 'لخدمات رجال الأعمال',
             ],
         ])->save();
 

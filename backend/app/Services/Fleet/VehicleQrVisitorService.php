@@ -16,7 +16,7 @@ final class VehicleQrVisitorService
     /**
      * @return array{
      *   vehicle: array{id:int,plate:?string,brand:?string,model:?string,year:?int},
-     *   center: array{name:string,phone:?string,address:?string,logo_url:?string,social:array<string,string>},
+     *   center: array{name:string,tagline:?string,phone:?string,address:?string,logo_url:?string,social:array<string,string>},
      *   current_renter: null|array{full_name:string,phone:?string},
      *   is_rented: bool,
      *   credit: array{name:string,whatsapp_url:string}
@@ -52,12 +52,12 @@ final class VehicleQrVisitorService
             ],
             'center' => [
                 'name' => (string) ($tenant?->center_name ?: 'مركز التأجير'),
-                'phone' => isset($ops['print_phone']) && is_string($ops['print_phone']) && $ops['print_phone'] !== ''
-                    ? $ops['print_phone']
-                    : null,
-                'address' => isset($ops['print_address']) && is_string($ops['print_address']) && $ops['print_address'] !== ''
-                    ? $ops['print_address']
-                    : null,
+                'tagline' => $this->stringOrNull($ops['company_tagline'] ?? null)
+                    ?? $this->stringOrNull(config('rpm.center_public_tagline')),
+                'phone' => $this->stringOrNull($ops['print_phone'] ?? null)
+                    ?? $this->stringOrNull(config('rpm.center_public_phone')),
+                'address' => $this->stringOrNull($ops['print_address'] ?? null)
+                    ?? $this->stringOrNull(config('rpm.center_public_address')),
                 'logo_url' => $this->publicLogoUrl($tenant?->logo_path),
                 'social' => $this->socialLinks($ops),
             ],
@@ -73,6 +73,16 @@ final class VehicleQrVisitorService
     public function payloadUrl(Vehicle $vehicle): string
     {
         return PublicAppUrl::to('/qr/vehicles/'.$vehicle->id);
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+        $trimmed = trim($value);
+
+        return $trimmed !== '' ? $trimmed : null;
     }
 
     private function publicLogoUrl(?string $logoPath): ?string

@@ -10,4 +10,16 @@ return [
     'platform_author_name' => env('PLATFORM_AUTHOR_NAME', 'محمد سامي'),
     'platform_whatsapp_url' => env('PLATFORM_WHATSAPP_URL', 'https://wa.me/201150100104'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | بيانات المركز العامة (بطاقة QR للزائر / احتياطي إن نقصت الإعدادات)
+    |--------------------------------------------------------------------------
+    */
+    'center_public_phone' => env('CENTER_PUBLIC_PHONE', '01125253888'),
+    'center_public_address' => env(
+        'CENTER_PUBLIC_ADDRESS',
+        '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة'
+    ),
+    'center_public_tagline' => env('CENTER_PUBLIC_TAGLINE', 'لخدمات رجال الأعمال'),
+
 ];
