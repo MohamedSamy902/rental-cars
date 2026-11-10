@@ -17,7 +17,10 @@ type MonthRow = {
   label: string
   locked: boolean
   rent_revenue: number
+  fees_revenue?: number
   expenses?: number
+  payroll_paid?: number
+  net_operating?: number
   completed_contracts: number
 }
 
@@ -141,6 +144,12 @@ export function AccountsPage() {
                   <div>
                     <dt>مصروفات</dt>
                     <dd className="tabular-nums">{formatMoney(m.expenses ?? 0)}</dd>
+                  </div>
+                  <div>
+                    <dt>صافي الربح</dt>
+                    <dd className={`tabular-nums ${(m.net_operating ?? 0) >= 0 ? 'ac-month__net--pos' : 'ac-month__net--neg'}`}>
+                      {formatMoney(m.net_operating ?? (m.rent_revenue - (m.expenses ?? 0)))}
+                    </dd>
                   </div>
                   <div>
                     <dt>عقود مكتملة</dt>

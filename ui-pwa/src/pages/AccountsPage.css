@@ -30,9 +30,17 @@
 
 .ac-month__metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.55rem;
   margin: 0;
+}
+
+.ac-month__net--pos {
+  color: var(--success, #15803d);
+}
+
+.ac-month__net--neg {
+  color: var(--danger, #b91c1c);
 }
 
 .ac-month__metrics div {
