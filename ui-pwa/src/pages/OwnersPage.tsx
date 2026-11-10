@@ -114,8 +114,19 @@ export function OwnersPage() {
   }
 
   async function onSave() {
-    setSaving(true)
     setFieldErrors({})
+    const local: Record<string, string> = {}
+    if (!form.full_name.trim()) local.full_name = 'اسم المالك مطلوب'
+    if (!form.phone.trim()) local.phone = 'رقم الموبايل مطلوب'
+    if (!form.national_id.trim()) local.national_id = 'الرقم القومي مطلوب'
+    if (!form.id_front_path.trim()) local.id_front_path = 'صورة البطاقة (وش) مطلوبة'
+    if (!form.id_back_path.trim()) local.id_back_path = 'صورة البطاقة (ضهر) مطلوبة'
+    if (Object.keys(local).length) {
+      setFieldErrors(local)
+      toast.error('أكمل بيانات المالك المطلوبة')
+      return
+    }
+    setSaving(true)
     try {
       await api('/owners', { method: 'POST', json: form })
       toast.success('تم تسجيل المالك.')
@@ -132,11 +143,13 @@ export function OwnersPage() {
   const formFields = (
     <div className="rpm-form-grid">
       <TextField label="اسم المالك" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-      <TextField label="الهاتف" error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <TextField label="الهاتف" required error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
-      <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <TextField label="الرقم القومي" required error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
       <MediaUpload
         label="بطاقة الرقم القومي — الوجه (وش)"
+        required
+        error={fieldErrors.id_front_path}
         value={form.id_front_path || null}
         collection="owner_ids"
         purpose="national_id"
@@ -145,6 +158,8 @@ export function OwnersPage() {
       />
       <MediaUpload
         label="بطاقة الرقم القومي — الظهر (ضهر)"
+        required
+        error={fieldErrors.id_back_path}
         value={form.id_back_path || null}
         collection="owner_ids"
         purpose="national_id"

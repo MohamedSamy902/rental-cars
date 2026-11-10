@@ -96,6 +96,8 @@ class QaV5FixTicketsTest extends TestCase
         $vehicle = $this->vehicle(null, ['odometer' => 900, 'daily_rate' => 1000, 'default_deposit' => 2000]);
         $start = now()->addHours(2);
         $contract = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => $start->format('Y-m-d H:i:s'),
@@ -116,6 +118,8 @@ class QaV5FixTicketsTest extends TestCase
         $customer = $this->customer('01055550002', 'LIC-V5-2');
         $vehicle = $this->vehicle(null, ['default_deposit' => 2000]);
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->subHour()->format('Y-m-d H:i:s'),
@@ -199,6 +203,8 @@ class QaV5FixTicketsTest extends TestCase
         ])->assertCreated();
 
         $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->addDays(10)->format('Y-m-d H:i:s'),

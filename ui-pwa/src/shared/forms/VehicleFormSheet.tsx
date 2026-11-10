@@ -87,6 +87,8 @@ type FormState = {
   owner_full_name: string
   owner_phone: string
   owner_national_id: string
+  owner_id_front_path: string
+  owner_id_back_path: string
   owner_notes: string
   owner_agreement_starts_on: string
   owner_agreement_ends_on: string
@@ -133,6 +135,8 @@ function emptyForm(): FormState {
     owner_full_name: '',
     owner_phone: '',
     owner_national_id: '',
+    owner_id_front_path: '',
+    owner_id_back_path: '',
     owner_notes: '',
     owner_agreement_starts_on: '',
     owner_agreement_ends_on: '',
@@ -320,7 +324,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       odometer: Number(form.odometer),
       daily_rate: Number(form.daily_rate),
       default_deposit: Number(form.default_deposit),
-      chassis_number: form.chassis_number || null,
+      chassis_number: form.chassis_number.trim() || null,
       engine_number: form.engine_number || null,
       engine_capacity: form.engine_capacity || null,
       color: form.color || null,
@@ -339,8 +343,24 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
   }
 
   async function save() {
-    setSaving(true)
     setErrors({})
+    const local: Record<string, string> = {}
+    if (mode === 'create' && !form.chassis_number.trim()) {
+      local.chassis_number = 'رقم الشاسيه مطلوب'
+    }
+    if (mode === 'create' && form.owner_mode === 'new') {
+      if (!form.owner_full_name.trim()) local['owner_inline.full_name'] = 'اسم المالك مطلوب'
+      if (!form.owner_phone.trim()) local['owner_inline.phone'] = 'رقم الموبايل مطلوب'
+      if (!form.owner_national_id.trim()) local['owner_inline.national_id'] = 'الرقم القومي مطلوب'
+      if (!form.owner_id_front_path.trim()) local['owner_inline.id_front_path'] = 'صورة البطاقة (وش) مطلوبة'
+      if (!form.owner_id_back_path.trim()) local['owner_inline.id_back_path'] = 'صورة البطاقة (ضهر) مطلوبة'
+    }
+    if (Object.keys(local).length) {
+      setErrors(local)
+      toast.error('أكمل الحقول المطلوبة')
+      return
+    }
+    setSaving(true)
     try {
       const payload = corePayload()
 
@@ -365,8 +385,10 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         } else if (form.owner_mode === 'new') {
           payload.owner_inline = {
             full_name: form.owner_full_name,
-            phone: form.owner_phone || null,
-            national_id: form.owner_national_id || null,
+            phone: form.owner_phone,
+            national_id: form.owner_national_id,
+            id_front_path: form.owner_id_front_path,
+            id_back_path: form.owner_id_back_path,
             notes: form.owner_notes || null,
           }
           payload.owner_monthly_amount = form.owner_monthly_amount !== '' ? Number(form.owner_monthly_amount) : null
@@ -474,7 +496,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         <TextField label="اللون" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
         <SelectField label="ناقل الحركة" options={[{ value: 'أوتوماتيك', label: 'أوتوماتيك' }, { value: 'مانيوال', label: 'مانيوال' }]} value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} />
         <NumberField label="عدد المقاعد" value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
-        <TextField label="رقم الشاسيه" value={form.chassis_number} error={errors.chassis_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} />
+        <TextField label="رقم الشاسيه" required value={form.chassis_number} error={errors.chassis_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} />
         <TextField label="رقم المحرك" value={form.engine_number} error={errors.engine_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, engine_number: e.target.value })} />
         <TextField label="سعة المحرك" value={form.engine_capacity} onChange={(e) => setForm({ ...form, engine_capacity: e.target.value })} />
         <NumberField label="العداد الفعلي" required value={form.odometer} error={errors.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
@@ -537,8 +559,28 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
             {form.owner_mode === 'new' ? (
               <>
                 <TextField label="اسم المالك" required value={form.owner_full_name} error={errors['owner_inline.full_name']} onChange={(e) => setForm({ ...form, owner_full_name: e.target.value })} />
-                <TextField label="هاتف المالك" value={form.owner_phone} onChange={(e) => setForm({ ...form, owner_phone: e.target.value })} />
-                <TextField label="الرقم القومي" value={form.owner_national_id} onChange={(e) => setForm({ ...form, owner_national_id: e.target.value })} />
+                <TextField label="هاتف المالك" required value={form.owner_phone} error={errors['owner_inline.phone']} onChange={(e) => setForm({ ...form, owner_phone: e.target.value })} />
+                <TextField label="الرقم القومي" required value={form.owner_national_id} error={errors['owner_inline.national_id']} onChange={(e) => setForm({ ...form, owner_national_id: e.target.value })} />
+                <MediaUpload
+                  label="بطاقة المالك — وش"
+                  required
+                  error={errors['owner_inline.id_front_path']}
+                  value={form.owner_id_front_path || null}
+                  collection="owner_ids"
+                  purpose="national_id"
+                  accept="image"
+                  onChange={(path) => setForm({ ...form, owner_id_front_path: path || '' })}
+                />
+                <MediaUpload
+                  label="بطاقة المالك — ضهر"
+                  required
+                  error={errors['owner_inline.id_back_path']}
+                  value={form.owner_id_back_path || null}
+                  collection="owner_ids"
+                  purpose="national_id"
+                  accept="image"
+                  onChange={(path) => setForm({ ...form, owner_id_back_path: path || '' })}
+                />
                 <TextAreaField label="ملاحظات المالك" value={form.owner_notes} onChange={(e) => setForm({ ...form, owner_notes: e.target.value })} />
               </>
             ) : null}

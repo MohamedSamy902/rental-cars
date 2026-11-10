@@ -76,6 +76,8 @@ class ContractNumberSequenceCollisionTest extends TestCase
         ]);
 
         $res = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $v2->id,
             'starts_at' => now()->addDays(3)->toDateTimeString(),

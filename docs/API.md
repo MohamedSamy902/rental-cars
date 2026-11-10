@@ -258,9 +258,10 @@ Query شائع: `?per_page=50&page=1&search=...`
 **حالات مشتقة `status`:** `available` | `reserved` | `rented` | `maintenance` | `out_of_service`
 
 **POST /vehicles — حقول أساسية**
-`plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit`  
+`plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit` · **`chassis_number` (مطلوب)**  
 الكود: يُولَّد تلقائياً إن لم يُرسل.  
-اختياري: `chassis_number`, `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_inline{full_name,phone,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}` — عند ربط مالك تُرجع الاستجابة أيضاً `owner_agreement` (عقد إدارة وتشغيل متعدد الصفحات مملوء ببيانات المركز/المالك/العربية) للطباعة. `GET /vehicles/{id}/owner-agreement/print`  
+اختياري: `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_inline{full_name,phone,national_id,id_front_path,id_back_path,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}` — عند ربط مالك تُرجع الاستجابة أيضاً `owner_agreement` (عقد إدارة وتشغيل متعدد الصفحات مملوء ببيانات المركز/المالك/العربية) للطباعة. `GET /vehicles/{id}/owner-agreement/print`  
+`owner_inline`: عند الإنشاء المضمّن يلزم الهاتف + الرقم القومي + وش/ضهر البطاقة.  
 **ملغى:** `rental_priority` · قائمة الانتظار · `fuel_level` في الفحص.
 
 **POST documents**
@@ -285,7 +286,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 أصل الرابط = `PUBLIC_APP_URL`، أو `APP_URL` إن لم يكن `localhost` / `127.0.0.1`. لا يُؤخذ من ترويسة الطلب. `type=customer` يبقى خلف `customers.view`.
 
-عند إنشاء عقد أو تسجيل دفعة جزئية على عقد: إن بقي رصيد تُرسل الواجهة `balance_due_on` (تاريخ تحصيل الباقي) إلزامياً. الـ API يقبل الحقل اختيارياً للتوافق مع المسارات القديمة. عند السداد الكامل يُمسح الحقل تلقائياً ويتوقف تنبيه الاستحقاق.
+عند إنشاء عقد: **`payment_amount` مطلوب ≥ ١** ولا يتجاوز إجمالي الإيجار التقديري (أيام × السعر اليومي). لا تأجير بلا دفع. إن بقي رصيد تُرسل الواجهة `balance_due_on` (تاريخ تحصيل الباقي) إلزامياً. الـ API يقبل `balance_due_on` اختيارياً للتوافق. عند السداد الكامل يُمسح الحقل تلقائياً ويتوقف تنبيه الاستحقاق.
 
 ### `GET /public/vehicles/{id}/qr-card` (عام — بلا توكن)
 بطاقة الزائر بعد مسح QR: مركز (`name` · `tagline` · `phone` · `address` · لوجو عام إن وُجد · سوشيال) + `current_renter` (اسم/هاتف) عند عقد `active` فقط، وإلا `is_rented: false` بلا رسالة «غير مؤجرة». إن نقص الهاتف/العنوان في الإعدادات تُستخدم قيم `config/rpm.php` الاحتياطية. يتضمن `credit` (اسم المطوّر + واتساب). بلا أرقام قومية ولا مبالغ.
@@ -353,9 +354,13 @@ Query شائع: `?per_page=50&page=1&search=...`
   "discount": 0,
   "other_fees": 0,
   "other_fees_description": null,
+  "payment_amount": 1000,
+  "payment_method": "cash",
+  "balance_due_on": "2026-11-03",
   "notes": null
 }
 ```
+`payment_amount` مطلوب (≥ ١) ولا يتجاوز `أيام × daily_rate`. صفر أو سالب أو أكبر من الإجمالي = 422.
 
 ### POST …/approve
 بدون body. يتحقق من:
@@ -742,7 +747,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 **على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · عقد المالك (`owner_agreement_*`)
 
-**حقول المالك:** اسم · هاتف · هاتف بديل · رقم قومي · بطاقة وش/ضهر · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
+**حقول المالك (عند الإنشاء):** اسم (مطلوب) · هاتف (مطلوب) · هاتف بديل · رقم قومي (مطلوب) · بطاقة وش (مطلوب) · بطاقة ضهر (مطلوب) · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
 
 **ترحيل محاسبي**
 - استحقاق شهري: مدين `5200` مصروف إيجار ملاك · دائن `2100` مستحقات ملاك

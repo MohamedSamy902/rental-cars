@@ -273,6 +273,8 @@ class HappyPathE2ETest extends TestCase
         ]);
 
         $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicleA->id,
             'starts_at' => now()->toIso8601String(),
@@ -334,6 +336,8 @@ class HappyPathE2ETest extends TestCase
             'is_active' => true,
         ]);
         $pending = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $pendingVehicle->id,
             'starts_at' => now()->addDays(10)->toIso8601String(),
@@ -346,6 +350,8 @@ class HappyPathE2ETest extends TestCase
 
         // Overlap after cancel should be allowed again
         $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $pendingVehicle->id,
             'starts_at' => now()->addDays(10)->toIso8601String(),

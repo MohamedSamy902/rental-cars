@@ -79,6 +79,8 @@ class P0SpecResolutionsTest extends TestCase
     public function test_same_contract_fault_swap_keeps_id_and_accumulates_km(): void
     {
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'starts_at' => now()->subDays(2)->toIso8601String(),
@@ -128,6 +130,8 @@ class P0SpecResolutionsTest extends TestCase
     public function test_early_termination_creates_client_credit_balance(): void
     {
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 10000,
+            'payment_method' => 'cash',
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'starts_at' => now()->subDays(1)->toIso8601String(),
@@ -142,15 +146,6 @@ class P0SpecResolutionsTest extends TestCase
             'odometer_out' => 10000,
             'signature_data' => str_repeat('sig', 20),
         ])->assertOk();
-
-        app(AccountingService::class)->recordPayment([
-            'amount' => 10000,
-            'method' => 'cash',
-            'direction' => 'in',
-            'link_type' => 'contract',
-            'link_id' => $id,
-            'notes' => 'دفعة مقدمة',
-        ], $this->user->id);
 
         $this->postJson("/api/contracts/{$id}/return", [
             'odometer_in' => 10100,
@@ -179,6 +174,8 @@ class P0SpecResolutionsTest extends TestCase
             'daily_rate' => 900, 'default_deposit' => 1500, 'is_active' => true,
         ]);
         $otherId = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $this->customer->id,
             'vehicle_id' => $otherVehicle->id,
             'starts_at' => now()->addDays(20)->toIso8601String(),

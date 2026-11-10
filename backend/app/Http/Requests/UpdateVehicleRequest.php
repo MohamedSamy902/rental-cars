@@ -85,7 +85,7 @@ class UpdateVehicleRequest extends FormRequest
             'tracker_sim_recharge_cycle_days' => ['nullable', 'integer', 'min:1', 'max:365'],
             'color' => ['nullable', 'string', 'max:50'],
             'transmission' => ['nullable', 'string', 'max:50'],
-            'chassis_number' => ['nullable', 'string', 'max:100'],
+            'chassis_number' => ['sometimes', 'required', 'string', 'min:5', 'max:32', 'regex:/^[A-Za-z0-9\-]+$/'],
             'engine_number' => ['nullable', 'string', 'max:100'],
             'engine_capacity' => ['nullable', 'string', 'max:50'],
             'seats' => ['nullable', 'integer', 'min:1', 'max:60'],

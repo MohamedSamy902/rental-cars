@@ -192,6 +192,8 @@ class ClientFinalPolishesTest extends TestCase
         $ends = $starts->copy()->addDays(2);
 
         $created = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => $starts->toDateTimeString(),

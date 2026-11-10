@@ -104,6 +104,8 @@ class ValidationArabicTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => '2026-10-20T10:00:00+02:00',
@@ -150,6 +152,8 @@ class ValidationArabicTest extends TestCase
         $vehicle->delete();
 
         $response = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->toIso8601String(),

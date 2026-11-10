@@ -50,6 +50,8 @@ class QaV2FixTicketsTest extends TestCase
         [$customer, $vehicle] = $this->party('B01');
 
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => '2026-01-30T00:00:00+02:00',
@@ -114,12 +116,12 @@ class QaV2FixTicketsTest extends TestCase
             'reference' => 'POVER',
         ])->assertStatus(422);
 
-        $this->assertSame(1, Payment::query()->where('link_type', 'contract')->where('link_id', $id)->count());
-        $this->assertSame(100, (int) $this->getJson("/api/contracts/{$id}")->json('data.ledger.paid'));
-        $this->assertSame(300, (int) $this->getJson("/api/contracts/{$id}")->json('data.ledger.balance'));
+        $this->assertSame(2, Payment::query()->where('link_type', 'contract')->where('link_id', $id)->count());
+        $this->assertSame(101, (int) $this->getJson("/api/contracts/{$id}")->json('data.ledger.paid'));
+        $this->assertSame(299, (int) $this->getJson("/api/contracts/{$id}")->json('data.ledger.balance'));
 
         $this->postJson('/api/accounting/payments', [
-            'amount' => 300,
+            'amount' => 299,
             'method' => 'cash',
             'direction' => 'in',
             'link_type' => 'contract',
@@ -220,7 +222,7 @@ class QaV2FixTicketsTest extends TestCase
         $methods = $this->getJson('/api/reports/payment-methods')->assertOk()->json('data');
         $cash = collect($methods)->firstWhere('method', 'cash');
         $this->assertNotNull($cash);
-        $this->assertSame(25, (int) $cash['in']);
+        $this->assertSame(26, (int) $cash['in']);
 
         $wallet = collect($methods)->first(
             fn ($row) => in_array($row['method'] ?? '', ['wallet', 'محفظة'], true)
@@ -396,8 +398,8 @@ class QaV2FixTicketsTest extends TestCase
         $row = collect($statement['contracts'])->firstWhere('id', $id);
         $this->assertNotNull($row);
         $this->assertSame(200, (int) $row['total']);
-        $this->assertSame(25, (int) $row['paid']);
-        $this->assertSame(175, (int) $row['remaining']);
+        $this->assertSame(26, (int) $row['paid']);
+        $this->assertSame(174, (int) $row['remaining']);
     }
 
     /** @return array{0: Customer, 1: Vehicle} */
@@ -436,6 +438,8 @@ class QaV2FixTicketsTest extends TestCase
         string $end,
     ): int {
         $id = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_at' => $start,
