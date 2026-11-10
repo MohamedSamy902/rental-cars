@@ -1,41 +1,27 @@
-# الفرونت (SPA) أولاً — منع ظهور صفحة Laravel الترحيبية على /
-DirectoryIndex index.html
+# بدون Options — على بعض cPanel أي Options في .htaccess يلغي الملف كله
+DirectoryIndex index.html index.php
 
 <IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
-
     RewriteEngine On
     RewriteBase /
 
-    # Authorization / Sanctum
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # لا تُعاد معالجة front controller
     RewriteRule ^index\.php$ - [L]
 
-    # Laravel API + health + sanctum + media
-    RewriteRule ^(api|up|sanctum|storage)(/.*)?$ index.php [L,QSA]
+    # API → Laravel (PATH_INFO يعمل على الاستضافة)
+    RewriteRule ^(api|up|sanctum|storage)(/.*)?$ /index.php/$1$2 [L,QSA]
 
-    # ملفات ثابتة موجودة فعلاً (assets, favicon, …)
+    # الصفحة الرئيسية → SPA
+    RewriteRule ^$ /index.html [L]
+
+    # ملفات موجودة
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
 
-    # باقي المسارات → SPA على نفس الدومين
-    RewriteRule ^ index.html [L]
-</IfModule>
-
-Options -Indexes
-
-<IfModule mod_expires.c>
-    ExpiresActive On
-    ExpiresByType text/css "access plus 7 days"
-    ExpiresByType application/javascript "access plus 7 days"
-    ExpiresByType image/webp "access plus 30 days"
-    ExpiresByType image/png "access plus 30 days"
-    ExpiresByType image/jpeg "access plus 30 days"
+    # مسارات React → SPA
+    RewriteRule . /index.html [L]
 </IfModule>
