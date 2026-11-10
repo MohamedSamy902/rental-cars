@@ -271,6 +271,7 @@ class QaV2FixTicketsTest extends TestCase
             'score' => 5,
             'period' => 'QA',
         ])->assertNotFound();
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasTable('evaluations'));
     }
 
     public function test_b09_inventory_batch_rejects_zero_unit_cost(): void
