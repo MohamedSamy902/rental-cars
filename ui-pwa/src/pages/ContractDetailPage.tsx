@@ -91,7 +91,9 @@ export function ContractDetailPage() {
               <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
                 <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'contract')}>طباعة العقد</Button>
                 <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'invoice')}>الفاتورة</Button>
+                {/* مؤقتاً: إخفاء زر إيصال الاستلام والتأمين
                 <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'receipt')}>إيصال الاستلام والتأمين</Button>
+                */}
               </div>
             ) : null}
           </div>
@@ -167,6 +169,18 @@ export function ContractDetailPage() {
             { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },
             { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },
             { label: 'التأمين المتفق', value: formatMoney(row.frozen_agreed_deposit || 0) },
+            {
+              label: 'بدل الكيلومتر اليومي',
+              value: row.frozen_daily_km_allowance != null
+                ? `${formatNumber(row.frozen_daily_km_allowance)} كم/يوم`
+                : '—',
+            },
+            {
+              label: 'سعر الكيلومتر الزائد',
+              value: row.frozen_excess_km_rate != null
+                ? formatMoney(row.frozen_excess_km_rate)
+                : '—',
+            },
             {
               label: 'تاريخ تحصيل المتبقي',
               value: row.balance_due_on

@@ -20,10 +20,14 @@ type Vehicle = {
 }
 
 const DEFAULT_DELIVERY_FEE = 1000
+const DEFAULT_DAILY_KM = 200
+const DEFAULT_EXCESS_KM_RATE = 5
 
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
   daily_rate: '', deposit: '', odometer: '', notes: '',
+  daily_km_allowance: String(DEFAULT_DAILY_KM),
+  excess_km_rate: String(DEFAULT_EXCESS_KM_RATE),
   has_delivery_service: false,
   delivery_service_fee: String(DEFAULT_DELIVERY_FEE),
   delivery_service_notes: '',
@@ -107,13 +111,24 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     void Promise.all([
       api<{ data: Customer[] }>('/customers?per_page=100'),
       loadVehicles(undefined, undefined, opts?.vehicleId),
+      api<{ data: { operational?: Record<string, unknown> } }>('/settings/tenant')
+        .catch(() => ({ data: { operational: {} as Record<string, unknown> } })),
     ])
-      .then(([c, v]) => {
+      .then(([c, v, tenant]) => {
         setCustomers(c.data)
+        const ops = tenant.data?.operational || {}
+        const kmDefault = Number(
+          ops.default_daily_km_allowance ?? ops.default_daily_km ?? DEFAULT_DAILY_KM,
+        )
+        const excessDefault = Number(
+          ops.default_excess_km_rate ?? ops.excess_km_rate ?? DEFAULT_EXCESS_KM_RATE,
+        )
         setForm((f) => {
           const next = {
             ...f,
             customer_id: opts?.customerId ? String(opts.customerId) : f.customer_id,
+            daily_km_allowance: String(Number.isFinite(kmDefault) ? kmDefault : DEFAULT_DAILY_KM),
+            excess_km_rate: String(Number.isFinite(excessDefault) ? excessDefault : DEFAULT_EXCESS_KM_RATE),
           }
           if (!opts?.vehicleId) return next
           const picked = v.find((x) => x.id === opts.vehicleId)
@@ -220,6 +235,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           planned_ends_at: toApiDateTime(form.planned_ends_at),
           daily_rate: form.daily_rate ? Number(form.daily_rate) : undefined,
           deposit: form.deposit ? Number(form.deposit) : undefined,
+          daily_km_allowance: form.daily_km_allowance !== '' ? Number(form.daily_km_allowance) : undefined,
+          excess_km_rate: form.excess_km_rate !== '' ? Number(form.excess_km_rate) : undefined,
           odometer: form.odometer !== '' ? Number(form.odometer) : undefined,
           accessory_ids: accessoryIds,
           has_delivery_service: form.has_delivery_service,
@@ -400,6 +417,22 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             hint="يُعبَّأ تلقائياً من العربية ويمكن تعديله"
           />
           <MoneyField label="التأمين النقدي المتفق" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} />
+          <NumberField
+            label="بدل الكيلومتر اليومي"
+            required
+            value={form.daily_km_allowance}
+            error={errors.daily_km_allowance}
+            onChange={(e) => setForm({ ...form, daily_km_allowance: e.target.value })}
+            hint="كم مسموح يومياً — يُجمَّد مع العقد"
+          />
+          <MoneyField
+            label="سعر الكيلومتر الزائد"
+            required
+            value={form.excess_km_rate}
+            error={errors.excess_km_rate}
+            onChange={(e) => setForm({ ...form, excess_km_rate: e.target.value })}
+            hint="جنيه لكل كم زيادة عن البدل"
+          />
           <NumberField
             label="العداد الحالي"
             value={form.odometer}

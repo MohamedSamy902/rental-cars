@@ -175,9 +175,10 @@ function headerBlock(tenant: PrintTenant) {
 }
 
 function shell(title: string, body: string) {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title>
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>
     <style>
-      body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a}
+      *{box-sizing:border-box}
+      body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#0f172a;margin:0}
       h1{margin:0 0 4px;font-size:22px}
       h2{margin:20px 0 8px;font-size:16px}
       .muted{color:#64748b}
@@ -193,9 +194,17 @@ function shell(title: string, body: string) {
       .id-grid figure{margin:0;border:1px solid #cbd5e1;padding:8px;text-align:center}
       .id-grid img{max-width:100%;max-height:220px;object-fit:contain}
       .id-grid figcaption{margin-top:6px;font-size:12px;color:#64748b}
-      @media print{.print-logo{max-width:110px}}
+      @media screen{
+        html,body{overflow-x:auto;-webkit-overflow-scrolling:touch}
+        body{--rpm-preview-scale:1}
+        .rpm-preview-root{transform:scale(var(--rpm-preview-scale));transform-origin:top center;width:100%}
+      }
+      @media print{
+        .rpm-preview-root{transform:none!important;width:100%!important}
+        .print-logo{max-width:110px}
+      }
     </style>
-  </head><body>${body}</body></html>`
+  </head><body><div class="rpm-preview-root">${body}</div></body></html>`
 }
 
 function contractBody(tenant: PrintTenant, c: PrintContract) {

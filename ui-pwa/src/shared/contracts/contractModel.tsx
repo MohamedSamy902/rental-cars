@@ -55,7 +55,10 @@ export type Contract = {
   planned_ends_at: string
   actual_ends_at?: string | null
   frozen_daily_rate: number
+  frozen_daily_km_allowance?: number | null
+  frozen_excess_km_rate?: number | null
   frozen_agreed_deposit?: number
+  excess_km?: number | null
   approved_days?: number
   odometer_out?: number
   odometer_in?: number
@@ -235,7 +238,8 @@ export function contractMenu(
     items.push(
       { id: 'print-contract', label: 'طباعة العقد', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('contract') },
       { id: 'print-invoice', label: 'الفاتورة', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('invoice') },
-      { id: 'print-receipt', label: 'إيصال الاستلام والتأمين', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
+      // مؤقتاً: إخفاء بند إيصال الاستلام والتأمين من قائمة الإجراءات
+      // { id: 'print-receipt', label: 'إيصال الاستلام والتأمين', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
     )
   }
   if ((b.status === 'pending' || b.status === 'approved') && can('contracts_cancel.approve')) {
