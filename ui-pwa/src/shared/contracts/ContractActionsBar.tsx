@@ -58,7 +58,9 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }
         <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('contract')}>طباعة العقد</Button>
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('invoice')}>الفاتورة</Button>
+          {/* مؤقتاً: إخفاء زر إيصال الاستلام والتأمين
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('receipt')}>إيصال الاستلام والتأمين</Button>
+          */}
         </div>
       ) : null}
     </div>
