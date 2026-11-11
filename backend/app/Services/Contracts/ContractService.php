@@ -31,7 +31,7 @@ class ContractService
 
         foreach ($required as $key) {
             if (! array_key_exists($key, $draft) || $draft[$key] === null || $draft[$key] === '') {
-                throw new DomainException("لا يمكن الاعتماد بدون تثبيت الحقل: {$key}");
+                throw new DomainException("لا يمكن منح موافقة الإدارة بدون تثبيت الحقل: {$key}");
             }
         }
 

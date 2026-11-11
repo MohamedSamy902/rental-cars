@@ -136,7 +136,7 @@ export function VehiclesPage() {
         id: 'reserved',
         label: 'محجوزة',
         attention: summary.reserved > 0 ? ('warning' as const) : null,
-        attentionLabel: 'حجوزات معتمدة',
+        attentionLabel: 'حجوزات بانتظار التسليم',
       },
       {
         id: 'maintenance',

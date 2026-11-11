@@ -25,7 +25,7 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }
     <div className="rpm-card__actions">
       {b.status === 'pending' ? (
         <>
-          {canApprove ? <Button type="button" size="sm" onClick={onApprove}>اعتماد</Button> : null}
+          {canApprove ? <Button type="button" size="sm" onClick={onApprove}>موافقة الإدارة</Button> : null}
           {canCancel ? <Button type="button" size="sm" variant="danger" onClick={() => onAction('cancel')}>إلغاء العقد</Button> : null}
         </>
       ) : null}

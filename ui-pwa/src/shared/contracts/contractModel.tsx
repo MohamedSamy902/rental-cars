@@ -143,7 +143,7 @@ export const inspectionTypeLabel: Record<string, string> = {
 
 export const timelineLabel: Record<string, string> = {
   created: 'إنشاء',
-  approved: 'اعتماد',
+  approved: 'موافقة الإدارة',
   handed_over: 'تسليم',
   returned: 'استلام',
   cancelled: 'إلغاء',
@@ -202,7 +202,7 @@ export function contractMenu(
     { id: 'sep-1', separator: true },
   ]
   if (b.status === 'pending' && can('contracts.approve')) {
-    items.push({ id: 'approve', label: 'اعتماد', icon: <IconCheck size={16} />, onSelect: handlers.approve })
+    items.push({ id: 'approve', label: 'موافقة الإدارة', icon: <IconCheck size={16} />, onSelect: handlers.approve })
   }
   if (b.status === 'approved' && can('contracts.update')) {
     items.push({ id: 'handover', label: 'تسليم', icon: <IconKey size={16} />, onSelect: () => handlers.openAction('handover') })

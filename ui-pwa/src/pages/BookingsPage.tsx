@@ -64,7 +64,7 @@ export function BookingsPage() {
         id: 'pending',
         label: 'قيد المراجعة',
         attention: summary.pending > 0 ? ('warning' as const) : null,
-        attentionLabel: 'بانتظار اعتماد الإدارة',
+        attentionLabel: 'بانتظار موافقة الإدارة',
       },
       {
         id: 'approved',
@@ -224,7 +224,7 @@ export function BookingsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="العقود والحجوزات"
-        subtitle="العقود والحجوزات حسب الحالة المعتمدة"
+        subtitle="العقود والحجوزات حسب الحالة"
         action={<Button onClick={() => openNewContract()}>عقد جديد</Button>}
         mobileFab
       />

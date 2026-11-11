@@ -83,7 +83,7 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
       label: c.overdue_returns
         ? `${c.overdue_returns} عقد متأخر عن الاستلام`
         : c.pending_approvals
-          ? `${c.pending_approvals} عقد بانتظار الاعتماد`
+          ? `${c.pending_approvals} عقد بانتظار موافقة الإدارة`
           : 'عقود تحتاج انتباهاً',
       ping: true,
     },

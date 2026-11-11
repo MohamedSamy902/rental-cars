@@ -147,7 +147,7 @@ class ContractController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم اعتماد العقد وتثبيت الأسعار.']);
+        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تمّت موافقة الإدارة وتثبيت الأسعار.']);
     }
 
     public function updatePricing(UpdateContractPricingRequest $request, Contract $contract): JsonResponse
@@ -167,7 +167,7 @@ class ContractController extends Controller
         $this->authorize('view', $contract);
         if ($contract->status === 'pending' && ! $request->user()?->hasPermission('contracts.approve')) {
             return response()->json([
-                'message' => 'التسليم يتطلب عقداً معتمداً، ولا تملك صلاحية الاعتماد.',
+                'message' => 'التسليم يتطلب عقداً بموافقة الإدارة، ولا تملك صلاحية الموافقة.',
             ], 403);
         }
 
