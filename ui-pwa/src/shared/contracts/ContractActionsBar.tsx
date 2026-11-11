@@ -22,24 +22,24 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }
   const canPrint = can('contracts.print')
 
   return (
-    <div className="rpm-card__actions">
+    <div className="rpm-card__actions cd-actions" role="group" aria-label="إجراءات العقد">
       {b.status === 'pending' ? (
         <>
-          {canApprove ? <Button type="button" size="sm" onClick={onApprove}>موافقة الإدارة</Button> : null}
-          {canCancel ? <Button type="button" size="sm" variant="danger" onClick={() => onAction('cancel')}>إلغاء العقد</Button> : null}
+          {canApprove ? <Button type="button" size="sm" className="cd-actions__primary" onClick={onApprove}>موافقة الإدارة</Button> : null}
+          {canCancel ? <Button type="button" size="sm" variant="danger" className="cd-actions__danger" onClick={() => onAction('cancel')}>إلغاء العقد</Button> : null}
         </>
       ) : null}
       {b.status === 'approved' ? (
         <>
-          {canUpdate ? <Button type="button" size="sm" onClick={() => onAction('handover')}>تسليم</Button> : null}
+          {canUpdate ? <Button type="button" size="sm" className="cd-actions__primary" onClick={() => onAction('handover')}>تسليم</Button> : null}
           {!b.deposit && canDeposit ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('deposit')}>قبض تأمين</Button> : null}
-          {canCancel ? <Button type="button" size="sm" variant="danger" onClick={() => onAction('cancel')}>إلغاء العقد</Button> : null}
+          {canCancel ? <Button type="button" size="sm" variant="danger" className="cd-actions__danger" onClick={() => onAction('cancel')}>إلغاء العقد</Button> : null}
           {canExtend ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('extend')}>تمديد</Button> : null}
         </>
       ) : null}
       {b.status === 'active' ? (
         <>
-          {canUpdate ? <Button type="button" size="sm" onClick={() => onAction('return')}>استلام</Button> : null}
+          {canUpdate ? <Button type="button" size="sm" className="cd-actions__primary" onClick={() => onAction('return')}>استلام</Button> : null}
           {!b.deposit && canDeposit ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('deposit')}>قبض تأمين</Button> : null}
           {canExtend ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('extend')}>تمديد</Button> : null}
           {canSwap ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('swap')}>تبديل عطل</Button> : null}
@@ -55,13 +55,10 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }
         </>
       ) : null}
       {canPrint ? (
-        <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
-          <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('contract')}>طباعة العقد</Button>
-          <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('invoice')}>الفاتورة</Button>
-          {/* مؤقتاً: إخفاء زر إيصال الاستلام والتأمين
-          <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('receipt')}>إيصال الاستلام والتأمين</Button>
-          */}
-        </div>
+        <>
+          <Button type="button" size="sm" variant="secondary" onClick={() => onPrint('contract')}>طباعة العقد</Button>
+          <Button type="button" size="sm" variant="secondary" onClick={() => onPrint('invoice')}>الفاتورة</Button>
+        </>
       ) : null}
     </div>
   )
