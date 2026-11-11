@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
-import { useAuth } from '@/shared/auth/AuthContext'
 import {
   Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState,
   RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, IconAlert, PhoneActions,
@@ -26,7 +25,6 @@ const relationLabel: Record<string, string> = {
 
 export function ContractDetailPage() {
   const { id } = useParams()
-  const { can } = useAuth()
   const contractId = Number(id)
   const [row, setRow] = useState<Contract | null>(null)
   const [loading, setLoading] = useState(true)
@@ -86,17 +84,6 @@ export function ContractDetailPage() {
       <header className="cd-hero">
         <div className="cd-hero__top">
           <BackNavButton to="/bookings" label="رجوع للعقود" />
-          <div className="cd-hero__actions">
-            {can('contracts.print') ? (
-              <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
-                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'contract')}>طباعة العقد</Button>
-                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'invoice')}>الفاتورة</Button>
-                {/* مؤقتاً: إخفاء زر إيصال الاستلام والتأمين
-                <Button size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => openPrint(row.id, 'receipt')}>إيصال الاستلام والتأمين</Button>
-                */}
-              </div>
-            ) : null}
-          </div>
         </div>
         <div className="cd-identity">
           <div className="cd-identity__pills">
@@ -104,8 +91,10 @@ export function ContractDetailPage() {
             <DepositBadge deposit={row.deposit} agreedAmount={row.frozen_agreed_deposit} />
             <span className="cd-code">{row.number}</span>
           </div>
-          <h1>{row.customer?.full_name || 'عقد'}</h1>
-          <p>{vehicleLabel}</p>
+          <div className="cd-identity__who">
+            <h1>{row.customer?.full_name || 'عقد'}</h1>
+            <p>{vehicleLabel}</p>
+          </div>
           {row.customer?.phone ? (
             <div className="cd-identity__phone">
               <PhoneActions phone={row.customer.phone} name={row.customer.full_name} compact />
@@ -123,6 +112,7 @@ export function ContractDetailPage() {
       {printSheet}
 
       <MetricCardGrid
+        className="cd-metrics"
         label="ملخص مالي"
         mobile="wrap"
         items={[
