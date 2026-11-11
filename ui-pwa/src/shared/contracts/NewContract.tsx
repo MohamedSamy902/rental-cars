@@ -111,7 +111,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     void Promise.all([
       api<{ data: Customer[] }>('/customers?per_page=100'),
       loadVehicles(undefined, undefined, opts?.vehicleId),
-      api<{ data: { operational?: Record<string, unknown> } }>('/settings/tenant').catch(() => ({ data: {} })),
+      api<{ data: { operational?: Record<string, unknown> } }>('/settings/tenant')
+        .catch(() => ({ data: { operational: {} as Record<string, unknown> } })),
     ])
       .then(([c, v, tenant]) => {
         setCustomers(c.data)
