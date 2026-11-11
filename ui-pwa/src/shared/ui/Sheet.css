@@ -195,6 +195,22 @@
   scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
 }
 
+/* Print preview: keep the scaled A4 iframe fully visible (no parent clip). */
+.rpm-sheet__body:has(.rpm-print-preview) {
+  overflow-x: auto;
+}
+
+.rpm-print-preview {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  min-height: 280px;
+  max-inline-size: 100%;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
 .rpm-sheet__body > *,
 .rpm-sheet__body .rpm-field,
 .rpm-sheet__body .rpm-form-grid,

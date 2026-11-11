@@ -168,6 +168,18 @@ export function ContractDetailPage() {
             { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },
             { label: 'التأمين المتفق', value: formatMoney(row.frozen_agreed_deposit || 0) },
             {
+              label: 'بدل الكيلومتر اليومي',
+              value: row.frozen_daily_km_allowance != null
+                ? `${formatNumber(row.frozen_daily_km_allowance)} كم/يوم`
+                : '—',
+            },
+            {
+              label: 'سعر الكيلومتر الزائد',
+              value: row.frozen_excess_km_rate != null
+                ? formatMoney(row.frozen_excess_km_rate)
+                : '—',
+            },
+            {
               label: 'تاريخ تحصيل المتبقي',
               value: row.balance_due_on
                 ? formatDate(row.balance_due_on)

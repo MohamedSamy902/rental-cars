@@ -55,7 +55,10 @@ export type Contract = {
   planned_ends_at: string
   actual_ends_at?: string | null
   frozen_daily_rate: number
+  frozen_daily_km_allowance?: number | null
+  frozen_excess_km_rate?: number | null
   frozen_agreed_deposit?: number
+  excess_km?: number | null
   approved_days?: number
   odometer_out?: number
   odometer_in?: number

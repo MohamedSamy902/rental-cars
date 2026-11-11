@@ -314,17 +314,31 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
 export function shellInvoiceHtml(body: string, title = 'فاتورة'): string {
   const trimmed = body.trim()
   if (/^<!doctype/i.test(trimmed) || /<html[\s>]/i.test(trimmed)) return trimmed
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title>
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>
 <style>
   @page { size: A4; margin: 10mm 9mm; }
   * { box-sizing: border-box; }
+  html{ margin:0; }
   body{
     margin:0; padding:0; background:#fff; color:#111;
     font-family: Tahoma,'Segoe UI',Arial,sans-serif;
     font-size: 11px; line-height: 1.45;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .rpm-invoice-v1{ --inv-navy:#0b1f3a; --inv-red:#c40000; max-width:192mm; margin:0 auto; }
+  @media screen{
+    html, body{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    body{ --rpm-preview-scale:1; }
+    .rpm-preview-root{
+      transform: scale(var(--rpm-preview-scale));
+      transform-origin: top center;
+      width: 100%;
+    }
+  }
+  .rpm-invoice-v1{ --inv-navy:#0b1f3a; --inv-red:#c40000; width:100%; max-width:192mm; margin:0 auto; }
+  @media print{
+    .rpm-preview-root{ transform:none !important; width:100% !important; }
+    .rpm-invoice-v1{ max-width:100%; width:100%; margin:0; }
+  }
   .inv-head{
     display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
     margin-bottom:10px; border-bottom:2px solid var(--inv-navy); padding-bottom:8px;
@@ -385,7 +399,7 @@ export function shellInvoiceHtml(body: string, title = 'فاتورة'): string {
   }
   .inv-print-footer{ margin-top:6px; font-size:10px; color:#666; text-align:center; }
   @media print{ body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
-</style></head><body>${body}</body></html>`
+</style></head><body><div class="rpm-preview-root">${body}</div></body></html>`
 }
 
 export function isInvoiceBody(html: string): boolean {

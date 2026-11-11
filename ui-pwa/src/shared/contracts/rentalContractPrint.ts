@@ -1,10 +1,11 @@
 /** Shared print shell — near-pixel clone of the RPM paper rental contract. */
 export function shellRentalContractHtml(body: string, title = 'عقد إيجار سيارة'): string {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escapeTitle(title)}</title>
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeTitle(title)}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&display=swap');
   @page { size: A4; margin: 5mm 4.5mm; }
   * { box-sizing: border-box; }
+  html{ margin: 0; }
   body{
     font-family: 'Cairo', 'Segoe UI', Tahoma, 'Arial', sans-serif;
     padding: 0; margin: 0;
@@ -21,11 +22,30 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     --rpm-red-dark: #8a0000;
     --rpm-black: #0a0a0a;
     --rpm-gray: #ececec;
+    width: 100%;
     max-width: 200mm;
     margin: 0 auto;
     position: relative;
-    padding: 1.5mm 1.5mm 3mm;
+    padding: 1.2mm 1.2mm 3mm;
     border: 1.2px solid #111;
+  }
+  /* Mobile / in-app iframe preview: fit paper to viewport without clipping RTL boxes */
+  @media screen{
+    html, body{
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    body{
+      --rpm-preview-scale: 1;
+    }
+    .rpm-preview-root{
+      transform: scale(var(--rpm-preview-scale));
+      transform-origin: top center;
+      width: 100%;
+    }
+    .rpm-paper-v2, .rpm-paper-v3{
+      max-width: 200mm;
+    }
   }
   .rpm-paper-v2::after, .rpm-paper-v3::after{
     content: '';
@@ -358,9 +378,25 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
   .foot{ margin-top: 1.5mm; color: #666; font-size: 7.5px; text-align: center; }
 
   @media print{
-    body{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    html, body{
+      width: 100%;
+      overflow: visible !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .rpm-preview-root{
+      transform: none !important;
+      width: 100% !important;
+    }
+    .rpm-paper-v2, .rpm-paper-v3{
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 1mm 1mm 2.5mm;
+      border-width: 1px;
+    }
   }
-</style></head><body>${body}</body></html>`
+</style></head><body><div class="rpm-preview-root">${body}</div></body></html>`
 }
 
 function escapeTitle(title: string) {

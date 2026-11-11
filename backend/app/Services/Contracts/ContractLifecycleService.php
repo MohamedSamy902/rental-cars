@@ -102,12 +102,24 @@ class ContractLifecycleService
                 ? (int) $data['deposit']
                 : (int) $vehicle->default_deposit;
             $ops = TenantSetting::query()->first()?->operational ?? [];
-            $kmAllowance = $allowPriceOverride && isset($data['daily_km_allowance'])
+            // بدل الكم وسعر الزيادة يُحدَّدان عند الإنشاء لأي منشئ (بلا صلاحية تجاوز السعر).
+            // مفاتيح الإعدادات: default_daily_km / excess_km_rate (الواجهة) مع توافق الأسماء القديمة.
+            $defaultKmAllowance = (int) (
+                $ops['default_daily_km_allowance']
+                ?? $ops['default_daily_km']
+                ?? self::DEFAULT_DAILY_KM_ALLOWANCE
+            );
+            $defaultExcessRate = (int) (
+                $ops['default_excess_km_rate']
+                ?? $ops['excess_km_rate']
+                ?? self::DEFAULT_EXCESS_KM_RATE
+            );
+            $kmAllowance = array_key_exists('daily_km_allowance', $data) && $data['daily_km_allowance'] !== null
                 ? (int) $data['daily_km_allowance']
-                : (int) ($ops['default_daily_km_allowance'] ?? self::DEFAULT_DAILY_KM_ALLOWANCE);
-            $excessRate = $allowPriceOverride && isset($data['excess_km_rate'])
+                : $defaultKmAllowance;
+            $excessRate = array_key_exists('excess_km_rate', $data) && $data['excess_km_rate'] !== null
                 ? (int) $data['excess_km_rate']
-                : (int) ($ops['default_excess_km_rate'] ?? self::DEFAULT_EXCESS_KM_RATE);
+                : $defaultExcessRate;
 
             $accessories = $this->resolveAccessoriesSnapshot($vehicle, $data['accessory_ids'] ?? null);
             $delivery = $this->pricing->normalizeDeliveryService($data);
