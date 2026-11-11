@@ -65,7 +65,7 @@ export function useContractLifecycle(onMutated?: () => void) {
   async function approve(id: number) {
     try {
       await api(`/contracts/${id}/approve`, { method: 'POST' })
-      toast.success('تم اعتماد العقد وتثبيت الأسعار.')
+      toast.success('تمّت موافقة الإدارة وتثبيت الأسعار.')
       onMutated?.()
     } catch (e) {
       toast.error((e as ApiError).message)

@@ -248,7 +248,7 @@ class ContractLifecycleService
             /** @var Contract $locked */
             $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'pending') {
-                throw new DomainException('لا يمكن اعتماد هذا العقد في حالته الحالية.');
+                throw new DomainException('لا يمكن منح موافقة الإدارة على هذا العقد في حالته الحالية.');
             }
 
             /** @var Vehicle $vehicle */
@@ -300,8 +300,8 @@ class ContractLifecycleService
             ]);
 
             $this->notifyLifecycle(
-                'تم اعتماد عقد',
-                "العقد {$locked->number} أصبح معتمداً.",
+                'موافقة الإدارة على عقد',
+                "العقد {$locked->number} بانتظار التسليم بعد موافقة الإدارة.",
                 $locked,
                 $userId,
             );
@@ -318,14 +318,14 @@ class ContractLifecycleService
     public function updatePending(Contract $contract, array $data, ?int $userId = null, bool $allowPriceOverride = false): Contract
     {
         if ($contract->status !== 'pending') {
-            throw new DomainException('يمكن تعديل بيانات العقد فقط وهو قيد المراجعة — بعد الاعتماد تُثبَّت الأسعار والحقول.');
+            throw new DomainException('يمكن تعديل بيانات العقد فقط وهو قيد المراجعة — بعد موافقة الإدارة تُثبَّت الأسعار والحقول.');
         }
 
         return DB::transaction(function () use ($contract, $data, $userId, $allowPriceOverride) {
             /** @var Contract $locked */
             $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'pending') {
-                throw new DomainException('يمكن تعديل بيانات العقد فقط وهو قيد المراجعة — بعد الاعتماد تُثبَّت الأسعار والحقول.');
+                throw new DomainException('يمكن تعديل بيانات العقد فقط وهو قيد المراجعة — بعد موافقة الإدارة تُثبَّت الأسعار والحقول.');
             }
 
             $vehicleId = (int) ($data['vehicle_id'] ?? $locked->vehicle_id);
@@ -477,7 +477,7 @@ class ContractLifecycleService
             return $this->updatePending($contract, $data, $userId, true);
         }
 
-        throw new DomainException('لا يمكن تعديل أسعار العقد بعد الاعتماد.');
+        throw new DomainException('لا يمكن تعديل أسعار العقد بعد موافقة الإدارة.');
     }
 
     /**
@@ -486,7 +486,7 @@ class ContractLifecycleService
     public function activateOnHandover(Contract $contract, int $odometerOut, ?int $userId = null, array $inspection = []): Contract
     {
         if (! in_array($contract->status, ['approved', 'pending'], true)) {
-            throw new DomainException('التسليم يتطلب عقداً معتمداً أو معلّقاً قابلاً للتفعيل.');
+            throw new DomainException('التسليم يتطلب عقداً بموافقة الإدارة أو قيد المراجعة وقابلاً للتفعيل.');
         }
 
         if ($contract->status === 'pending') {
@@ -497,7 +497,7 @@ class ContractLifecycleService
             /** @var Contract $locked */
             $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'approved') {
-                throw new DomainException('التسليم يتطلب عقداً معتمداً.');
+                throw new DomainException('التسليم يتطلب عقداً بموافقة الإدارة.');
             }
 
             /** @var Vehicle $vehicle */
@@ -1228,7 +1228,7 @@ class ContractLifecycleService
 
         $customer = $contract->customer ?? Customer::query()->find($contract->customer_id);
         if ($blockExpiredLicense && $customer?->license_expires_on && $customer->license_expires_on->isPast()) {
-            throw new DomainException('رخصة العميل منتهية — يُمنع الاعتماد.');
+            throw new DomainException('رخصة العميل منتهية — تُمنع موافقة الإدارة.');
         }
 
         if ($customer?->license_expires_on && $customer->license_expires_on->lt($contract->planned_ends_at)) {
@@ -1246,7 +1246,7 @@ class ContractLifecycleService
                 ->whereDate('expires_on', '<', now()->toDateString())
                 ->first();
             if ($expired) {
-                throw new DomainException('مستند عربية منتهٍ ('.$expired->type.') — يُمنع الاعتماد.');
+                throw new DomainException('مستند عربية منتهٍ ('.$expired->type.') — تُمنع موافقة الإدارة.');
             }
 
             $endsBeforeContract = VehicleDocument::query()

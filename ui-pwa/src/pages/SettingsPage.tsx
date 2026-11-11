@@ -186,12 +186,12 @@ export function SettingsPage() {
             onChange={(e) => setOps({ ...ops, excess_km_rate: Number(e.target.value) })}
           />
           <SwitchField
-            label="منع اعتماد عقد برخصة منتهية"
+            label="منع موافقة عقد برخصة منتهية"
             checked={Boolean(ops.block_expired_license)}
             onChange={(v) => setOps({ ...ops, block_expired_license: v })}
           />
           <SwitchField
-            label="منع اعتماد عقد بمستند عربية منتهٍ"
+            label="منع موافقة عقد بمستند عربية منتهٍ"
             checked={Boolean(ops.block_expired_vehicle_docs)}
             onChange={(v) => setOps({ ...ops, block_expired_vehicle_docs: v })}
           />
