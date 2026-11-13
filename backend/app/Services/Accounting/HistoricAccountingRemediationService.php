@@ -28,7 +28,6 @@ class HistoricAccountingRemediationService
 
     public function __construct(
         private readonly AccountingService $accounting,
-        private readonly MonthAllocationService $allocation,
         private readonly ContractLedgerMath $ledgerMath,
         private readonly PaymentMethodNormalizer $methods,
         private readonly CustomerCreditService $credits,
@@ -71,14 +70,20 @@ class HistoricAccountingRemediationService
     }
 
     /**
-     * B04/B05: every non-credit payment gets payment:{id} cash↔AR journal.
+     * B04/B05: contract cash receipts/refunds get payment:{id} cash↔AR journal.
+     * Mirrors live recordPayment: skip credit/deposit methods and non-contract links
+     * (deposit cash is already posted via deposit_hold / deposit_return).
      */
     public function backfillPaymentJournals(?int $userId = null): int
     {
         $fixed = 0;
         $payments = Payment::query()->orderBy('id')->get();
         foreach ($payments as $payment) {
-            if ($this->methods->canonical((string) $payment->method) === 'credit') {
+            $method = $this->methods->canonical((string) $payment->method);
+            if (in_array($method, ['credit', 'deposit'], true)) {
+                continue;
+            }
+            if ((string) $payment->link_type !== 'contract') {
                 continue;
             }
             $source = 'payment:'.$payment->id;
@@ -221,52 +226,8 @@ class HistoricAccountingRemediationService
             ->get();
 
         foreach ($contracts as $contract) {
-            $start = $contract->starts_at;
-            $end = $contract->actual_ends_at ?? $contract->planned_ends_at;
-            if (! $start || ! $end || $end <= $start) {
-                continue;
-            }
-
-            $periodRent = (int) ($contract->period_rent ?? 0);
-            if ($periodRent <= 0) {
-                $periodRent = (int) ($contract->final_total ?? 0);
-            }
-            if ($periodRent <= 0) {
-                continue;
-            }
-
-            $slices = $this->allocation->allocateRentByMonth($start, $end, $periodRent);
-            foreach ($slices as $slice) {
-                $year = (int) $slice['year'];
-                $month = (int) $slice['month'];
-                $needed = (int) $slice['amount'];
-                if ($needed <= 0) {
-                    continue;
-                }
-
-                $current = $this->rentRecognizedNet($contract->id, $year, $month);
-                if ($current === $needed) {
-                    continue;
-                }
-
-                if ($current < $needed) {
-                    // postRentRecognition tops up the primary rent_recog entry only.
-                    $this->accounting->postRentRecognition(
-                        $contract,
-                        $year,
-                        $month,
-                        $needed + $this->rentRecognitionAdjustmentDebits($contract->id, $year, $month),
-                        $userId,
-                    );
-                    // If adj debits exist, primary must reach needed+adj so net == needed.
-                    $current = $this->rentRecognizedNet($contract->id, $year, $month);
-                }
-
-                if ($current > $needed) {
-                    $this->reverseRentRecognitionExcess($contract, $year, $month, $current - $needed, $userId);
-                }
-                $fixed++;
-            }
+            // Historic heal may top-up locked months; live close will not.
+            $fixed += $this->accounting->realignContractRentRecognition($contract, $userId, true);
         }
 
         return $fixed;
@@ -368,98 +329,6 @@ class HistoricAccountingRemediationService
         }
 
         return null;
-    }
-
-    /** Net rent income for a contract/month after primary + adjustment entries. */
-    private function rentRecognizedNet(int $contractId, int $year, int $month): int
-    {
-        $rent = Account::query()->where('code', '4000')->firstOrFail();
-        $sources = [
-            sprintf('rent_recog:%d:%04d-%02d', $contractId, $year, $month),
-            sprintf('rent_recog_adj:%d:%04d-%02d', $contractId, $year, $month),
-        ];
-        $entryIds = JournalEntry::query()->whereIn('source', $sources)->pluck('id');
-        if ($entryIds->isEmpty()) {
-            return 0;
-        }
-
-        return (int) JournalLine::query()
-            ->whereIn('journal_entry_id', $entryIds)
-            ->where('account_id', $rent->id)
-            ->sum('credit')
-            - (int) JournalLine::query()
-                ->whereIn('journal_entry_id', $entryIds)
-                ->where('account_id', $rent->id)
-                ->sum('debit');
-    }
-
-    private function rentRecognitionAdjustmentDebits(int $contractId, int $year, int $month): int
-    {
-        $rent = Account::query()->where('code', '4000')->firstOrFail();
-        $adj = JournalEntry::query()
-            ->where('source', sprintf('rent_recog_adj:%d:%04d-%02d', $contractId, $year, $month))
-            ->first();
-        if (! $adj) {
-            return 0;
-        }
-
-        return (int) JournalLine::query()
-            ->where('journal_entry_id', $adj->id)
-            ->where('account_id', $rent->id)
-            ->sum('debit')
-            - (int) JournalLine::query()
-                ->where('journal_entry_id', $adj->id)
-                ->where('account_id', $rent->id)
-                ->sum('credit');
-    }
-
-    private function reverseRentRecognitionExcess(
-        Contract $contract,
-        int $year,
-        int $month,
-        int $excess,
-        ?int $userId,
-    ): void {
-        if ($excess <= 0) {
-            return;
-        }
-
-        $primarySource = sprintf('rent_recog:%d:%04d-%02d', $contract->id, $year, $month);
-        $primary = JournalEntry::query()->where('source', $primarySource)->lockForUpdate()->first();
-        if (! $primary) {
-            return;
-        }
-
-        $adjSource = sprintf('rent_recog_adj:%d:%04d-%02d', $contract->id, $year, $month);
-        $adj = JournalEntry::query()->where('source', $adjSource)->lockForUpdate()->first();
-        if (! $adj) {
-            $adj = JournalEntry::query()->create([
-                'entry_date' => $primary->entry_date,
-                'narration' => sprintf('تصحيح زيادة إثبات إيجار عقد %s — %04d-%02d', $contract->number, $year, $month),
-                'source' => $adjSource,
-                'posted_by' => $userId,
-            ]);
-        }
-
-        $rent = Account::query()->where('code', '4000')->firstOrFail();
-        $ar = Account::query()->where('code', '1200')->firstOrFail();
-
-        JournalLine::query()->create([
-            'journal_entry_id' => $adj->id,
-            'account_id' => $rent->id,
-            'debit' => $excess,
-            'credit' => 0,
-            'vehicle_id' => $contract->vehicle_id,
-            'customer_id' => $contract->customer_id,
-        ]);
-        JournalLine::query()->create([
-            'journal_entry_id' => $adj->id,
-            'account_id' => $ar->id,
-            'debit' => 0,
-            'credit' => $excess,
-            'vehicle_id' => $contract->vehicle_id,
-            'customer_id' => $contract->customer_id,
-        ]);
     }
 
     /**

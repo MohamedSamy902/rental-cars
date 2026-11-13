@@ -128,6 +128,7 @@ class AccountingService
     public function recognizeRentForMonth(int $year, int $month, ?int $userId = null): void
     {
         $this->ensureChartOfAccounts();
+        $this->assertMonthOpen($year, $month);
         $monthStart = CarbonImmutable::create($year, $month, 1, 0, 0, 0, config('app.timezone'));
         $monthEndExclusive = $monthStart->addMonth();
 
@@ -194,7 +195,8 @@ class AccountingService
     }
 
     /**
-     * Post or top-up rent recognition for one contract/month. Balanced Dr 1200 / Cr 4000.
+     * Post, top-up, or reverse rent recognition for one contract/month. Balanced Dr/Cr 1200↔4000.
+     * Top-ups require an open month; reverses of excess are allowed even when locked (correction).
      */
     public function postRentRecognition(
         Contract $contract,
@@ -202,9 +204,10 @@ class AccountingService
         int $month,
         int $neededAmount,
         ?int $userId = null,
+        bool $forceTopUpLocked = false,
     ): ?JournalEntry {
-        if ($neededAmount <= 0) {
-            return null;
+        if ($neededAmount < 0) {
+            $neededAmount = 0;
         }
 
         $this->ensureChartOfAccounts();
@@ -213,21 +216,49 @@ class AccountingService
             ->endOfMonth()
             ->toDateString();
 
-        return DB::transaction(function () use ($contract, $neededAmount, $userId, $source, $entryDate, $year, $month) {
+        return DB::transaction(function () use ($contract, $neededAmount, $userId, $source, $entryDate, $year, $month, $forceTopUpLocked) {
+            $net = $this->rentRecognizedNet((int) $contract->id, $year, $month);
+            if ($net === $neededAmount) {
+                $existing = JournalEntry::query()->where('source', $source)->first();
+
+                return $existing?->load('lines.account');
+            }
+
+            if ($net > $neededAmount) {
+                $this->reverseRentRecognitionExcess(
+                    $contract,
+                    $year,
+                    $month,
+                    $net - $neededAmount,
+                    $userId,
+                );
+                $existing = JournalEntry::query()->where('source', $source)->first();
+
+                return $existing?->load('lines.account');
+            }
+
+            // Top-up path — never silently write into a locked month unless remediation forces it.
+            if (! $forceTopUpLocked) {
+                $this->assertMonthOpen($year, $month);
+            }
+
             $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
-            $already = 0;
+            $primaryCredit = 0;
             if ($existing) {
                 $rent = Account::query()->where('code', '4000')->firstOrFail();
-                $already = (int) JournalLine::query()
+                $primaryCredit = (int) JournalLine::query()
                     ->where('journal_entry_id', $existing->id)
                     ->where('account_id', $rent->id)
                     ->sum('credit');
-                if ($already >= $neededAmount) {
-                    return $existing->load('lines.account');
-                }
             }
 
-            $delta = $neededAmount - $already;
+            // Primary must reach needed + outstanding adj debits so net == needed.
+            $targetPrimary = $neededAmount + $this->rentRecognitionAdjustmentDebits((int) $contract->id, $year, $month);
+            if ($primaryCredit >= $targetPrimary) {
+                return $existing?->load('lines.account');
+            }
+
+            $delta = $targetPrimary - $primaryCredit;
             $ar = Account::query()->where('code', '1200')->firstOrFail();
             $rent = Account::query()->where('code', '4000')->firstOrFail();
 
@@ -259,6 +290,161 @@ class AccountingService
 
             return $existing->load('lines.account');
         });
+    }
+
+    /**
+     * Align every rent_recog month for a contract to allocateRentByMonth (incl. zeroing months outside the period).
+     *
+     * @return int number of months that needed a write
+     */
+    public function realignContractRentRecognition(
+        Contract $contract,
+        ?int $userId = null,
+        bool $forceTopUpLocked = false,
+    ): int {
+        $this->ensureChartOfAccounts();
+        $start = $contract->starts_at;
+        $end = $contract->actual_ends_at ?? $contract->planned_ends_at;
+        if (! $start || ! $end || $end <= $start) {
+            return 0;
+        }
+
+        $periodRent = (int) ($contract->period_rent ?? 0);
+        if ($periodRent <= 0) {
+            $days = $this->pricing->countRentalDays($start, $end);
+            $periodRent = $days * (int) $contract->frozen_daily_rate;
+        }
+        if ($periodRent <= 0) {
+            return 0;
+        }
+
+        $neededByMonth = [];
+        foreach ($this->allocation->allocateRentByMonth($start, $end, $periodRent) as $slice) {
+            $key = sprintf('%04d-%02d', (int) $slice['year'], (int) $slice['month']);
+            $neededByMonth[$key] = (int) $slice['amount'];
+        }
+
+        $prefix = sprintf('rent_recog:%d:', $contract->id);
+        $existingSources = JournalEntry::query()
+            ->where('source', 'like', $prefix.'%')
+            ->where('source', 'not like', 'rent_recog_adj:%')
+            ->pluck('source');
+        foreach ($existingSources as $source) {
+            if (preg_match('/^rent_recog:\d+:(\d{4})-(\d{2})$/', (string) $source, $m) !== 1) {
+                continue;
+            }
+            $key = $m[1].'-'.$m[2];
+            if (! array_key_exists($key, $neededByMonth)) {
+                $neededByMonth[$key] = 0;
+            }
+        }
+
+        $fixed = 0;
+        foreach ($neededByMonth as $key => $needed) {
+            [$yearStr, $monthStr] = explode('-', $key);
+            $year = (int) $yearStr;
+            $month = (int) $monthStr;
+            $before = $this->rentRecognizedNet((int) $contract->id, $year, $month);
+            if ($before === $needed) {
+                continue;
+            }
+            $this->postRentRecognition($contract, $year, $month, $needed, $userId, $forceTopUpLocked);
+            $fixed++;
+        }
+
+        return $fixed;
+    }
+
+    /** Net rent income (credit − debit) for a contract/month after primary + adjustment entries. */
+    public function rentRecognizedNet(int $contractId, int $year, int $month): int
+    {
+        $rent = Account::query()->where('code', '4000')->firstOrFail();
+        $sources = [
+            sprintf('rent_recog:%d:%04d-%02d', $contractId, $year, $month),
+            sprintf('rent_recog_adj:%d:%04d-%02d', $contractId, $year, $month),
+        ];
+        $entryIds = JournalEntry::query()->whereIn('source', $sources)->pluck('id');
+        if ($entryIds->isEmpty()) {
+            return 0;
+        }
+
+        return (int) JournalLine::query()
+            ->whereIn('journal_entry_id', $entryIds)
+            ->where('account_id', $rent->id)
+            ->sum('credit')
+            - (int) JournalLine::query()
+                ->whereIn('journal_entry_id', $entryIds)
+                ->where('account_id', $rent->id)
+                ->sum('debit');
+    }
+
+    public function rentRecognitionAdjustmentDebits(int $contractId, int $year, int $month): int
+    {
+        $rent = Account::query()->where('code', '4000')->firstOrFail();
+        $adj = JournalEntry::query()
+            ->where('source', sprintf('rent_recog_adj:%d:%04d-%02d', $contractId, $year, $month))
+            ->first();
+        if (! $adj) {
+            return 0;
+        }
+
+        return (int) JournalLine::query()
+            ->where('journal_entry_id', $adj->id)
+            ->where('account_id', $rent->id)
+            ->sum('debit')
+            - (int) JournalLine::query()
+                ->where('journal_entry_id', $adj->id)
+                ->where('account_id', $rent->id)
+                ->sum('credit');
+    }
+
+    public function reverseRentRecognitionExcess(
+        Contract $contract,
+        int $year,
+        int $month,
+        int $excess,
+        ?int $userId = null,
+    ): void {
+        if ($excess <= 0) {
+            return;
+        }
+
+        $primarySource = sprintf('rent_recog:%d:%04d-%02d', $contract->id, $year, $month);
+        $primary = JournalEntry::query()->where('source', $primarySource)->lockForUpdate()->first();
+        if (! $primary) {
+            return;
+        }
+
+        $adjSource = sprintf('rent_recog_adj:%d:%04d-%02d', $contract->id, $year, $month);
+        $adj = JournalEntry::query()->where('source', $adjSource)->lockForUpdate()->first();
+        if (! $adj) {
+            $adj = JournalEntry::query()->create([
+                'entry_date' => $primary->entry_date,
+                'narration' => sprintf('تصحيح زيادة إثبات إيجار عقد %s — %04d-%02d', $contract->number, $year, $month),
+                'source' => $adjSource,
+                'posted_by' => $userId,
+            ]);
+        }
+
+        $rent = Account::query()->where('code', '4000')->firstOrFail();
+        $ar = Account::query()->where('code', '1200')->firstOrFail();
+
+        JournalLine::query()->create([
+            'journal_entry_id' => $adj->id,
+            'account_id' => $rent->id,
+            'debit' => $excess,
+            'credit' => 0,
+            'vehicle_id' => $contract->vehicle_id,
+            'customer_id' => $contract->customer_id,
+        ]);
+        JournalLine::query()->create([
+            'journal_entry_id' => $adj->id,
+            'account_id' => $ar->id,
+            'debit' => 0,
+            'credit' => $excess,
+            'vehicle_id' => $contract->vehicle_id,
+            'customer_id' => $contract->customer_id,
+        ]);
     }
 
     public function reopenMonth(int $year, int $month, string $reason, ?int $userId = null): MonthLock
@@ -299,35 +485,23 @@ class AccountingService
         }
 
         $this->ensureChartOfAccounts();
-        $start = $contract->starts_at;
         $end = $contract->actual_ends_at ?? $contract->planned_ends_at;
-        $slices = $this->allocation->allocateRentByMonth($start, $end, (int) $contract->period_rent);
 
-        // Rent months may already be locked with accruals; close still tops up recognition.
         // Extra fees always post into the close month, which must remain open.
+        // Rent realign may reverse excess in locked service months (correction) but will not top-up them.
         $closeYear = (int) $end->format('Y');
         $closeMonth = (int) $end->format('n');
         $this->assertMonthOpen($closeYear, $closeMonth);
 
-        return DB::transaction(function () use ($contract, $slices, $end, $userId) {
+        return DB::transaction(function () use ($contract, $end, $userId) {
             $source = 'contract_close:'.$contract->id;
             $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
             if ($existing) {
                 return $existing->load('lines');
             }
 
-            foreach ($slices as $slice) {
-                if ($slice['amount'] <= 0) {
-                    continue;
-                }
-                $this->postRentRecognition(
-                    $contract,
-                    (int) $slice['year'],
-                    (int) $slice['month'],
-                    (int) $slice['amount'],
-                    $userId,
-                );
-            }
+            // Align rent_recog to actual period (tops up open months; reverses excess incl. months outside period).
+            $this->realignContractRentRecognition($contract, $userId, false);
 
             $entry = JournalEntry::query()->create([
                 'entry_date' => $end->toDateString(),
@@ -899,13 +1073,25 @@ class AccountingService
                 ->whereHas('entry', function ($q) use ($year, $month) {
                     $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
                 })
-                ->sum('credit');
+                ->sum('credit')
+                - (int) JournalLine::query()
+                    ->whereHas('account', fn ($q) => $q->where('code', '4000'))
+                    ->whereHas('entry', function ($q) use ($year, $month) {
+                        $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
+                    })
+                    ->sum('debit');
             $feesCredit = (int) JournalLine::query()
                 ->whereHas('account', fn ($q) => $q->whereIn('code', ['4100', '4200', '4300', '4400']))
                 ->whereHas('entry', function ($q) use ($year, $month) {
                     $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
                 })
-                ->sum('credit');
+                ->sum('credit')
+                - (int) JournalLine::query()
+                    ->whereHas('account', fn ($q) => $q->whereIn('code', ['4100', '4200', '4300', '4400']))
+                    ->whereHas('entry', function ($q) use ($year, $month) {
+                        $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
+                    })
+                    ->sum('debit');
             $expensesTotal = (int) Expense::query()
                 ->whereYear('spent_on', $year)
                 ->whereMonth('spent_on', $month)
