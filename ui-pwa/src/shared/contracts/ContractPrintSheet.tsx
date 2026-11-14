@@ -130,13 +130,13 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
       || 'zoom' in doc.body.style
 
     if (supportsZoom) {
+      // zoom shrinks the visual size; keep layout height unscaled then size the iframe to the visual.
       ;(doc.body.style as CSSStyleDeclaration & { zoom?: string }).zoom = String(scale)
-      const zoomedHeight = Math.ceil(naturalHeight * scale) + 12
-      doc.body.style.height = `${zoomedHeight}px`
+      doc.body.style.height = `${naturalHeight}px`
       doc.body.style.width = '100%'
       doc.body.style.overflow = 'hidden'
       doc.documentElement.style.overflow = 'hidden'
-      setIframeHeight(`${zoomedHeight}px`)
+      setIframeHeight(`${Math.ceil(naturalHeight * scale) + 12}px`)
       return
     }
 
