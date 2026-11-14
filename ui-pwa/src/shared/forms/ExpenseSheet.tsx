@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAuth } from '@/shared/auth/AuthContext'
 import { civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import {
   Button, Sheet, TextField, MoneyField, SelectField, TextAreaField, DateField, SwitchField, useToast,
@@ -60,6 +61,9 @@ function spentOnValue(raw: string | undefined): string {
 
 export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee, initial }: Props) {
   const toast = useToast()
+  const { user, can } = useAuth()
+  const canManagePetty = can('petty_cash.manage')
+  const ownEmployeeId = user?.employee_id ?? null
   const editing = Boolean(initial?.id)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -72,36 +76,49 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
     if (!open) return
     if (initial) {
       const hasVehicle = Boolean(initial.vehicle_id || vehicle?.id)
+      const fromPetty = Boolean(initial.from_petty_cash)
+      let employeeId = initial.employee_id ? String(initial.employee_id) : ''
+      if (fromPetty && !canManagePetty && ownEmployeeId) {
+        employeeId = String(ownEmployeeId)
+      }
       setForm({
         title: initial.title || '',
         category: initial.category || 'تشغيل',
         scope: hasVehicle || initial.scope === 'vehicle' ? 'vehicle' : 'general',
         amount: String(initial.amount ?? ''),
         spent_on: spentOnValue(initial.spent_on),
-        payment_method: initial.from_petty_cash ? 'cash' : (initial.payment_method || 'cash'),
+        payment_method: fromPetty ? 'cash' : (initial.payment_method || 'cash'),
         notes: initial.notes || '',
         vehicle_id: initial.vehicle_id ? String(initial.vehicle_id) : (vehicle?.id ? String(vehicle.id) : ''),
         work_order_id: initial.work_order_id ? String(initial.work_order_id) : '',
-        employee_id: initial.employee_id ? String(initial.employee_id) : '',
-        from_petty_cash: Boolean(initial.from_petty_cash),
+        employee_id: employeeId,
+        from_petty_cash: fromPetty,
       })
     } else {
+      const preferCustody = Boolean(custodyEmployee?.id)
+      const employeeId = canManagePetty
+        ? (custodyEmployee?.id ? String(custodyEmployee.id) : '')
+        : (ownEmployeeId ? String(ownEmployeeId) : '')
       setForm({
         ...emptyForm(),
         scope: vehicle?.id ? 'vehicle' : 'general',
         vehicle_id: vehicle?.id ? String(vehicle.id) : '',
-        from_petty_cash: Boolean(custodyEmployee?.id),
-        employee_id: custodyEmployee?.id ? String(custodyEmployee.id) : '',
+        from_petty_cash: preferCustody,
+        employee_id: employeeId,
       })
     }
     setErrors({})
     void api<{ data: VehicleOption[] }>('/vehicles?per_page=100')
       .then((r) => setVehicles(r.data))
       .catch(() => setVehicles([]))
-    void api<{ data: EmployeeOption[] }>('/employees/lookup')
-      .then((r) => setEmployees(r.data || []))
-      .catch(() => setEmployees([]))
-  }, [open, vehicle?.id, custodyEmployee?.id, initial])
+    if (canManagePetty) {
+      void api<{ data: EmployeeOption[] }>('/employees/lookup')
+        .then((r) => setEmployees(r.data || []))
+        .catch(() => setEmployees([]))
+    } else {
+      setEmployees([])
+    }
+  }, [open, vehicle?.id, custodyEmployee?.id, initial, canManagePetty, ownEmployeeId])
 
   useEffect(() => {
     if (!open || form.category !== 'صيانة' || !form.vehicle_id) {
@@ -130,7 +147,9 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
         vehicle_id: linkedVehicle || null,
         work_order_id: form.category === 'صيانة' && form.work_order_id ? Number(form.work_order_id) : undefined,
         from_petty_cash: form.from_petty_cash,
-        employee_id: form.from_petty_cash && form.employee_id ? Number(form.employee_id) : undefined,
+        employee_id: form.from_petty_cash
+          ? Number(canManagePetty ? form.employee_id : ownEmployeeId)
+          : undefined,
       }
       if (editing && initial) {
         await api(`/expenses/${initial.id}`, { method: 'PUT', json: payload })
@@ -240,20 +259,46 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
         <SwitchField
           label="الصرف من عهدة موظف"
           checked={form.from_petty_cash}
-          onChange={(from_petty_cash) => setForm({ ...form, from_petty_cash })}
+          onChange={(from_petty_cash) => {
+            if (from_petty_cash && !canManagePetty && !ownEmployeeId) {
+              toast.error('حسابك غير مرتبط بموظف — إدارة العهدة فقط تخصم عهدة الغير.')
+              return
+            }
+            setForm({
+              ...form,
+              from_petty_cash,
+              employee_id: from_petty_cash
+                ? (canManagePetty
+                  ? (form.employee_id || (custodyEmployee?.id ? String(custodyEmployee.id) : ''))
+                  : String(ownEmployeeId))
+                : form.employee_id,
+            })
+          }}
         />
         {form.from_petty_cash ? (
-          <SelectField
-            label="موظف العهدة (من دفع)"
-            required
-            value={form.employee_id}
-            error={errors.employee_id}
-            options={[
-              { value: '', label: 'اختر الموظف…' },
-              ...employees.map((e) => ({ value: String(e.id), label: e.name })),
-            ]}
-            onChange={(e) => setForm({ ...form, employee_id: e.target.value })}
-          />
+          canManagePetty ? (
+            <SelectField
+              label="موظف العهدة (من دفع)"
+              required
+              value={form.employee_id}
+              error={errors.employee_id}
+              hint="الإدارة فقط تختار عهدة موظف آخر"
+              options={[
+                { value: '', label: 'اختر الموظف…' },
+                ...employees.map((e) => ({ value: String(e.id), label: e.name })),
+              ]}
+              onChange={(e) => setForm({ ...form, employee_id: e.target.value })}
+            />
+          ) : (
+            <TextField
+              label="موظف العهدة (من دفع)"
+              value={custodyEmployee?.name || user?.name || `موظف #${ownEmployeeId}`}
+              disabled
+              onChange={() => undefined}
+              hint="يُخصم من عهدتك فقط — لا يمكن اختيار موظف آخر"
+              error={errors.employee_id}
+            />
+          )
         ) : (
           <SelectField
             label="طريقة الدفع"

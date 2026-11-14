@@ -7,6 +7,8 @@ export type AuthUser = {
   name: string
   email: string
   phone?: string | null
+  /** Linked HR employee — used to lock petty-cash spend to self. */
+  employee_id?: number | null
   role?: string | null
   role_name?: string | null
   permissions?: string[]

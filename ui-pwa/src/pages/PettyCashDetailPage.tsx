@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAuth } from '@/shared/auth/AuthContext'
 import { formatMoney, formatDate } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
@@ -84,6 +85,8 @@ const categoryLabel: Record<string, string> = {
 export function PettyCashDetailPage() {
   const { id } = useParams()
   const toast = useToast()
+  const { user, can } = useAuth()
+  const canManagePetty = can('petty_cash.manage')
   const [account, setAccount] = useState<Account | null>(null)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [ledger, setLedger] = useState<LedgerRow[]>([])
@@ -97,6 +100,11 @@ export function PettyCashDetailPage() {
   const [move, setMove] = useState({ amount: '', notes: '' })
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [woOpen, setWoOpen] = useState(false)
+
+  const canSpendOnThisAccount = Boolean(
+    account
+    && (canManagePetty || (user?.employee_id != null && Number(user.employee_id) === Number(account.employee_id))),
+  )
 
   async function load() {
     if (!id) return
@@ -295,8 +303,12 @@ export function PettyCashDetailPage() {
             >
               سحب / استرداد من العهدة
             </Button>
-            <Button variant="accent" onClick={() => setExpenseOpen(true)}>مصروف من العهدة</Button>
-            <Button onClick={() => setWoOpen(true)}>صيانة من العهدة</Button>
+            {canSpendOnThisAccount ? (
+              <>
+                <Button variant="accent" onClick={() => setExpenseOpen(true)}>مصروف من العهدة</Button>
+                <Button onClick={() => setWoOpen(true)}>صيانة من العهدة</Button>
+              </>
+            ) : null}
           </>
         }
       />

@@ -12,6 +12,7 @@ use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
 use App\Services\Accounting\PaymentMethodNormalizer;
 use App\Support\CivilDate;
+use App\Support\PettyCashSpendGuard;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -152,9 +153,7 @@ class ExpenseService
 
     private function debitPettyCash(int $employeeId, int $amount, string $spentOn, string $notes, ?int $userId): void
     {
-        if ($employeeId < 1) {
-            throw new DomainException('موظف العهدة مطلوب عند الصرف من العهدة.');
-        }
+        PettyCashSpendGuard::assertMayChargeByUserId($userId, $employeeId);
         $account = PettyCashAccount::query()
             ->where('employee_id', $employeeId)
             ->where('is_active', true)
