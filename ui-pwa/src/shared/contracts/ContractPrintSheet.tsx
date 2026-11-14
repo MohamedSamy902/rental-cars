@@ -39,7 +39,7 @@ type Props = {
 const kindTitle: Record<PrintDocKind, string> = {
   contract: 'عقد الإيجار',
   invoice: 'الفاتورة',
-  receipt: 'إيصال الاستلام والتأمين',
+  receipt: 'إقرار الاستلام والتسليم',
 }
 
 /**
@@ -96,20 +96,58 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
     if (!iframe || !doc?.documentElement) return
 
     const root = (doc.querySelector('.rpm-preview-root') as HTMLElement | null) || doc.body
-    // Reset before measuring so scale/height from a previous pass do not shrink the reading.
+    const paper = (doc.querySelector('.rpm-paper-v3, .rpm-paper-v2, .rpm-invoice-v1, .rpm-legal-contract') as HTMLElement | null)
+      || root
+
+    // Reset measurement styles.
+    root.style.transform = ''
+    root.style.width = ''
+    root.style.marginInline = ''
     doc.body.style.removeProperty('--rpm-preview-scale')
+    doc.body.style.removeProperty('zoom')
     doc.body.style.height = 'auto'
+    doc.body.style.width = 'auto'
     doc.body.style.overflow = 'visible'
     doc.documentElement.style.overflow = 'visible'
 
-    const frameWidth = Math.max(iframe.clientWidth, 1)
-    const naturalWidth = Math.max(root.scrollWidth, PAPER_WIDTH_PX)
-    const naturalHeight = Math.max(root.scrollHeight, 320)
+    const frameWidth = Math.max(iframe.clientWidth - 2, 1)
+    const naturalWidth = Math.ceil(Math.max(
+      paper.scrollWidth,
+      paper.offsetWidth,
+      root.scrollWidth,
+      PAPER_WIDTH_PX,
+    ))
+    const naturalHeight = Math.ceil(Math.max(
+      root.scrollHeight,
+      paper.scrollHeight,
+      doc.body.scrollHeight,
+      320,
+    ))
     const scale = Math.min(1, frameWidth / naturalWidth)
 
+    // Prefer zoom when available — it shrinks layout box (no clipped transform leftovers).
+    const supportsZoom = typeof (doc.body.style as CSSStyleDeclaration & { zoom?: string }).zoom === 'string'
+      || 'zoom' in doc.body.style
+
+    if (supportsZoom) {
+      // zoom shrinks the visual size; keep layout height unscaled then size the iframe to the visual.
+      ;(doc.body.style as CSSStyleDeclaration & { zoom?: string }).zoom = String(scale)
+      doc.body.style.height = `${naturalHeight}px`
+      doc.body.style.width = '100%'
+      doc.body.style.overflow = 'hidden'
+      doc.documentElement.style.overflow = 'hidden'
+      setIframeHeight(`${Math.ceil(naturalHeight * scale) + 12}px`)
+      return
+    }
+
     doc.body.style.setProperty('--rpm-preview-scale', String(scale))
-    // Collapse the leftover layout space left by CSS transform:scale.
-    const scaledHeight = Math.ceil(naturalHeight * scale) + 8
+    root.style.width = `${naturalWidth}px`
+    root.style.marginInline = 'auto'
+    root.style.transformOrigin = 'top center'
+    root.style.transform = `scale(${scale})`
+    const scaledHeight = Math.ceil(naturalHeight * scale) + 12
+    const scaledWidth = Math.ceil(naturalWidth * scale)
+    doc.body.style.width = `${scaledWidth}px`
     doc.body.style.height = `${scaledHeight}px`
     doc.body.style.overflow = 'hidden'
     doc.documentElement.style.overflow = 'hidden'
@@ -123,9 +161,8 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
 
     const onLoad = () => {
       fitPreviewToFrame()
-      // Fonts / images may change layout after first paint.
       window.setTimeout(fitPreviewToFrame, 120)
-      window.setTimeout(fitPreviewToFrame, 400)
+      window.setTimeout(fitPreviewToFrame, 450)
     }
     iframe.addEventListener('load', onLoad)
 

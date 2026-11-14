@@ -111,7 +111,7 @@ class DocumentTemplateService
                 'content' => $this->defaultContractHtml(),
             ],
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => [
-                'title' => 'قالب إيصال الاستلام والتأمين',
+                'title' => 'قالب إقرار الاستلام والتسليم',
                 'content' => $this->defaultHandoverHtml(),
             ],
             DocumentTemplate::TYPE_OWNER_AGREEMENT => [
@@ -150,7 +150,7 @@ class DocumentTemplateService
                     ->orWhere('content', 'like', '%محضر التسليم%');
             })
             ->update([
-                'title' => 'قالب إيصال الاستلام والتأمين',
+                'title' => 'قالب إقرار الاستلام والتسليم',
                 'content' => $this->defaultHandoverHtml(),
             ]);
 
@@ -640,7 +640,7 @@ class DocumentTemplateService
     {
         return match ($type) {
             DocumentTemplate::TYPE_CONTRACT => 'عقد إيجار سيارة (نموذج المركز)',
-            DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب إيصال الاستلام والتأمين',
+            DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب إقرار الاستلام والتسليم',
             DocumentTemplate::TYPE_OWNER_AGREEMENT => 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
             DocumentTemplate::TYPE_CUSTODY_AGREEMENT => 'قالب عقد الاعتماد',
             default => 'قالب مستند',
@@ -820,7 +820,7 @@ HTML;
     <p class="muted">{{company_phone}} · {{company_address}}</p>
   </div>
 </header>
-<h2>إيصال الاستلام والتأمين</h2>
+<h2>إقرار الاستلام والتسليم</h2>
 <p class="muted">عقد {{contract_number}} · إصدار القالب {{template_version}}</p>
 <h2>بيانات العميل والعربية</h2>
 <table>

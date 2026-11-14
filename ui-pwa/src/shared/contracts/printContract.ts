@@ -109,7 +109,7 @@ export type PrintPayload = {
 const titles: Record<PrintDocKind, string> = {
   contract: 'عقد تأجير',
   invoice: 'فاتورة',
-  receipt: 'إيصال الاستلام والتأمين',
+  receipt: 'إقرار الاستلام والتسليم',
 }
 
 const snapshotType: Record<PrintDocKind, string> = {
@@ -259,7 +259,7 @@ function receiptBody(tenant: PrintTenant, c: PrintContract) {
   const deposit = c.deposit
   return `
     ${headerBlock(tenant)}
-    <h2>إيصال الاستلام والتأمين</h2>
+    <h2>إقرار الاستلام والتسليم</h2>
     <p class="muted">عقد ${esc(c.number)}</p>
     <h2>بيانات العميل والعربية</h2>
     <table>
