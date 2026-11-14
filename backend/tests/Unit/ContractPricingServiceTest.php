@@ -77,6 +77,24 @@ class ContractPricingServiceTest extends TestCase
         $this->assertSame(3125.0, $total);
     }
 
+    public function test_prepaid_excess_amount_and_billable_beyond_package(): void
+    {
+        $this->assertSame(5000, $this->pricing->prepaidExcessAmount(1000, 5));
+        $this->assertSame(0, $this->pricing->billableExcessKilometers(800, 1000));
+        $this->assertSame(200, $this->pricing->billableExcessKilometers(1200, 1000));
+    }
+
+    public function test_final_total_includes_prepaid_and_additional_excess(): void
+    {
+        $total = $this->pricing->finalTotal([
+            'period_rent' => 3000,
+            'prepaid_excess_km_fee' => 5000,
+            'excess_km_fee' => 200,
+        ]);
+
+        $this->assertSame(8200.0, $total);
+    }
+
     public function test_final_total_includes_delivery_service_fee(): void
     {
         $total = $this->pricing->finalTotal([

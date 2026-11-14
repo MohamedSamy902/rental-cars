@@ -57,6 +57,8 @@ export type Contract = {
   frozen_daily_rate: number
   frozen_daily_km_allowance?: number | null
   frozen_excess_km_rate?: number | null
+  prepaid_excess_km?: number | null
+  prepaid_excess_km_amount?: number | null
   frozen_agreed_deposit?: number
   excess_km?: number | null
   approved_days?: number

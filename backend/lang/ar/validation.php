@@ -237,6 +237,7 @@ return [
         'other_fees_description' => 'وصف الرسوم الأخرى',
         'daily_km_allowance' => 'بدل الكيلومترات اليومي',
         'excess_km_rate' => 'سعر الكيلومتر الزائد',
+        'prepaid_excess_km' => 'كيلومترات زيادة مدفوعة مقدماً',
         'allowed_km' => 'الكيلومترات المسموحة',
         'min_days' => 'الحد الأدنى للأيام',
         'start_date' => 'تاريخ البداية',

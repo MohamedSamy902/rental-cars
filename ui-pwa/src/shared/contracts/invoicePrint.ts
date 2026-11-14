@@ -28,6 +28,8 @@ type InvoiceContract = {
   frozen_agreed_deposit?: number
   approved_days?: number | null
   period_rent?: number | null
+  prepaid_excess_km?: number | null
+  prepaid_excess_km_amount?: number | null
   excess_km?: number | null
   excess_km_amount?: number | null
   damage_fee?: number | null
@@ -111,6 +113,8 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
   const daily = Number(c.frozen_daily_rate || 0)
   const rent = c.period_rent != null ? Number(c.period_rent) : days * daily
   const deposit = Number(c.deposit?.original_amount ?? c.frozen_agreed_deposit ?? 0)
+  const prepaidQty = Number(c.prepaid_excess_km ?? 0)
+  const prepaidAmt = Number(c.prepaid_excess_km_amount ?? 0)
   const excessQty = Number(c.excess_km ?? 0)
   const excessAmt = Number(c.excess_km_amount ?? 0)
   const other = Number(c.other_fees ?? 0)
@@ -119,7 +123,7 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
   const discount = Number(c.discount ?? 0)
   const total = c.final_total != null
     ? Number(c.final_total)
-    : Math.max(0, rent + excessAmt + other + damage + delivery - discount)
+    : Math.max(0, rent + prepaidAmt + excessAmt + other + damage + delivery - discount)
   const paidIn = (c.payments || []).filter((p) => p.direction === 'in').reduce((s, p) => s + Number(p.amount || 0), 0)
   const paidOut = (c.payments || []).filter((p) => p.direction === 'out').reduce((s, p) => s + Number(p.amount || 0), 0)
   const paidNet = paidIn - paidOut
@@ -259,7 +263,13 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
           <td class="num">${deposit ? moneyOrBlank(deposit) : ''}</td>
         </tr>
         <tr>
-          <td class="desc">كيلومترات إضافية (Extra KM)</td>
+          <td class="desc">كم زيادة مدفوعة مقدماً (Prepaid Extra KM)</td>
+          <td class="num">${prepaidQty || ''}</td>
+          <td class="num">—</td>
+          <td class="num">${prepaidAmt ? moneyOrBlank(prepaidAmt) : ''}</td>
+        </tr>
+        <tr>
+          <td class="desc">زيادة إضافية عند الاستلام (Extra KM beyond prepaid)</td>
           <td class="num">${excessQty || ''}</td>
           <td class="num">—</td>
           <td class="num">${excessAmt ? moneyOrBlank(excessAmt) : ''}</td>

@@ -45,8 +45,11 @@ class ContractLedgerMath
             return $total;
         }
 
+        $prepaid = (int) ($contract->prepaid_excess_km_amount ?? 0);
+
         if ($contract->period_rent !== null && (int) $contract->period_rent > 0) {
             return (int) $contract->period_rent
+                + $prepaid
                 + (int) $contract->excess_km_amount
                 + (int) $contract->damage_fee
                 + (int) ($contract->frozen_operating_insurance_fee ?? 0)
@@ -68,6 +71,7 @@ class ContractLedgerMath
         $days = max(1, $days);
 
         return $days * (int) $contract->frozen_daily_rate
+            + $prepaid
             + (int) $contract->other_fees
             + (int) ($contract->delivery_service_fee ?? 0)
             - (int) $contract->discount;
