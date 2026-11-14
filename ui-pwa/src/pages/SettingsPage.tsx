@@ -150,7 +150,7 @@ export function SettingsPage() {
             label="ملاحظات التذييل"
             value={printFooter}
             onChange={(e) => setPrintFooter(e.target.value)}
-            hint="سطر ختامي على العقد والفاتورة وإيصال الاستلام والتأمين"
+            hint="سطر ختامي على العقد والفاتورة وإقرار الاستلام والتسليم"
           />
         </div>
       </section>

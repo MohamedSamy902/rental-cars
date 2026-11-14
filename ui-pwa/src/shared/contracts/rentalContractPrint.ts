@@ -26,22 +26,28 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     max-width: 200mm;
     margin: 0 auto;
     position: relative;
-    padding: 1.2mm 1.2mm 3mm;
+    /* Extra bottom/inline padding so hanging party tags stay inside the paper frame */
+    padding: 2.4mm 2.2mm 5mm;
     border: 1.2px solid #111;
+    overflow: visible;
+    box-sizing: border-box;
   }
   /* Mobile / in-app iframe preview: fit paper to viewport without clipping RTL boxes */
   @media screen{
     html, body{
-      overflow-x: auto;
+      margin: 0;
+      overflow: hidden;
       -webkit-overflow-scrolling: touch;
     }
     body{
       --rpm-preview-scale: 1;
+      background: #fff;
     }
     .rpm-preview-root{
       transform: scale(var(--rpm-preview-scale));
       transform-origin: top center;
       width: 100%;
+      box-sizing: border-box;
     }
     .rpm-paper-v2, .rpm-paper-v3{
       max-width: 200mm;
@@ -317,7 +323,10 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     grid-template-columns: 1fr 34mm 1fr;
     gap: 2.5mm;
     align-items: start;
-    margin-top: 5mm;
+    margin-top: 6mm;
+    margin-inline: 0.5mm;
+    width: 100%;
+    box-sizing: border-box;
   }
   .rpm-lc-sign-col{
     position: relative;

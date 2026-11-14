@@ -240,8 +240,7 @@ export function contractMenu(
     items.push(
       { id: 'print-contract', label: 'طباعة العقد', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('contract') },
       { id: 'print-invoice', label: 'الفاتورة', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('invoice') },
-      // مؤقتاً: إخفاء بند إيصال الاستلام والتأمين من قائمة الإجراءات
-      // { id: 'print-receipt', label: 'إيصال الاستلام والتأمين', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
+      { id: 'print-receipt', label: 'إقرار الاستلام والتسليم', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
     )
   }
   if ((b.status === 'pending' || b.status === 'approved') && can('contracts_cancel.approve')) {

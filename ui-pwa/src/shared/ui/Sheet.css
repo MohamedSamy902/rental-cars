@@ -208,7 +208,12 @@
   min-height: 280px;
   max-inline-size: 100%;
   width: 100%;
+  box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
+}
+
+.rpm-print-preview iframe {
+  max-width: 100%;
 }
 
 .rpm-sheet__body > *,
