@@ -17,7 +17,10 @@ class StaffController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $q = User::query()->with(['role:id,name,label'])->latest('id');
+        // المديرون الأعلى لا يظهرون أبداً في قائمة الموظفين (حسابات نظام بلا employee_id).
+        $staffScope = fn ($q) => $q->whereDoesntHave('role', fn ($r) => $r->where('name', 'super_admin'));
+
+        $q = User::query()->with(['role:id,name,label'])->tap($staffScope)->latest('id');
 
         if ($search = $request->string('search')->toString()) {
             $q->where(function ($qq) use ($search) {
@@ -42,10 +45,10 @@ class StaffController extends Controller
         return response()->json([
             'data' => collect($rows->items())->map(fn (User $u) => $this->present($u))->values(),
             'summary' => [
-                'total' => User::query()->count(),
-                'active' => User::query()->where('is_active', true)->count(),
-                'inactive' => User::query()->where('is_active', false)->count(),
-                'roles' => DB::table('roles')->count(),
+                'total' => User::query()->tap($staffScope)->count(),
+                'active' => User::query()->tap($staffScope)->where('is_active', true)->count(),
+                'inactive' => User::query()->tap($staffScope)->where('is_active', false)->count(),
+                'roles' => DB::table('roles')->where('name', '!=', 'super_admin')->count(),
             ],
             'meta' => [
                 'current_page' => $rows->currentPage(),
@@ -132,6 +135,11 @@ class StaffController extends Controller
 
     public function update(Request $request, User $user): JsonResponse
     {
+        $user->loadMissing('role');
+        if ($user->role?->name === 'super_admin') {
+            return response()->json(['message' => 'غير موجود.'], 404);
+        }
+
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:200'],
             'email' => ['nullable', 'email', 'max:190', Rule::unique('users', 'email')->ignore($user->id)],
