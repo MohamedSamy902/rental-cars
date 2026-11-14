@@ -172,6 +172,12 @@ export function ContractDetailPage() {
                 : '—',
             },
             {
+              label: 'كم زيادة مدفوعة مقدماً',
+              value: (row.prepaid_excess_km ?? 0) > 0
+                ? `${formatNumber(row.prepaid_excess_km || 0)} كم · ${formatMoney(row.prepaid_excess_km_amount || 0)}`
+                : '—',
+            },
+            {
               label: 'تاريخ تحصيل المتبقي',
               value: row.balance_due_on
                 ? formatDate(row.balance_due_on)
@@ -180,7 +186,14 @@ export function ContractDetailPage() {
             { label: 'أنشأه', value: row.created_by || row.sales_user?.name || '—' },
             { label: 'عداد الخروج', value: row.odometer_out != null ? `${formatNumber(row.odometer_out)} كم` : '—' },
             { label: 'عداد العودة', value: row.odometer_in != null ? `${formatNumber(row.odometer_in)} كم` : '—' },
-            { label: 'كيلومترات زيادة', value: row.excess_km_amount ? formatMoney(row.excess_km_amount) : '—' },
+            {
+              label: 'كم زيادة فعلية',
+              value: row.excess_km != null ? `${formatNumber(row.excess_km)} كم` : '—',
+            },
+            {
+              label: 'رسوم زيادة إضافية',
+              value: row.excess_km_amount ? formatMoney(row.excess_km_amount) : '—',
+            },
             { label: 'رسوم أضرار', value: row.damage_fee ? formatMoney(row.damage_fee) : '—' },
             {
               label: 'خدمة تسليم واستلام',

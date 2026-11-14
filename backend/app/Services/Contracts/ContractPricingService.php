@@ -74,13 +74,30 @@ class ContractPricingService
     }
 
     /**
-     * Final total = period rent − discount + excess km + damages + operating insurance
-     * + other fees + delivery/pick-up service fee.
+     * Money for prepaid extra kilometers agreed at booking (km × rate). No refund if unused.
+     */
+    public function prepaidExcessAmount(int $prepaidKm, int $excessKmRate): int
+    {
+        return max(0, $prepaidKm) * max(0, $excessKmRate);
+    }
+
+    /**
+     * Kilometers beyond the prepaid package that are billable at return.
+     */
+    public function billableExcessKilometers(int $actualExcessKm, int $prepaidKm): int
+    {
+        return max(0, $actualExcessKm - max(0, $prepaidKm));
+    }
+
+    /**
+     * Final total = period rent − discount + prepaid excess km + additional excess km
+     * + damages + operating insurance + other fees + delivery/pick-up service fee.
      * Cash deposit is outside this total. No separate late fee / fuel differential.
      *
      * @param  array{
      *     period_rent: int|float,
      *     discount?: int|float,
+     *     prepaid_excess_km_fee?: int|float,
      *     excess_km_fee?: int|float,
      *     damage_fee?: int|float,
      *     operating_insurance_fee?: int|float,
@@ -92,13 +109,14 @@ class ContractPricingService
     {
         $period = (float) ($parts['period_rent'] ?? 0);
         $discount = (float) ($parts['discount'] ?? 0);
+        $prepaidExcess = (float) ($parts['prepaid_excess_km_fee'] ?? 0);
         $excess = (float) ($parts['excess_km_fee'] ?? 0);
         $damage = (float) ($parts['damage_fee'] ?? 0);
         $operating = (float) ($parts['operating_insurance_fee'] ?? 0);
         $other = (float) ($parts['other_fees'] ?? 0);
         $delivery = (float) ($parts['delivery_service_fee'] ?? 0);
 
-        return $period - $discount + $excess + $damage + $operating + $other + $delivery;
+        return $period - $discount + $prepaidExcess + $excess + $damage + $operating + $other + $delivery;
     }
 
     /**

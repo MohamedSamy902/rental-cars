@@ -120,6 +120,8 @@ class ContractLifecycleService
             $excessRate = array_key_exists('excess_km_rate', $data) && $data['excess_km_rate'] !== null
                 ? (int) $data['excess_km_rate']
                 : $defaultExcessRate;
+            $prepaidExcessKm = max(0, (int) ($data['prepaid_excess_km'] ?? 0));
+            $prepaidExcessAmount = $this->pricing->prepaidExcessAmount($prepaidExcessKm, $excessRate);
 
             $accessories = $this->resolveAccessoriesSnapshot($vehicle, $data['accessory_ids'] ?? null);
             $delivery = $this->pricing->normalizeDeliveryService($data);
@@ -144,6 +146,8 @@ class ContractLifecycleService
                 'frozen_daily_rate' => $dailyRate,
                 'frozen_daily_km_allowance' => $kmAllowance,
                 'frozen_excess_km_rate' => $excessRate,
+                'prepaid_excess_km' => $prepaidExcessKm,
+                'prepaid_excess_km_amount' => $prepaidExcessAmount,
                 'frozen_agreed_deposit' => $deposit,
                 'frozen_operating_insurance_fee' => $data['operating_insurance_fee'] ?? null,
                 'discount' => $data['discount'] ?? 0,
@@ -391,6 +395,10 @@ class ContractLifecycleService
             $excessRate = array_key_exists('excess_km_rate', $data) && $data['excess_km_rate'] !== null
                 ? (int) $data['excess_km_rate']
                 : (int) ($locked->frozen_excess_km_rate ?? 5);
+            $prepaidExcessKm = array_key_exists('prepaid_excess_km', $data) && $data['prepaid_excess_km'] !== null
+                ? max(0, (int) $data['prepaid_excess_km'])
+                : (int) ($locked->prepaid_excess_km ?? 0);
+            $prepaidExcessAmount = $this->pricing->prepaidExcessAmount($prepaidExcessKm, $excessRate);
 
             if (array_key_exists('accessory_ids', $data)) {
                 $accessories = $this->resolveAccessoriesSnapshot($vehicle, $data['accessory_ids']);
@@ -430,6 +438,8 @@ class ContractLifecycleService
                 'frozen_daily_rate' => $dailyRate,
                 'frozen_daily_km_allowance' => $kmAllowance,
                 'frozen_excess_km_rate' => $excessRate,
+                'prepaid_excess_km' => $prepaidExcessKm,
+                'prepaid_excess_km_amount' => $prepaidExcessAmount,
                 'frozen_agreed_deposit' => $deposit,
                 'discount' => array_key_exists('discount', $data) ? (int) $data['discount'] : $locked->discount,
                 'other_fees' => array_key_exists('other_fees', $data) ? (int) $data['other_fees'] : $locked->other_fees,
@@ -668,11 +678,17 @@ class ContractLifecycleService
             $allowed = $this->pricing->allowedKilometers((int) $locked->frozen_daily_km_allowance, $billableDays);
             $driven = $this->accumulatedDrivenKm($locked, $odometerIn);
             $excess = max(0, $driven - $allowed);
-            $excessAmount = $excess * (int) $locked->frozen_excess_km_rate;
+            $prepaidKm = (int) ($locked->prepaid_excess_km ?? 0);
+            $prepaidAmount = (int) ($locked->prepaid_excess_km_amount ?? 0);
+            $rate = (int) $locked->frozen_excess_km_rate;
+            // Additional billable km beyond the prepaid package; unused prepaid is not refunded.
+            $billableExtraKm = $this->pricing->billableExcessKilometers($excess, $prepaidKm);
+            $excessAmount = $billableExtraKm * $rate;
 
             $final = $this->pricing->finalTotal([
                 'period_rent' => $periodRent,
                 'discount' => (int) $locked->discount,
+                'prepaid_excess_km_fee' => $prepaidAmount,
                 'excess_km_fee' => $excessAmount,
                 'damage_fee' => $damageFee,
                 'operating_insurance_fee' => (int) ($locked->frozen_operating_insurance_fee ?? 0),

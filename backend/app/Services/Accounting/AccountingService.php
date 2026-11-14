@@ -517,8 +517,10 @@ class AccountingService
             $fees = Account::query()->where('code', '4300')->firstOrFail();
             $delivery = Account::query()->where('code', '4400')->firstOrFail();
 
+            // Prepaid package + additional excess beyond it both credit إيراد كيلومترات زيادة.
+            $excessRevenue = (int) ($contract->prepaid_excess_km_amount ?? 0) + (int) $contract->excess_km_amount;
             $extras = [
-                [(int) $contract->excess_km_amount, $excess->id],
+                [$excessRevenue, $excess->id],
                 [(int) $contract->damage_fee, $damage->id],
                 [(int) ($contract->frozen_operating_insurance_fee ?? 0) + (int) $contract->other_fees, $fees->id],
                 [(int) ($contract->delivery_service_fee ?? 0), $delivery->id],

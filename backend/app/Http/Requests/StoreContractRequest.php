@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
+use App\Models\TenantSetting;
 use App\Models\Vehicle;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
@@ -32,6 +33,7 @@ class StoreContractRequest extends FormRequest
             'daily_rate',
             'daily_km_allowance',
             'excess_km_rate',
+            'prepaid_excess_km',
             'deposit',
             'min_days',
             'discount',
@@ -67,6 +69,7 @@ class StoreContractRequest extends FormRequest
             'daily_rate' => ['nullable', 'integer', 'min:0'],
             'daily_km_allowance' => ['nullable', 'integer', 'min:0'],
             'excess_km_rate' => ['nullable', 'integer', 'min:0'],
+            'prepaid_excess_km' => ['nullable', 'integer', 'min:0'],
             'deposit' => ['nullable', 'integer', 'min:0'],
             'min_days' => ['nullable', 'integer', 'min:0'],
             'discount' => ['nullable', 'integer', 'min:0'],
@@ -135,7 +138,15 @@ class StoreContractRequest extends FormRequest
             $deliveryFee = $deliveryEnabled ? (int) $this->input('delivery_service_fee', 0) : 0;
             $otherFees = (int) $this->input('other_fees', 0);
             $discount = (int) $this->input('discount', 0);
-            $total = max(0, ($days * $rate) + $deliveryFee + $otherFees - $discount);
+            $ops = TenantSetting::query()->first()?->operational ?? [];
+            $defaultExcessRate = (int) ($ops['default_excess_km_rate'] ?? $ops['excess_km_rate'] ?? 5);
+            $excessRateInput = $this->input('excess_km_rate');
+            $excessRate = ($excessRateInput === null || $excessRateInput === '')
+                ? $defaultExcessRate
+                : (int) $excessRateInput;
+            $prepaidKm = max(0, (int) $this->input('prepaid_excess_km', 0));
+            $prepaidAmount = $prepaidKm * max(0, $excessRate);
+            $total = max(0, ($days * $rate) + $deliveryFee + $otherFees + $prepaidAmount - $discount);
             if ($paid > $total) {
                 $v->errors()->add(
                     'payment_amount',
@@ -159,6 +170,7 @@ class StoreContractRequest extends FormRequest
             'daily_rate' => 'الإيجار اليومي',
             'daily_km_allowance' => 'بدل الكيلومترات اليومي',
             'excess_km_rate' => 'سعر الكيلومتر الزائد',
+            'prepaid_excess_km' => 'كيلومترات زيادة مدفوعة مقدماً',
             'deposit' => 'التأمين النقدي',
             'min_days' => 'الحد الأدنى للأيام',
             'discount' => 'الخصم',

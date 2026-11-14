@@ -16,6 +16,7 @@ class Contract extends Model
         'number', 'customer_id', 'vehicle_id', 'guarantor_customer_id', 'status',
         'starts_at', 'planned_ends_at', 'actual_ends_at', 'approved_days', 'min_days',
         'frozen_daily_rate', 'frozen_daily_km_allowance', 'frozen_excess_km_rate',
+        'prepaid_excess_km', 'prepaid_excess_km_amount',
         'frozen_agreed_deposit', 'frozen_operating_insurance_fee', 'frozen_min_days',
         'tagged_late_days', 'odometer_out', 'odometer_in', 'allowed_km', 'excess_km',
         'excess_km_amount', 'period_rent', 'discount', 'damage_fee', 'other_fees',

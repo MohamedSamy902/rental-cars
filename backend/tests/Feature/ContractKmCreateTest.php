@@ -118,4 +118,43 @@ class ContractKmCreateTest extends TestCase
         $this->assertSame(180, (int) $create->json('data.frozen_daily_km_allowance'));
         $this->assertSame(7, (int) $create->json('data.frozen_excess_km_rate'));
     }
+
+    public function test_create_stores_prepaid_excess_km_and_amount(): void
+    {
+        $this->actingWith(['contracts.view', 'contracts.create']);
+
+        // 2 days × 900 = 1800 rent + 1000km × 5 = 5000 prepaid → total 6800
+        $create = $this->postJson('/api/contracts', [
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->addDays(10)->startOfDay()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(12)->startOfDay()->toIso8601String(),
+            'excess_km_rate' => 5,
+            'prepaid_excess_km' => 1000,
+            'payment_amount' => 2000,
+            'payment_method' => 'cash',
+            'balance_due_on' => now()->addDays(14)->toDateString(),
+        ])->assertCreated();
+
+        $this->assertSame(1000, (int) $create->json('data.prepaid_excess_km'));
+        $this->assertSame(5000, (int) $create->json('data.prepaid_excess_km_amount'));
+    }
+
+    public function test_payment_may_cover_prepaid_package_within_estimate(): void
+    {
+        $this->actingWith(['contracts.view', 'contracts.create']);
+
+        // Without prepaid, max payment for 2 days is 1800; with 1000×5 prepaid, max is 6800.
+        $this->postJson('/api/contracts', [
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->addDays(20)->startOfDay()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(22)->startOfDay()->toIso8601String(),
+            'excess_km_rate' => 5,
+            'prepaid_excess_km' => 1000,
+            'payment_amount' => 5000,
+            'payment_method' => 'cash',
+            'balance_due_on' => now()->addDays(25)->toDateString(),
+        ])->assertCreated();
+    }
 }

@@ -28,6 +28,7 @@ const emptyForm = {
   daily_rate: '', deposit: '', odometer: '', notes: '',
   daily_km_allowance: String(DEFAULT_DAILY_KM),
   excess_km_rate: String(DEFAULT_EXCESS_KM_RATE),
+  prepaid_excess_km: '',
   has_delivery_service: false,
   delivery_service_fee: String(DEFAULT_DELIVERY_FEE),
   delivery_service_notes: '',
@@ -201,7 +202,11 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
         days = Math.max(1, Math.ceil((b.getTime() - a.getTime()) / 86400000))
       }
     }
-    const total = days && rate ? days * rate : 0
+    const excessRate = Number(form.excess_km_rate || 0)
+    const prepaidKm = Math.max(0, Number(form.prepaid_excess_km || 0))
+    const prepaidAmount = prepaidKm * (Number.isFinite(excessRate) ? excessRate : 0)
+    const deliveryNow = form.has_delivery_service ? Math.max(0, Number(form.delivery_service_fee || 0)) : 0
+    const total = days && rate ? days * rate + deliveryNow + prepaidAmount : 0
     if (!Number.isFinite(paid) || paid < 1) {
       setErrors({ payment_amount: 'دفعة عند الإنشاء مطلوبة وأكبر من صفر' })
       toast.error('لا تأجير بلا دفع — أدخل دفعة عند الإنشاء')
@@ -213,8 +218,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       return
     }
     if (total > 0 && paid > total) {
-      setErrors({ payment_amount: `لا يجوز أن تتجاوز الدفعة إجمالي الإيجار (${total} ج.م)` })
-      toast.error('الدفعة أكبر من إجمالي الإيجار')
+      setErrors({ payment_amount: `لا يجوز أن تتجاوز الدفعة إجمالي العقد التقديري (${total} ج.م)` })
+      toast.error('الدفعة أكبر من إجمالي العقد التقديري')
       return
     }
     const left = Math.max(0, total - paid)
@@ -237,6 +242,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           deposit: form.deposit ? Number(form.deposit) : undefined,
           daily_km_allowance: form.daily_km_allowance !== '' ? Number(form.daily_km_allowance) : undefined,
           excess_km_rate: form.excess_km_rate !== '' ? Number(form.excess_km_rate) : undefined,
+          prepaid_excess_km: form.prepaid_excess_km !== '' ? Number(form.prepaid_excess_km) : 0,
           odometer: form.odometer !== '' ? Number(form.odometer) : undefined,
           accessory_ids: accessoryIds,
           has_delivery_service: form.has_delivery_service,
@@ -288,10 +294,12 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     return estimatedDays * rate
   }, [estimatedDays, form.daily_rate])
 
+  const prepaidKmEstimate = Math.max(0, Number(form.prepaid_excess_km || 0))
+  const prepaidAmountEstimate = prepaidKmEstimate * Math.max(0, Number(form.excess_km_rate || 0))
   const deliveryFee = form.has_delivery_service ? Math.max(0, Number(form.delivery_service_fee || 0)) : 0
   const depositEstimate = Math.max(0, Number(form.deposit || 0))
-  const estimatedTotal = rentEstimate + deliveryFee
-  const dueWithDepositLabel = rentEstimate + deliveryFee + depositEstimate
+  const estimatedTotal = rentEstimate + deliveryFee + prepaidAmountEstimate
+  const dueWithDepositLabel = rentEstimate + deliveryFee + prepaidAmountEstimate + depositEstimate
 
   const paidNow = Number(form.payment_amount || 0)
   const remainingBalance = Math.max(0, estimatedTotal - paidNow)
@@ -434,6 +442,17 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             hint="جنيه لكل كم زيادة عن البدل"
           />
           <NumberField
+            label="كيلومترات زيادة مدفوعة مقدماً"
+            value={form.prepaid_excess_km}
+            error={errors.prepaid_excess_km}
+            onChange={(e) => setForm({ ...form, prepaid_excess_km: e.target.value })}
+            hint={
+              prepaidAmountEstimate > 0
+                ? `يُحسب الآن: ${formatMoney(prepaidAmountEstimate)} · غير المستخدم لا يُرد`
+                : 'اختياري — باقة كم زيادة تُدفع مع الاتفاق؛ الزائد عنها يُحسب عند الاستلام'
+            }
+          />
+          <NumberField
             label="العداد الحالي"
             value={form.odometer}
             error={errors.odometer}
@@ -479,6 +498,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               <p className="rpm-inline-box__title">ملخص المستحق</p>
               <p style={{ margin: 0 }}>
                 قيمة الإيجار {formatMoney(rentEstimate)}
+                {prepaidAmountEstimate > 0 ? ` + كم مدفوع مقدماً ${formatMoney(prepaidAmountEstimate)}` : ''}
                 {deliveryFee > 0 ? ` + خدمة تسليم واستلام ${formatMoney(deliveryFee)}` : ''}
                 {depositEstimate > 0 ? ` + التأمين ${formatMoney(depositEstimate)}` : ''}
                 {' = '}

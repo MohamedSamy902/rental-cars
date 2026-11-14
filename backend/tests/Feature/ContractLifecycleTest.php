@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use App\Models\Customer;
+use App\Models\JournalLine;
 use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -113,6 +115,110 @@ class ContractLifecycleTest extends TestCase
         $this->getJson('/api/accounting/overview')
             ->assertOk()
             ->assertJsonStructure(['data' => ['months', 'accounts', 'payments_in']]);
+    }
+
+    public function test_prepaid_excess_km_covers_usage_and_bills_only_beyond(): void
+    {
+        $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1000,
+            'payment_method' => 'cash',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->startOfDay()->toIso8601String(),
+            'planned_ends_at' => now()->startOfDay()->addDays(3)->toIso8601String(),
+            'daily_rate' => 1000,
+            'daily_km_allowance' => 200,
+            'excess_km_rate' => 5,
+            'prepaid_excess_km' => 1000,
+            'balance_due_on' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+
+        $id = (int) $create->json('data.id');
+        $this->assertSame(1000, (int) $create->json('data.prepaid_excess_km'));
+        $this->assertSame(5000, (int) $create->json('data.prepaid_excess_km_amount'));
+
+        $this->postJson("/api/contracts/{$id}/approve")->assertOk();
+        $this->postJson("/api/contracts/{$id}/deposit", [
+            'method' => 'cash',
+            'receipt_number' => 'R-PRE',
+        ])->assertCreated();
+        $signature = 'sig-'.str_repeat('prepaid-ok-', 5);
+        $this->postJson("/api/contracts/{$id}/handover", [
+            'odometer_out' => 10000,
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        // 3 days × 200 = 600 allowed; driven 1800 → excess 1200; prepaid 1000 → billable 200 × 5 = 1000.
+        $ret = $this->postJson("/api/contracts/{$id}/return", [
+            'odometer_in' => 11800,
+            'returned_at' => now()->startOfDay()->addDays(3)->toIso8601String(),
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        $this->assertSame(1200, (int) $ret->json('data.excess_km'));
+        $this->assertSame(1000, (int) $ret->json('data.excess_km_amount'));
+        $this->assertSame(5000, (int) $ret->json('data.prepaid_excess_km_amount'));
+        // period_rent 3000 + prepaid 5000 + extra 1000 = 9000
+        $this->assertSame(9000, (int) $ret->json('data.final_total'));
+
+        $income4100 = Account::query()->where('code', '4100')->firstOrFail();
+        $credit = (int) JournalLine::query()->where('account_id', $income4100->id)->sum('credit');
+        $this->assertSame(6000, $credit);
+    }
+
+    public function test_unused_prepaid_excess_km_is_not_refunded(): void
+    {
+        $vehicle = Vehicle::query()->create([
+            'code' => 'T-PRE-2',
+            'plate' => 'TEST 222',
+            'brand' => 'هيونداي',
+            'model' => 'أكسنت',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 5000,
+            'daily_rate' => 1000,
+            'default_deposit' => 2000,
+            'is_active' => true,
+        ]);
+
+        $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1000,
+            'payment_method' => 'cash',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $vehicle->id,
+            'starts_at' => now()->startOfDay()->toIso8601String(),
+            'planned_ends_at' => now()->startOfDay()->addDays(3)->toIso8601String(),
+            'daily_rate' => 1000,
+            'daily_km_allowance' => 200,
+            'excess_km_rate' => 5,
+            'prepaid_excess_km' => 1000,
+            'balance_due_on' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+        $id = (int) $create->json('data.id');
+
+        $this->postJson("/api/contracts/{$id}/approve")->assertOk();
+        $this->postJson("/api/contracts/{$id}/deposit", [
+            'method' => 'cash',
+            'receipt_number' => 'R-UNDER',
+        ])->assertCreated();
+        $signature = 'sig-'.str_repeat('under-use-', 5);
+        $this->postJson("/api/contracts/{$id}/handover", [
+            'odometer_out' => 5000,
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        // allowed 600; driven 900 → excess 300 < prepaid 1000 → no additional charge.
+        $ret = $this->postJson("/api/contracts/{$id}/return", [
+            'odometer_in' => 5900,
+            'returned_at' => now()->startOfDay()->addDays(3)->toIso8601String(),
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        $this->assertSame(300, (int) $ret->json('data.excess_km'));
+        $this->assertSame(0, (int) $ret->json('data.excess_km_amount'));
+        $this->assertSame(5000, (int) $ret->json('data.prepaid_excess_km_amount'));
+        $this->assertSame(8000, (int) $ret->json('data.final_total'));
     }
 
     public function test_cancel_before_handover_is_allowed(): void
