@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAuth } from '@/shared/auth/AuthContext'
 import { civilDateOnly, nowLocalDateTimeValue } from '@/shared/lib/dates'
 import { formatMoney } from '@/shared/lib/format'
 import {
@@ -38,6 +39,9 @@ const emptyForm = {
 
 export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmployee }: Props) {
   const toast = useToast()
+  const { user, can } = useAuth()
+  const canManagePetty = can('petty_cash.manage')
+  const ownEmployeeId = user?.employee_id ?? null
   const [vehicles, setVehicles] = useState<VehicleOption[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
@@ -62,13 +66,16 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
 
   useEffect(() => {
     if (!open) return
+    const defaultEmployeeId = canManagePetty
+      ? (lockCustody && custodyEmployee?.id ? String(custodyEmployee.id) : '')
+      : (ownEmployeeId ? String(ownEmployeeId) : '')
     setForm({
       ...emptyForm,
       opened_at: nowLocalDateTimeValue(),
       vehicle_id: lockedId ? String(lockedId) : '',
       odometer: lockedOdometer != null ? String(lockedOdometer) : '',
       funding: lockCustody ? 'custody' : 'stock',
-      employee_id: lockCustody && custodyEmployee?.id ? String(custodyEmployee.id) : '',
+      employee_id: defaultEmployeeId,
     })
     setFieldErrors({})
     setPutsInMaintenance(true)
@@ -79,13 +86,21 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           setItems([])
           toast.error((e as ApiError).message || 'تعذّر تحميل أصناف المخزون.')
         }),
-      api<{ data: EmployeeOption[] }>('/employees/lookup').then((r) => setEmployees(r.data || [])).catch(() => setEmployees([])),
     ]
+    if (canManagePetty) {
+      requests.push(
+        api<{ data: EmployeeOption[] }>('/employees/lookup')
+          .then((r) => setEmployees(r.data || []))
+          .catch(() => setEmployees([])),
+      )
+    } else {
+      setEmployees([])
+    }
     if (!lockedId) {
       requests.push(api<{ data: VehicleOption[] }>('/vehicles?per_page=100').then((r) => setVehicles(r.data)))
     }
     Promise.all(requests).catch((e) => toast.error((e as ApiError).message))
-  }, [open, lockedId, lockedOdometer, lockCustody, custodyEmployee?.id, toast])
+  }, [open, lockedId, lockedOdometer, lockCustody, custodyEmployee?.id, toast, canManagePetty, ownEmployeeId])
 
   function validate(): boolean {
     const next: Record<string, string> = {}
@@ -96,7 +111,11 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
       if (!form.inventory_item_id) next.inventory_item_id = 'اختر صنف المخزون.'
       else if (!selectedItem) next.inventory_item_id = 'الصنف غير متاح أو نفد رصيده.'
     } else {
-      if (!form.employee_id) next.employee_id = 'اختر موظف العهدة.'
+      if (!canManagePetty && !ownEmployeeId) {
+        next.employee_id = 'حسابك غير مرتبط بموظف — إدارة العهدة فقط تخصم عهدة الغير.'
+      } else if (!form.employee_id) {
+        next.employee_id = canManagePetty ? 'اختر موظف العهدة.' : 'تعذّر تحديد عهدتك.'
+      }
       if (!form.unit_price || Number(form.unit_price) < 0) next.unit_price = 'أدخل سعر الشراء.'
     }
     if (!form.quantity || Number(form.quantity) < 1) next.quantity = 'الكمية يجب أن تكون ١ فأكثر.'
@@ -145,7 +164,9 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
               quantity: Number(form.quantity || 1),
               unit_price: fromStock ? undefined : Number(form.unit_price || 0),
               from_petty_cash: !fromStock,
-              petty_cash_employee_id: !fromStock && form.employee_id ? Number(form.employee_id) : undefined,
+              petty_cash_employee_id: !fromStock
+                ? Number(canManagePetty ? form.employee_id : ownEmployeeId)
+                : undefined,
               petty_cash_amount: !fromStock
                 ? Number(form.unit_price || 0) * Number(form.quantity || 1)
                 : undefined,
@@ -224,7 +245,22 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           required
           value={form.funding}
           onChange={(e) => {
-            setForm({ ...form, funding: e.target.value as 'stock' | 'custody', inventory_item_id: '', employee_id: '', unit_price: '0' })
+            const funding = e.target.value as 'stock' | 'custody'
+            if (funding === 'custody' && !canManagePetty && !ownEmployeeId) {
+              toast.error('حسابك غير مرتبط بموظف — إدارة العهدة فقط تخصم عهدة الغير.')
+              return
+            }
+            setForm({
+              ...form,
+              funding,
+              inventory_item_id: '',
+              employee_id: funding === 'custody'
+                ? (canManagePetty
+                  ? (custodyEmployee?.id ? String(custodyEmployee.id) : '')
+                  : String(ownEmployeeId))
+                : '',
+              unit_price: '0',
+            })
             setFieldErrors((prev) => ({ ...prev, inventory_item_id: '', employee_id: '', unit_price: '' }))
           }}
           options={[
@@ -257,20 +293,32 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           />
         ) : (
           <>
-            <SelectField
-              label="موظف العهدة"
-              required
-              error={fieldErrors.employee_id}
-              options={[
-                { value: '', label: 'اختر…' },
-                ...employees.map((e) => ({ value: String(e.id), label: e.name })),
-              ]}
-              value={form.employee_id}
-              onChange={(e) => {
-                setForm({ ...form, employee_id: e.target.value })
-                setFieldErrors((prev) => ({ ...prev, employee_id: '' }))
-              }}
-            />
+            {canManagePetty ? (
+              <SelectField
+                label="موظف العهدة"
+                required
+                error={fieldErrors.employee_id}
+                hint="الإدارة فقط تختار عهدة موظف آخر"
+                options={[
+                  { value: '', label: 'اختر…' },
+                  ...employees.map((e) => ({ value: String(e.id), label: e.name })),
+                ]}
+                value={form.employee_id}
+                onChange={(e) => {
+                  setForm({ ...form, employee_id: e.target.value })
+                  setFieldErrors((prev) => ({ ...prev, employee_id: '' }))
+                }}
+              />
+            ) : (
+              <TextField
+                label="موظف العهدة"
+                value={custodyEmployee?.name || user?.name || `موظف #${ownEmployeeId}`}
+                disabled
+                onChange={() => undefined}
+                hint="يُخصم من عهدتك فقط — لا يمكن اختيار موظف آخر"
+                error={fieldErrors.employee_id}
+              />
+            )}
             <MoneyField
               label="سعر شراء الوحدة"
               required

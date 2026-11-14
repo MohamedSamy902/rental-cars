@@ -193,6 +193,7 @@ class AuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'phone' => $user->phone,
+            'employee_id' => $user->employee_id ? (int) $user->employee_id : null,
             'role' => $user->role?->label,
             'role_name' => $roleName,
             'permissions' => $permissions,

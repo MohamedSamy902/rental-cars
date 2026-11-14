@@ -7,6 +7,7 @@ use App\Models\InventoryItem;
 use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
 use App\Services\Accounting\AccountingService;
+use App\Support\PettyCashSpendGuard;
 use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +69,9 @@ class InventoryService
             $employeeId = isset($data['petty_cash_employee_id']) ? (int) $data['petty_cash_employee_id'] : 0;
             if ($fromPetty && $employeeId < 1) {
                 throw new DomainException('شراء المخزون من العهدة يتطلب تحديد الموظف صاحب العهدة.');
+            }
+            if ($fromPetty) {
+                PettyCashSpendGuard::assertMayChargeByUserId($userId, $employeeId);
             }
 
             $batch = InventoryBatch::query()->create([

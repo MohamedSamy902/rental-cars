@@ -13,6 +13,7 @@ use App\Models\WorkOrderLine;
 use App\Services\Accounting\AccountingService;
 use App\Services\Fleet\VehicleAvailabilityService;
 use App\Services\Inventory\FifoConsumptionService;
+use App\Support\PettyCashSpendGuard;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -246,6 +247,7 @@ class WorkOrderService
         if ($amount <= 0) {
             throw new DomainException('مبلغ العهدة غير صالح.');
         }
+        PettyCashSpendGuard::assertMayChargeByUserId($userId, (int) $employeeId);
 
         $account = PettyCashAccount::query()
             ->where('employee_id', $employeeId)
