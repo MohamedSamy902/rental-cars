@@ -10,13 +10,17 @@ use App\Models\PettyCashAccount;
 use App\Models\PettyCashMovement;
 use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
+use App\Services\Accounting\PaymentMethodNormalizer;
 use App\Support\CivilDate;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class ExpenseService
 {
-    public function __construct(private readonly AccountingService $accounting) {}
+    public function __construct(
+        private readonly AccountingService $accounting,
+        private readonly PaymentMethodNormalizer $methods,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -229,7 +233,8 @@ class ExpenseService
             return;
         }
 
-        $cash = Account::query()->where('code', '1000')->firstOrFail();
+        $cashCode = $this->methods->cashAccountCode((string) ($expense->payment_method ?? 'cash'));
+        $cash = Account::query()->where('code', $cashCode)->firstOrFail();
         $entry = JournalEntry::query()->create([
             'entry_date' => $spentOn,
             'narration' => 'مصروف: '.$expense->title,

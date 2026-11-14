@@ -90,14 +90,17 @@ class InventoryController extends Controller
             'supplier' => ['nullable', 'string'],
             'payment_method' => ['nullable', 'string'],
             'from_petty_cash' => ['nullable', 'boolean'],
+            'petty_cash_employee_id' => ['nullable', 'integer', 'exists:employees,id', 'required_if:from_petty_cash,true,1'],
             'reference' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
         ], [
             'unit_cost.min' => 'سعر الوحدة مطلوب ويجب أن يكون أكبر من صفر.',
+            'petty_cash_employee_id.required_if' => 'شراء المخزون من العهدة يتطلب تحديد الموظف.',
         ], [
             'inventory_item_id' => 'الصنف',
             'quantity' => 'الكمية',
             'unit_cost' => 'سعر الوحدة',
+            'petty_cash_employee_id' => 'موظف العهدة',
         ]);
 
         $batch = $this->inventory->receiveBatch($data, $request->user()?->id);

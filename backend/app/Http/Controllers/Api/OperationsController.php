@@ -484,7 +484,7 @@ class OperationsController extends Controller
                 ]);
 
                 if ($topup > 0) {
-                    PettyCashMovement::query()->create([
+                    $movement = PettyCashMovement::query()->create([
                         'petty_cash_account_id' => $existing->id,
                         'type' => 'topup',
                         'amount' => $topup,
@@ -492,6 +492,13 @@ class OperationsController extends Controller
                         'performed_by' => $request->user()?->id,
                         'notes' => 'تغذية عهدة',
                     ]);
+                    app(AccountingService::class)->postCustodyMovement(
+                        'petty_topup:'.$movement->id,
+                        'in',
+                        $topup,
+                        $movement->moved_on->toDateString(),
+                        $request->user()?->id,
+                    );
                 }
 
                 return $existing->fresh('employee');
@@ -505,7 +512,7 @@ class OperationsController extends Controller
             ]);
 
             if ($topup > 0) {
-                PettyCashMovement::query()->create([
+                $movement = PettyCashMovement::query()->create([
                     'petty_cash_account_id' => $created->id,
                     'type' => 'topup',
                     'amount' => $topup,
@@ -513,6 +520,13 @@ class OperationsController extends Controller
                     'performed_by' => $request->user()?->id,
                     'notes' => 'تغذية عهدة',
                 ]);
+                app(AccountingService::class)->postCustodyMovement(
+                    'petty_topup:'.$movement->id,
+                    'in',
+                    $topup,
+                    $movement->moved_on->toDateString(),
+                    $request->user()?->id,
+                );
             }
 
             return $created->load('employee');
@@ -531,48 +545,57 @@ class OperationsController extends Controller
 
         $row = DB::transaction(function () use ($account, $data, $request) {
             $amount = (int) $data['amount'];
-            $balance = (int) $account->balance;
-            if ($data['type'] === 'topup') {
-                $limit = (int) $account->limit_amount;
-                if ($limit > 0 && $balance + $amount > $limit) {
-                    abort(422, 'التغذية تتجاوز حد العهدة ('.$limit.')');
-                }
-                $balance += $amount;
-            } elseif ($data['type'] === 'spend' || $data['type'] === 'return') {
-                if ($amount > $balance) {
-                    abort(422, 'رصيد العهدة غير كافٍ.');
-                }
-                $balance -= $amount;
-            } else {
-                $balance = $amount;
+            $priorBalance = (int) $account->balance;
+            $type = (string) $data['type'];
+            $accounting = app(AccountingService::class);
+
+            // صرف العهدة يمر عبر مصروف/صيانة فقط حتى لا تتحرك العهدة بلا قيد.
+            if ($type === 'spend') {
+                abort(422, 'صرف العهدة يتم عبر تسجيل مصروف أو أمر صيانة من العهدة — وليس من حركة مباشرة.');
             }
 
-            $account->update(['balance' => $balance]);
+            $newBalance = $priorBalance;
+            if ($type === 'topup') {
+                $limit = (int) $account->limit_amount;
+                if ($limit > 0 && $priorBalance + $amount > $limit) {
+                    abort(422, 'التغذية تتجاوز حد العهدة ('.$limit.')');
+                }
+                $newBalance = $priorBalance + $amount;
+            } elseif ($type === 'return') {
+                if ($amount > $priorBalance) {
+                    abort(422, 'رصيد العهدة غير كافٍ.');
+                }
+                $newBalance = $priorBalance - $amount;
+            } else {
+                // adjust: amount is the absolute target balance.
+                $newBalance = $amount;
+            }
+
+            $account->update(['balance' => $newBalance]);
 
             $movement = PettyCashMovement::query()->create([
                 'petty_cash_account_id' => $account->id,
-                'type' => $data['type'],
+                'type' => $type,
                 'amount' => $amount,
                 'moved_on' => now()->toDateString(),
                 'performed_by' => $request->user()?->id,
                 'notes' => $data['notes'] ?? null,
             ]);
-            if ($data['type'] === 'topup') {
-                app(AccountingService::class)->postCustodyMovement(
-                    'petty_topup:'.$movement->id,
-                    'in',
-                    $amount,
-                    $movement->moved_on->toDateString(),
-                    $request->user()?->id,
-                );
-            } elseif ($data['type'] === 'return') {
-                app(AccountingService::class)->postCustodyMovement(
-                    'petty_return:'.$movement->id,
-                    'out',
-                    $amount,
-                    $movement->moved_on->toDateString(),
-                    $request->user()?->id,
-                );
+
+            $movedOn = $movement->moved_on->toDateString();
+            $userId = $request->user()?->id;
+
+            if ($type === 'topup') {
+                $accounting->postCustodyMovement('petty_topup:'.$movement->id, 'in', $amount, $movedOn, $userId);
+            } elseif ($type === 'return') {
+                $accounting->postCustodyMovement('petty_return:'.$movement->id, 'out', $amount, $movedOn, $userId);
+            } elseif ($type === 'adjust') {
+                $delta = $newBalance - $priorBalance;
+                if ($delta > 0) {
+                    $accounting->postCustodyMovement('petty_adjust_in:'.$movement->id, 'in', $delta, $movedOn, $userId);
+                } elseif ($delta < 0) {
+                    $accounting->postCustodyMovement('petty_adjust_out:'.$movement->id, 'out', abs($delta), $movedOn, $userId);
+                }
             }
 
             return $movement;

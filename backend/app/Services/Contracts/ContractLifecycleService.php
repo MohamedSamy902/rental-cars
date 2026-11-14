@@ -783,7 +783,7 @@ class ContractLifecycleService
             $contract = $locked;
 
             $deposit = $contract->deposit;
-            if ($deposit && $deposit->status === 'received') {
+            if ($deposit && in_array($deposit->status, ['received', 'partial'], true)) {
                 $this->returnDeposit($deposit, 'cash', 'CXL-'.$contract->number, $userId);
             }
 
@@ -1123,6 +1123,16 @@ class ContractLifecycleService
      */
     private function writeDepositDeduction(Deposit $deposit, array $data, int $amount, int $userId): Deposit
     {
+        $contract = Contract::query()->find($deposit->contract_id);
+        if ($contract) {
+            $remaining = $this->ledgerMath->remainingCollectible($contract);
+            if ($amount > $remaining) {
+                throw new DomainException(
+                    sprintf('خصم التأمين يتجاوز المتبقي على العقد (%d ج.م).', $remaining)
+                );
+            }
+        }
+
         $deduction = DepositDeduction::query()->create([
             'deposit_id' => $deposit->id,
             'reason' => $data['reason'],
@@ -1135,7 +1145,6 @@ class ContractLifecycleService
         $deposit->status = $deposit->remaining() === 0 ? 'settled' : 'partial';
         $deposit->save();
 
-        $contract = Contract::query()->find($deposit->contract_id);
         if ($contract) {
             Payment::query()->create([
                 'amount' => $amount,
