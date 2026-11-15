@@ -45,7 +45,7 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     }
     .rpm-preview-root{
       transform: scale(var(--rpm-preview-scale, 1));
-      transform-origin: top center;
+      transform-origin: top right;
       width: 100%;
       box-sizing: border-box;
     }
