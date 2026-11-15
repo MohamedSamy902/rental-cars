@@ -6,7 +6,7 @@ export function shellOwnerAgreementHtml(body: string, title = 'عقد إدارة
   * { box-sizing: border-box; }
   body{font-family:Tahoma,'Segoe UI',Arial,sans-serif;padding:0;margin:0;color:#0f172a;font-size:13px;line-height:1.75}
   @media screen{
-    html,body{overflow:hidden;-webkit-overflow-scrolling:touch}
+    html,body{overflow:visible;-webkit-overflow-scrolling:touch}
     .rpm-preview-root{transform:scale(var(--rpm-preview-scale,1));transform-origin:top center;width:100%}
   }
   @media print{

@@ -32,11 +32,11 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     overflow: visible;
     box-sizing: border-box;
   }
-  /* Mobile / in-app iframe preview: fit paper to viewport without clipping RTL boxes */
+  /* Mobile / in-app iframe preview: host scales via transform; keep overflow visible for full height measure */
   @media screen{
     html, body{
       margin: 0;
-      overflow: hidden;
+      overflow: visible;
       -webkit-overflow-scrolling: touch;
     }
     body{
@@ -44,7 +44,7 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
       background: #fff;
     }
     .rpm-preview-root{
-      transform: scale(var(--rpm-preview-scale));
+      transform: scale(var(--rpm-preview-scale, 1));
       transform-origin: top center;
       width: 100%;
       box-sizing: border-box;

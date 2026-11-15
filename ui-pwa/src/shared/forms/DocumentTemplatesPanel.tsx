@@ -5,10 +5,8 @@ import { Button, Sheet, TextField, useToast } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
 import { shellRentalContractHtml } from '@/shared/contracts/rentalContractPrint'
+import { fitPrintPreviewIframe } from '@/shared/contracts/fitPrintPreview'
 import './DocumentTemplatesPanel.css'
-
-/** Logical A4 content width used by rental shells (mm → CSS px at 96dpi). */
-const PAPER_WIDTH_PX = 756
 
 type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement' | 'custody_agreement'
 
@@ -118,62 +116,8 @@ function TemplatePreviewSheet({
 
   const fitPreviewToFrame = useCallback(() => {
     const iframe = iframeRef.current
-    const doc = iframe?.contentDocument
-    if (!iframe || !doc?.documentElement) return
-
-    const root = (doc.querySelector('.rpm-preview-root') as HTMLElement | null) || doc.body
-    const paper = (doc.querySelector('.rpm-paper-v3, .rpm-paper-v2, .rpm-invoice-v1, .rpm-legal-contract') as HTMLElement | null)
-      || root
-
-    root.style.transform = ''
-    root.style.width = ''
-    root.style.marginInline = ''
-    doc.body.style.removeProperty('--rpm-preview-scale')
-    doc.body.style.removeProperty('zoom')
-    doc.body.style.height = 'auto'
-    doc.body.style.width = 'auto'
-    doc.body.style.overflow = 'visible'
-    doc.documentElement.style.overflow = 'visible'
-
-    const frameWidth = Math.max(iframe.clientWidth - 2, 1)
-    const naturalWidth = Math.ceil(Math.max(
-      paper.scrollWidth,
-      paper.offsetWidth,
-      root.scrollWidth,
-      PAPER_WIDTH_PX,
-    ))
-    const naturalHeight = Math.ceil(Math.max(
-      root.scrollHeight,
-      paper.scrollHeight,
-      doc.body.scrollHeight,
-      320,
-    ))
-    const scale = Math.min(1, frameWidth / naturalWidth)
-
-    const supportsZoom = typeof (doc.body.style as CSSStyleDeclaration & { zoom?: string }).zoom === 'string'
-      || 'zoom' in doc.body.style
-
-    if (supportsZoom) {
-      ;(doc.body.style as CSSStyleDeclaration & { zoom?: string }).zoom = String(scale)
-      doc.body.style.height = `${naturalHeight}px`
-      doc.body.style.width = '100%'
-      doc.body.style.overflow = 'hidden'
-      doc.documentElement.style.overflow = 'hidden'
-      setIframeHeight(`${Math.ceil(naturalHeight * scale) + 12}px`)
-      return
-    }
-
-    doc.body.style.setProperty('--rpm-preview-scale', String(scale))
-    root.style.width = `${naturalWidth}px`
-    root.style.marginInline = 'auto'
-    root.style.transformOrigin = 'top center'
-    root.style.transform = `scale(${scale})`
-    const scaledHeight = Math.ceil(naturalHeight * scale) + 12
-    doc.body.style.width = `${Math.ceil(naturalWidth * scale)}px`
-    doc.body.style.height = `${scaledHeight}px`
-    doc.body.style.overflow = 'hidden'
-    doc.documentElement.style.overflow = 'hidden'
-    setIframeHeight(`${scaledHeight}px`)
+    if (!iframe) return
+    fitPrintPreviewIframe(iframe, setIframeHeight)
   }, [])
 
   useEffect(() => {
@@ -184,17 +128,26 @@ function TemplatePreviewSheet({
     const iframe = iframeRef.current
     if (!iframe) return
 
+    let cancelled = false
+    const runFit = () => {
+      if (!cancelled) fitPreviewToFrame()
+    }
     const onLoad = () => {
-      fitPreviewToFrame()
-      window.setTimeout(fitPreviewToFrame, 120)
-      window.setTimeout(fitPreviewToFrame, 450)
+      runFit()
+      window.setTimeout(runFit, 80)
+      window.setTimeout(runFit, 250)
+      window.setTimeout(runFit, 700)
     }
     iframe.addEventListener('load', onLoad)
+    // srcDoc may already be complete when the effect runs.
+    if (iframe.contentDocument?.readyState === 'complete') onLoad()
+
     const ro = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => fitPreviewToFrame())
+      ? new ResizeObserver(() => runFit())
       : null
     ro?.observe(iframe)
     return () => {
+      cancelled = true
       iframe.removeEventListener('load', onLoad)
       ro?.disconnect()
     }
