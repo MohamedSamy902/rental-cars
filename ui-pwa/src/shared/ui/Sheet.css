@@ -195,9 +195,9 @@
   scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
 }
 
-/* Print preview: keep the scaled A4 iframe fully visible (no parent clip). */
+/* Print preview: scale fits the frame — never enable page/sheet horizontal scroll. */
 .rpm-sheet__body:has(.rpm-print-preview) {
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .rpm-print-preview {
@@ -209,11 +209,14 @@
   max-inline-size: 100%;
   width: 100%;
   box-sizing: border-box;
+  min-width: 0;
   -webkit-overflow-scrolling: touch;
 }
 
 .rpm-print-preview iframe {
   max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .rpm-sheet__body > *,

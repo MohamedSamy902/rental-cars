@@ -54,6 +54,8 @@ function pinSheetScroll(sheet: HTMLElement | null | undefined) {
   if (!sheet) return
   if (sheet.scrollTop !== 0) sheet.scrollTop = 0
   if (sheet.scrollLeft !== 0) sheet.scrollLeft = 0
+  const body = sheet.querySelector('.rpm-sheet__body') as HTMLElement | null
+  if (body && body.scrollLeft !== 0) body.scrollLeft = 0
 }
 
 export function Sheet(props: Props) {

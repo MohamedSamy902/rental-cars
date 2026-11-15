@@ -18,9 +18,9 @@ const PRINT_FRAME_HEIGHT_PX = 1123
 function applyHiddenFrameStyles(frame: HTMLIFrameElement) {
   frame.setAttribute('aria-hidden', 'true')
   frame.setAttribute('title', 'print-frame')
-  // Off-screen but real size so the browser lays out the page for print.
+  // Real A4 box for layout/paint, clipped in-place so it never widens the page.
   frame.style.position = 'fixed'
-  frame.style.insetInlineStart = '-10000px'
+  frame.style.insetInlineStart = '0'
   frame.style.top = '0'
   frame.style.width = `${PRINT_FRAME_WIDTH_PX}px`
   frame.style.height = `${PRINT_FRAME_HEIGHT_PX}px`
@@ -29,6 +29,8 @@ function applyHiddenFrameStyles(frame: HTMLIFrameElement) {
   frame.style.pointerEvents = 'none'
   frame.style.visibility = 'hidden'
   frame.style.zIndex = '-1'
+  frame.style.clipPath = 'inset(50%)'
+  frame.style.overflow = 'hidden'
 }
 
 function cleanupFrame(frame: HTMLIFrameElement) {
