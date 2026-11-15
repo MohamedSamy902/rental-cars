@@ -4,24 +4,31 @@
  * Avoids Brave/Chrome `window.open(..., 'noopener')` / async-boundary
  * failures that orphan an `about:blank` tab and falsely report
  * "اسمح بالنوافذ المنبثقة للطباعة".
+ *
+ * The iframe must keep a real A4 layout box (not 0×0). Zero-size frames
+ * often print blank pages in Chromium while still opening the print dialog.
  */
 
-const SETTLE_MS = 150
+const SETTLE_MS = 180
 const FALLBACK_CLEANUP_MS = 60_000
+/** CSS px ≈ A4 @ 96dpi — enough for layout/paint before print. */
+const PRINT_FRAME_WIDTH_PX = 794
+const PRINT_FRAME_HEIGHT_PX = 1123
 
 function applyHiddenFrameStyles(frame: HTMLIFrameElement) {
   frame.setAttribute('aria-hidden', 'true')
   frame.setAttribute('title', 'print-frame')
-  // Logical + physical zero box so it never paints or shifts layout.
+  // Off-screen but real size so the browser lays out the page for print.
   frame.style.position = 'fixed'
-  frame.style.right = '0'
-  frame.style.bottom = '0'
-  frame.style.width = '0'
-  frame.style.height = '0'
+  frame.style.insetInlineStart = '-10000px'
+  frame.style.top = '0'
+  frame.style.width = `${PRINT_FRAME_WIDTH_PX}px`
+  frame.style.height = `${PRINT_FRAME_HEIGHT_PX}px`
   frame.style.border = '0'
   frame.style.opacity = '0'
   frame.style.pointerEvents = 'none'
   frame.style.visibility = 'hidden'
+  frame.style.zIndex = '-1'
 }
 
 function cleanupFrame(frame: HTMLIFrameElement) {

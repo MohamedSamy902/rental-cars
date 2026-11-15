@@ -1,9 +1,18 @@
 /** Shared print shell for owner–center vehicle operation agreements. */
 export function shellOwnerAgreementHtml(body: string, title = 'عقد إدارة وتشغيل مركبة'): string {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${title}</title>
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>
 <style>
   @page { size: A4; margin: 14mm 12mm; }
+  * { box-sizing: border-box; }
   body{font-family:Tahoma,'Segoe UI',Arial,sans-serif;padding:0;margin:0;color:#0f172a;font-size:13px;line-height:1.75}
+  @media screen{
+    html,body{overflow:hidden;-webkit-overflow-scrolling:touch}
+    .rpm-preview-root{transform:scale(var(--rpm-preview-scale,1));transform-origin:top center;width:100%}
+  }
+  @media print{
+    html,body{overflow:visible!important}
+    .rpm-preview-root{transform:none!important;width:100%!important}
+  }
   h1{margin:0 0 4px;font-size:20px} h2{margin:18px 0 8px;font-size:15px} h3{margin:14px 0 6px;font-size:14px}
   .muted{color:#64748b;font-size:12px}
   table{width:100%;border-collapse:collapse;margin-top:10px}
@@ -30,5 +39,5 @@ export function shellOwnerAgreementHtml(body: string, title = 'عقد إدارة
     body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .page-break{break-before:page;page-break-before:always}
   }
-</style></head><body>${body}</body></html>`
+</style></head><body><div class="rpm-preview-root">${body}</div></body></html>`
 }

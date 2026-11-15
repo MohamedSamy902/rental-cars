@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { api, apiUpload, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
-import { Button, TextField, useToast } from '@/shared/ui'
+import { Button, Sheet, TextField, useToast } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
 import { shellRentalContractHtml } from '@/shared/contracts/rentalContractPrint'
 import './DocumentTemplatesPanel.css'
+
+/** Logical A4 content width used by rental shells (mm → CSS px at 96dpi). */
+const PAPER_WIDTH_PX = 756
 
 type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement' | 'custody_agreement'
 
@@ -68,10 +71,186 @@ function shellPreview(type: TemplateType, title: string, body: string) {
   if (type === 'contract') {
     return shellRentalContractHtml(body, title)
   }
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${title}</title>
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>
 <style>
-  body{font-family:'Cairo','IBM Plex Sans Arabic',Tahoma,sans-serif;padding:24px;color:#0f172a}
-</style></head><body>${body}</body></html>`
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body{font-family:'Cairo','IBM Plex Sans Arabic',Tahoma,sans-serif;margin:0;padding:16px;color:#0f172a;background:#fff}
+  @media screen{
+    html,body{overflow:hidden}
+    .rpm-preview-root{transform:scale(var(--rpm-preview-scale,1));transform-origin:top center;width:100%}
+  }
+  @media print{
+    html,body{overflow:visible!important}
+    .rpm-preview-root{transform:none!important;width:100%!important}
+  }
+</style></head><body><div class="rpm-preview-root">${body}</div></body></html>`
+}
+
+function fillSamplePlaceholders(content: string, placeholders: Placeholder[]): string {
+  const sampleMap: Record<string, string> = {}
+  for (const p of placeholders) {
+    sampleMap[p.key] = p.sample
+    for (const a of p.aliases) sampleMap[a] = p.sample
+  }
+  return content.replace(/\{\{\s*([a-zA-Z0-9_\u0600-\u06FF]+)\s*\}\}/g, (_, key: string) => {
+    const v = sampleMap[key]
+    return v != null
+      ? String(v).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch))
+      : `{{${key}}}`
+  })
+}
+
+function TemplatePreviewSheet({
+  open,
+  title,
+  html,
+  onClose,
+}: {
+  open: boolean
+  title: string
+  html: string
+  onClose: () => void
+}) {
+  const [iframeHeight, setIframeHeight] = useState('70vh')
+  const [printing, setPrinting] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+
+  const fitPreviewToFrame = useCallback(() => {
+    const iframe = iframeRef.current
+    const doc = iframe?.contentDocument
+    if (!iframe || !doc?.documentElement) return
+
+    const root = (doc.querySelector('.rpm-preview-root') as HTMLElement | null) || doc.body
+    const paper = (doc.querySelector('.rpm-paper-v3, .rpm-paper-v2, .rpm-invoice-v1, .rpm-legal-contract') as HTMLElement | null)
+      || root
+
+    root.style.transform = ''
+    root.style.width = ''
+    root.style.marginInline = ''
+    doc.body.style.removeProperty('--rpm-preview-scale')
+    doc.body.style.removeProperty('zoom')
+    doc.body.style.height = 'auto'
+    doc.body.style.width = 'auto'
+    doc.body.style.overflow = 'visible'
+    doc.documentElement.style.overflow = 'visible'
+
+    const frameWidth = Math.max(iframe.clientWidth - 2, 1)
+    const naturalWidth = Math.ceil(Math.max(
+      paper.scrollWidth,
+      paper.offsetWidth,
+      root.scrollWidth,
+      PAPER_WIDTH_PX,
+    ))
+    const naturalHeight = Math.ceil(Math.max(
+      root.scrollHeight,
+      paper.scrollHeight,
+      doc.body.scrollHeight,
+      320,
+    ))
+    const scale = Math.min(1, frameWidth / naturalWidth)
+
+    const supportsZoom = typeof (doc.body.style as CSSStyleDeclaration & { zoom?: string }).zoom === 'string'
+      || 'zoom' in doc.body.style
+
+    if (supportsZoom) {
+      ;(doc.body.style as CSSStyleDeclaration & { zoom?: string }).zoom = String(scale)
+      doc.body.style.height = `${naturalHeight}px`
+      doc.body.style.width = '100%'
+      doc.body.style.overflow = 'hidden'
+      doc.documentElement.style.overflow = 'hidden'
+      setIframeHeight(`${Math.ceil(naturalHeight * scale) + 12}px`)
+      return
+    }
+
+    doc.body.style.setProperty('--rpm-preview-scale', String(scale))
+    root.style.width = `${naturalWidth}px`
+    root.style.marginInline = 'auto'
+    root.style.transformOrigin = 'top center'
+    root.style.transform = `scale(${scale})`
+    const scaledHeight = Math.ceil(naturalHeight * scale) + 12
+    doc.body.style.width = `${Math.ceil(naturalWidth * scale)}px`
+    doc.body.style.height = `${scaledHeight}px`
+    doc.body.style.overflow = 'hidden'
+    doc.documentElement.style.overflow = 'hidden'
+    setIframeHeight(`${scaledHeight}px`)
+  }, [])
+
+  useEffect(() => {
+    if (!open || !html) {
+      setIframeHeight('70vh')
+      return
+    }
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const onLoad = () => {
+      fitPreviewToFrame()
+      window.setTimeout(fitPreviewToFrame, 120)
+      window.setTimeout(fitPreviewToFrame, 450)
+    }
+    iframe.addEventListener('load', onLoad)
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => fitPreviewToFrame())
+      : null
+    ro?.observe(iframe)
+    return () => {
+      iframe.removeEventListener('load', onLoad)
+      ro?.disconnect()
+    }
+  }, [open, html, fitPreviewToFrame])
+
+  function handlePrint() {
+    if (!html) return
+    setPrinting(true)
+    try {
+      printHtmlDocument(html)
+    } finally {
+      window.setTimeout(() => setPrinting(false), 400)
+    }
+  }
+
+  return (
+    <Sheet
+      open={open}
+      title={`معاينة ${title}`}
+      onClose={onClose}
+      closeLabel="إغلاق"
+      footer={(
+        <div className="rpm-actions-row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+          <Button type="button" variant="secondary" onClick={onClose}>إغلاق</Button>
+          <Button type="button" loading={printing} disabled={!html} onClick={handlePrint}>
+            طباعة
+          </Button>
+        </div>
+      )}
+    >
+      {!html ? (
+        <p className="muted">لا يوجد محتوى للمعاينة.</p>
+      ) : (
+        <div className="rpm-stack" style={{ gap: '0.85rem' }}>
+          <p className="muted" style={{ margin: 0 }}>
+            معاينة بالبيانات التجريبية. احفظ القالب قبل طباعة عقود حقيقية.
+          </p>
+          <div className="rpm-print-preview">
+            <iframe
+              ref={iframeRef}
+              title="معاينة القالب"
+              srcDoc={html}
+              style={{
+                width: '100%',
+                height: iframeHeight,
+                minHeight: 280,
+                border: 0,
+                background: '#fff',
+                display: 'block',
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </Sheet>
+  )
 }
 
 function assetLabel(node: HTMLElement): string {
@@ -235,6 +414,7 @@ export function DocumentTemplatesPanel() {
   const [files, setFiles] = useState<Partial<Record<TemplateType, File | null>>>({})
   const [saving, setSaving] = useState<TemplateType | null>(null)
   const [previewing, setPreviewing] = useState<TemplateType | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<{ title: string; html: string } | null>(null)
   const [expanded, setExpanded] = useState<Partial<Record<TemplateType, boolean>>>({ contract: true })
   const [codeMode, setCodeMode] = useState<Partial<Record<TemplateType, boolean>>>({})
   const [editorSeed, setEditorSeed] = useState<Record<TemplateType, number>>({
@@ -356,17 +536,16 @@ export function DocumentTemplatesPanel() {
   async function preview(type: TemplateType) {
     setPreviewing(type)
     try {
-      const content = codeMode[type] ? drafts[type].content : readVisualContent(type)
-      const sampleMap: Record<string, string> = {}
-      for (const p of placeholders) {
-        sampleMap[p.key] = p.sample
-        for (const a of p.aliases) sampleMap[a] = p.sample
+      // Prefer live editor content; fall back to draft (works even when accordion collapsed).
+      const content = (codeMode[type] ? drafts[type].content : readVisualContent(type)).trim()
+      if (!content) {
+        toast.error('لا يوجد محتوى للمعاينة. افتح القالب أو احفظه أولاً.')
+        return
       }
-      const rendered = content.replace(/\{\{\s*([a-zA-Z0-9_\u0600-\u06FF]+)\s*\}\}/g, (_, key: string) => {
-        const v = sampleMap[key]
-        return v != null ? String(v).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch)) : `{{${key}}}`
-      })
-      printHtmlDocument(shellPreview(type, TYPE_META[type].title, rendered))
+      const rendered = fillSamplePlaceholders(content, placeholders)
+      const title = drafts[type].title || TYPE_META[type].title
+      setPreviewDoc({ title, html: shellPreview(type, title, rendered) })
+      // Server audit/ack — ignore failures (preview is client-side with sample data).
       await api('/document-templates/preview', { method: 'POST', json: { type } }).catch(() => undefined)
     } catch (e) {
       toast.error((e as ApiError).message || 'تعذّر معاينة القالب.')
@@ -445,8 +624,14 @@ export function DocumentTemplatesPanel() {
 
   return (
     <div className="rpm-stack" style={{ gap: '1rem' }}>
+      <TemplatePreviewSheet
+        open={Boolean(previewDoc)}
+        title={previewDoc?.title || ''}
+        html={previewDoc?.html || ''}
+        onClose={() => setPreviewDoc(null)}
+      />
       <p className="rpm-template-intro">
-        محرّر نص خفيف للبنود والجمل — الرسوم والترويسة والختم تظهر كشارات محمية ولا تتكسر أثناء التعديل. استخدم «معاينة طباعة» لرؤية الشكل النهائي قبل الحفظ.
+        محرّر نص خفيف للبنود والجمل — الرسوم والترويسة والختم تظهر كشارات محمية ولا تتكسر أثناء التعديل. استخدم «معاينة» لرؤية الشكل النهائي قبل الحفظ.
       </p>
 
       {(['contract', 'handover_receipt', 'owner_agreement', 'custody_agreement'] as TemplateType[]).map((type) => {
@@ -487,7 +672,7 @@ export function DocumentTemplatesPanel() {
               </button>
               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <Button size="sm" variant="secondary" loading={previewing === type} onClick={() => void preview(type)}>
-                  معاينة طباعة
+                  معاينة
                 </Button>
                 <Button size="sm" loading={saving === type} disabled={!canEdit || !isOpen} onClick={() => void save(type)}>
                   حفظ ونشر
