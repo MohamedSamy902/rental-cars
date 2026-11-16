@@ -124,6 +124,9 @@ export const IconPrinter = (p: Props) => (
 export const IconBan = (p: Props) => (
   <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></Svg>
 )
+export const IconTrash = (p: Props) => (
+  <Svg {...p}><path d="M4 7h16M9 7V5h6v2M10 11v6M14 11v6M6 7l1 12h10l1-12" /></Svg>
+)
 export const IconCash = (p: Props) => (
   <Svg {...p}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></Svg>
 )

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
+import { useAuth } from '@/shared/auth/AuthContext'
 import {
   Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState,
   RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, IconAlert, PhoneActions,
@@ -25,6 +26,8 @@ const relationLabel: Record<string, string> = {
 
 export function ContractDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
+  const { isIntegrator } = useAuth()
   const contractId = Number(id)
   const [row, setRow] = useState<Contract | null>(null)
   const [loading, setLoading] = useState(true)
@@ -107,6 +110,11 @@ export function ContractDetailPage() {
           onApprove={() => void life.approve(row.id)}
           onAction={(kind) => void life.openAction(kind, row)}
           onPrint={(kind = 'contract') => openPrint(row.id, kind)}
+          onSoftDelete={isIntegrator ? () => {
+            void life.softDelete(row.id).then((ok) => {
+              if (ok) navigate('/bookings', { replace: true })
+            })
+          } : undefined}
         />
       </header>
       {printSheet}

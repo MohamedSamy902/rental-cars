@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class JournalLine extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'journal_entry_id', 'account_id', 'debit', 'credit', 'vehicle_id', 'customer_id',
     ];

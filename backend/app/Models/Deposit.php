@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Deposit extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'contract_id', 'original_amount', 'status', 'received_at', 'receipt_number',
         'collection_method', 'collection_ref', 'returned_at', 'return_receipt_number',

@@ -72,6 +72,46 @@ export function useContractLifecycle(onMutated?: () => void) {
     }
   }
 
+  /** سوبر أدمن فقط — حذف ناعم للعقد وكل الماليات/المخالفات/الصيانة المرتبطة. */
+  async function softDelete(id: number): Promise<boolean> {
+    const ok1 = window.confirm(
+      'حذف ناعم لهذا العقد؟ سيُخفى العقد مع المدفوعات والقيود والتأمين والمخالفات والفحوصات والصيانة المرتبطة. لا يمكن التراجع من الواجهة.',
+    )
+    if (!ok1) return false
+    const ok2 = window.confirm('تأكيد نهائي: حذف ناعم للعقد وكل ما يخصه؟')
+    if (!ok2) return false
+    try {
+      await api(`/contracts/${id}`, { method: 'DELETE' })
+      toast.success('تم الحذف الناعم للعقد وما يخصه.')
+      onMutated?.()
+      return true
+    } catch (e) {
+      toast.error((e as ApiError).message)
+      return false
+    }
+  }
+
+  async function softPurgeAll(): Promise<boolean> {
+    const ok1 = window.confirm(
+      'مسح كل العقود ناعماً مع الماليات والمخالفات، وحذف أوامر الشغل/الصيانة المتبقية؟ هذا للسوبر أدمن فقط.',
+    )
+    if (!ok1) return false
+    const typed = window.prompt('اكتب بالضبط: حذف الكل')
+    if (typed !== 'حذف الكل') {
+      toast.error('لم يُكتب التأكيد المطلوب.')
+      return false
+    }
+    try {
+      await api('/contracts/soft-purge-all', { method: 'POST', json: { confirm: 'حذف الكل' } })
+      toast.success('تم الحذف الناعم لكل العقود والصيانات.')
+      onMutated?.()
+      return true
+    } catch (e) {
+      toast.error((e as ApiError).message)
+      return false
+    }
+  }
+
   async function runAction() {
     if (!selected || !action) return
 
@@ -201,6 +241,6 @@ export function useContractLifecycle(onMutated?: () => void) {
 
   return {
     action, selected, vehicles, saving, actionForm, setActionForm,
-    openAction, closeAction, approve, runAction,
+    openAction, closeAction, approve, softDelete, softPurgeAll, runAction,
   }
 }

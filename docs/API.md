@@ -339,6 +339,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/contracts/{id}/deposit/deduct` | خصم من التأمين |
 | POST | `/contracts/{id}/deposit/return` | رد متبقي |
 | GET | `/contracts/{id}/print` | بيانات الطباعة |
+| DELETE | `/contracts/{id}` | حذف ناعم + cascade مالي/تشغيلي — **سوبر أدمن فقط** (`integrator`) |
+| POST | `/contracts/soft-purge-all` | مسح كل العقود ناعماً + أوامر الشغل المتبقية — جسم `{ "confirm": "حذف الكل" }` · سوبر أدمن فقط |
 
 ### POST /contracts
 ```json
