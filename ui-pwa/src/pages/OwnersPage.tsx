@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
+import { useQueryTab } from '@/shared/lib/useQueryTab'
+import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, DataTable, TextField, TextAreaField, SwitchField,
   StatusPill, useToast, IconEye, MediaUpload, PhoneActions, type DataColumn,
@@ -10,7 +12,9 @@ import './pages.css'
 
 type Balance = {
   accrued_total: number
+  earned_total?: number
   paid_total: number
+  overdue?: number
   remaining: number
   month: string
   month_accrued: number
@@ -37,9 +41,14 @@ const emptyForm = {
   notes: '', is_active: true,
 }
 
+const OwnersPageTabs = ['all', 'overdue'] as const
 const LIST_PER_PAGE = 50
 
 type PageMeta = { current_page: number; last_page: number; total: number }
+
+function ownerOverdue(o: Owner): number {
+  return Number(o.balance?.overdue ?? o.balance?.remaining ?? 0)
+}
 
 export function OwnersPage() {
   const toast = useToast()
@@ -53,6 +62,26 @@ export function OwnersPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [chip, setChip] = useQueryTab({ allowed: OwnersPageTabs, defaultValue: 'all' })
+  const { counts: attention } = useAttentionSignals(true)
+
+  const chips = useMemo(
+    () => [
+      { id: 'all', label: 'الكل' },
+      {
+        id: 'overdue',
+        label: 'متأخر',
+        attention: attention.owners_unpaid > 0 ? ('warning' as const) : null,
+        attentionLabel: `${attention.owners_unpaid} مالك له فلوس متأخرة`,
+      },
+    ],
+    [attention.owners_unpaid],
+  )
+
+  const visible = useMemo(
+    () => (chip === 'overdue' ? rows.filter((o) => ownerOverdue(o) > 0) : rows),
+    [rows, chip],
+  )
 
   async function load(nextPage = page) {
     setLoading(true)
@@ -172,6 +201,15 @@ export function OwnersPage() {
       sortValue: (o) => Number(o.balance?.vehicles_monthly_total || 0),
     },
     {
+      id: 'overdue',
+      header: 'متأخر',
+      cell: (o) => {
+        const v = ownerOverdue(o)
+        return v > 0 ? <strong className="tabular-nums" style={{ color: 'var(--danger, #dc2626)' }}>{formatMoney(v)}</strong> : formatMoney(0)
+      },
+      sortValue: (o) => ownerOverdue(o),
+    },
+    {
       id: 'status',
       header: 'الحالة',
       cell: (o) => <StatusPill status={o.is_active ? 'active' : 'cancelled'} tone={o.is_active ? 'success' : 'muted'} label={o.is_active ? 'نشط' : 'موقوف'} />,
@@ -184,7 +222,7 @@ export function OwnersPage() {
     <div className="rpm-stack">
       <PageHeader
         title="ملاك العربيات"
-        subtitle="عربيات الغير · المبلغ الشهري التعاقدي فقط (بلا رصيد متراكم)"
+        subtitle="المبلغ الشهري التعاقدي · المتأخر = شهور مكتملة لم تُصرف"
         action={<Button onClick={() => { setForm(emptyForm); setFieldErrors({}); setOpen(true) }}>إضافة مالك</Button>}
         mobileFab
       />
@@ -193,13 +231,13 @@ export function OwnersPage() {
         search={search}
         onSearchChange={(v) => { setSearch(v); setPage(1) }}
         placeholder="بحث بالاسم أو الهاتف…"
-        chips={[{ id: 'all', label: 'الكل' }]}
-        activeChip="all"
-        onChipChange={() => undefined}
+        chips={chips}
+        activeChip={chip}
+        onChipChange={(id) => { setChip(id); setPage(1) }}
       />
       <DataTable
         label="الملاك"
-        rows={rows}
+        rows={visible}
         columns={ownerColumns}
         rowKey={(o) => o.id}
         rowLabel={(o) => o.full_name}
@@ -211,13 +249,13 @@ export function OwnersPage() {
         ]}
         emptyTitle="لا ملاك بعد"
         emptyDescription="أضف مالكاً ثم اربطه من شاشة العربيات مع المبلغ الشهري"
-        serverPagination={{
+        serverPagination={chip === 'all' ? {
           page: meta.current_page,
           lastPage: meta.last_page,
           total: meta.total,
           perPage: LIST_PER_PAGE,
           onPageChange: setPage,
-        }}
+        } : undefined}
       />
 
       <Sheet open={open} title="إضافة مالك" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>

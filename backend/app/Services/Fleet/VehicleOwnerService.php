@@ -606,7 +606,9 @@ class VehicleOwnerService
     /**
      * @return array{
      *   accrued_total: int,
+     *   earned_total: int,
      *   paid_total: int,
+     *   overdue: int,
      *   remaining: int,
      *   month: string,
      *   month_accrued: int,
@@ -615,34 +617,69 @@ class VehicleOwnerService
      * }
      */
     /**
-     * Read-only balance from existing dues/payouts. Does NOT accrue missing months
-     * (V4-03 — GETs must not post). Use ensureAccruedThrough via payout / artisan.
+     * Read-only. Does NOT post journals.
+     * earned_total = مجموع نصيب الشهور المدنية المكتملة من جدول العقد (OwnerRentSchedule).
+     * overdue = max(0, earned_total − paid_total) — فلوس شهور عدّت ولم تُصرف بعد.
      */
     public function balance(VehicleOwner $owner, ?string $yearMonth = null): array
     {
-        $ym = $yearMonth ?: now()->format('Y-m');
+        $tz = config('app.timezone', 'Africa/Cairo');
+        $ym = $yearMonth ?: now()->timezone($tz)->format('Y-m');
+        $today = now()->timezone($tz)->toDateString();
 
-        $accruedTotal = (int) OwnerMonthDue::query()->where('owner_id', $owner->id)->sum('amount');
+        $earnedTotal = 0;
+        $vehicles = Vehicle::query()
+            ->where('owner_id', $owner->id)
+            ->where('is_active', true)
+            ->whereNotNull('owner_monthly_amount')
+            ->where('owner_monthly_amount', '>', 0)
+            ->get(['id', 'owner_monthly_amount', 'owner_agreement_starts_on', 'owner_agreement_ends_on']);
+
+        foreach ($vehicles as $vehicle) {
+            $start = $vehicle->owner_agreement_starts_on?->toDateString();
+            $end = $vehicle->owner_agreement_ends_on?->toDateString();
+            $shares = $this->rentSchedule->shares(
+                $start,
+                $end,
+                (int) $vehicle->owner_monthly_amount,
+                $today,
+            );
+            $earnedTotal += (int) array_sum($shares);
+        }
+
         $paidTotal = (int) OwnerPayout::query()->where('owner_id', $owner->id)->sum('amount');
-        $monthAccrued = (int) OwnerMonthDue::query()->where('owner_id', $owner->id)->where('year_month', $ym)->sum('amount');
+        $overdue = max(0, $earnedTotal - $paidTotal);
         $monthPaid = (int) OwnerPayout::query()
             ->where('owner_id', $owner->id)
             ->whereBetween('paid_on', [$ym.'-01', $ym.'-31'])
             ->sum('amount');
-        $vehiclesMonthly = (int) Vehicle::query()
-            ->where('owner_id', $owner->id)
-            ->where('is_active', true)
-            ->sum('owner_monthly_amount');
+        $vehiclesMonthly = (int) $vehicles->sum('owner_monthly_amount');
 
         return [
-            'accrued_total' => $accruedTotal,
+            // accrued_total يطابق earned_total (حساب حي من الجدول) — ليس صفوف owner_month_dues القديمة
+            'accrued_total' => $earnedTotal,
+            'earned_total' => $earnedTotal,
             'paid_total' => $paidTotal,
-            'remaining' => max(0, $accruedTotal - $paidTotal),
+            'overdue' => $overdue,
+            'remaining' => $overdue,
             'month' => $ym,
-            'month_accrued' => $monthAccrued,
+            'month_accrued' => 0,
             'month_paid' => $monthPaid,
             'vehicles_monthly_total' => $vehiclesMonthly,
         ];
+    }
+
+    /** عدد الملاك النشطين الذين عليهم فلوس متأخرة (شهور مكتملة − مصروف). */
+    public function countOwnersWithOverdue(): int
+    {
+        $n = 0;
+        foreach (VehicleOwner::query()->where('is_active', true)->orderBy('id')->cursor() as $owner) {
+            if ($this->balance($owner)['overdue'] > 0) {
+                $n++;
+            }
+        }
+
+        return $n;
     }
 
     private function ensureOwnerAccounts(): void

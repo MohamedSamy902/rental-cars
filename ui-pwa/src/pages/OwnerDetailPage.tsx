@@ -8,14 +8,16 @@ import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
-  SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconCash, IconKey,
+  SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconCash, IconKey, IconTrend,
   PhoneActions,
 } from '@/shared/ui'
 import './pages.css'
 
 type Balance = {
   accrued_total: number
+  earned_total?: number
   paid_total: number
+  overdue?: number
   remaining: number
   vehicles_monthly_total: number
 }
@@ -214,10 +216,19 @@ export function OwnerDetailPage() {
       />
 
       <MetricCardGrid
-        label="المبلغ الشهري التعاقدي"
+        label="ملخص المالك"
         items={[
           { id: 'monthly', label: 'المبلغ الشهري', value: balance?.vehicles_monthly_total || 0, format: 'money', tone: 'success', icon: <IconKey size={16} /> },
-          { id: 'paid', label: 'إجمالي المصروف المسجّل', value: balance?.paid_total || 0, format: 'money', icon: <IconCash size={16} /> },
+          { id: 'earned', label: 'مستحق شهور مكتملة', value: balance?.earned_total ?? balance?.accrued_total ?? 0, format: 'money', icon: <IconCash size={16} /> },
+          { id: 'paid', label: 'إجمالي المصروف', value: balance?.paid_total || 0, format: 'money', icon: <IconCash size={16} /> },
+          {
+            id: 'overdue',
+            label: 'متأخر',
+            value: balance?.overdue ?? balance?.remaining ?? 0,
+            format: 'money',
+            tone: (balance?.overdue ?? balance?.remaining ?? 0) > 0 ? 'warning' : 'success',
+            icon: <IconTrend size={16} />,
+          },
         ]}
       />
 

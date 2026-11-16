@@ -250,11 +250,11 @@ class DueNotificationScanTest extends TestCase
         ]);
 
         $owner = VehicleOwner::query()->create(['full_name' => 'مالك التنبيه', 'is_active' => true]);
-        OwnerMonthDue::query()->create([
+        $this->vehicle->update([
             'owner_id' => $owner->id,
-            'vehicle_id' => $this->vehicle->id,
-            'year_month' => now()->format('Y-m'),
-            'amount' => 2500,
+            'owner_monthly_amount' => 2500,
+            'owner_agreement_starts_on' => now()->subMonths(2)->startOfMonth()->toDateString(),
+            'owner_agreement_ends_on' => now()->addMonths(6)->toDateString(),
         ]);
 
         $unpaidEmployee = Employee::query()->create([
@@ -308,7 +308,7 @@ class DueNotificationScanTest extends TestCase
         $this->assertSame(1, $this->titlesLike('صيانة بالتاريخ'));
         $this->assertSame(1, $this->titlesLike('صيانة بالكيلومتر'));
         $this->assertSame(1, NotificationReminder::query()->where('rule_key', 'violation_open')->count());
-        $this->assertSame(0, $this->titlesLike('مستحق مالك لم يُصرف: مالك التنبيه'));
+        $this->assertSame(1, $this->titlesLike('فلوس متأخرة لمالك: مالك التنبيه'));
         $this->assertSame(1, $this->titlesLike('راتب لم يُصرف: راتب معلّق'));
         $this->assertSame(0, $this->titlesLike('راتب لم يُصرف: راتب مسودة'));
         $this->assertSame(0, $this->titlesLike('تقييم معلّق:'));

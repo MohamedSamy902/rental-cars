@@ -75,7 +75,10 @@ class VehicleOwnerPayoutTest extends TestCase
 
         $show = $this->getJson('/api/owners/'.$owner['id'])->assertOk()->json('data');
         $this->assertSame(20000, $show['balance']['vehicles_monthly_total']);
-        $this->assertSame(0, $show['balance']['remaining']);
+        // اليوم 2026-12-01 → نوفمبر مكتمل وغير مصروف = متأخر 20000
+        $this->assertSame(20000, $show['balance']['earned_total']);
+        $this->assertSame(20000, $show['balance']['overdue']);
+        $this->assertSame(20000, $show['balance']['remaining']);
 
         $payout = $this->postJson('/api/owners/'.$owner['id'].'/payouts', [
             'amount' => 20000,
@@ -87,6 +90,7 @@ class VehicleOwnerPayoutTest extends TestCase
 
         $this->assertSame(20000, $payout->json('data.amount'));
         $this->assertSame(20000, $payout->json('balance.paid_total'));
+        $this->assertSame(0, $payout->json('balance.overdue'));
         $this->assertSame(0, $payout->json('balance.remaining'));
         $this->assertDatabaseCount('owner_payouts', 1);
         $this->assertDatabaseCount('owner_month_dues', 0);

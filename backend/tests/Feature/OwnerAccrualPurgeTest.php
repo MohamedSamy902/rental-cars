@@ -104,14 +104,18 @@ class OwnerAccrualPurgeTest extends TestCase
         $payoutEntry->update(['source' => 'owner_payout:'.$payout->id]);
 
         $svc = app(VehicleOwnerService::class);
-        $this->assertSame(376774, $svc->balance($owner)['remaining']);
+        // يناير→أكتوبر مكتملة × 20000 − صرف 20000 = 180000 (حي من الجدول، لا من owner_month_dues)
+        $this->assertSame(200000, $svc->balance($owner)['earned_total']);
+        $this->assertSame(180000, $svc->balance($owner)['overdue']);
+        $this->assertSame(180000, $svc->balance($owner)['remaining']);
 
         $result = $svc->purgeAccrualLedger($owner, $admin->id);
         $this->assertSame(1, $result['dues_cleared']);
         $this->assertSame(1, $result['payouts_reclassed']);
         $this->assertDatabaseCount('owner_month_dues', 0);
         $this->assertDatabaseCount('owner_payouts', 1);
-        $this->assertSame(0, $svc->balance($owner)['remaining']);
+        // التنظيف يزيل دفتر الاستحقاق القديم ولا يصفّر المتأخر التشغيلي من الشهور المكتملة
+        $this->assertSame(180000, $svc->balance($owner)['overdue']);
         $this->assertSame(20000, $svc->balance($owner)['paid_total']);
         $this->assertDatabaseHas('journal_entries', ['source' => 'owner_accrual_purge:'.$due->id.':2026-10']);
         $this->assertDatabaseHas('journal_entries', ['source' => 'owner_payout_reclass:'.$payout->id]);
