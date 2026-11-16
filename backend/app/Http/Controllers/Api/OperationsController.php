@@ -86,6 +86,12 @@ class OperationsController extends Controller
                 }
 
                 $daily = (int) $v->daily_rate;
+                $half = $v->half_monthly_rate !== null
+                    ? (int) $v->half_monthly_rate
+                    : (int) round($daily * $halfMonthlyFactor);
+                $monthly = $v->monthly_rate !== null
+                    ? (int) $v->monthly_rate
+                    : (int) round($daily * $monthlyFactor);
 
                 return [
                     'id' => $v->id,
@@ -99,8 +105,8 @@ class OperationsController extends Controller
                     'seats' => $v->seats,
                     'plate' => $v->plate,
                     'daily_rate' => $daily,
-                    'half_monthly_rate' => (int) round($daily * $halfMonthlyFactor),
-                    'monthly_rate' => (int) round($daily * $monthlyFactor),
+                    'half_monthly_rate' => $half,
+                    'monthly_rate' => $monthly,
                     'default_deposit' => (int) $v->default_deposit,
                     'status' => $status,
                     'available' => $status === 'available',

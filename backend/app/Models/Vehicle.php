@@ -14,7 +14,7 @@ class Vehicle extends Model
     protected $fillable = [
         'code', 'plate', 'chassis_number', 'engine_number', 'brand', 'model', 'year', 'color',
         'category', 'engine_capacity', 'transmission', 'fuel_type', 'seats', 'odometer',
-        'odometer_source', 'daily_rate', 'default_deposit',
+        'odometer_source', 'daily_rate', 'half_monthly_rate', 'monthly_rate', 'default_deposit',
         'purchase_value_estimate', 'tracker_device_number', 'tracker_sim_number',
         'tracker_sim_last_recharged_on', 'tracker_sim_last_recharge_amount',
         'tracker_sim_next_recharge_on', 'tracker_sim_recharge_cycle_days',
@@ -30,6 +30,8 @@ class Vehicle extends Model
             'year' => 'integer',
             'odometer' => 'integer',
             'daily_rate' => 'integer',
+            'half_monthly_rate' => 'integer',
+            'monthly_rate' => 'integer',
             'default_deposit' => 'integer',
             'owner_monthly_amount' => 'integer',
             'owner_since' => 'date:Y-m-d',

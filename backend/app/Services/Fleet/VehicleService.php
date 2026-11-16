@@ -12,6 +12,7 @@ use App\Models\VehicleDocument;
 use App\Models\VehicleDocumentHistory;
 use App\Models\VehicleOwner;
 use App\Models\VehicleTrackerSimRecharge;
+use App\Services\Contracts\ContractPricingService;
 use App\Services\Documents\DocumentTemplateService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +55,8 @@ class VehicleService
             if (empty($data['code'])) {
                 $data['code'] = $this->nextInternalCode();
             }
+
+            $data = $this->normalizePackageRates($data);
 
             if (! empty($data['owner_id']) && empty($data['owner_since'])) {
                 $data['owner_since'] = now()->toDateString();
@@ -135,6 +138,7 @@ class VehicleService
                 $data['license'],
             );
 
+            $data = $this->normalizePackageRates($data, $vehicle);
             $vehicle->update($data);
 
             if ($addonIds !== null) {
@@ -676,5 +680,39 @@ class VehicleService
                 'created_at' => $r->created_at?->toIso8601String(),
             ])
             ->all();
+    }
+
+    /**
+     * إن غاب نص الشهري/الشهري يُشتقّان من اليومي (أو من قيم العربية عند التحديث الجزئي).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizePackageRates(array $data, ?Vehicle $existing = null): array
+    {
+        $daily = array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
+            ? (int) $data['daily_rate']
+            : (int) ($existing?->daily_rate ?? 0);
+
+        $halfMissing = ! array_key_exists('half_monthly_rate', $data) || $data['half_monthly_rate'] === null || $data['half_monthly_rate'] === '';
+        $monthlyMissing = ! array_key_exists('monthly_rate', $data) || $data['monthly_rate'] === null || $data['monthly_rate'] === '';
+
+        if ($halfMissing) {
+            if ($existing?->half_monthly_rate !== null && ! array_key_exists('daily_rate', $data)) {
+                // تحديث جزئي بلا يومي: أبقِ المخزّن.
+            } elseif ($daily > 0) {
+                $data['half_monthly_rate'] = (int) round($daily * ContractPricingService::DEFAULT_HALF_MONTHLY_FACTOR);
+            }
+        }
+
+        if ($monthlyMissing) {
+            if ($existing?->monthly_rate !== null && ! array_key_exists('daily_rate', $data)) {
+                // تحديث جزئي بلا يومي: أبقِ المخزّن.
+            } elseif ($daily > 0) {
+                $data['monthly_rate'] = (int) round($daily * ContractPricingService::DEFAULT_MONTHLY_FACTOR);
+            }
+        }
+
+        return $data;
     }
 }
