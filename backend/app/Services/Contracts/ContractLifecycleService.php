@@ -1404,9 +1404,13 @@ class ContractLifecycleService
     private function notifyLifecycle(string $title, string $body, Contract $contract, ?int $actorId = null): void
     {
         try {
+            // نفس قاعدة الماسح الآلي: المدير الأعلى + من لديه صلاحية الوحدة فقط.
             $recipients = User::query()
                 ->where('is_active', true)
-                ->whereHas('role.permissions', fn ($q) => $q->where('key', 'contracts.view'))
+                ->where(function ($query) {
+                    $query->whereHas('role', fn ($role) => $role->where('name', 'super_admin'))
+                        ->orWhereHas('role.permissions', fn ($q) => $q->where('key', 'contracts.view'));
+                })
                 ->when($actorId, fn ($q) => $q->where('id', '!=', $actorId))
                 ->limit(40)
                 ->get();
