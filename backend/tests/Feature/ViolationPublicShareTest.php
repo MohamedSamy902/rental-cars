@@ -170,15 +170,25 @@ class ViolationPublicShareTest extends TestCase
 
     public function test_expired_signature_is_rejected(): void
     {
-        URL::forceRootUrl('http://localhost');
         $url = URL::temporarySignedRoute(
             'public.media.file',
             now()->subMinute(),
             ['medium' => $this->media->id],
+            absolute: false,
         );
 
         $this->getJson($this->pathAndQuery($url))
             ->assertForbidden();
+    }
+
+    public function test_relative_signature_accepts_any_host(): void
+    {
+        $url = app(PublicMediaLinkService::class)->temporaryViolationsShareUrl([$this->violation->id]);
+        $path = $this->pathAndQuery($url);
+
+        $this->get($path, ['HTTP_HOST' => 'rpmrentcar.com'])
+            ->assertOk()
+            ->assertSee('بيان مخالفات', false);
     }
 
     private function pathAndQuery(string $absoluteUrl): string

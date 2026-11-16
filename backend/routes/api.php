@@ -40,12 +40,12 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,
 Route::get('/public/vehicles/{vehicle}/qr-card', [OperationsController::class, 'vehicleQrVisitorCard'])
     ->middleware('throttle:60,1');
 
-/** مشاركة مخالفات/ميديا موقّعة للعميل عبر واتساب — بلا تسجيل دخول. */
+/** مشاركة مخالفات/ميديا موقّعة للعميل عبر واتساب — بلا تسجيل دخول (توقيع نسبي). */
 Route::get('/public/media/{medium}/file', [ViolationShareController::class, 'publicMediaFile'])
-    ->middleware(['signed', 'throttle:120,1'])
+    ->middleware(['signed:relative', 'throttle:120,1'])
     ->name('public.media.file');
 Route::get('/public/violations/share', [ViolationShareController::class, 'publicShare'])
-    ->middleware(['signed', 'throttle:60,1'])
+    ->middleware(['signed:relative', 'throttle:60,1'])
     ->name('public.violations.share');
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {

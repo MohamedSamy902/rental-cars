@@ -52,13 +52,16 @@ class PublicMediaLinkService
     public function temporaryFileUrl(int $mediaId, ?int $ttlDays = null): string
     {
         $days = max(1, $ttlDays ?? self::DEFAULT_TTL_DAYS);
-        $this->forcePublicRoot();
 
-        return URL::temporarySignedRoute(
+        // توقيع نسبي (المسار فقط) حتى يعمل الرابط على دومين الإنتاج حتى لو اختلف Host المحلي.
+        $relative = URL::temporarySignedRoute(
             'public.media.file',
             now()->addDays($days),
             ['medium' => $mediaId],
+            absolute: false,
         );
+
+        return $this->toPublicAbsolute($relative);
     }
 
     /**
@@ -69,13 +72,15 @@ class PublicMediaLinkService
         $ids = array_values(array_unique(array_filter(array_map('intval', $violationIds), fn (int $id) => $id > 0)));
         sort($ids);
         $days = max(1, $ttlDays ?? self::DEFAULT_TTL_DAYS);
-        $this->forcePublicRoot();
 
-        return URL::temporarySignedRoute(
+        $relative = URL::temporarySignedRoute(
             'public.violations.share',
             now()->addDays($days),
             ['ids' => implode(',', $ids)],
+            absolute: false,
         );
+
+        return $this->toPublicAbsolute($relative);
     }
 
     public function assertMediaExists(int $mediaId): MediaFile
@@ -83,12 +88,13 @@ class PublicMediaLinkService
         return MediaFile::query()->whereKey($mediaId)->firstOrFail();
     }
 
-    private function forcePublicRoot(): void
+    private function toPublicAbsolute(string $relativeUrl): string
     {
-        URL::forceRootUrl(PublicAppUrl::origin());
-        $root = PublicAppUrl::origin();
-        if (str_starts_with($root, 'https://')) {
-            URL::forceScheme('https');
+        $relativeUrl = trim($relativeUrl);
+        if (str_starts_with($relativeUrl, 'http://') || str_starts_with($relativeUrl, 'https://')) {
+            return $relativeUrl;
         }
+
+        return PublicAppUrl::to(ltrim($relativeUrl, '/'));
     }
 }
