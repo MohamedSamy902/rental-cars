@@ -17,6 +17,7 @@ type Balance = {
   overdue?: number
   remaining: number
   vehicles_monthly_total: number
+  dues_counts_from?: string | null
 }
 
 type OwnerVehicle = {
@@ -188,7 +189,11 @@ export function OwnerDetailPage() {
     <div className="rpm-stack">
       <PageHeader
         title={owner.full_name}
-        subtitle="ملف مالك · المبلغ الشهري لعقد الإدارة · الصرف للمالك فقط (بلا عقود تأجير ولا حسابات)"
+        subtitle={
+          balance?.dues_counts_from
+            ? `مستحقات من ${formatDate(balance.dues_counts_from)} فصاعداً · ما قبل كده مش محسوب · بلا عقود تأجير`
+            : 'ملف مالك · مستحقات عقد الإدارة · الصرف فقط (بلا عقود تأجير ولا حسابات)'
+        }
         action={
           <>
             <BackNavButton to="/owners" label="رجوع للملاك" />

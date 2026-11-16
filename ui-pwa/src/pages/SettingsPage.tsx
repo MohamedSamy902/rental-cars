@@ -15,6 +15,7 @@ type Ops = {
   block_expired_vehicle_docs?: boolean
   require_handover_signature?: boolean
   require_return_signature_always?: boolean
+  owner_dues_counts_from?: string | null
   print_phone?: string | null
   print_address?: string | null
   print_commercial_register?: string | null
@@ -63,6 +64,7 @@ export function SettingsPage() {
         block_expired_vehicle_docs: operational.block_expired_vehicle_docs ?? true,
         require_handover_signature: operational.require_handover_signature ?? true,
         require_return_signature_always: operational.require_return_signature_always ?? false,
+        owner_dues_counts_from: operational.owner_dues_counts_from || '2026-11-01',
       })
     })
   }, [])
@@ -204,6 +206,13 @@ export function SettingsPage() {
             label="إلزام توقيع الاستلام دائماً"
             checked={Boolean(ops.require_return_signature_always)}
             onChange={(v) => setOps({ ...ops, require_return_signature_always: v })}
+          />
+          <TextField
+            label="بداية احتساب مستحقات الملاك"
+            type="date"
+            value={ops.owner_dues_counts_from || ''}
+            onChange={(e) => setOps({ ...ops, owner_dues_counts_from: e.target.value || null })}
+            hint="تاريخ تشغيل لمرة واحدة (مش كل سنة). مثال 2026-11-01: الشهور قبله متتحسبش أبداً، ومنه واللي بعده يتراكموا عادي سنة ورا سنة"
           />
         </div>
       </section>

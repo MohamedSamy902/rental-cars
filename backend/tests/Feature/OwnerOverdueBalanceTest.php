@@ -28,6 +28,7 @@ class OwnerOverdueBalanceTest extends TestCase
         TenantSetting::query()->create([
             'center_name' => 'اختبار',
             'feature_flags' => [],
+            // بلا أرضية تشغيل حتى تبقى اختبارات الشهور المكتملة التاريخية صريحة
             'operational' => [],
         ]);
         Sanctum::actingAs(User::factory()->create([
@@ -173,5 +174,41 @@ class OwnerOverdueBalanceTest extends TestCase
         $this->assertSame(29000, $show['balance']['earned_total']);
         $this->assertSame(29000, $show['balance']['overdue']);
         $this->assertSame(['2026-10' => 29000], $show['balance']['vehicles_breakdown'][0]['shares']);
+    }
+
+    public function test_go_live_counts_from_november_ignores_older_agreement_months(): void
+    {
+        TenantSetting::query()->first()?->update([
+            'operational' => ['owner_dues_counts_from' => '2026-11-01'],
+        ]);
+
+        $owner = VehicleOwner::query()->create([
+            'full_name' => 'محمد قديم العقد',
+            'phone' => '01125253888',
+            'is_active' => true,
+        ]);
+        Vehicle::query()->create([
+            'code' => 'OWN-JET',
+            'plate' => 'ك ر ب 1',
+            'brand' => 'جيتور',
+            'model' => 'T2',
+            'year' => 2025,
+            'category' => 'SUV',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 2000,
+            'default_deposit' => 0,
+            'is_active' => true,
+            'owner_id' => $owner->id,
+            'owner_monthly_amount' => 41000,
+            'owner_agreement_starts_on' => '2026-01-11',
+            'owner_agreement_ends_on' => '2027-01-11',
+        ]);
+
+        $show = $this->getJson('/api/owners/'.$owner->id)->assertOk()->json('data');
+        $this->assertSame('2026-11-01', $show['balance']['dues_counts_from']);
+        $this->assertSame(0, $show['balance']['earned_total']);
+        $this->assertSame(0, $show['balance']['overdue']);
+        $this->assertSame([], $show['balance']['vehicles_breakdown'][0]['shares']);
     }
 }

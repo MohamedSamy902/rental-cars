@@ -9,6 +9,7 @@ use App\Models\JournalLine;
 use App\Models\MonthLock;
 use App\Models\OwnerMonthDue;
 use App\Models\OwnerPayout;
+use App\Models\TenantSetting;
 use App\Models\Vehicle;
 use App\Models\VehicleOwner;
 use App\Services\Accounting\AccountingService;
@@ -86,7 +87,13 @@ class VehicleOwnerService
                 continue;
             }
             $end = $vehicle->owner_agreement_ends_on?->toDateString();
-            $shares = $this->rentSchedule->shares($start, $end, (int) $vehicle->owner_monthly_amount, $today);
+            $shares = $this->rentSchedule->shares(
+                $start,
+                $end,
+                (int) $vehicle->owner_monthly_amount,
+                $today,
+                $this->duesCountsFrom(),
+            );
             foreach ($shares as $ym => $amount) {
                 if ($ym > $throughYearMonth || $amount < 1) {
                     continue;
@@ -146,6 +153,7 @@ class VehicleOwnerService
                 $end,
                 (int) ($vehicle->owner_monthly_amount ?? 0),
                 $today,
+                $this->duesCountsFrom(),
             );
             $needed = (int) ($shares[$due->year_month] ?? 0);
 
@@ -630,6 +638,7 @@ class VehicleOwnerService
      * Read-only. Does NOT post journals.
      * earned_total = مجموع نصيب الشهور المدنية المكتملة من جدول العقد (OwnerRentSchedule).
      * الشهر الجاري لا يُحسب أبداً — مثال: بداية عقد ١٥/١١ واليوم ١٦/١١ ⇒ earned=0 ⇒ overdue=0.
+     * operational.owner_dues_counts_from يرفع بداية الاحتساب (تشغيل النظام) دون تغيير بداية عقد الإدارة.
      * overdue = max(0, earned_total − paid_total) — فلوس شهور عدّت ولم تُصرف بعد.
      */
     public function balance(VehicleOwner $owner, ?string $yearMonth = null): array
@@ -637,6 +646,7 @@ class VehicleOwnerService
         $tz = config('app.timezone', 'Africa/Cairo');
         $ym = $yearMonth ?: now()->timezone($tz)->format('Y-m');
         $today = now()->timezone($tz)->toDateString();
+        $countsFrom = $this->duesCountsFrom();
 
         $earnedTotal = 0;
         $breakdown = [];
@@ -651,7 +661,7 @@ class VehicleOwnerService
             $start = $vehicle->owner_agreement_starts_on?->toDateString();
             $end = $vehicle->owner_agreement_ends_on?->toDateString();
             $monthly = (int) $vehicle->owner_monthly_amount;
-            $shares = $this->rentSchedule->shares($start, $end, $monthly, $today);
+            $shares = $this->rentSchedule->shares($start, $end, $monthly, $today, $countsFrom);
             $earned = (int) array_sum($shares);
             $earnedTotal += $earned;
             $breakdown[] = [
@@ -661,6 +671,7 @@ class VehicleOwnerService
                 'monthly' => $monthly,
                 'agreement_starts_on' => $start,
                 'agreement_ends_on' => $end,
+                'dues_counts_from' => $countsFrom,
                 'earned' => $earned,
                 'shares' => $shares,
             ];
@@ -685,8 +696,24 @@ class VehicleOwnerService
             'month_accrued' => 0,
             'month_paid' => $monthPaid,
             'vehicles_monthly_total' => $vehiclesMonthly,
+            'dues_counts_from' => $countsFrom,
             'vehicles_breakdown' => $breakdown,
         ];
+    }
+
+    /**
+     * تاريخ بداية احتساب مستحقات الملاك (تشغيل النظام). null = من بداية عقد الإدارة كما هي.
+     */
+    public function duesCountsFrom(): ?string
+    {
+        $raw = TenantSetting::query()->value('operational');
+        $ops = is_array($raw) ? $raw : [];
+        $value = $ops['owner_dues_counts_from'] ?? null;
+        if (! is_string($value) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return null;
+        }
+
+        return $value;
     }
 
     /** عدد الملاك النشطين الذين عليهم فلوس متأخرة (شهور مكتملة − مصروف). */
