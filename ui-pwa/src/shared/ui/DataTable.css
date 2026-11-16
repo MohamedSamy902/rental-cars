@@ -458,8 +458,18 @@
 
 .rpm-dt-card__field dd {
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
   font-size: 0.875rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rpm-dt-card__field dd [dir='ltr'] {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

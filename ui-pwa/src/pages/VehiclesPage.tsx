@@ -6,7 +6,7 @@ import { addCivilDays, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
-  PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable,
+  PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Badge, Fab, DataTable,
   useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench, IconEdit,
   Sheet, MoneyField, DateField, TextAreaField,
   type DataColumn, type MenuItem,
@@ -299,9 +299,10 @@ export function VehiclesPage() {
           id: 'sim',
           header: 'رقم الشريحة',
           cell: (v) => (
-            <strong className="tabular-nums" dir="ltr">{v.tracker_sim_number || '—'}</strong>
+            <strong className="vh-sim-num tabular-nums" dir="ltr">{v.tracker_sim_number || '—'}</strong>
           ),
           sortValue: (v) => v.tracker_sim_number || '',
+          wide: true,
         },
         {
           id: 'last_recharge',
@@ -315,12 +316,15 @@ export function VehiclesPage() {
             </>
           ),
           sortValue: (v) => v.tracker_sim_last_recharged_on || '',
+          wide: true,
         },
         {
           id: 'next_recharge',
           header: 'الشحن القادم',
           cell: (v) => (
-            <strong>{v.tracker_sim_next_recharge_on ? formatDate(v.tracker_sim_next_recharge_on) : '—'}</strong>
+            <Badge tone="warning" dot={false}>
+              {v.tracker_sim_next_recharge_on ? formatDate(v.tracker_sim_next_recharge_on) : '—'}
+            </Badge>
           ),
           sortValue: (v) => v.tracker_sim_next_recharge_on || '',
           mobile: 'badge',
@@ -568,6 +572,7 @@ export function VehiclesPage() {
 
       <MetricCardGrid
         label="ملخص الأسطول"
+        mobile="wrap"
         items={[
           { id: 'total', label: 'إجمالي الأسطول', value: summary.total, icon: <IconCar size={16} /> },
           {
