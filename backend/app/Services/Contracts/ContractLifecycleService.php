@@ -618,6 +618,9 @@ class ContractLifecycleService
                 ],
             ]);
 
+            // إثبات حصة كل شهر خدمة من الإيجار فوراً (حتى الشهور اللاحقة مثل ديسمبر من عقد يبدأ في نوفمبر).
+            $this->accounting->realignContractRentRecognition($locked->fresh(), $userId, false);
+
             $this->notifyLifecycle(
                 'تم تسليم عربية',
                 "العقد {$locked->number} أصبح نشطاً بعد التسليم.",

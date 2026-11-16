@@ -44,9 +44,19 @@ class MonthAllocationService
             $cursor = $sliceEnd;
         }
 
-        $allocated = 0;
         $keys = array_keys($buckets);
         $lastKey = $keys[array_key_last($keys)] ?? null;
+        // Flooring inside each slice can drop residual hours across month boundaries;
+        // pin the last bucket so day shares still sum to the rental day count.
+        $sumDays = array_sum(array_map(static fn (array $row): int => (int) $row['days'], $buckets));
+        if ($lastKey !== null && $sumDays !== $totalDays) {
+            $buckets[$lastKey]['days'] += $totalDays - $sumDays;
+            if ($buckets[$lastKey]['days'] < 0) {
+                $buckets[$lastKey]['days'] = 0;
+            }
+        }
+
+        $allocated = 0;
         foreach ($buckets as $key => &$row) {
             if ($key === $lastKey) {
                 $row['amount'] = $periodRent - $allocated;

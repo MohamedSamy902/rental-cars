@@ -19,6 +19,7 @@ use App\Services\Contracts\ContractLedgerMath;
 use App\Services\Contracts\ContractPricingService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -1051,24 +1052,56 @@ class AccountingService
     }
 
     /**
+     * Calendar months shown on /accounts: past window + current + any future month
+     * that still carries active/completed rental days (RSD 3.6 / ن٫٧).
+     *
+     * @return list<array{0:int,1:int}> year/month pairs ascending
+     */
+    public function overviewMonthKeys(?CarbonInterface $now = null): array
+    {
+        $tz = config('app.timezone');
+        $today = CarbonImmutable::instance(($now ?? now($tz))->copy()->timezone($tz))->startOfMonth();
+        $from = $today->subMonths(5);
+        $to = $today;
+
+        $horizonRaw = Contract::query()
+            ->whereIn('status', ['active', 'completed'])
+            ->whereNotNull('starts_at')
+            ->selectRaw('MAX(COALESCE(actual_ends_at, planned_ends_at)) as max_end')
+            ->value('max_end');
+        if ($horizonRaw) {
+            $horizon = CarbonImmutable::parse($horizonRaw, $tz)->startOfMonth();
+            if ($horizon->greaterThan($to)) {
+                $to = $horizon;
+            }
+        }
+
+        $cap = $today->addMonths(24);
+        if ($to->greaterThan($cap)) {
+            $to = $cap;
+        }
+
+        $keys = [];
+        for ($cursor = $from; $cursor->lessThanOrEqualTo($to); $cursor = $cursor->addMonth()) {
+            $keys[] = [(int) $cursor->format('Y'), (int) $cursor->format('n')];
+        }
+
+        return $keys;
+    }
+
+    /**
      * @return array{months: list<array<string, mixed>>, accounts: list<Account>, payments_in: int, payments_out: int}
      */
     public function overview(): array
     {
         $this->ensureChartOfAccounts();
 
-        $months = [];
-        $toSync = [];
-        for ($i = 0; $i < 6; $i++) {
-            $dt = now()->startOfMonth()->subMonths($i);
-            $toSync[] = [(int) $dt->format('Y'), (int) $dt->format('n')];
-        }
-        $this->syncRentRecognition($toSync);
+        $keysAsc = $this->overviewMonthKeys();
+        $this->syncRentRecognition($keysAsc);
 
-        for ($i = 0; $i < 6; $i++) {
-            $dt = now()->startOfMonth()->subMonths($i);
-            $year = (int) $dt->format('Y');
-            $month = (int) $dt->format('n');
+        $months = [];
+        foreach (array_reverse($keysAsc) as [$year, $month]) {
+            $dt = CarbonImmutable::create($year, $month, 1, 0, 0, 0, config('app.timezone'));
             $lock = MonthLock::query()->where(compact('year', 'month'))->first();
             $rentCredit = (int) JournalLine::query()
                 ->whereHas('account', fn ($q) => $q->where('code', '4000'))
@@ -1105,7 +1138,7 @@ class AccountingService
             $months[] = [
                 'year' => $year,
                 'month' => $month,
-                'label' => $dt->translatedFormat('F Y'),
+                'label' => $dt->locale(app()->getLocale())->translatedFormat('F Y'),
                 'locked' => $lock?->isLocked() ?? false,
                 'rent_revenue' => $rentCredit,
                 'fees_revenue' => $feesCredit,
