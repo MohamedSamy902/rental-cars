@@ -64,15 +64,31 @@ class ReportQueryService
     }
 
     /**
-     * @return array{from:string|null,to:string|null,income:list<array<string,mixed>>,expenses:list<array<string,mixed>>,net:int}
+     * Owner-rent accrual (5200) is a liability recognition, not cash spent.
+     * Headline مصروفات / صافي exclude it; it is returned separately for transparency.
+     *
+     * @return array{
+     *   from:string|null,
+     *   to:string|null,
+     *   income:list<array<string,mixed>>,
+     *   expenses:list<array<string,mixed>>,
+     *   owner_accruals:list<array<string,mixed>>,
+     *   income_total:int,
+     *   expense_total:int,
+     *   owner_accrual_total:int,
+     *   net:int,
+     *   net_with_owner_accrual:int
+     * }
      */
     public function incomeStatement(?Carbon $from = null, ?Carbon $to = null): array
     {
         $rows = $this->trialBalance($from, $to);
         $income = [];
         $expenses = [];
+        $ownerAccruals = [];
         $incomeTotal = 0;
         $expenseTotal = 0;
+        $ownerAccrualTotal = 0;
         foreach ($rows as $row) {
             if ($row['type'] === 'income') {
                 $amount = (int) $row['credit'] - (int) $row['debit'];
@@ -87,6 +103,12 @@ class ReportQueryService
                 if ($amount === 0) {
                     continue;
                 }
+                // 5200 = مصروف إيجار ملاك from owners:accrue-dues — not cash outflow yet.
+                if ((string) $row['code'] === '5200') {
+                    $ownerAccruals[] = [...$row, 'amount' => $amount];
+                    $ownerAccrualTotal += $amount;
+                    continue;
+                }
                 $expenses[] = [...$row, 'amount' => $amount];
                 $expenseTotal += $amount;
             }
@@ -97,9 +119,12 @@ class ReportQueryService
             'to' => $to?->toDateString(),
             'income' => $income,
             'expenses' => $expenses,
+            'owner_accruals' => $ownerAccruals,
             'income_total' => $incomeTotal,
             'expense_total' => $expenseTotal,
+            'owner_accrual_total' => $ownerAccrualTotal,
             'net' => $incomeTotal - $expenseTotal,
+            'net_with_owner_accrual' => $incomeTotal - $expenseTotal - $ownerAccrualTotal,
         ];
     }
 

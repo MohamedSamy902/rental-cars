@@ -32,9 +32,12 @@ type TrialRow = { code: string; name: string; type: string; debit: number; credi
 type IncomeStatement = {
   income: Array<TrialRow & { amount: number }>
   expenses: Array<TrialRow & { amount: number }>
+  owner_accruals?: Array<TrialRow & { amount: number }>
   income_total: number
   expense_total: number
+  owner_accrual_total?: number
   net: number
+  net_with_owner_accrual?: number
 }
 type PayMethod = { method: string; label: string; in: number; out: number; net: number }
 type ProfitCompare = {
@@ -410,15 +413,30 @@ export function ReportsPage() {
               mobile="wrap"
               items={[
                 { id: 'inc', label: 'إيرادات', value: income.income_total, format: 'money', tone: 'success' },
-                { id: 'exp', label: 'مصروفات', value: income.expense_total, format: 'money', tone: 'warning' },
-                { id: 'net', label: 'صافي', value: income.net, format: 'money', tone: 'info' },
+                { id: 'exp', label: 'مصروفات تشغيل', value: income.expense_total, format: 'money', tone: 'warning' },
+                {
+                  id: 'own',
+                  label: 'مستحقات ملاك (استحقاق)',
+                  value: income.owner_accrual_total || 0,
+                  format: 'money',
+                  tone: 'default',
+                },
+                { id: 'net', label: 'صافي تشغيلي', value: income.net, format: 'money', tone: 'info' },
               ]}
             />
+            <p className="muted" style={{ marginBlockStart: 0 }}>
+              مستحقات الملاك استحقاق محاسبي وليست مصروفاً نقدياً حتى يتم الصرف من شاشة الملاك.
+              {typeof income.net_with_owner_accrual === 'number'
+                ? ` · صافي بعد الاستحقاق ${formatMoney(income.net_with_owner_accrual)}`
+                : ''}
+            </p>
             <div className="rp-table-scroll">
               <table className="rpm-table rpm-table--stack">
                 <thead><tr><th>البند</th><th>النوع</th><th>المبلغ</th></tr></thead>
                 <tbody>
-                  {income.income.length === 0 && income.expenses.length === 0 ? (
+                  {income.income.length === 0
+                    && income.expenses.length === 0
+                    && (income.owner_accruals || []).length === 0 ? (
                     <tr>
                       <td colSpan={3} data-label="البند">لا بنود دخل/مصروف مرحّلة في الفترة.</td>
                     </tr>
@@ -433,7 +451,14 @@ export function ReportsPage() {
                   {income.expenses.map((r) => (
                     <tr key={`e-${r.code}`}>
                       <td data-label="البند">{r.code} · {r.name}</td>
-                      <td data-label="النوع"><span className="rp-account-type">مصروف</span></td>
+                      <td data-label="النوع"><span className="rp-account-type">مصروف تشغيل</span></td>
+                      <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
+                    </tr>
+                  ))}
+                  {(income.owner_accruals || []).map((r) => (
+                    <tr key={`o-${r.code}`}>
+                      <td data-label="البند">{r.code} · {r.name}</td>
+                      <td data-label="النوع"><span className="rp-account-type">استحقاق ملاك</span></td>
                       <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
                     </tr>
                   ))}
