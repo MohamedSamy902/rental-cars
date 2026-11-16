@@ -26,6 +26,17 @@ class OwnerRentScheduleTest extends TestCase
         ], $shares);
     }
 
+    public function test_counts_from_floor_skips_months_before_go_live(): void
+    {
+        // عقد من يناير · التشغيل من نوفمبر · اليوم ١٦ نوفمبر → لا شهر مكتمل بعد أرضية نوفمبر
+        $shares = $this->schedule->shares('2026-01-11', '2027-01-11', 41000, '2026-11-16', '2026-11-01');
+        $this->assertSame([], $shares);
+
+        // بعد اكتمال نوفمبر: يُحسب نوفمبر فقط من أرضية التشغيل
+        $afterNov = $this->schedule->shares('2026-01-11', '2027-01-11', 41000, '2026-12-01', '2026-11-01');
+        $this->assertSame(['2026-11' => 41000], $afterNov);
+    }
+
     public function test_full_calendar_month_inside_a_mid_month_agreement_is_exact(): void
     {
         $shares = $this->schedule->shares('2026-09-15', '2026-12-14', 3000, '2026-11-08');

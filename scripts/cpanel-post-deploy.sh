@@ -81,6 +81,7 @@ fi
 echo "==> تنظيف DEMO + تنظيف استحقاق الملاك المتراكم + ترحيل إيجار آمن"
 "$PHP_BIN" artisan rpm:purge-demo-contracts --force 2>/dev/null || echo "تنبيه: rpm:purge-demo-contracts تُخطّي أو غير متاح بعد"
 "$PHP_BIN" artisan owners:purge-accrual-ledger --force 2>/dev/null || echo "تنبيه: owners:purge-accrual-ledger تُخطّي أو غير متاح بعد"
+"$PHP_BIN" artisan owners:ensure-dues-counts-from 2026-11-01 2>/dev/null || echo "تنبيه: owners:ensure-dues-counts-from تُخطّي أو غير متاح بعد"
 "$PHP_BIN" artisan rpm:enrich-live-demo 2>/dev/null || echo "تنبيه: rpm:enrich-live-demo تُخطّي أو غير متاح بعد"
 
 "$PHP_BIN" artisan config:cache

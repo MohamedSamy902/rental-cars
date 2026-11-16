@@ -14,23 +14,38 @@ use DateTimeZone;
  * through its last equals the monthly amount exactly. Counting uses date-only
  * UTC instants so a Cairo DST transition cannot drop or duplicate a civil day.
  * The unfinished current month is omitted. Days after owner_agreement_ends_on
- * are omitted. Existing dues are not rewritten by this schedule.
+ * are omitted. Optional $countsFrom raises the money-count start (go-live floor)
+ * without changing the legal agreement start used elsewhere. Existing dues are
+ * not rewritten by this schedule.
  */
 final class OwnerRentSchedule
 {
     /**
      * @return array<string, int> year-month => amount in whole currency units
      */
-    public function shares(?string $startsOn, ?string $endsOn, int $monthlyAmount, string $today): array
-    {
+    public function shares(
+        ?string $startsOn,
+        ?string $endsOn,
+        int $monthlyAmount,
+        string $today,
+        ?string $countsFrom = null,
+    ): array {
         if ($monthlyAmount < 1 || $startsOn === null || $startsOn === '') {
             return [];
         }
 
-        $start = $this->civil($startsOn);
+        $agreementStart = $this->civil($startsOn);
         $todayDate = $this->civil($today);
-        if (! $start || ! $todayDate) {
+        if (! $agreementStart || ! $todayDate) {
             return [];
+        }
+
+        $start = $agreementStart;
+        if ($countsFrom !== null && $countsFrom !== '') {
+            $floor = $this->civil($countsFrom);
+            if ($floor && $floor > $start) {
+                $start = $floor;
+            }
         }
 
         $endCap = null;
