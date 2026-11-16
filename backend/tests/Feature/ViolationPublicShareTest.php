@@ -143,7 +143,11 @@ class ViolationPublicShareTest extends TestCase
             ->assertSee('بيان مخالفات', false)
             ->assertSee('عميل مشاركة', false)
             ->assertSee('350', false)
-            ->assertSee('/api/public/media/'.$this->media->id.'/file', false);
+            ->assertSee('/api/public/media/'.$this->media->id.'/file', false)
+            ->assertSee('#18181b', false)
+            ->assertSee('#dc2626', false)
+            ->assertSee('Tajawal', false)
+            ->assertDontSee('#0f766e', false);
     }
 
     public function test_public_media_file_opens_with_valid_signature_without_login(): void
