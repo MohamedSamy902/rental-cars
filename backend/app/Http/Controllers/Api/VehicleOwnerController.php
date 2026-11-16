@@ -64,7 +64,7 @@ class VehicleOwnerController extends Controller
         $ym = $request->string('month')->toString() ?: now()->format('Y-m');
         $owner->load(['vehicles' => fn ($q) => $q->orderBy('code')]);
         $balance = $this->owners->balance($owner, $ym);
-        $dues = $owner->monthDues()->with('vehicle:id,code,plate,brand,model')->orderByDesc('year_month')->limit(24)->get();
+        // ملف المالك بلا ترحيل محاسبي (dues) — الصرف فقط + جدول عقد الإدارة الحي
         $payouts = $owner->payouts()->with('vehicle:id,code,plate')->orderByDesc('paid_on')->orderByDesc('id')->limit(50)->get();
         $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
 
@@ -89,7 +89,6 @@ class VehicleOwnerController extends Controller
                         'is_active' => $v->is_active,
                     ];
                 }),
-                'dues' => $dues,
                 'payouts' => $payouts,
             ],
         ]);
