@@ -38,7 +38,7 @@ class DueNotificationService
 
     public const REMINDER_HOURS = 24;
 
-    public const LEAD_KM = 500;
+    public const LEAD_KM = 2000;
 
     /** افتراضي الإنتاج: من 1 ظهر لمدة 12 ساعة حتى قبل 1 بالليل */
     public const DEFAULT_SPREAD_START_HOUR = 13;

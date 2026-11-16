@@ -370,7 +370,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
             })
             setFieldErrors((prev) => ({ ...prev, next_service_on: '', next_service_odometer: '' }))
           }}
-          hint="للقطع التي تتغيّر بالكيلومتر — إشعار قبل ٥٠٠ كم · واحد من الاثنين فقط"
+          hint="للقطع التي تتغيّر بالكيلومتر — إشعار قبل ٢٠٠٠ كم · واحد من الاثنين فقط"
         />
       </div>
     </Sheet>
