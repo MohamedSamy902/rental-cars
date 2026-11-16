@@ -3,12 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney, toApiDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
-import {
-  absoluteMediaUrls,
-  collectViolationPhotoPaths,
-  openWhatsAppText,
-  violationsWhatsAppText,
-} from '@/shared/lib/whatsappShare'
+import { openWhatsAppText } from '@/shared/lib/whatsappShare'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, SelectField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck, IconEdit,
   MediaUpload, type DataColumn,
@@ -298,26 +293,22 @@ export function ViolationsPage() {
       toast.error('لا يوجد رقم واتساب للعميل على هذه المخالفة.')
       return
     }
-    let centerName = 'شركة آر بي إم للتأجير'
     try {
-      const settings = await api<{ data: { center_name?: string } }>('/settings/tenant')
-      if (settings.data.center_name) centerName = settings.data.center_name
-    } catch {
-      /* الاسم الافتراضي يكفي */
+      const res = await api<{
+        data: { message_text: string; customer_phone?: string | null; share_url: string }
+      }>('/violations/share', {
+        method: 'POST',
+        json: { violation_ids: items.map((r) => r.id) },
+      })
+      openWhatsAppText(res.data.message_text, phone || res.data.customer_phone)
+      toast.success(
+        mode === 'customer'
+          ? `تم فتح واتساب بـ ${items.length} مخالفة مع رابط بيان يفتح بدون تسجيل دخول.`
+          : 'تم فتح واتساب بالمخالفة مع رابط بيان يفتح بدون تسجيل دخول.',
+      )
+    } catch (e) {
+      toast.error((e as ApiError).message)
     }
-    const photoPaths = collectViolationPhotoPaths(items)
-    const text = violationsWhatsAppText(items, {
-      centerName,
-      customerName: customer?.full_name,
-      absolutePhotoUrls: absoluteMediaUrls(photoPaths),
-    })
-    openWhatsAppText(text, phone)
-    const photoCount = photoPaths.length
-    toast.success(
-      mode === 'customer'
-        ? `تم فتح واتساب بـ ${items.length} مخالفة${photoCount ? ` · ${photoCount} صورة كروابط` : ''}.`
-        : `تم فتح واتساب بالمخالفة${photoCount ? ` · ${photoCount} صورة كروابط` : ''}.`,
-    )
   }
 
   function customerKey(r: Violation): string {

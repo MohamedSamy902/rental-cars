@@ -54,12 +54,17 @@ function violationPhotoPaths(v: ViolationShareItem): string[] {
   return v.photo_path ? [String(v.photo_path).trim()] : []
 }
 
-/** نص مخالفات للعميل على واتساب (مبلغ · تاريخ · لوحة · روابط صور إن أمكن). */
+/**
+ * نص مخالفات للعميل على واتساب.
+ * المسار الحي يفضّل `POST /violations/share` (رابط بيان موقّع يفتح بلا لوجين).
+ * هذه الدالة للاختبارات/الاحتياط عندما يتوفر `shareUrl` جاهز.
+ */
 export function violationsWhatsAppText(
   items: ViolationShareItem[],
   opts: {
     centerName?: string
     customerName?: string
+    shareUrl?: string
     absolutePhotoUrls?: string[]
   } = {},
 ): string {
@@ -70,6 +75,12 @@ export function violationsWhatsAppText(
     : `${center} — بيان مخالفات`
 
   const lines: string[] = [header, '']
+  if (opts.shareUrl?.trim()) {
+    lines.push('افتح البيان والصور من الرابط:')
+    lines.push(opts.shareUrl.trim())
+    lines.push('')
+  }
+
   let total = 0
   items.forEach((v, i) => {
     total += Number(v.amount) || 0
@@ -86,16 +97,12 @@ export function violationsWhatsAppText(
   lines.push(`الإجمالي: ${formatMoneyPlain(total)}`)
   lines.push(`عدد المخالفات: ${items.length}`)
 
-  const urls = (opts.absolutePhotoUrls || []).filter(Boolean)
-  if (urls.length > 0) {
-    lines.push('')
-    lines.push('صور المخالفات:')
-    urls.forEach((u, i) => lines.push(`${i + 1}. ${u}`))
-  } else {
-    const photoCount = items.reduce((n, v) => n + violationPhotoPaths(v).length, 0)
-    if (photoCount > 0) {
+  if (!opts.shareUrl?.trim()) {
+    const urls = (opts.absolutePhotoUrls || []).filter(Boolean)
+    if (urls.length > 0) {
       lines.push('')
-      lines.push(`مرفق ${photoCount} صورة داخل النظام — يُفضّل إرفاقها يدوياً من المعرض بعد فتح المحادثة.`)
+      lines.push('صور المخالفات:')
+      urls.forEach((u, i) => lines.push(`${i + 1}. ${u}`))
     }
   }
 

@@ -611,6 +611,9 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/violations` | تسجيل مع إسناد حيازة تلقائي إن أمكن |
 | PUT | `/violations/{id}` | تعديل (تاريخ · عقد · مبلغ · مكان · حالة · مرفق) |
 | POST | `/violations/{id}/confirm` | تأكيد سداد دون قيد |
+| POST | `/violations/share` | تجهيز نص واتساب + رابط بيان موقّع (`share_url` · `message_text`) — صلاحية `violations.view` |
+| GET | `/public/violations/share` | صفحة HTML عامة (توقيع مؤقت · بلا لوجين) |
+| GET | `/public/media/{id}/file` | بث ميديا عام (توقيع مؤقت · بلا لوجين) |
 | GET | `/violation-inquiries` | قائمة استعلام اللوحات · `meta.auto_daily_reset` |
 | POST | `/violation-inquiries/{vehicle}/mark` | تعليم تم الاستعلام |
 | POST | `/violation-inquiries/reset-all` | إعادة كل اللوحات لبانتظار الاستعلام (يمسح العلامات) |
@@ -637,6 +640,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/media` | رفع ملف (`multipart/form-data`) |
 | GET | `/media/{id}` | بيانات الملف |
 | GET | `/media/{id}/file` | بث الملف (مصادق · inline) |
+| GET | `/public/media/{id}/file` | بث ملف عبر توقيع مؤقت (واتساب/عميل · بلا لوجين) |
 | DELETE | `/media/{id}` | حذف ناعم + إزالة من التخزين |
 
 **POST حقول**
