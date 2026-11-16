@@ -71,16 +71,24 @@ class VehicleOwnerController extends Controller
         return response()->json([
             'data' => [
                 ...$this->present($owner, $balance, $canViewNid),
-                'vehicles' => $owner->vehicles->map(fn ($v) => [
-                    'id' => $v->id,
-                    'code' => $v->code,
-                    'plate' => $v->plate,
-                    'brand' => $v->brand,
-                    'model' => $v->model,
-                    'owner_monthly_amount' => $v->owner_monthly_amount,
-                    'owner_since' => $v->owner_since?->toDateString(),
-                    'is_active' => $v->is_active,
-                ]),
+                'vehicles' => $owner->vehicles->map(function ($v) use ($balance) {
+                    $row = collect($balance['vehicles_breakdown'] ?? [])->firstWhere('vehicle_id', $v->id);
+
+                    return [
+                        'id' => $v->id,
+                        'code' => $v->code,
+                        'plate' => $v->plate,
+                        'brand' => $v->brand,
+                        'model' => $v->model,
+                        'owner_monthly_amount' => $v->owner_monthly_amount,
+                        'owner_since' => $v->owner_since?->toDateString(),
+                        'owner_agreement_starts_on' => $v->owner_agreement_starts_on?->toDateString(),
+                        'owner_agreement_ends_on' => $v->owner_agreement_ends_on?->toDateString(),
+                        'earned_completed' => (int) ($row['earned'] ?? 0),
+                        'earned_shares' => $row['shares'] ?? [],
+                        'is_active' => $v->is_active,
+                    ];
+                }),
                 'dues' => $dues,
                 'payouts' => $payouts,
             ],
