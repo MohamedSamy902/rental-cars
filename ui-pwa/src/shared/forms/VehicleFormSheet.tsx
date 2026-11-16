@@ -32,6 +32,8 @@ export type VehicleFormInitial = {
   seats?: number | string | null
   odometer?: number | string | null
   daily_rate?: number | string | null
+  half_monthly_rate?: number | string | null
+  monthly_rate?: number | string | null
   default_deposit?: number | string | null
   purchase_value_estimate?: number | string | null
   tracker_device_number?: string | null
@@ -73,6 +75,8 @@ type FormState = {
   seats: string
   odometer: string
   daily_rate: string
+  half_monthly_rate: string
+  monthly_rate: string
   default_deposit: string
   purchase_value_estimate: string
   tracker_device_number: string
@@ -121,6 +125,8 @@ function emptyForm(): FormState {
     seats: '5',
     odometer: '',
     daily_rate: '',
+    half_monthly_rate: '',
+    monthly_rate: '',
     default_deposit: '',
     purchase_value_estimate: '',
     tracker_device_number: '',
@@ -180,6 +186,18 @@ function fromInitial(initial?: VehicleFormInitial | null): FormState {
     seats: str(initial.seats, '5'),
     odometer: str(initial.odometer),
     daily_rate: str(initial.daily_rate),
+    half_monthly_rate: str(
+      initial.half_monthly_rate
+        ?? (initial.daily_rate != null && initial.daily_rate !== ''
+          ? Math.round(Number(initial.daily_rate) * 15)
+          : ''),
+    ),
+    monthly_rate: str(
+      initial.monthly_rate
+        ?? (initial.daily_rate != null && initial.daily_rate !== ''
+          ? Math.round(Number(initial.daily_rate) * 22)
+          : ''),
+    ),
     default_deposit: str(initial.default_deposit),
     purchase_value_estimate: str(initial.purchase_value_estimate),
     tracker_device_number: str(initial.tracker_device_number),
@@ -327,6 +345,8 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       fuel_type: form.fuel_type,
       odometer: Number(form.odometer),
       daily_rate: Number(form.daily_rate),
+      half_monthly_rate: Number(form.half_monthly_rate),
+      monthly_rate: Number(form.monthly_rate),
       default_deposit: Number(form.default_deposit),
       chassis_number: form.chassis_number.trim() || null,
       engine_number: form.engine_number || null,
@@ -528,7 +548,42 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         <TextField label="رقم المحرك" value={form.engine_number} error={errors.engine_number} hint="إنجليزي/أرقام فقط · 5–32" onChange={(e) => setForm({ ...form, engine_number: e.target.value })} />
         <TextField label="سعة المحرك" value={form.engine_capacity} onChange={(e) => setForm({ ...form, engine_capacity: e.target.value })} />
         <NumberField label="العداد الفعلي" required value={form.odometer} error={errors.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />
-        <MoneyField label="الإيجار اليومي الافتراضي" required value={form.daily_rate} error={errors.daily_rate} onChange={(e) => setForm({ ...form, daily_rate: e.target.value })} />
+        <MoneyField
+          label="الإيجار اليومي"
+          required
+          value={form.daily_rate}
+          error={errors.daily_rate}
+          onChange={(e) => {
+            const daily = Number(e.target.value || 0)
+            setForm({
+              ...form,
+              daily_rate: e.target.value,
+              half_monthly_rate: Number.isFinite(daily) && daily > 0
+                ? String(Math.round(daily * 15))
+                : form.half_monthly_rate,
+              monthly_rate: Number.isFinite(daily) && daily > 0
+                ? String(Math.round(daily * 22))
+                : form.monthly_rate,
+            })
+          }}
+          hint="لمدة ١–١٠ أيام"
+        />
+        <MoneyField
+          label="سعر نص الشهر (١٥ يوماً)"
+          required
+          value={form.half_monthly_rate}
+          error={errors.half_monthly_rate}
+          onChange={(e) => setForm({ ...form, half_monthly_rate: e.target.value })}
+          hint="لمدة ١١–٢٠ يوماً · يُقترح يومي×١٥"
+        />
+        <MoneyField
+          label="السعر الشهري (٣٠ يوماً)"
+          required
+          value={form.monthly_rate}
+          error={errors.monthly_rate}
+          onChange={(e) => setForm({ ...form, monthly_rate: e.target.value })}
+          hint="لمدة ٢١ يوماً فأكثر · يُقترح يومي×٢٢"
+        />
         <MoneyField label="التأمين النقدي الافتراضي" required value={form.default_deposit} error={errors.default_deposit} onChange={(e) => setForm({ ...form, default_deposit: e.target.value })} />
         <TextField label="رقم جهاز التتبع" value={form.tracker_device_number} onChange={(e) => setForm({ ...form, tracker_device_number: e.target.value })} />
         <TextField label="رقم شريحة التتبع" value={form.tracker_sim_number} onChange={(e) => setForm({ ...form, tracker_sim_number: e.target.value })} />

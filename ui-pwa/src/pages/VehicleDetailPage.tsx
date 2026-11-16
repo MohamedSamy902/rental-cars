@@ -70,6 +70,8 @@ type Vehicle = {
   odometer: number
   odometer_source?: string | null
   daily_rate: number
+  half_monthly_rate?: number | null
+  monthly_rate?: number | null
   default_deposit: number
   purchase_value_estimate?: number | null
   status: string
@@ -787,6 +789,8 @@ export function VehicleDetailPage() {
         <Fact label="العداد الفعلي" value={`${formatNumber(v.odometer)} كم`} />
         <Fact label="مصدر العداد" value={v.odometer_source || '—'} />
         <Fact label="الإيجار اليومي" value={formatMoney(v.daily_rate)} />
+        <Fact label="سعر نص الشهر (١٥ يوماً)" value={formatMoney(v.half_monthly_rate ?? Math.round(v.daily_rate * 15))} />
+        <Fact label="السعر الشهري (٣٠ يوماً)" value={formatMoney(v.monthly_rate ?? Math.round(v.daily_rate * 22))} />
         <Fact label="التأمين النقدي" value={formatMoney(v.default_deposit)} />
         <Fact label="الحالة التشغيلية" value={statusLabel[v.status] || v.status} />
         <Fact label="حالة يدوية" value={v.manual_status || '—'} />
@@ -1641,6 +1645,14 @@ export function VehicleDetailPage() {
             <div className="vd-rate">
               <span>الإيجار اليومي</span>
               <strong>{formatMoney(v.daily_rate)}</strong>
+            </div>
+            <div className="vd-rate">
+              <span>نص شهر</span>
+              <strong>{formatMoney(v.half_monthly_rate ?? Math.round(v.daily_rate * 15))}</strong>
+            </div>
+            <div className="vd-rate">
+              <span>شهري</span>
+              <strong>{formatMoney(v.monthly_rate ?? Math.round(v.daily_rate * 22))}</strong>
             </div>
             <QrCode
               className="vd-qr"

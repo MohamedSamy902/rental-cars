@@ -14,6 +14,8 @@ type Vehicle = {
   model: string
   plate: string
   daily_rate: number
+  half_monthly_rate?: number | null
+  monthly_rate?: number | null
   default_deposit: number
   odometer?: number
   accessories?: Accessory[]
@@ -120,12 +122,18 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   const applyVehicleDefaults = useCallback((v: Vehicle | undefined, prev: typeof emptyForm) => {
     if (!v) return prev
     const daily = Number(v.daily_rate || 0)
+    const half = v.half_monthly_rate != null && Number(v.half_monthly_rate) > 0
+      ? Number(v.half_monthly_rate)
+      : Math.round(daily * HALF_MONTHLY_FACTOR)
+    const monthly = v.monthly_rate != null && Number(v.monthly_rate) > 0
+      ? Number(v.monthly_rate)
+      : Math.round(daily * MONTHLY_FACTOR)
     return {
       ...prev,
       vehicle_id: String(v.id),
       daily_rate: String(v.daily_rate),
-      half_monthly_rate: String(Math.round(daily * HALF_MONTHLY_FACTOR)),
-      monthly_rate: String(Math.round(daily * MONTHLY_FACTOR)),
+      half_monthly_rate: String(half),
+      monthly_rate: String(monthly),
       deposit: String(v.default_deposit),
       odometer: v.odometer != null ? String(v.odometer) : prev.odometer,
     }

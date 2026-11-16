@@ -649,6 +649,8 @@ class VehicleController extends Controller
             'odometer' => $v->odometer,
             'odometer_source' => $v->odometer_source,
             'daily_rate' => $v->daily_rate,
+            'half_monthly_rate' => $v->half_monthly_rate !== null ? (int) $v->half_monthly_rate : null,
+            'monthly_rate' => $v->monthly_rate !== null ? (int) $v->monthly_rate : null,
             'default_deposit' => $v->default_deposit,
             'purchase_value_estimate' => $v->purchase_value_estimate,
             'tracker_device_number' => $v->tracker_device_number,

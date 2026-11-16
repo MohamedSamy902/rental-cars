@@ -116,10 +116,14 @@ class ContractLifecycleService
                 ? (int) $data['half_monthly_rate']
                 : (array_key_exists('weekly_rate', $data) && $data['weekly_rate'] !== null
                     ? (int) $data['weekly_rate'] // توافق مؤقت إن وصل الطلب بالاسم القديم
-                    : (int) round($dailyRate * $halfFactor));
+                    : ($vehicle->half_monthly_rate !== null
+                        ? (int) $vehicle->half_monthly_rate
+                        : (int) round($dailyRate * $halfFactor)));
             $monthlyRate = array_key_exists('monthly_rate', $data) && $data['monthly_rate'] !== null
                 ? (int) $data['monthly_rate']
-                : (int) round($dailyRate * $monthlyFactor);
+                : ($vehicle->monthly_rate !== null
+                    ? (int) $vehicle->monthly_rate
+                    : (int) round($dailyRate * $monthlyFactor));
             $plannedDays = $this->pricing->countRentalDays(
                 Carbon::parse($data['starts_at']),
                 Carbon::parse($data['planned_ends_at']),
