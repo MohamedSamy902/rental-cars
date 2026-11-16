@@ -48,6 +48,8 @@ function mediaApiPath(stored: string): string | null {
     return match ? `/media/${match[1]}/file` : null
   }
   if (/^\/media\/\d+\/file$/.test(stored)) return stored
+  // رقم ميديا محفوظ مباشرة
+  if (/^\d+$/.test(stored)) return `/media/${stored}/file`
   return null
 }
 
@@ -189,11 +191,11 @@ export function MediaUpload({
   }
 
   const showError = error || localError || undefined
-  const resolvedHint = hint ?? limits.hint ?? DEFAULT_MEDIA_LIMITS.hint
+  const resolvedHint = disabled ? undefined : (hint ?? limits.hint ?? DEFAULT_MEDIA_LIMITS.hint)
   const acceptAttr = acceptForKind(limits, accept)
 
   return (
-    <FieldShell label={label} required={required} error={showError} hint={resolvedHint} htmlFor={inputId}>
+    <FieldShell label={label} required={required} error={showError} hint={resolvedHint} htmlFor={disabled ? undefined : inputId}>
       <div className={`rpm-media ${disabled ? 'is-disabled' : ''} ${uploading ? 'is-uploading' : ''}`}>
         {previewUrl ? (
           <div className="rpm-media__preview">
@@ -205,34 +207,42 @@ export function MediaUpload({
           </div>
         ) : (
           <div className="rpm-media__empty" aria-hidden>
-            <span>لا ملف بعد</span>
+            <span>
+              {value
+                ? mediaApiPath(value)
+                  ? 'تعذّر تحميل المعاينة'
+                  : 'ملف قديم — أعد الرفع للمعاينة'
+                : 'لا ملف بعد'}
+            </span>
           </div>
         )}
-        <div className="rpm-media__actions">
-          <input
-            ref={inputRef}
-            id={inputId}
-            type="file"
-            accept={acceptAttr}
-            capture={capture}
-            disabled={disabled || uploading}
-            className="rpm-media__input"
-            onChange={(e) => void onPick(e.target.files?.[0] || null)}
-          />
-          <button
-            type="button"
-            className="rpm-media__btn"
-            disabled={disabled || uploading}
-            onClick={() => inputRef.current?.click()}
-          >
-            {uploading ? 'جارٍ الرفع…' : value ? 'استبدال' : 'اختيار ملف'}
-          </button>
-          {value ? (
-            <button type="button" className="rpm-media__btn is-muted" disabled={disabled || uploading} onClick={clear}>
-              إزالة
+        {!disabled ? (
+          <div className="rpm-media__actions">
+            <input
+              ref={inputRef}
+              id={inputId}
+              type="file"
+              accept={acceptAttr}
+              capture={capture}
+              disabled={uploading}
+              className="rpm-media__input"
+              onChange={(e) => void onPick(e.target.files?.[0] || null)}
+            />
+            <button
+              type="button"
+              className="rpm-media__btn"
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
+            >
+              {uploading ? 'جارٍ الرفع…' : value ? 'استبدال' : 'اختيار ملف'}
             </button>
-          ) : null}
-        </div>
+            {value ? (
+              <button type="button" className="rpm-media__btn is-muted" disabled={uploading} onClick={clear}>
+                إزالة
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {uploading ? (
           <p className="rpm-media__progress" role="status" aria-live="polite">
             جارٍ الرفع…
