@@ -21,6 +21,7 @@ use App\Models\VehicleDocument;
 use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
+use App\Support\FleetCatalog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -45,15 +46,6 @@ class MegaSeeder extends Seeder
     private const TARGET_EXPENSES = 25;
 
     private const TARGET_AUDIT = 220;
-
-    /** @var list<string> */
-    private array $brands = ['هيونداي', 'تويوتا', 'كيا', 'نيسان', 'شيري', 'MG', 'بي واي دي', 'سكودا', 'شيفروليه', 'رينو'];
-
-    /** @var list<string> */
-    private array $models = ['إلنترا', 'أكسنت', 'كورولا', 'يارس', 'سبورتاج', 'صني', 'تيجو', 'ZS', 'أتو 3', 'أوكافيا', 'لانوس', 'لوجان', 'سيراتو', 'ريو', 'كروز'];
-
-    /** @var list<string> */
-    private array $categories = ['اقتصادي', 'SUV', 'عائلي', 'كهربائي', 'تجاري'];
 
     /** @var list<string> */
     private array $colors = ['أبيض', 'أسود', 'فضي', 'رمادي', 'أزرق', 'أحمر', 'بني'];
@@ -124,9 +116,10 @@ class MegaSeeder extends Seeder
             if (Vehicle::query()->where('code', $code)->exists()) {
                 continue;
             }
-            $brand = $this->brands[$n % count($this->brands)];
-            $model = $this->models[$n % count($this->models)];
-            $category = $this->categories[$n % count($this->categories)];
+            $pair = FleetCatalog::pairForIndex($n);
+            $brand = $pair['brand'];
+            $model = $pair['model'];
+            $category = FleetCatalog::categoryForModel($model);
             $manual = $manualPool[$n % count($manualPool)];
             $odometer = 5000 + ($n * 1733) % 140000;
             $daily = 650 + ($n % 12) * 75;
@@ -138,14 +131,14 @@ class MegaSeeder extends Seeder
                 'model' => $model,
                 'year' => 2018 + ($n % 7),
                 'category' => $category,
-                'fuel_type' => $category === 'كهربائي' ? 'كهرباء' : 'بنزين',
+                'fuel_type' => 'بنزين',
                 'odometer' => $odometer,
                 'odometer_source' => 'manual',
                 'daily_rate' => $daily,
                 'default_deposit' => (int) round($daily * 3.2 / 100) * 100,
                 'color' => $this->colors[$n % count($this->colors)],
                 'transmission' => $n % 5 === 0 ? 'مانيوال' : 'أوتوماتيك',
-                'seats' => $category === 'عائلي' ? 7 : 5,
+                'seats' => 5,
                 'manual_status' => $manual,
                 'is_active' => true,
                 'notes' => $n % 11 === 0 ? 'بذرة ميجا — حالة خاصة' : null,

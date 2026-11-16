@@ -21,6 +21,12 @@ export function formatMoney(value: number): string {
   return egp.format(value)
 }
 
+/** Plain money for WhatsApp/share (Western digits, no RTL isolates). */
+export function formatMoneyPlain(value: number): string {
+  const n = Number.isFinite(value) ? Math.round(value) : 0
+  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)} ج.م.`
+}
+
 export function formatNumber(value: number): string {
   return numberAr.format(value)
 }
