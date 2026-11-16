@@ -46,6 +46,7 @@ class VehicleController extends Controller
         return response()->json([
             'data' => [
                 'brands' => $this->vehicles->brandOptions(),
+                'categories' => $this->vehicles->categoryOptions(),
                 'addons' => $this->vehicles->addonCatalog(),
                 'next_code' => $this->vehicles->nextInternalCode(),
             ],

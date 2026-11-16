@@ -53,7 +53,7 @@ class MegaSeeder extends Seeder
     private array $models = ['إلنترا', 'أكسنت', 'كورولا', 'يارس', 'سبورتاج', 'صني', 'تيجو', 'ZS', 'أتو 3', 'أوكافيا', 'لانوس', 'لوجان', 'سيراتو', 'ريو', 'كروز'];
 
     /** @var list<string> */
-    private array $categories = ['اقتصادي', 'SUV', 'عائلي', 'كهربائي', 'تجاري'];
+    private array $categories = ['اقتصادي', 'سيدان', 'SUV', 'دفع رباعي', 'فاخر', 'لاكشري'];
 
     /** @var list<string> */
     private array $colors = ['أبيض', 'أسود', 'فضي', 'رمادي', 'أزرق', 'أحمر', 'بني'];
