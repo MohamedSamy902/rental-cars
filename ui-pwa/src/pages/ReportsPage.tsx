@@ -372,26 +372,14 @@ export function ReportsPage() {
               items={[
                 { id: 'inc', label: 'إيرادات', value: income.income_total, format: 'money', tone: 'success' },
                 { id: 'exp', label: 'مصروفات تشغيل', value: income.expense_total, format: 'money', tone: 'warning' },
-                {
-                  id: 'own',
-                  label: 'مستحقات ملاك (استحقاق)',
-                  value: income.owner_accrual_total || 0,
-                  format: 'money',
-                  tone: 'default',
-                },
                 { id: 'net', label: 'صافي تشغيلي', value: income.net, format: 'money', tone: 'info' },
               ]}
             />
             <p className="muted" style={{ marginBlockStart: 0 }}>
-              مستحقات الملاك استحقاق محاسبي وليست مصروفاً نقدياً حتى يتم الصرف من شاشة الملاك.
-              {typeof income.net_with_owner_accrual === 'number'
-                ? ` · صافي بعد الاستحقاق ${formatMoney(income.net_with_owner_accrual)}`
-                : ''}
+              صرف الملاك الشهري يُسجَّل مصروفاً نقدياً (٥٢٠٠) ضمن مصروفات التشغيل عند التسديد.
             </p>
             <div className="rp-income-rows" role="list" aria-label="بنود قائمة الدخل">
-              {income.income.length === 0
-                && income.expenses.length === 0
-                && (income.owner_accruals || []).length === 0 ? (
+              {income.income.length === 0 && income.expenses.length === 0 ? (
                 <p className="muted">لا بنود دخل/مصروف مرحّلة في الفترة.</p>
               ) : null}
               {income.income.map((r) => (
@@ -408,15 +396,6 @@ export function ReportsPage() {
                   <div>
                     <strong>{r.code} · {r.name}</strong>
                     <span className="rp-account-type">مصروف تشغيل</span>
-                  </div>
-                  <strong className="tabular-nums">{formatMoney(r.amount)}</strong>
-                </article>
-              ))}
-              {(income.owner_accruals || []).map((r) => (
-                <article key={`o-${r.code}`} className="rp-income-row" role="listitem">
-                  <div>
-                    <strong>{r.code} · {r.name}</strong>
-                    <span className="rp-account-type">استحقاق ملاك</span>
                   </div>
                   <strong className="tabular-nums">{formatMoney(r.amount)}</strong>
                 </article>

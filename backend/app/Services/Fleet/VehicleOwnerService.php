@@ -407,8 +407,6 @@ class VehicleOwnerService
         $date = new DateTimeImmutable($paidOn);
         $this->accounting->assertMonthOpen((int) $date->format('Y'), (int) $date->format('n'));
 
-        $this->ensureAccruedThrough($owner, $date->format('Y-m'), $userId);
-
         $vehicleId = isset($data['vehicle_id']) ? (int) $data['vehicle_id'] : null;
         if ($vehicleId) {
             $belongs = Vehicle::query()->where('id', $vehicleId)->where('owner_id', $owner->id)->exists();
@@ -421,18 +419,11 @@ class VehicleOwnerService
         $this->accounting->ensureChartOfAccounts();
         $this->ensureOwnerAccounts();
 
+        // صرف تشغيلي = مصروف إيجار ملاك مباشرة مقابل النقدية (بلا ترحيل استحقاق / بلا سقف متبقي).
         return DB::transaction(function () use ($owner, $amount, $paidOn, $method, $vehicleId, $data, $userId) {
-            OwnerMonthDue::query()->where('owner_id', $owner->id)->lockForUpdate()->get();
             OwnerPayout::query()->where('owner_id', $owner->id)->lockForUpdate()->get();
-            $balance = $this->balance($owner);
-            if ($amount > $balance['remaining']) {
-                throw new DomainException(sprintf(
-                    'المبلغ أكبر من المتبقي للمالك (%d).',
-                    $balance['remaining']
-                ));
-            }
 
-            $payable = Account::query()->where('code', '2100')->firstOrFail();
+            $expense = Account::query()->where('code', '5200')->firstOrFail();
             $cashCode = $method === 'transfer' || $method === 'bank' ? '1100' : '1000';
             $cash = Account::query()->where('code', $cashCode)->firstOrFail();
 
@@ -449,13 +440,13 @@ class VehicleOwnerService
 
             $entry = JournalEntry::query()->create([
                 'entry_date' => $paidOn,
-                'narration' => "صرف لمالك {$owner->full_name}",
+                'narration' => "صرف شهري لمالك {$owner->full_name}",
                 'source' => 'owner_payout:'.$payout->id,
                 'posted_by' => $userId,
             ]);
             JournalLine::query()->create([
                 'journal_entry_id' => $entry->id,
-                'account_id' => $payable->id,
+                'account_id' => $expense->id,
                 'debit' => $amount,
                 'credit' => 0,
                 'vehicle_id' => $vehicleId,
@@ -472,6 +463,144 @@ class VehicleOwnerService
 
             return $payout->fresh('vehicle');
         });
+    }
+
+    /**
+     * ينظّف دفتر استحقاق الملاك المتراكم (owner_month_dues + قيود 2100/5200 المرتبطة)
+     * ويعيد تصنيف صرفات 2100 القديمة إلى مصروف 5200، بدون حذف سجلات الصرف النقدية.
+     *
+     * @return array{dues_cleared: int, payouts_reclassed: int}
+     */
+    public function purgeAccrualLedger(?VehicleOwner $onlyOwner = null, ?int $userId = null): array
+    {
+        $this->accounting->ensureChartOfAccounts();
+        $this->ensureOwnerAccounts();
+
+        $duesCleared = 0;
+        $payoutsReclassed = 0;
+        $today = now()->timezone(config('app.timezone', 'Africa/Cairo'))->toDateString();
+
+        $owners = $onlyOwner
+            ? collect([$onlyOwner])
+            : VehicleOwner::query()->orderBy('id')->get();
+
+        foreach ($owners as $owner) {
+            $result = DB::transaction(function () use ($owner, $userId, $today) {
+                $cleared = 0;
+                $reclassed = 0;
+                $payable = Account::query()->where('code', '2100')->firstOrFail();
+                $expense = Account::query()->where('code', '5200')->firstOrFail();
+
+                $dues = OwnerMonthDue::query()
+                    ->where('owner_id', $owner->id)
+                    ->lockForUpdate()
+                    ->orderBy('id')
+                    ->get();
+
+                foreach ($dues as $due) {
+                    $amount = (int) $due->amount;
+                    if ($amount > 0) {
+                        $source = sprintf('owner_accrual_purge:%d:%s', $due->id, $due->year_month);
+                        if (! JournalEntry::query()->where('source', $source)->exists()) {
+                            $entry = JournalEntry::query()->create([
+                                'entry_date' => $today,
+                                'narration' => "تنظيف استحقاق مالك متراكم · {$owner->full_name} · {$due->year_month}",
+                                'source' => $source,
+                                'posted_by' => $userId,
+                            ]);
+                            // عكس أثر الاستحقاق: مدين 2100 / دائن 5200
+                            JournalLine::query()->create([
+                                'journal_entry_id' => $entry->id,
+                                'account_id' => $payable->id,
+                                'debit' => $amount,
+                                'credit' => 0,
+                                'vehicle_id' => $due->vehicle_id,
+                            ]);
+                            JournalLine::query()->create([
+                                'journal_entry_id' => $entry->id,
+                                'account_id' => $expense->id,
+                                'debit' => 0,
+                                'credit' => $amount,
+                                'vehicle_id' => $due->vehicle_id,
+                            ]);
+                        }
+                    }
+
+                    AuditLog::query()->create([
+                        'user_id' => $userId,
+                        'action' => 'owner_month_due_purged',
+                        'record_type' => OwnerMonthDue::class,
+                        'record_id' => $due->id,
+                        'before' => [
+                            'owner_id' => $due->owner_id,
+                            'vehicle_id' => $due->vehicle_id,
+                            'year_month' => $due->year_month,
+                            'amount' => $due->amount,
+                            'journal_entry_id' => $due->journal_entry_id,
+                        ],
+                    ]);
+                    $due->delete();
+                    $cleared++;
+                }
+
+                $payouts = OwnerPayout::query()
+                    ->where('owner_id', $owner->id)
+                    ->whereNotNull('journal_entry_id')
+                    ->lockForUpdate()
+                    ->orderBy('id')
+                    ->get();
+
+                foreach ($payouts as $payout) {
+                    $amount = (int) $payout->amount;
+                    if ($amount < 1 || ! $payout->journal_entry_id) {
+                        continue;
+                    }
+                    $hadPayableDebit = JournalLine::query()
+                        ->where('journal_entry_id', $payout->journal_entry_id)
+                        ->where('account_id', $payable->id)
+                        ->where('debit', '>', 0)
+                        ->exists();
+                    if (! $hadPayableDebit) {
+                        continue;
+                    }
+                    $source = 'owner_payout_reclass:'.$payout->id;
+                    if (JournalEntry::query()->where('source', $source)->exists()) {
+                        continue;
+                    }
+                    $entry = JournalEntry::query()->create([
+                        'entry_date' => $today,
+                        'narration' => "إعادة تصنيف صرف مالك إلى مصروف · {$owner->full_name}",
+                        'source' => $source,
+                        'posted_by' => $userId,
+                    ]);
+                    JournalLine::query()->create([
+                        'journal_entry_id' => $entry->id,
+                        'account_id' => $expense->id,
+                        'debit' => $amount,
+                        'credit' => 0,
+                        'vehicle_id' => $payout->vehicle_id,
+                    ]);
+                    JournalLine::query()->create([
+                        'journal_entry_id' => $entry->id,
+                        'account_id' => $payable->id,
+                        'debit' => 0,
+                        'credit' => $amount,
+                        'vehicle_id' => $payout->vehicle_id,
+                    ]);
+                    $reclassed++;
+                }
+
+                return ['cleared' => $cleared, 'reclassed' => $reclassed];
+            });
+
+            $duesCleared += $result['cleared'];
+            $payoutsReclassed += $result['reclassed'];
+        }
+
+        return [
+            'dues_cleared' => $duesCleared,
+            'payouts_reclassed' => $payoutsReclassed,
+        ];
     }
 
     /**

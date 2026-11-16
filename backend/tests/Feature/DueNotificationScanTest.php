@@ -308,7 +308,7 @@ class DueNotificationScanTest extends TestCase
         $this->assertSame(1, $this->titlesLike('صيانة بالتاريخ'));
         $this->assertSame(1, $this->titlesLike('صيانة بالكيلومتر'));
         $this->assertSame(1, NotificationReminder::query()->where('rule_key', 'violation_open')->count());
-        $this->assertSame(1, $this->titlesLike('مستحق مالك لم يُصرف: مالك التنبيه'));
+        $this->assertSame(0, $this->titlesLike('مستحق مالك لم يُصرف: مالك التنبيه'));
         $this->assertSame(1, $this->titlesLike('راتب لم يُصرف: راتب معلّق'));
         $this->assertSame(0, $this->titlesLike('راتب لم يُصرف: راتب مسودة'));
         $this->assertSame(0, $this->titlesLike('تقييم معلّق:'));

@@ -13,6 +13,5 @@ Schedule::command('notifications:scan')
     ->hourly()
     ->withoutOverlapping();
 
-Schedule::command('owners:accrue-dues')
-    ->dailyAt('00:30')
-    ->withoutOverlapping();
+// توقّف ترحيل استحقاق الملاك اليومي — الصرف التشغيلي = مصروف شهري نقدي مباشرة (owners:purge-accrual-ledger).
+

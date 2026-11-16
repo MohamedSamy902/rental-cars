@@ -85,10 +85,8 @@ class ReportQueryService
         $rows = $this->trialBalance($from, $to);
         $income = [];
         $expenses = [];
-        $ownerAccruals = [];
         $incomeTotal = 0;
         $expenseTotal = 0;
-        $ownerAccrualTotal = 0;
         foreach ($rows as $row) {
             if ($row['type'] === 'income') {
                 $amount = (int) $row['credit'] - (int) $row['debit'];
@@ -103,12 +101,7 @@ class ReportQueryService
                 if ($amount === 0) {
                     continue;
                 }
-                // 5200 = مصروف إيجار ملاك from owners:accrue-dues — not cash outflow yet.
-                if ((string) $row['code'] === '5200') {
-                    $ownerAccruals[] = [...$row, 'amount' => $amount];
-                    $ownerAccrualTotal += $amount;
-                    continue;
-                }
+                // 5200 = مصروف إيجار ملاك النقدي عند الصرف الشهري (يدخل مصروفات التشغيل).
                 $expenses[] = [...$row, 'amount' => $amount];
                 $expenseTotal += $amount;
             }
@@ -119,12 +112,12 @@ class ReportQueryService
             'to' => $to?->toDateString(),
             'income' => $income,
             'expenses' => $expenses,
-            'owner_accruals' => $ownerAccruals,
+            'owner_accruals' => [],
             'income_total' => $incomeTotal,
             'expense_total' => $expenseTotal,
-            'owner_accrual_total' => $ownerAccrualTotal,
+            'owner_accrual_total' => 0,
             'net' => $incomeTotal - $expenseTotal,
-            'net_with_owner_accrual' => $incomeTotal - $expenseTotal - $ownerAccrualTotal,
+            'net_with_owner_accrual' => $incomeTotal - $expenseTotal,
         ];
     }
 

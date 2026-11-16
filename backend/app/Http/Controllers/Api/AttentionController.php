@@ -102,20 +102,10 @@ class AttentionController extends Controller
     }
 
     /**
-     * ملاك لهم رصيد مستحق مسجّل (استحقاقات − صرف) دون إعادة استحقاق جماعي.
+     * رصيد المالك التشغيلي = الشهري التعاقدي فقط — بلا تنبيه على متبقي محاسبي متراكم.
      */
     private function ownersWithUnpaidBalance(): int
     {
-        if (! Schema::hasTable('vehicle_owners') || ! Schema::hasTable('owner_month_dues') || ! Schema::hasTable('owner_payouts')) {
-            return 0;
-        }
-
-        return (int) DB::table('vehicle_owners as o')
-            ->whereNull('o.deleted_at')
-            ->whereRaw(
-                '(SELECT COALESCE(SUM(d.amount), 0) FROM owner_month_dues d WHERE d.owner_id = o.id)
-                 > (SELECT COALESCE(SUM(p.amount), 0) FROM owner_payouts p WHERE p.owner_id = o.id)'
-            )
-            ->count();
+        return 0;
     }
 }
