@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Inspection extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'contract_id', 'type', 'inspected_at', 'odometer', 'notes',
         'inspector_id', 'signature_path', 'signature_data', 'accessories_json',

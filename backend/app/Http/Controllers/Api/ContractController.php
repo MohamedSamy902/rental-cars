@@ -14,6 +14,7 @@ use App\Models\TenantSetting;
 use App\Models\Violation;
 use App\Services\Contracts\ContractDossierService;
 use App\Services\Contracts\ContractLifecycleService;
+use App\Services\Contracts\ContractSoftDeleteService;
 use App\Services\Contracts\RentalProgressService;
 use App\Services\Documents\DocumentTemplateService;
 use App\Support\NestedCustomerRedactor;
@@ -29,6 +30,7 @@ class ContractController extends Controller
         private readonly ContractLifecycleService $lifecycle,
         private readonly RentalProgressService $progress,
         private readonly DocumentTemplateService $documentTemplates,
+        private readonly ContractSoftDeleteService $softDelete,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -479,6 +481,38 @@ class ContractController extends Controller
         }
 
         return response()->json(['data' => $deposit, 'message' => 'تم رد متبقي التأمين النقدي.']);
+    }
+
+    /**
+     * حذف ناعم للعقد وكل ما يخصه — سوبر أدمن فقط (middleware integrator).
+     */
+    public function destroy(Request $request, Contract $contract): JsonResponse
+    {
+        $result = $this->softDelete->softDelete($contract, $request->user());
+
+        return response()->json([
+            'message' => 'تم الحذف الناعم للعقد وكل ما يخصه (ماليات · مخالفات · فحوصات · صيانة مرتبطة).',
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * مسح كل العقود ناعماً + أوامر الشغل المتبقية — سوبر أدمن فقط.
+     */
+    public function softPurgeAll(Request $request): JsonResponse
+    {
+        $request->validate([
+            'confirm' => ['required', 'string', 'in:حذف الكل'],
+        ], [], [
+            'confirm' => 'تأكيد الحذف',
+        ]);
+
+        $result = $this->softDelete->softPurgeAll($request->user());
+
+        return response()->json([
+            'message' => 'تم الحذف الناعم لكل العقود والصيانات المرتبطة/المتبقية.',
+            'data' => $result,
+        ]);
     }
 
     /**

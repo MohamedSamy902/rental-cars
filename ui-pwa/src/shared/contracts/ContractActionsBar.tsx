@@ -8,10 +8,11 @@ type Props = {
   onApprove: () => void
   onAction: (kind: Exclude<ActionKind, null>) => void
   onPrint: (kind?: PrintDocKind) => void
+  onSoftDelete?: () => void
 }
 
-export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }: Props) {
-  const { can } = useAuth()
+export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint, onSoftDelete }: Props) {
+  const { can, isIntegrator } = useAuth()
   const canApprove = can('contracts.approve')
   const canUpdate = can('contracts.update')
   const canCancel = can('contracts_cancel.approve')
@@ -60,6 +61,11 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('invoice')}>الفاتورة</Button>
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('receipt')}>إقرار الاستلام والتسليم</Button>
         </div>
+      ) : null}
+      {isIntegrator && onSoftDelete ? (
+        <Button type="button" size="sm" variant="danger" className="cd-actions__danger" onClick={onSoftDelete}>
+          حذف ناعم
+        </Button>
       ) : null}
     </div>
   )

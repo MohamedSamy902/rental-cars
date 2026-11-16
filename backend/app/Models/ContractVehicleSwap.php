@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ContractVehicleSwap extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'contract_id', 'from_vehicle_id', 'to_vehicle_id',
         'segment_start_odometer', 'odometer_in', 'odometer_out',

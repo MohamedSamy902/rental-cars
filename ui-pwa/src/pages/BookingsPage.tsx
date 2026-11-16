@@ -27,7 +27,7 @@ const LIST_PER_PAGE = 50
 
 export function BookingsPage() {
   const navigate = useNavigate()
-  const { can } = useAuth()
+  const { can, isIntegrator } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Contract[]>([])
   const [page, setPage] = useState(1)
@@ -225,7 +225,14 @@ export function BookingsPage() {
       <PageHeader
         title="العقود والحجوزات"
         subtitle="العقود والحجوزات حسب الحالة"
-        action={<Button onClick={() => openNewContract()}>عقد جديد</Button>}
+        action={(
+          <div className="rpm-actions-row">
+            {isIntegrator ? (
+              <Button variant="danger" onClick={() => void life.softPurgeAll()}>مسح كل العقود ناعماً</Button>
+            ) : null}
+            <Button onClick={() => openNewContract()}>عقد جديد</Button>
+          </div>
+        )}
         mobileFab
       />
       <Fab label="عقد جديد" onClick={() => openNewContract()} />
@@ -270,7 +277,9 @@ export function BookingsPage() {
               approve: () => void life.approve(b.id),
               openAction: (kind) => void life.openAction(kind, b),
               print: (kind = 'contract') => openPrint(b.id, kind),
+              softDelete: () => void life.softDelete(b.id),
               can,
+              isIntegrator,
             })
           }
           emptyTitle="لا توجد عقود مطابقة"

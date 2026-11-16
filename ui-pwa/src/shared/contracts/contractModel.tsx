@@ -1,6 +1,6 @@
 import { StatusPill, type MenuItem } from '@/shared/ui'
 import {
-  IconEye, IconCheck, IconKey, IconReturn, IconCash, IconCalendar, IconCar, IconBan, IconPrinter, IconWallet,
+  IconEye, IconCheck, IconKey, IconReturn, IconCash, IconCalendar, IconCar, IconBan, IconPrinter, IconWallet, IconTrash,
 } from '@/shared/ui'
 
 export type Deposit = { id: number; original_amount: number; status: string; deductions_total: number; remaining?: number }
@@ -201,7 +201,9 @@ export function contractMenu(
     approve: () => void
     openAction: (kind: Exclude<ActionKind, null>) => void
     print: (kind?: 'contract' | 'invoice' | 'receipt') => void
+    softDelete?: () => void
     can?: (permission: string) => boolean
+    isIntegrator?: boolean
   },
 ): MenuItem[] {
   const can = handlers.can ?? (() => true)
@@ -250,6 +252,18 @@ export function contractMenu(
     items.push(
       { id: 'sep-2', separator: true },
       { id: 'cancel', label: 'إلغاء العقد', icon: <IconBan size={16} />, tone: 'danger', onSelect: () => handlers.openAction('cancel') },
+    )
+  }
+  if (handlers.isIntegrator && handlers.softDelete) {
+    items.push(
+      { id: 'sep-soft-delete', separator: true },
+      {
+        id: 'soft-delete',
+        label: 'حذف ناعم (عقد + ماليات)',
+        icon: <IconTrash size={16} />,
+        tone: 'danger',
+        onSelect: handlers.softDelete,
+      },
     )
   }
   return items
