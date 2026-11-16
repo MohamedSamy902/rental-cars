@@ -36,22 +36,8 @@ class VehicleOwnerController extends Controller
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
         $data = collect($rows->items())->map(function (VehicleOwner $o) use ($canViewNid) {
-            // قائمة خفيفة: رصيد من القيود الحالية دون إعادة استحقاق جماعي
-            $accrued = (int) $o->monthDues()->sum('amount');
-            $paid = (int) $o->payouts()->sum('amount');
-            $monthly = (int) $o->vehicles()->where('is_active', true)->sum('owner_monthly_amount');
-
-            return $this->present($o, [
-                'accrued_total' => $accrued,
-                'paid_total' => $paid,
-                'remaining' => max(0, $accrued - $paid),
-                'month' => now()->format('Y-m'),
-                'month_accrued' => (int) $o->monthDues()->where('year_month', now()->format('Y-m'))->sum('amount'),
-                'month_paid' => (int) $o->payouts()
-                    ->whereBetween('paid_on', [now()->format('Y-m-01'), now()->format('Y-m-t')])
-                    ->sum('amount'),
-                'vehicles_monthly_total' => $monthly,
-            ], $canViewNid);
+            // نفس حساب العرض/التفصيل: شهور مكتملة من الجدول − مصروف (بلا owner_month_dues)
+            return $this->present($o, $this->owners->balance($o), $canViewNid);
         });
 
         return response()->json([

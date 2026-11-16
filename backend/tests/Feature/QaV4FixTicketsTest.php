@@ -136,9 +136,15 @@ class QaV4FixTicketsTest extends TestCase
         $journalsBefore = JournalEntry::query()->count();
         $liabilityBefore = (int) Account::query()->where('code', '2100')->value('id');
 
-        $this->getJson('/api/owners/'.$owner->id)->assertOk()
-            ->assertJsonPath('data.balance.accrued_total', 0);
+        $expectedEarned = app(\App\Services\Fleet\VehicleOwnerService::class)->balance($owner)['earned_total'];
+        $this->assertGreaterThan(0, $expectedEarned);
 
+        $this->getJson('/api/owners/'.$owner->id)->assertOk()
+            ->assertJsonPath('data.balance.accrued_total', $expectedEarned)
+            ->assertJsonPath('data.balance.earned_total', $expectedEarned)
+            ->assertJsonPath('data.balance.overdue', $expectedEarned);
+
+        // القراءة لا تكتب dues ولا قيود — حتى لو accrued_total > 0 من الجدول الحي
         $this->assertSame($duesBefore, OwnerMonthDue::query()->count());
         $this->assertSame($journalsBefore, JournalEntry::query()->count());
 

@@ -4,8 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Contract;
 use App\Models\Customer;
-use App\Models\OwnerMonthDue;
-use App\Models\OwnerPayout;
 use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -14,6 +12,7 @@ use App\Models\VehicleOwner;
 use App\Models\WorkOrder;
 use App\Services\Accounting\AccountingService;
 use App\Support\PermissionCatalog;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -121,25 +120,24 @@ class AttentionSignalsTest extends TestCase
         ]);
     }
 
-    public function test_attention_ignores_owner_accrual_remaining(): void
+    public function test_attention_counts_owners_with_completed_month_overdue(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-11-16 12:00:00', 'Africa/Cairo'));
         $dueOwner = VehicleOwner::query()->create(['full_name' => 'مالك مستحق', 'is_active' => true]);
-        $vehicle = $this->vehicle('OWN-DUE', $dueOwner->id);
-
-        OwnerMonthDue::query()->create([
-            'owner_id' => $dueOwner->id,
-            'vehicle_id' => $vehicle->id,
-            'year_month' => now()->format('Y-m'),
-            'amount' => 5000,
+        $this->vehicle('OWN-DUE', $dueOwner->id, [
+            'owner_monthly_amount' => 5000,
+            'owner_agreement_starts_on' => '2026-09-01',
+            'owner_agreement_ends_on' => '2027-09-01',
         ]);
 
         $res = $this->getJson('/api/attention')->assertOk();
-        $res->assertJsonPath('data.owners_unpaid', 0);
+        $res->assertJsonPath('data.owners_unpaid', 1);
+        Carbon::setTestNow();
     }
 
-    private function vehicle(string $code, int $ownerId): Vehicle
+    private function vehicle(string $code, int $ownerId, array $extra = []): Vehicle
     {
-        return Vehicle::query()->create([
+        return Vehicle::query()->create(array_merge([
             'code' => $code,
             'plate' => $code,
             'brand' => 'تويوتا',
@@ -153,6 +151,6 @@ class AttentionSignalsTest extends TestCase
             'is_active' => true,
             'owner_id' => $ownerId,
             'owner_monthly_amount' => 2000,
-        ]);
+        ], $extra));
     }
 }

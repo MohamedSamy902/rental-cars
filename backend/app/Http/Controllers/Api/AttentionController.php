@@ -11,6 +11,7 @@ use App\Models\Notification;
 use App\Models\PayrollRun;
 use App\Models\Violation;
 use App\Models\WorkOrder;
+use App\Services\Fleet\VehicleOwnerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class AttentionController extends Controller
 {
+    public function __construct(private readonly VehicleOwnerService $owners) {}
+
     public function __invoke(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -102,10 +105,10 @@ class AttentionController extends Controller
     }
 
     /**
-     * رصيد المالك التشغيلي = الشهري التعاقدي فقط — بلا تنبيه على متبقي محاسبي متراكم.
+     * ملاك لهم فلوس متأخرة: شهور مدنية مكتملة حسب عقد المالك − إجمالي المصروف المسجّل.
      */
     private function ownersWithUnpaidBalance(): int
     {
-        return 0;
+        return $this->owners->countOwnersWithOverdue();
     }
 }

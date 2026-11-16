@@ -67,7 +67,15 @@ class OwnerDuesReconcileTest extends TestCase
             'created_by' => $admin->id,
         ]);
 
-        $this->assertSame(396774, $svc->balance($owner)['remaining']);
+        // الرصيد التشغيلي من الجدول الحي فقط — نوفمبر غير مكتمل ⇒ متأخر 0 رغم صف dues الخاطئ
+        $this->assertSame(0, $svc->balance($owner)['overdue']);
+        $this->assertSame(0, $svc->balance($owner)['remaining']);
+        $this->assertDatabaseHas('owner_month_dues', [
+            'owner_id' => $owner->id,
+            'year_month' => '2026-11',
+            'amount' => 396774,
+        ]);
+
         $fixed = $svc->reconcileAccrualsToSchedule($owner, $admin->id);
         $this->assertGreaterThan(0, $fixed);
         $this->assertSame(0, $svc->balance($owner)['remaining']);
@@ -79,6 +87,7 @@ class OwnerDuesReconcileTest extends TestCase
         $list = $this->getJson('/api/owners?per_page=50')->assertOk()->json('data');
         $row = collect($list)->firstWhere('id', $owner->id);
         $this->assertNotNull($row);
+        $this->assertSame(0, (int) ($row['balance']['overdue'] ?? -1));
         $this->assertSame(0, (int) ($row['balance']['remaining'] ?? -1));
 
         Carbon::setTestNow();

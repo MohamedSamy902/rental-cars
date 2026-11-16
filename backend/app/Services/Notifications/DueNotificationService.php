@@ -517,10 +517,33 @@ class DueNotificationService
      */
     private function ownerBalanceAlerts(array &$scanned): array
     {
-        // توقّف تنبيه «متبقي محاسبي» — رصيد المالك التشغيلي = المبلغ الشهري فقط.
         $this->mark($scanned, 'owner_balance');
 
-        return [];
+        if (! Schema::hasTable('vehicle_owners') || ! Schema::hasTable('owner_payouts') || ! Schema::hasTable('vehicles')) {
+            return [];
+        }
+
+        /** @var \App\Services\Fleet\VehicleOwnerService $owners */
+        $owners = app(\App\Services\Fleet\VehicleOwnerService::class);
+        $alerts = [];
+        foreach (\App\Models\VehicleOwner::query()->where('is_active', true)->orderBy('id')->cursor() as $owner) {
+            $overdue = (int) ($owners->balance($owner)['overdue'] ?? 0);
+            if ($overdue < 1) {
+                continue;
+            }
+            $alerts[] = new DueAlert(
+                ruleKey: 'owner_balance',
+                subjectType: 'owner',
+                subjectId: (int) $owner->id,
+                title: "فلوس متأخرة لمالك: {$owner->full_name}",
+                body: "شهور مكتملة لم تُصرف · المتأخر {$this->money($overdue)}.",
+                linkType: 'owner',
+                linkId: (int) $owner->id,
+                permissions: ['owners.view'],
+            );
+        }
+
+        return $alerts;
     }
 
     /**
