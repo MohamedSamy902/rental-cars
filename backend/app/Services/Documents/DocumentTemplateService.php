@@ -452,6 +452,8 @@ class DocumentTemplateService
             'actual_end_date' => $contract->actual_ends_at?->format('d/m/Y H:i') ?? '',
             'rental_duration' => $durationDays === null ? '' : ($durationDays === 1 ? 'يوم واحد' : $durationDays.' أيام'),
             'daily_rate' => (string) (int) $contract->frozen_daily_rate,
+            // إن وُجد {{vehicle_daily_rate}} في قالب عقد الإيجار نعرض سعر العقد المثبّت لا سعر العربية الافتراضي.
+            'vehicle_daily_rate' => (string) (int) $contract->frozen_daily_rate,
             'daily_km' => (string) (int) ($contract->frozen_daily_km_allowance ?? $ops['default_daily_km'] ?? 0),
             'excess_km_rate' => (string) (int) ($contract->frozen_excess_km_rate ?? $ops['excess_km_rate'] ?? 0),
             'deposit' => (string) (int) ($deposit?->original_amount ?? $contract->frozen_agreed_deposit ?? 0),

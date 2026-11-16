@@ -141,6 +141,9 @@ type Dossier = {
     actual_ends_at?: string | null
     final_total?: number | null
     period_rent?: number | null
+    frozen_daily_rate?: number | null
+    frozen_agreed_deposit?: number | null
+    approved_days?: number | null
     customer?: { id: number; full_name: string; phone?: string | null } | null
   }>
   work_orders: Array<{
@@ -527,7 +530,8 @@ export function VehicleDetailPage() {
       starts_at: c.starts_at || '',
       planned_ends_at: c.planned_ends_at || '',
       actual_ends_at: c.actual_ends_at,
-      frozen_daily_rate: dossier?.vehicle.daily_rate || 0,
+      frozen_daily_rate: Number(c.frozen_daily_rate ?? 0),
+      approved_days: c.approved_days ?? undefined,
       final_total: c.final_total ?? undefined,
       period_rent: c.period_rent ?? undefined,
       customer: c.customer
@@ -991,7 +995,11 @@ export function VehicleDetailPage() {
                   </div>
                   <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
                 </div>
-                <p className="tabular-nums">{c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : '—')}</p>
+                <p className="tabular-nums">
+                  {c.frozen_daily_rate != null ? `${formatMoney(c.frozen_daily_rate)}/يوم` : null}
+                  {c.frozen_daily_rate != null && (c.final_total != null || c.period_rent != null) ? ' · ' : null}
+                  {c.final_total != null ? formatMoney(c.final_total) : (c.period_rent != null ? formatMoney(c.period_rent) : (c.frozen_daily_rate == null ? '—' : null))}
+                </p>
                 <div className="vd-no-print">
                   <ContractActionsBar
                     contract={contract}

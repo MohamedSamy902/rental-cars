@@ -61,7 +61,10 @@ class ContractLifecycleService
      */
     public function create(array $data, ?int $userId = null, bool $allowPriceOverride = false): Contract
     {
-        return DB::transaction(function () use ($data, $userId, $allowPriceOverride) {
+        // $allowPriceOverride محفوظ للتوافق؛ سعر/وديعة الإنشاء من النموذج دائماً (ن٫٥).
+        unset($allowPriceOverride);
+
+        return DB::transaction(function () use ($data, $userId) {
             /** @var Vehicle $vehicle */
             $vehicle = Vehicle::query()->whereKey($data['vehicle_id'])->lockForUpdate()->firstOrFail();
             if (! $vehicle->is_active) {
@@ -94,11 +97,12 @@ class ContractLifecycleService
 
             $number = $data['number'] ?? $this->nextNumber();
 
-            // الأسعار تُقترح من السيارة؛ التعديل عند الإنشاء يتطلب صلاحية تجاوز السعر.
-            $dailyRate = $allowPriceOverride && isset($data['daily_rate'])
+            // ن٫٥: السعر اليومي والوديعة من النموذج عند الإنشاء بلا اشتراط صلاحية تجاوز السعر.
+            // صلاحية contracts_price.override محصورة بتعديل أسعار عقد معتمد لاحقاً.
+            $dailyRate = array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
                 ? (int) $data['daily_rate']
                 : (int) $vehicle->daily_rate;
-            $deposit = $allowPriceOverride && isset($data['deposit'])
+            $deposit = array_key_exists('deposit', $data) && $data['deposit'] !== null
                 ? (int) $data['deposit']
                 : (int) $vehicle->default_deposit;
             $ops = TenantSetting::query()->first()?->operational ?? [];
@@ -260,7 +264,10 @@ class ContractLifecycleService
 
     public function approve(Contract $contract, ?int $userId = null, bool $reSnapshotRatesFromVehicle = false): Contract
     {
-        return DB::transaction(function () use ($contract, $userId, $reSnapshotRatesFromVehicle) {
+        // $reSnapshotRatesFromVehicle مُهمَل عمداً: الأسعار المجمّدة لا تُستبدل بسعر العربية أبداً.
+        unset($reSnapshotRatesFromVehicle);
+
+        return DB::transaction(function () use ($contract, $userId) {
             /** @var Contract $locked */
             $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'pending') {
@@ -285,16 +292,12 @@ class ContractLifecycleService
                 $this->fractionDayThreshold(),
             );
 
-            // ن٫٥ / RSD ٣٫٤: الأسعار المجمّدة عند الإنشاء تبقى؛ لا تُستبدل بسعر العربية الحيّ عند الاعتماد.
-            // التمديد/التبديل يمرّر أسعاراً مُجمَّدة مسبقاً. إعادة اللقطة فقط إن طُلبت صراحة ولم يُجمَّد سعر بعد.
-            $keepFrozenRate = (int) $locked->frozen_daily_rate > 0;
-            $keepFrozenDeposit = (int) $locked->frozen_agreed_deposit > 0;
-            $rate = ($reSnapshotRatesFromVehicle && ! $keepFrozenRate)
-                ? (int) $vehicle->daily_rate
-                : ((int) $locked->frozen_daily_rate ?: (int) $vehicle->daily_rate);
-            $deposit = ($reSnapshotRatesFromVehicle && ! $keepFrozenDeposit)
-                ? (int) $vehicle->default_deposit
-                : ((int) $locked->frozen_agreed_deposit ?: (int) $vehicle->default_deposit);
+            // ن٫٥ / RSD ٣٫٤: الأسعار المجمّدة عند الإنشاء تبقى بلا استثناء — لا تُستبدل بسعر العربية الحيّ.
+            $rate = (int) $locked->frozen_daily_rate;
+            $deposit = (int) $locked->frozen_agreed_deposit;
+            if ($rate < 1) {
+                throw new DomainException('لا يمكن منح موافقة الإدارة بدون سعر يومي مثبّت على العقد.');
+            }
 
             $locked->fill([
                 'status' => 'approved',
@@ -343,7 +346,10 @@ class ContractLifecycleService
             throw new DomainException('يمكن تعديل بيانات العقد فقط وهو قيد المراجعة — بعد موافقة الإدارة تُثبَّت الأسعار والحقول.');
         }
 
-        return DB::transaction(function () use ($contract, $data, $userId, $allowPriceOverride) {
+        // $allowPriceOverride للتوافق؛ تعديل قيد المراجعة يقبل السعر المكتوب دائماً.
+        unset($allowPriceOverride);
+
+        return DB::transaction(function () use ($contract, $data, $userId) {
             /** @var Contract $locked */
             $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'pending') {
@@ -380,17 +386,10 @@ class ContractLifecycleService
                 Carbon::parse($endsAt)->toDateString(),
             );
 
-            $dailyRate = $allowPriceOverride && array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
+            // قيد المراجعة: أي سعر مُرسل من النموذج يُثبَّت على العقد (نفس قاعدة الإنشاء).
+            $dailyRate = array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
                 ? (int) $data['daily_rate']
-                : (array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
-                    ? (int) $data['daily_rate']
-                    : (int) $locked->frozen_daily_rate);
-            if (! $allowPriceOverride && array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
-                && (int) $data['daily_rate'] !== (int) $vehicle->daily_rate
-                && (int) $data['daily_rate'] !== (int) $locked->frozen_daily_rate) {
-                // السماح بتعديل السعر عند قيد المراجعة إن أُرسل — نفس مسار الإنشاء مع صلاحية التجاوز من المتحكم.
-                $dailyRate = (int) $data['daily_rate'];
-            }
+                : (int) $locked->frozen_daily_rate;
 
             $deposit = array_key_exists('deposit', $data) && $data['deposit'] !== null
                 ? (int) $data['deposit']

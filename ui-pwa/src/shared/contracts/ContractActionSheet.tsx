@@ -41,9 +41,9 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
   const estimatedTotal = selected
     ? Math.max(
         0,
-        (selected.final_total
-          ?? (selected.frozen_daily_rate || 0) * Math.max(1, selected.approved_days || 1))
-          - 0,
+        selected.final_total
+          ?? selected.period_rent
+          ?? (selected.frozen_daily_rate || 0) * Math.max(1, selected.approved_days || 1),
       )
     : 0
 

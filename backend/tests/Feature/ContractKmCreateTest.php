@@ -97,7 +97,7 @@ class ContractKmCreateTest extends TestCase
 
         $this->assertSame(250, (int) $create->json('data.frozen_daily_km_allowance'));
         $this->assertSame(9, (int) $create->json('data.frozen_excess_km_rate'));
-        // Without override, daily rate stays from vehicle.
+        // No daily_rate in payload → vehicle default is frozen.
         $this->assertSame(900, (int) $create->json('data.frozen_daily_rate'));
     }
 

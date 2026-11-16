@@ -268,6 +268,9 @@ class VehicleController extends Controller
                 'actual_ends_at' => $c->actual_ends_at?->toIso8601String(),
                 'final_total' => $c->final_total,
                 'period_rent' => $c->period_rent,
+                'frozen_daily_rate' => (int) $c->frozen_daily_rate,
+                'frozen_agreed_deposit' => (int) ($c->frozen_agreed_deposit ?? 0),
+                'approved_days' => $c->approved_days !== null ? (int) $c->approved_days : null,
                 'odometer_out' => $c->odometer_out,
                 'odometer_in' => $c->odometer_in,
                 'customer' => $c->customer ? [
