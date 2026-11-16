@@ -19,7 +19,14 @@ class ViolationController extends Controller
         $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = Violation::query()
-            ->with(['vehicle', 'customer', 'contract', 'creator:id,name'])
+            ->with([
+                'vehicle',
+                'customer',
+                'contract',
+                'creator:id,name,phone,email,role_id,employee_id',
+                'creator.role:id,name,label',
+                'creator.employee:id,name',
+            ])
             ->latest('id')
             ->paginate($perPage, ['*'], 'page', $page);
 
@@ -58,7 +65,12 @@ class ViolationController extends Controller
         ]);
 
         return response()->json([
-            'data' => $this->serialize($violation->fresh()->load(['vehicle', 'customer', 'contract', 'creator:id,name'])),
+            'data' => $this->serialize($violation->fresh()->load([
+                'vehicle', 'customer', 'contract',
+                'creator:id,name,phone,email,role_id,employee_id',
+                'creator.role:id,name,label',
+                'creator.employee:id,name',
+            ])),
             'message' => 'تم تسجيل المخالفة للمتابعة.',
         ], 201);
     }
@@ -118,7 +130,12 @@ class ViolationController extends Controller
         $violation->update($payload);
 
         return response()->json([
-            'data' => $this->serialize($violation->fresh()->load(['vehicle', 'customer', 'contract', 'creator:id,name'])),
+            'data' => $this->serialize($violation->fresh()->load([
+                'vehicle', 'customer', 'contract',
+                'creator:id,name,phone,email,role_id,employee_id',
+                'creator.role:id,name,label',
+                'creator.employee:id,name',
+            ])),
             'message' => 'تم تحديث المخالفة.',
         ]);
     }
@@ -140,7 +157,12 @@ class ViolationController extends Controller
         ]);
 
         return response()->json([
-            'data' => $this->serialize($violation->fresh()->load(['vehicle', 'customer', 'contract', 'creator:id,name'])),
+            'data' => $this->serialize($violation->fresh()->load([
+                'vehicle', 'customer', 'contract',
+                'creator:id,name,phone,email,role_id,employee_id',
+                'creator.role:id,name,label',
+                'creator.employee:id,name',
+            ])),
             'message' => 'تم تأكيد السداد دون قيد محاسبي.',
         ]);
     }
@@ -227,9 +249,9 @@ class ViolationController extends Controller
     {
         $arr = $v->toArray();
         $arr['photo_paths'] = $v->resolvedPhotoPaths();
-        $arr['created_by_name'] = $v->creator?->name;
+        $arr['created_by_name'] = $v->creator?->displayName();
         $arr['creator'] = $v->creator
-            ? ['id' => $v->creator->id, 'name' => $v->creator->name]
+            ? ['id' => $v->creator->id, 'name' => $v->creator->displayName()]
             : null;
 
         return $arr;

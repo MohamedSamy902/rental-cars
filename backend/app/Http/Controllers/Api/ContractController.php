@@ -33,7 +33,14 @@ class ContractController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = Contract::query()->with(['customer', 'vehicle', 'deposit', 'salesUser:id,name'])->latest('id');
+        $q = Contract::query()->with([
+            'customer',
+            'vehicle',
+            'deposit',
+            'salesUser:id,name,phone,email,role_id,employee_id',
+            'salesUser.role:id,name,label',
+            'salesUser.employee:id,name',
+        ])->latest('id');
         $user = $request->user();
         if ($user && $user->role?->name === 'sales' && ! $user->hasPermission('contracts.approve')) {
             $q->where('sales_user_id', $user->id);
@@ -80,9 +87,9 @@ class ContractController extends Controller
                 $arr['customer'] = Customer::normalizeDateOnlyFields($arr['customer']);
             }
             $arr['progress'] = $this->progress->forContract($c);
-            $arr['created_by'] = $c->salesUser?->name;
+            $arr['created_by'] = $c->salesUser?->displayName();
             $arr['sales_user'] = $c->salesUser
-                ? ['id' => $c->salesUser->id, 'name' => $c->salesUser->name]
+                ? ['id' => $c->salesUser->id, 'name' => $c->salesUser->displayName()]
                 : null;
             $agg = $openViolationTotals->get($c->id);
             $arr['open_violations_total'] = (int) ($agg->total_amount ?? 0);

@@ -468,7 +468,7 @@ export function DashboardPage() {
     return <ErrorState title="تعذّر تحميل لوحة اليوم" description={error} />
   }
 
-  const displayName = (user?.name || '').trim() || 'مستخدم'
+  const displayName = (user?.display_name || user?.name || '').trim() || 'مستخدم'
   const openTasks = (data.important_tasks ?? data.tasks ?? []).length
   const ring = Math.PI * 2 * 54
 

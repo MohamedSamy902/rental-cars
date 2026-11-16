@@ -355,7 +355,7 @@ class OperationsController extends Controller
 
         $data = $rows->map(function (AuditLog $log) use ($narrator) {
             $user = $log->user;
-            $userName = $user?->name;
+            $userName = $user?->displayName();
             $roleTitle = $user ? $narrator->resolveRoleTitle($user) : null;
 
             return [
@@ -408,12 +408,13 @@ class OperationsController extends Controller
             ->get(['id', 'name', 'role_id', 'employee_id'])
             ->map(function (User $u) use ($narrator) {
                 $title = $narrator->resolveRoleTitle($u);
+                $person = $u->displayName();
 
                 return [
                     'id' => $u->id,
-                    'name' => $u->name,
+                    'name' => $person,
                     'role_title' => $title,
-                    'label' => $title ? "{$title} — {$u->name}" : $u->name,
+                    'label' => $title && $title !== $person ? "{$person} — {$title}" : $person,
                 ];
             })
             ->values()

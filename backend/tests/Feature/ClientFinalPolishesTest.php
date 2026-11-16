@@ -79,15 +79,15 @@ class ClientFinalPolishesTest extends TestCase
     {
         $narrator = app(AuditNarrator::class);
         $this->assertSame(
-            'المحاسب (أحمد محمد)',
+            'أحمد محمد (المحاسب)',
             $narrator->actorPhrase('أحمد محمد', 'المحاسب'),
         );
         $this->assertSame(
-            'مسؤول الموارد البشرية (محمود إبراهيم)',
+            'محمود إبراهيم (مسؤول الموارد البشرية)',
             $narrator->actorPhrase('محمود إبراهيم', 'مسؤول الموارد البشرية'),
         );
         $this->assertSame(
-            'مدير التشغيل (محمد سامي)',
+            'محمد سامي (مدير التشغيل)',
             $narrator->actorPhrase('محمد سامي', 'مدير التشغيل'),
         );
 
@@ -98,7 +98,7 @@ class ClientFinalPolishesTest extends TestCase
             'after' => ['employee_name' => 'عمرو سائق'],
         ]);
         $sentence = $narrator->summarize($log, 'أحمد محمد', 'المحاسب');
-        $this->assertSame('قام المحاسب (أحمد محمد) بتسجيل عهدة للموظف عمرو سائق', $sentence);
+        $this->assertSame('قام أحمد محمد (المحاسب) بتسجيل عهدة للموظف عمرو سائق', $sentence);
     }
 
     public function test_audit_logs_filter_by_user_action_and_date(): void
