@@ -8,6 +8,122 @@ namespace App\Services\Contracts;
  */
 class ContractPricingService
 {
+    public const BASIS_DAILY = 'daily';
+
+    public const BASIS_HALF_MONTHLY = 'half_monthly';
+
+    public const BASIS_MONTHLY = 'monthly';
+
+    /** نص الشهر = سعر وحدة ١٥ يوماً. */
+    public const HALF_MONTH_UNIT_DAYS = 15;
+
+    /** الشهر = سعر وحدة ٣٠ يوماً. */
+    public const MONTH_UNIT_DAYS = 30;
+
+    /** شريحة يومي: ١–١٠ أيام. */
+    public const DAILY_TIER_MAX_DAYS = 10;
+
+    /** شريحة نص شهري: ١١–٢٠ يوماً. */
+    public const HALF_MONTHLY_TIER_MAX_DAYS = 20;
+
+    /** افتراضي نص شهري = يومي × ١٥ (سعر ١٥ يوماً). */
+    public const DEFAULT_HALF_MONTHLY_FACTOR = 15.0;
+
+    /** افتراضي شهري = يومي × ٢٢ (متوافق مع المعرض). */
+    public const DEFAULT_MONTHLY_FACTOR = 22.0;
+
+    /**
+     * شريحة التسعير من مدة العقد:
+     * ١–١٠ → يومي · ١١–٢٠ → نص شهري · ٢١+ → شهري.
+     *
+     * @return self::BASIS_*
+     */
+    public function resolveRentBasisFromDays(int $days): string
+    {
+        $days = max(0, $days);
+        if ($days <= self::DAILY_TIER_MAX_DAYS) {
+            return self::BASIS_DAILY;
+        }
+        if ($days <= self::HALF_MONTHLY_TIER_MAX_DAYS) {
+            return self::BASIS_HALF_MONTHLY;
+        }
+
+        return self::BASIS_MONTHLY;
+    }
+
+    /**
+     * إيجار المدة حسب شريحة الأيام والأسعار المجمّدة:
+     * - daily: أيام × اليومي
+     * - half_monthly: وحدات ١٥ يوماً × نص الشهري + أيام زيادة × (نص الشهري ÷ ١٥)
+     * - monthly: وحدات ٣٠ يوماً × الشهري + أيام زيادة × (الشهري ÷ ٣٠)
+     *
+     * إن لم يُمرَّر $basis تُستنتج الشريحة من عدد الأيام.
+     */
+    public function periodRent(
+        int $days,
+        ?string $basis,
+        int $dailyRate,
+        ?int $halfMonthlyRate = null,
+        ?int $monthlyRate = null,
+        float $halfMonthlyFactor = self::DEFAULT_HALF_MONTHLY_FACTOR,
+        float $monthlyFactor = self::DEFAULT_MONTHLY_FACTOR,
+    ): int {
+        $days = max(0, $days);
+        $dailyRate = max(0, $dailyRate);
+        $basis = $basis !== null && $basis !== ''
+            ? $this->normalizeRentBasis($basis)
+            : $this->resolveRentBasisFromDays($days);
+
+        // عند الحساب الفعلي نفضّل الشريحة من الأيام حتى لو تغيّرت المدة عن المخطط.
+        $basis = $this->resolveRentBasisFromDays($days);
+
+        return match ($basis) {
+            self::BASIS_HALF_MONTHLY => $this->unitPackRent(
+                $days,
+                self::HALF_MONTH_UNIT_DAYS,
+                max(0, $halfMonthlyRate ?? (int) round($dailyRate * $halfMonthlyFactor)),
+            ),
+            self::BASIS_MONTHLY => $this->unitPackRent(
+                $days,
+                self::MONTH_UNIT_DAYS,
+                max(0, $monthlyRate ?? (int) round($dailyRate * $monthlyFactor)),
+            ),
+            default => $days * $dailyRate,
+        };
+    }
+
+    /**
+     * @return self::BASIS_*
+     */
+    public function normalizeRentBasis(mixed $basis): string
+    {
+        $value = is_string($basis) ? strtolower(trim($basis)) : self::BASIS_DAILY;
+        // توافق أسماء قديمة إن وُجدت في بيانات مرحلية.
+        if (in_array($value, ['weekly', 'half', 'half-month', 'half_month'], true)) {
+            $value = self::BASIS_HALF_MONTHLY;
+        }
+
+        return in_array($value, [self::BASIS_DAILY, self::BASIS_HALF_MONTHLY, self::BASIS_MONTHLY], true)
+            ? $value
+            : self::BASIS_DAILY;
+    }
+
+    /**
+     * وحدات كاملة بسعر الباقة + أيام زيادة بنفس تكلفة يوم الوحدة.
+     */
+    public function unitPackRent(int $days, int $unitDays, int $unitRate): int
+    {
+        if ($days < 1 || $unitDays < 1 || $unitRate < 1) {
+            return 0;
+        }
+
+        $fullUnits = intdiv($days, $unitDays);
+        $extraDays = $days % $unitDays;
+        $extraCharge = (int) round(($extraDays * $unitRate) / $unitDays);
+
+        return ($fullUnits * $unitRate) + $extraCharge;
+    }
+
     /**
      * Full rental days without auto-billing an extra day for a fractional
      * remainder past the start hour. Optional threshold (hours): when the

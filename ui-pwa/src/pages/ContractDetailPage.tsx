@@ -116,7 +116,26 @@ export function ContractDetailPage() {
         label="ملخص مالي"
         mobile="wrap"
         items={[
-          { id: 'rate', label: 'السعر اليومي', value: row.frozen_daily_rate, format: 'money', icon: <IconCash size={16} /> },
+          {
+            id: 'rate',
+            label: row.rent_basis === 'half_monthly' || row.rent_basis === 'weekly'
+              ? 'سعر نص الشهر (١٥ يوماً)'
+              : row.rent_basis === 'monthly'
+                ? 'السعر الشهري (٣٠ يوماً)'
+                : 'السعر اليومي',
+            value: row.rent_basis === 'half_monthly' || row.rent_basis === 'weekly'
+              ? (row.frozen_half_monthly_rate ?? row.frozen_daily_rate)
+              : row.rent_basis === 'monthly'
+                ? (row.frozen_monthly_rate ?? row.frozen_daily_rate)
+                : row.frozen_daily_rate,
+            format: 'money',
+            icon: <IconCash size={16} />,
+            hint: row.rent_basis === 'half_monthly' || row.rent_basis === 'weekly'
+              ? 'أيام الزيادة = نص الشهر ÷ 15'
+              : row.rent_basis === 'monthly'
+                ? 'أيام الزيادة = الشهري ÷ 30'
+                : 'الشريحة حسب المدة: ١–١٠ يومي · ١١–٢٠ نص شهري · ٢١+ شهري',
+          },
           { id: 'deposit', label: 'تأمين محتجز', value: ledger?.deposit_held ?? 0, format: 'money', tone: 'info', icon: <IconWallet size={16} /> },
           { id: 'total', label: 'إجمالي العقد', value: ledger?.contract_total ?? row.final_total ?? 0, format: 'money', icon: <IconClipboard size={16} /> },
           {

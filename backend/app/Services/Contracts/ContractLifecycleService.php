@@ -106,6 +106,26 @@ class ContractLifecycleService
                 ? (int) $data['deposit']
                 : (int) $vehicle->default_deposit;
             $ops = TenantSetting::query()->first()?->operational ?? [];
+            $halfFactor = is_numeric($ops['showroom_half_monthly_factor'] ?? null)
+                ? (float) $ops['showroom_half_monthly_factor']
+                : ContractPricingService::DEFAULT_HALF_MONTHLY_FACTOR;
+            $monthlyFactor = is_numeric($ops['showroom_monthly_factor'] ?? null)
+                ? (float) $ops['showroom_monthly_factor']
+                : ContractPricingService::DEFAULT_MONTHLY_FACTOR;
+            $halfMonthlyRate = array_key_exists('half_monthly_rate', $data) && $data['half_monthly_rate'] !== null
+                ? (int) $data['half_monthly_rate']
+                : (array_key_exists('weekly_rate', $data) && $data['weekly_rate'] !== null
+                    ? (int) $data['weekly_rate'] // توافق مؤقت إن وصل الطلب بالاسم القديم
+                    : (int) round($dailyRate * $halfFactor));
+            $monthlyRate = array_key_exists('monthly_rate', $data) && $data['monthly_rate'] !== null
+                ? (int) $data['monthly_rate']
+                : (int) round($dailyRate * $monthlyFactor);
+            $plannedDays = $this->pricing->countRentalDays(
+                Carbon::parse($data['starts_at']),
+                Carbon::parse($data['planned_ends_at']),
+                $this->fractionDayThreshold(),
+            );
+            $rentBasis = $this->pricing->resolveRentBasisFromDays($plannedDays);
             // بدل الكم وسعر الزيادة يُحدَّدان عند الإنشاء لأي منشئ (بلا صلاحية تجاوز السعر).
             // مفاتيح الإعدادات: default_daily_km / excess_km_rate (الواجهة) مع توافق الأسماء القديمة.
             $defaultKmAllowance = (int) (
@@ -148,6 +168,9 @@ class ContractLifecycleService
                 'planned_ends_at' => $data['planned_ends_at'],
                 'min_days' => $data['min_days'] ?? null,
                 'frozen_daily_rate' => $dailyRate,
+                'rent_basis' => $rentBasis,
+                'frozen_half_monthly_rate' => $halfMonthlyRate,
+                'frozen_monthly_rate' => $monthlyRate,
                 'frozen_daily_km_allowance' => $kmAllowance,
                 'frozen_excess_km_rate' => $excessRate,
                 'prepaid_excess_km' => $prepaidExcessKm,
@@ -390,6 +413,21 @@ class ContractLifecycleService
             $dailyRate = array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
                 ? (int) $data['daily_rate']
                 : (int) $locked->frozen_daily_rate;
+            $halfMonthlyRate = array_key_exists('half_monthly_rate', $data) && $data['half_monthly_rate'] !== null
+                ? (int) $data['half_monthly_rate']
+                : (array_key_exists('weekly_rate', $data) && $data['weekly_rate'] !== null
+                    ? (int) $data['weekly_rate']
+                    : (int) ($locked->frozen_half_monthly_rate ?? 0));
+            $monthlyRate = array_key_exists('monthly_rate', $data) && $data['monthly_rate'] !== null
+                ? (int) $data['monthly_rate']
+                : (int) ($locked->frozen_monthly_rate ?? 0);
+            $rentBasis = $this->pricing->resolveRentBasisFromDays(
+                $this->pricing->countRentalDays(
+                    Carbon::parse($startsAt),
+                    Carbon::parse($endsAt),
+                    $this->fractionDayThreshold(),
+                ),
+            );
 
             $deposit = array_key_exists('deposit', $data) && $data['deposit'] !== null
                 ? (int) $data['deposit']
@@ -441,6 +479,9 @@ class ContractLifecycleService
                 'planned_ends_at' => $endsAt,
                 'min_days' => array_key_exists('min_days', $data) ? $data['min_days'] : $locked->min_days,
                 'frozen_daily_rate' => $dailyRate,
+                'rent_basis' => $rentBasis,
+                'frozen_half_monthly_rate' => $halfMonthlyRate > 0 ? $halfMonthlyRate : $locked->frozen_half_monthly_rate,
+                'frozen_monthly_rate' => $monthlyRate > 0 ? $monthlyRate : $locked->frozen_monthly_rate,
                 'frozen_daily_km_allowance' => $kmAllowance,
                 'frozen_excess_km_rate' => $excessRate,
                 'prepaid_excess_km' => $prepaidExcessKm,
@@ -682,7 +723,15 @@ class ContractLifecycleService
                 $lateDays = $this->pricing->countLateDays($plannedEnd, $end, $threshold);
             }
 
-            $periodRent = $billableDays * (int) $locked->frozen_daily_rate;
+            $rentBasis = $this->pricing->resolveRentBasisFromDays($billableDays);
+            $periodRent = $this->pricing->periodRent(
+                $billableDays,
+                $rentBasis,
+                (int) $locked->frozen_daily_rate,
+                $locked->frozen_half_monthly_rate !== null ? (int) $locked->frozen_half_monthly_rate : null,
+                $locked->frozen_monthly_rate !== null ? (int) $locked->frozen_monthly_rate : null,
+            );
+            $locked->rent_basis = $rentBasis;
             $allowed = $this->pricing->allowedKilometers((int) $locked->frozen_daily_km_allowance, $billableDays);
             $driven = $this->accumulatedDrivenKm($locked, $odometerIn);
             $excess = max(0, $driven - $allowed);
@@ -878,6 +927,8 @@ class ContractLifecycleService
             'starts_at' => $starts,
             'planned_ends_at' => $data['planned_ends_at'],
             'daily_rate' => $source->frozen_daily_rate,
+            'half_monthly_rate' => $source->frozen_half_monthly_rate,
+            'monthly_rate' => $source->frozen_monthly_rate,
             'daily_km_allowance' => $source->frozen_daily_km_allowance,
             'excess_km_rate' => $source->frozen_excess_km_rate,
             'deposit' => $source->frozen_agreed_deposit,

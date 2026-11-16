@@ -74,6 +74,8 @@ class AccountsMonthRentSplitTest extends TestCase
             'starts_at' => '2026-11-16T12:00:00+02:00',
             'planned_ends_at' => '2026-12-16T12:00:00+02:00',
             'daily_rate' => 1000,
+            'half_monthly_rate' => 15000,
+            'monthly_rate' => 30000, // وحدة ٣٠ يوماً = ٣٠٠٠٠ حتى يبقى إجمالي المدة ٣٠٠٠٠ لاختبار التوزيع
             'deposit' => 0,
             'odometer' => 1000,
         ])->assertCreated()->json('data.id');

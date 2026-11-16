@@ -180,7 +180,13 @@ class AccountingService
         $periodRent = (int) ($contract->period_rent ?? 0);
         if ($periodRent <= 0) {
             $days = $this->pricing->countRentalDays($start, $end);
-            $periodRent = $days * $rate;
+            $periodRent = $this->pricing->periodRent(
+                $days,
+                (string) ($contract->rent_basis ?? \App\Services\Contracts\ContractPricingService::BASIS_DAILY),
+                $rate,
+                $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
+                $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
+            );
         }
         if ($periodRent <= 0) {
             return 0;
@@ -313,7 +319,13 @@ class AccountingService
         $periodRent = (int) ($contract->period_rent ?? 0);
         if ($periodRent <= 0) {
             $days = $this->pricing->countRentalDays($start, $end);
-            $periodRent = $days * (int) $contract->frozen_daily_rate;
+            $periodRent = $this->pricing->periodRent(
+                $days,
+                (string) ($contract->rent_basis ?? \App\Services\Contracts\ContractPricingService::BASIS_DAILY),
+                (int) $contract->frozen_daily_rate,
+                $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
+                $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
+            );
         }
         if ($periodRent <= 0) {
             return 0;

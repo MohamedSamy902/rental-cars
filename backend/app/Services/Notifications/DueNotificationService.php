@@ -1071,7 +1071,13 @@ class DueNotificationService
 
         $days = (int) ($contract->approved_days ?: $this->pricing->countRentalDays($contract->starts_at, $contract->planned_ends_at));
 
-        return $rate * max(1, $days);
+        return $this->pricing->periodRent(
+            max(1, $days),
+            (string) ($contract->rent_basis ?? \App\Services\Contracts\ContractPricingService::BASIS_DAILY),
+            $rate,
+            $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
+            $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
+        );
     }
 
     private function momentDue(mixed $at): bool

@@ -69,8 +69,15 @@ class ContractLedgerMath
             );
         }
         $days = max(1, $days);
+        $rent = $this->pricing->periodRent(
+            $days,
+            (string) ($contract->rent_basis ?? ContractPricingService::BASIS_DAILY),
+            (int) $contract->frozen_daily_rate,
+            $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
+            $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
+        );
 
-        return $days * (int) $contract->frozen_daily_rate
+        return $rent
             + $prepaid
             + (int) $contract->other_fees
             + (int) ($contract->delivery_service_fee ?? 0)
