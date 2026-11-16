@@ -11,7 +11,8 @@ class AccrueOwnerDuesCommand extends Command
 {
     protected $signature = 'owners:accrue-dues
                             {--owner= : معرف مالك واحد}
-                            {--through= : شهر YYYY-MM (افتراضي الشهر الحالي)}';
+                            {--through= : شهر YYYY-MM (افتراضي الشهر الحالي)}
+                            {--repair : تصحيح مبالغ الأشهر غير المقفلة لتطابق أيام العقد}';
 
     protected $description = 'ترحيل استحقاق ملاك العربيات بشكل صريح ومُدقَّق (لا يُستدعى من GET)';
 
@@ -24,24 +25,27 @@ class AccrueOwnerDuesCommand extends Command
             return self::FAILURE;
         }
 
+        $repair = (bool) $this->option('repair');
         $query = VehicleOwner::query()->where('is_active', true)->orderBy('id');
         if ($id = $this->option('owner')) {
             $query->whereKey((int) $id);
         }
 
         $count = 0;
+        $changed = 0;
         $failed = 0;
         foreach ($query->cursor() as $owner) {
             try {
-                $owners->ensureAccruedThrough($owner, $through);
+                $n = $owners->ensureAccruedThrough($owner, $through, null, $repair);
                 $count++;
-                $this->line("· مالك #{$owner->id} {$owner->full_name}");
+                $changed += $n;
+                $this->line("· مالك #{$owner->id} {$owner->full_name}".($n ? " · {$n} قيد" : ''));
             } catch (DomainException $e) {
                 $failed++;
                 $this->error("مالك #{$owner->id}: {$e->getMessage()}");
             }
         }
-        $this->info("تم ترحيل الاستحقاق حتى {$through} لـ {$count} مالك.");
+        $this->info("تم ترحيل الاستحقاق حتى {$through} لـ {$count} مالك · صفوف جديدة/مصحَّحة: {$changed}.");
 
         return $failed > 0 ? self::FAILURE : self::SUCCESS;
     }

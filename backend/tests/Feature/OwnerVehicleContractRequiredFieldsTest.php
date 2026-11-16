@@ -90,6 +90,36 @@ class OwnerVehicleContractRequiredFieldsTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['chassis_number']);
     }
 
+    public function test_vehicle_with_owner_requires_agreement_dates_and_monthly_amount(): void
+    {
+        $this->injectRequiredCreateFields = false;
+        $ownerId = \App\Models\VehicleOwner::query()->create([
+            'full_name' => 'مالك تواريخ',
+            'phone' => '01022223333',
+            'national_id' => '29001019999888',
+            'is_active' => true,
+        ])->id;
+
+        $this->postJson('/api/vehicles', [
+            'plate_letters' => 'أ ب ج',
+            'plate_numbers' => '8899',
+            'brand' => 'نيسان',
+            'model' => 'صني',
+            'year' => 2020,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 500,
+            'default_deposit' => 1500,
+            'chassis_number' => 'CHSREQOWN01',
+            'owner_id' => $ownerId,
+        ])->assertStatus(422)->assertJsonValidationErrors([
+            'owner_monthly_amount',
+            'owner_agreement_starts_on',
+            'owner_agreement_ends_on',
+        ]);
+    }
+
     public function test_contract_create_requires_positive_payment_not_over_rent_total(): void
     {
         $this->injectRequiredCreateFields = false;

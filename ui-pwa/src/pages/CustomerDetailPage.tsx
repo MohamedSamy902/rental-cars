@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDate, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatMoney, toDateOnly } from '@/shared/lib/format'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { statusLabel } from '@/shared/contracts/contractModel'
 import {
@@ -83,9 +83,9 @@ export function CustomerDetailPage() {
         full_name: res.data.full_name,
         phone: res.data.phone,
         phone_alt: res.data.phone_alt || '',
-        birth_date: formatDate(res.data.birth_date) === '—' ? '1990-01-01' : formatDate(res.data.birth_date),
+        birth_date: toDateOnly(res.data.birth_date) || '1990-01-01',
         license_number: res.data.license_number,
-        license_expires_on: formatDate(res.data.license_expires_on) === '—' ? '2030-01-01' : formatDate(res.data.license_expires_on),
+        license_expires_on: toDateOnly(res.data.license_expires_on) || '2030-01-01',
         national_id: res.data.national_id || '',
         notes: res.data.notes || '',
         national_id_image_path: res.data.national_id_image_path || '',

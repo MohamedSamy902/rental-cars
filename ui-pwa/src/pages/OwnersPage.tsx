@@ -189,13 +189,13 @@ export function OwnersPage() {
     { id: 'vehicles', header: 'العربيات', cell: (o) => o.vehicles_count ?? 0, sortValue: (o) => o.vehicles_count ?? 0 },
     {
       id: 'monthly',
-      header: 'الشهري',
+      header: 'الشهري التعاقدي',
       cell: (o) => formatMoney(o.balance?.vehicles_monthly_total || 0),
       sortValue: (o) => Number(o.balance?.vehicles_monthly_total || 0),
     },
     {
       id: 'remaining',
-      header: 'المتبقي',
+      header: 'المتبقي المستحق',
       cell: (o) => formatMoney(o.balance?.remaining || 0),
       sortValue: (o) => Number(o.balance?.remaining || 0),
     },

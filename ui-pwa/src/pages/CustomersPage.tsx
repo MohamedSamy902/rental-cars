@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { civilDateOnly } from '@/shared/lib/dates'
+import { formatDate } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useLatestRequest } from '@/shared/lib/useLatestRequest'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
@@ -208,7 +208,7 @@ export function CustomersPage() {
       mobile: 'subtitle',
     },
     { id: 'license', header: 'رقم الرخصة', cell: (c) => c.license_number, sortValue: (c) => c.license_number },
-    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => civilDateOnly(c.license_expires_on) || '—', sortValue: (c) => c.license_expires_on },
+    { id: 'expires', header: 'انتهاء الرخصة', cell: (c) => formatDate(c.license_expires_on), sortValue: (c) => c.license_expires_on },
     { id: 'status', header: 'الحالة', cell: statusPill, sortValue: (c) => c.status, mobile: 'badge' },
   ]
 
@@ -361,9 +361,9 @@ export function CustomersPage() {
                 { label: 'هاتف بديل', value: detail.phone_alt ? <PhoneActions phone={detail.phone_alt} name={detail.full_name} /> : '—' },
                 { label: 'البريد', value: detail.email || '—' },
                 { label: 'الرقم القومي', value: detail.national_id || '—' },
-                { label: 'تاريخ الميلاد', value: detail.birth_date || '—' },
+                { label: 'تاريخ الميلاد', value: formatDate(detail.birth_date) },
                 { label: 'رقم الرخصة', value: detail.license_number },
-                { label: 'انتهاء الرخصة', value: detail.license_expires_on },
+                { label: 'انتهاء الرخصة', value: formatDate(detail.license_expires_on) },
                 { label: 'صورة البطاقة', value: detail.national_id_image_path ? 'مرفوعة' : '—' },
                 { label: 'صورة الرخصة', value: detail.license_image_path ? 'مرفوعة' : '—' },
                 { label: 'سبب القائمة السوداء', value: detail.blacklist_reason || '—', wide: true },

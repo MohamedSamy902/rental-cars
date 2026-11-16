@@ -107,6 +107,28 @@ class OwnerRentScheduleTest extends TestCase
         $this->assertSame(intdiv(10 * 3000, 31), $shares['2026-12']);
     }
 
+    /** ٣٠ يوماً من ١٠/١١ → نهاية ٠٩/١٢: ٢١ يوماً في نوفمبر + ٩ في ديسمبر (بعد اكتمال الشهرين). */
+    public function test_thirty_days_from_november_tenth_splits_across_months(): void
+    {
+        $shares = $this->schedule->shares('2026-11-10', '2026-12-09', 30000, '2027-01-01');
+
+        $this->assertSame(intdiv(21 * 30000, 30), $shares['2026-11']);
+        $this->assertSame(intdiv(9 * 30000, 31), $shares['2026-12']);
+        $this->assertSame(21000, $shares['2026-11']);
+    }
+
+    public function test_november_partial_not_booked_while_november_still_open(): void
+    {
+        $this->assertSame(
+            [],
+            $this->schedule->shares('2026-11-10', '2026-12-09', 30000, '2026-11-16'),
+        );
+        $this->assertSame(
+            ['2026-11' => 21000],
+            $this->schedule->shares('2026-11-10', '2026-12-09', 30000, '2026-12-01'),
+        );
+    }
+
     public function test_unfinished_current_month_is_not_booked(): void
     {
         $this->assertSame(

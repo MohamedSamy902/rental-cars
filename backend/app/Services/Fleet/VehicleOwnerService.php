@@ -61,7 +61,7 @@ class VehicleOwnerService
      *
      * @return int عدد الاستحقاقات الجديدة
      */
-    public function ensureAccruedThrough(VehicleOwner $owner, string $throughYearMonth, ?int $userId = null): int
+    public function ensureAccruedThrough(VehicleOwner $owner, string $throughYearMonth, ?int $userId = null, bool $repairProration = false): int
     {
         if (! preg_match('/^\d{4}-\d{2}$/', $throughYearMonth)) {
             throw new DomainException('صيغة الشهر غير صحيحة.');
@@ -78,21 +78,28 @@ class VehicleOwnerService
             ->get();
 
         $pending = [];
+        $repaired = 0;
         foreach ($vehicles as $vehicle) {
-            $start = $vehicle->owner_agreement_starts_on?->toDateString()
-                ?? $vehicle->owner_since?->toDateString();
+            // بدون بداية عقد لا يُرحَّل شيء — حتى لا يُحسب شهر كامل من تاريخ الربط بالخطأ.
+            $start = $vehicle->owner_agreement_starts_on?->toDateString();
+            if ($start === null || $start === '') {
+                continue;
+            }
             $end = $vehicle->owner_agreement_ends_on?->toDateString();
             $shares = $this->rentSchedule->shares($start, $end, (int) $vehicle->owner_monthly_amount, $today);
             foreach ($shares as $ym => $amount) {
                 if ($ym > $throughYearMonth || $amount < 1) {
                     continue;
                 }
-                $exists = OwnerMonthDue::query()
+                $existing = OwnerMonthDue::query()
                     ->where('owner_id', $owner->id)
                     ->where('vehicle_id', $vehicle->id)
                     ->where('year_month', $ym)
-                    ->exists();
-                if ($exists) {
+                    ->first();
+                if ($existing) {
+                    if ($repairProration && (int) $existing->amount !== $amount) {
+                        $repaired += $this->repairDueAmount($existing, $amount) ? 1 : 0;
+                    }
                     continue;
                 }
                 $this->assertMonthOpenForAccrual($ym);
@@ -104,7 +111,56 @@ class VehicleOwnerService
             $this->accrueVehicleMonth($owner, $vehicle, $ym, $userId, $amount);
         }
 
-        return count($pending);
+        return count($pending) + $repaired;
+    }
+
+    /**
+     * يصحّح مبلغ استحقاق في شهر غير مقفل ليطابق جدول الأيام المدنية.
+     */
+    private function repairDueAmount(OwnerMonthDue $due, int $amount): bool
+    {
+        if ($amount < 1 || (int) $due->amount === $amount) {
+            return false;
+        }
+        try {
+            $this->assertMonthOpenForAccrual($due->year_month);
+        } catch (DomainException) {
+            return false;
+        }
+
+        return (bool) DB::transaction(function () use ($due, $amount) {
+            $locked = OwnerMonthDue::query()->whereKey($due->id)->lockForUpdate()->first();
+            if (! $locked || (int) $locked->amount === $amount) {
+                return false;
+            }
+            $old = (int) $locked->amount;
+            $locked->update(['amount' => $amount]);
+            if ($locked->journal_entry_id) {
+                JournalLine::query()
+                    ->where('journal_entry_id', $locked->journal_entry_id)
+                    ->where('debit', '>', 0)
+                    ->update(['debit' => $amount]);
+                JournalLine::query()
+                    ->where('journal_entry_id', $locked->journal_entry_id)
+                    ->where('credit', '>', 0)
+                    ->update(['credit' => $amount]);
+            }
+            AuditLog::query()->create([
+                'user_id' => null,
+                'action' => 'owner_month_proration_repaired',
+                'record_type' => OwnerMonthDue::class,
+                'record_id' => $locked->id,
+                'after' => [
+                    'year_month' => $locked->year_month,
+                    'old_amount' => $old,
+                    'amount' => $amount,
+                    'vehicle_id' => $locked->vehicle_id,
+                    'owner_id' => $locked->owner_id,
+                ],
+            ]);
+
+            return true;
+        });
     }
 
     public function accrueVehicleMonth(VehicleOwner $owner, Vehicle $vehicle, string $yearMonth, ?int $userId = null, ?int $amount = null): OwnerMonthDue

@@ -127,6 +127,8 @@ class HappyPathE2ETest extends TestCase
             'owner_id' => $ownerId,
             'owner_monthly_amount' => 9000,
             'owner_since' => now()->toDateString(),
+            'owner_agreement_starts_on' => now()->toDateString(),
+            'owner_agreement_ends_on' => now()->addYear()->toDateString(),
         ])->assertCreated();
         $v2 = $this->postJson('/api/vehicles', [
             'plate_letters' => 'أ ب ج',
@@ -142,6 +144,8 @@ class HappyPathE2ETest extends TestCase
             'owner_id' => $ownerId,
             'owner_monthly_amount' => 8500,
             'owner_since' => now()->toDateString(),
+            'owner_agreement_starts_on' => now()->toDateString(),
+            'owner_agreement_ends_on' => now()->addYear()->toDateString(),
         ])->assertCreated();
 
         $vehicleA = Vehicle::query()->findOrFail($v1->json('data.id'));

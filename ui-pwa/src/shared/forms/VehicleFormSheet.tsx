@@ -214,17 +214,20 @@ function ownerAgreementFields(
       <TextField
         label="بداية عقد المالك"
         type="date"
+        required
         value={form.owner_agreement_starts_on}
         error={errors.owner_agreement_starts_on}
         onChange={(e) => setForm({ ...form, owner_agreement_starts_on: e.target.value })}
+        hint="من هذا اليوم يُحسب الاستحقاق (نسبة أيام الشهر)"
       />
       <TextField
         label="نهاية عقد المالك"
         type="date"
+        required
         value={form.owner_agreement_ends_on}
         error={errors.owner_agreement_ends_on}
         onChange={(e) => setForm({ ...form, owner_agreement_ends_on: e.target.value })}
-        hint="يُنبَّه يومياً قبل الانتهاء بشهر"
+        hint="مثال: ٣٠ يوماً من ١٠/١١ → النهاية ٠٩/١٢ · يُقسَّم على شهري التقويم · تنبيه قبل الانتهاء بشهر"
       />
     </>
   )
@@ -354,6 +357,24 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       if (!form.owner_national_id.trim()) local['owner_inline.national_id'] = 'الرقم القومي مطلوب'
       if (!form.owner_id_front_path.trim()) local['owner_inline.id_front_path'] = 'صورة البطاقة (وش) مطلوبة'
       if (!form.owner_id_back_path.trim()) local['owner_inline.id_back_path'] = 'صورة البطاقة (ضهر) مطلوبة'
+    }
+    const ownerLinked = mode === 'create'
+      ? form.owner_mode === 'existing' || form.owner_mode === 'new'
+      : Boolean(form.owner_id)
+    if (ownerLinked) {
+      if (mode === 'create' && form.owner_mode === 'existing' && !form.owner_id) {
+        local.owner_id = 'اختر المالك'
+      }
+      if (!form.owner_monthly_amount.trim()) local.owner_monthly_amount = 'المبلغ الشهري مطلوب'
+      if (!form.owner_agreement_starts_on.trim()) local.owner_agreement_starts_on = 'بداية عقد المالك مطلوبة'
+      if (!form.owner_agreement_ends_on.trim()) local.owner_agreement_ends_on = 'نهاية عقد المالك مطلوبة'
+      if (
+        form.owner_agreement_starts_on
+        && form.owner_agreement_ends_on
+        && form.owner_agreement_ends_on < form.owner_agreement_starts_on
+      ) {
+        local.owner_agreement_ends_on = 'النهاية يجب أن تكون بعد البداية أو مساوية لها'
+      }
     }
     if (Object.keys(local).length) {
       setErrors(local)

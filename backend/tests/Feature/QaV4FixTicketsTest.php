@@ -128,6 +128,8 @@ class QaV4FixTicketsTest extends TestCase
             'owner_id' => $owner->id,
             'owner_monthly_amount' => 5000,
             'owner_since' => now()->subMonths(3)->toDateString(),
+            'owner_agreement_starts_on' => now()->subMonths(3)->toDateString(),
+            'owner_agreement_ends_on' => now()->addYear()->toDateString(),
         ]);
 
         $duesBefore = OwnerMonthDue::query()->count();
@@ -182,6 +184,8 @@ class QaV4FixTicketsTest extends TestCase
             'owner_id' => $owner->id,
             'owner_monthly_amount' => 4000,
             'owner_since' => $month->toDateString(),
+            'owner_agreement_starts_on' => $month->toDateString(),
+            'owner_agreement_ends_on' => now()->addYear()->toDateString(),
         ]);
 
         app(AccountingService::class)->lockMonth((int) $month->year, (int) $month->month, $this->admin->id);

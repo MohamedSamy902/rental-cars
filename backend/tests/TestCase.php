@@ -32,6 +32,16 @@ abstract class TestCase extends BaseTestCase
                 $data['owner_inline']['id_back_path'] ??= 'tests/owners/id-back.jpg';
             }
 
+            if (
+                $path === '/api/vehicles'
+                && $data !== []
+                && (! empty($data['owner_id']) || isset($data['owner_inline']))
+            ) {
+                $data['owner_monthly_amount'] ??= 1000;
+                $data['owner_agreement_starts_on'] ??= now()->toDateString();
+                $data['owner_agreement_ends_on'] ??= now()->addYear()->toDateString();
+            }
+
             if ($path === '/api/owners' && $data !== []) {
                 $data['phone'] ??= '01012345678';
                 $data['national_id'] ??= '29001011234567';

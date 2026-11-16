@@ -63,8 +63,8 @@ class VehicleCustodyAgreementTest extends TestCase
         $this->assertStringContainsString('إلنترا', $html);
         $this->assertStringContainsString('CHS-CAD-1', $html);
         $this->assertStringContainsString('9000', $html);
-        $this->assertStringContainsString('2026-01-01', $html);
-        $this->assertStringContainsString('2026-12-31', $html);
+        $this->assertStringContainsString('01/01/2026', $html);
+        $this->assertStringContainsString('31/12/2026', $html);
         $this->assertStringContainsString('01150100104', $html);
         $this->assertSame($admin->id, VehicleCustodyAgreement::query()->value('issued_by'));
 

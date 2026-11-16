@@ -68,6 +68,8 @@ class VehicleOwnerPayoutTest extends TestCase
             'odometer' => 10000, 'daily_rate' => 900, 'default_deposit' => 2000, 'is_active' => true,
             'owner_id' => $owner['id'], 'owner_monthly_amount' => 5000,
             'owner_since' => $since,
+            'owner_agreement_starts_on' => $since,
+            'owner_agreement_ends_on' => '2027-11-01',
         ]);
         $v2 = Vehicle::query()->create([
             'code' => 'O-2', 'plate' => 'OWN 2', 'brand' => 'كيا', 'model' => 'سيراتو',
@@ -75,6 +77,8 @@ class VehicleOwnerPayoutTest extends TestCase
             'odometer' => 8000, 'daily_rate' => 850, 'default_deposit' => 2000, 'is_active' => true,
             'owner_id' => $owner['id'], 'owner_monthly_amount' => 4000,
             'owner_since' => $since,
+            'owner_agreement_starts_on' => $since,
+            'owner_agreement_ends_on' => '2027-11-01',
         ]);
 
         $this->assertSame(5000, (int) $v1->fresh()->owner_monthly_amount);
@@ -146,6 +150,8 @@ class VehicleOwnerPayoutTest extends TestCase
             'default_deposit' => 1500,
             'owner_id' => $ownerId,
             'owner_monthly_amount' => 3500,
+            'owner_agreement_starts_on' => '2026-11-10',
+            'owner_agreement_ends_on' => '2026-12-09',
         ])->assertCreated();
 
         $this->assertSame($ownerId, $res->json('data.owner_id'));

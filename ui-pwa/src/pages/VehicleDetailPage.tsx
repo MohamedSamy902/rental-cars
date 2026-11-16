@@ -7,7 +7,7 @@ import {
 import { api, type ApiError } from '@/shared/api/client'
 import { civilDateOnly, nowLocalDateTimeValue, todayCivilIso } from '@/shared/lib/dates'
 import { useAuth } from '@/shared/auth/AuthContext'
-import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   Button, BackNavButton, StatusPill, Sheet, AttentionDot,
@@ -262,8 +262,7 @@ const emptyAcc = {
 }
 
 function shortDate(value?: string | null) {
-  if (!value) return '—'
-  return civilDateOnly(value) || '—'
+  return formatDate(value)
 }
 
 function monthLabel(ym: string) {
@@ -1116,7 +1115,7 @@ export function VehicleDetailPage() {
                 <div>
                   <span>
                     {d.document_number ? `رقم ${d.document_number} · ` : ''}
-                    صدر {d.issued_on ? civilDateOnly(d.issued_on) : '—'} · ينتهي {d.expires_on ? civilDateOnly(d.expires_on) : '—'}
+                    صدر {formatDate(d.issued_on)} · ينتهي {formatDate(d.expires_on)}
                     {d.file_path ? ' · وجه' : ''}
                     {d.file_path_back ? ' · ظهر' : ''}
                   </span>

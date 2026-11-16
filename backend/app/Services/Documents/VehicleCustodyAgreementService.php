@@ -182,8 +182,8 @@ class VehicleCustodyAgreementService
             'contract_terms' => (string) ($ops['contract_terms'] ?? ''),
             'agreement_number' => (string) $period['number'],
             'contract_number' => (string) $period['number'],
-            'start_date' => (string) $period['starts_on'],
-            'end_date' => (string) $period['ends_on'],
+            'start_date' => $this->displayDate((string) $period['starts_on']),
+            'end_date' => $this->displayDate((string) $period['ends_on']),
             'monthly_amount' => (string) (int) $period['monthly_amount'],
             'owner_name' => (string) ($owner?->full_name ?: ''),
             'owner_phone' => (string) ($owner?->phone ?: ''),
@@ -197,7 +197,7 @@ class VehicleCustodyAgreementService
             'vehicle_color' => (string) ($vehicle->color ?: ''),
             'vehicle_chassis' => (string) ($vehicle->chassis_number ?: ''),
             'vehicle_engine' => (string) ($vehicle->engine_number ?: ''),
-            'issued_on' => now()->toDateString(),
+            'issued_on' => now()->format('d/m/Y'),
             'template_version' => (string) ($template?->version ?? ''),
         ];
 
@@ -264,5 +264,15 @@ class VehicleCustodyAgreementService
         }
 
         return $value;
+    }
+
+    /** Print/display dates as day/month/year (Western digits). */
+    private function displayDate(string $ymd): string
+    {
+        if (! preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $ymd, $m)) {
+            return $ymd;
+        }
+
+        return $m[3].'/'.$m[2].'/'.$m[1];
     }
 }

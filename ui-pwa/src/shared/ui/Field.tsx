@@ -54,7 +54,7 @@ export function DateField(props: TextProps) {
 }
 
 /**
- * Date-only field (platform standard: YYYY-MM-DD).
+ * Date-only field (storage/input: YYYY-MM-DD · display elsewhere: DD/MM/YYYY).
  * Kept as DateTimeField for call-site compatibility; time is always midnight.
  * Value format accepted: `YYYY-MM-DD` or `YYYY-MM-DDTHH:mm` (time ignored).
  */

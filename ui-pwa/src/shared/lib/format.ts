@@ -32,12 +32,14 @@ export function formatPercent(value: number): string {
 export function formatDateTime(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
-  return new Intl.DateTimeFormat('ar-EG', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+  const date = formatDate(iso)
+  const time = new Intl.DateTimeFormat('ar-EG', {
+    hour: '2-digit',
+    minute: '2-digit',
     timeZone: 'Africa/Cairo',
     ...latn,
   }).format(d)
+  return date === '—' ? '—' : `${date} ${time}`
 }
 
 /** Normalize any ISO/datetime string to YYYY-MM-DD (Western digits, Africa/Cairo). */
@@ -45,10 +47,16 @@ export function toDateOnly(iso: string | null | undefined): string {
   return civilDateOnly(iso)
 }
 
-/** Date only as YYYY-MM-DD (Western digits) — platform display standard. */
+/**
+ * Date display as DD/MM/YYYY (Western digits).
+ * Storage/API and `<input type="date">` stay YYYY-MM-DD via `toDateOnly`.
+ */
 export function formatDate(iso: string | null | undefined): string {
   const only = toDateOnly(iso)
-  return only || '—'
+  if (!only) return '—'
+  const [y, m, d] = only.split('-')
+  if (!y || !m || !d) return '—'
+  return `${d}/${m}/${y}`
 }
 
 /** Append midnight for APIs that still expect datetime. */
