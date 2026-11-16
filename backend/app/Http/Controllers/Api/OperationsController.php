@@ -49,8 +49,19 @@ class OperationsController extends Controller
             ->pluck('vehicle_id')
             ->flip();
 
+        $ops = is_array($settings?->operational) ? $settings->operational : [];
+        $weeklyFactor = is_numeric($ops['showroom_weekly_factor'] ?? null)
+            ? (float) $ops['showroom_weekly_factor']
+            : 6.0; // أسبوع تجاري = ٦ أيام
+        $monthlyFactor = is_numeric($ops['showroom_monthly_factor'] ?? null)
+            ? (float) $ops['showroom_monthly_factor']
+            : 22.0; // شهر تجاري ≈ ٢٢ يوم عمل
+        $phone = is_string($ops['print_phone'] ?? null) && trim((string) $ops['print_phone']) !== ''
+            ? trim((string) $ops['print_phone'])
+            : (string) config('rpm.center_public_phone', '01125253888');
+
         $rows = Vehicle::query()->where('is_active', true)->orderBy('brand')->orderBy('model')->get()
-            ->map(function (Vehicle $v) use ($activeIds, $reservedIds) {
+            ->map(function (Vehicle $v) use ($activeIds, $reservedIds, $weeklyFactor, $monthlyFactor) {
                 $status = $this->availability->statusOnDate([
                     'manual_status' => $v->manual_status,
                     'has_active_handover' => $activeIds->has($v->id),
@@ -72,6 +83,8 @@ class OperationsController extends Controller
                         ->value('planned_ends_at');
                 }
 
+                $daily = (int) $v->daily_rate;
+
                 return [
                     'id' => $v->id,
                     'brand' => $v->brand,
@@ -83,9 +96,9 @@ class OperationsController extends Controller
                     'color' => $v->color,
                     'seats' => $v->seats,
                     'plate' => $v->plate,
-                    'daily_rate' => (int) $v->daily_rate,
-                    'weekly_rate' => (int) round(((int) $v->daily_rate) * 7 * 0.9),
-                    'monthly_rate' => (int) round(((int) $v->daily_rate) * 30 * 0.75),
+                    'daily_rate' => $daily,
+                    'weekly_rate' => (int) round($daily * $weeklyFactor),
+                    'monthly_rate' => (int) round($daily * $monthlyFactor),
                     'default_deposit' => (int) $v->default_deposit,
                     'status' => $status,
                     'available' => $status === 'available',
@@ -97,6 +110,7 @@ class OperationsController extends Controller
         return response()->json([
             'data' => [
                 'center_name' => $settings?->center_name,
+                'center_phone' => $phone,
                 'vehicles' => $rows,
             ],
         ]);
