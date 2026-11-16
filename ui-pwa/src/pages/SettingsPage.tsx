@@ -212,7 +212,7 @@ export function SettingsPage() {
             type="date"
             value={ops.owner_dues_counts_from || ''}
             onChange={(e) => setOps({ ...ops, owner_dues_counts_from: e.target.value || null })}
-            hint="الشهور قبل التاريخ ده متتحسبش في المتأخر — حتى لو عقد الإدارة أقدم (تشغيل النظام)"
+            hint="تاريخ تشغيل لمرة واحدة (مش كل سنة). مثال 2026-11-01: الشهور قبله متتحسبش أبداً، ومنه واللي بعده يتراكموا عادي سنة ورا سنة"
           />
         </div>
       </section>
