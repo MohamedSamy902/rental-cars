@@ -67,6 +67,9 @@ class StoreContractRequest extends FormRequest
             'starts_at' => ['required', 'date'],
             'planned_ends_at' => ['required', 'date', 'after:starts_at', 'before:2100-01-01'],
             'daily_rate' => ['nullable', 'integer', 'min:0'],
+            'rent_basis' => ['nullable', 'string', 'in:daily,weekly,monthly'],
+            'weekly_rate' => ['nullable', 'integer', 'min:0'],
+            'monthly_rate' => ['nullable', 'integer', 'min:0'],
             'daily_km_allowance' => ['nullable', 'integer', 'min:0'],
             'excess_km_rate' => ['nullable', 'integer', 'min:0'],
             'prepaid_excess_km' => ['nullable', 'integer', 'min:0'],
@@ -146,7 +149,24 @@ class StoreContractRequest extends FormRequest
                 : (int) $excessRateInput;
             $prepaidKm = max(0, (int) $this->input('prepaid_excess_km', 0));
             $prepaidAmount = $prepaidKm * max(0, $excessRate);
-            $total = max(0, ($days * $rate) + $deliveryFee + $otherFees + $prepaidAmount - $discount);
+            $weeklyFactor = is_numeric($ops['showroom_weekly_factor'] ?? null)
+                ? (float) $ops['showroom_weekly_factor']
+                : \App\Services\Contracts\ContractPricingService::DEFAULT_WEEKLY_FACTOR;
+            $monthlyFactor = is_numeric($ops['showroom_monthly_factor'] ?? null)
+                ? (float) $ops['showroom_monthly_factor']
+                : \App\Services\Contracts\ContractPricingService::DEFAULT_MONTHLY_FACTOR;
+            $weekly = $this->input('weekly_rate');
+            $monthly = $this->input('monthly_rate');
+            $rent = app(\App\Services\Contracts\ContractPricingService::class)->periodRent(
+                $days,
+                (string) ($this->input('rent_basis') ?: 'daily'),
+                $rate,
+                ($weekly === null || $weekly === '') ? null : (int) $weekly,
+                ($monthly === null || $monthly === '') ? null : (int) $monthly,
+                $weeklyFactor,
+                $monthlyFactor,
+            );
+            $total = max(0, $rent + $deliveryFee + $otherFees + $prepaidAmount - $discount);
             if ($paid > $total) {
                 $v->errors()->add(
                     'payment_amount',
@@ -168,6 +188,9 @@ class StoreContractRequest extends FormRequest
             'starts_at' => 'وقت البداية',
             'planned_ends_at' => 'وقت النهاية المخطط',
             'daily_rate' => 'الإيجار اليومي',
+            'rent_basis' => 'أساس الإيجار',
+            'weekly_rate' => 'الإيجار الأسبوعي',
+            'monthly_rate' => 'الإيجار الشهري',
             'daily_km_allowance' => 'بدل الكيلومترات اليومي',
             'excess_km_rate' => 'سعر الكيلومتر الزائد',
             'prepaid_excess_km' => 'كيلومترات زيادة مدفوعة مقدماً',

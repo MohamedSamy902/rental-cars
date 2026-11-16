@@ -119,4 +119,25 @@ class ContractPricingServiceTest extends TestCase
         $this->assertSame(0, $normalized['delivery_service_fee']);
         $this->assertNull($normalized['delivery_service_notes']);
     }
+
+    public function test_weekly_rent_full_weeks_plus_extra_days_at_week_day_cost(): void
+    {
+        // أسبوعي 6000 · ٧ أيام = 6000 · ١٠ أيام = 6000 + round(3*6000/7)=6000+2571
+        $this->assertSame(6000, $this->pricing->periodRent(7, 'weekly', 1000, 6000, null));
+        $this->assertSame(8571, $this->pricing->periodRent(10, 'weekly', 1000, 6000, null));
+        $this->assertSame(12000, $this->pricing->periodRent(14, 'weekly', 1000, 6000, null));
+    }
+
+    public function test_monthly_rent_full_months_plus_extra_days_at_month_day_cost(): void
+    {
+        // شهري 22000 · ٣٠ يوماً = 22000 · ٣٢ يوماً = 22000 + round(2*22000/30)=22000+1467
+        $this->assertSame(22000, $this->pricing->periodRent(30, 'monthly', 1000, null, 22000));
+        $this->assertSame(23467, $this->pricing->periodRent(32, 'monthly', 1000, null, 22000));
+        $this->assertSame(44000, $this->pricing->periodRent(60, 'monthly', 1000, null, 22000));
+    }
+
+    public function test_daily_rent_unchanged(): void
+    {
+        $this->assertSame(5000, $this->pricing->periodRent(5, 'daily', 1000, 6000, 22000));
+    }
 }

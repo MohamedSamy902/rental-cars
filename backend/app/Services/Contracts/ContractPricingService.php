@@ -8,6 +8,86 @@ namespace App\Services\Contracts;
  */
 class ContractPricingService
 {
+    public const BASIS_DAILY = 'daily';
+
+    public const BASIS_WEEKLY = 'weekly';
+
+    public const BASIS_MONTHLY = 'monthly';
+
+    /** أيام وحدة الأسبوع التعاقدية. */
+    public const WEEK_UNIT_DAYS = 7;
+
+    /** أيام وحدة الشهر التعاقدية (شهر إيجار = ٣٠ يوماً). */
+    public const MONTH_UNIT_DAYS = 30;
+
+    /** معامل المعرض الافتراضي: أسبوعي = يومي × ٦. */
+    public const DEFAULT_WEEKLY_FACTOR = 6.0;
+
+    /** معامل المعرض الافتراضي: شهري = يومي × ٢٢. */
+    public const DEFAULT_MONTHLY_FACTOR = 22.0;
+
+    /**
+     * إيجار المدة حسب أساس التسعير:
+     * - daily: أيام × السعر اليومي
+     * - weekly: أسابيع كاملة × الأسبوعي + أيام زيادة × (الأسبوعي ÷ ٧)
+     * - monthly: شهور كاملة (٣٠ يوماً) × الشهري + أيام زيادة × (الشهري ÷ ٣٠)
+     */
+    public function periodRent(
+        int $days,
+        string $basis,
+        int $dailyRate,
+        ?int $weeklyRate = null,
+        ?int $monthlyRate = null,
+        float $weeklyFactor = self::DEFAULT_WEEKLY_FACTOR,
+        float $monthlyFactor = self::DEFAULT_MONTHLY_FACTOR,
+    ): int {
+        $days = max(0, $days);
+        $dailyRate = max(0, $dailyRate);
+        $basis = $this->normalizeRentBasis($basis);
+
+        return match ($basis) {
+            self::BASIS_WEEKLY => $this->unitPackRent(
+                $days,
+                self::WEEK_UNIT_DAYS,
+                max(0, $weeklyRate ?? (int) round($dailyRate * $weeklyFactor)),
+            ),
+            self::BASIS_MONTHLY => $this->unitPackRent(
+                $days,
+                self::MONTH_UNIT_DAYS,
+                max(0, $monthlyRate ?? (int) round($dailyRate * $monthlyFactor)),
+            ),
+            default => $days * $dailyRate,
+        };
+    }
+
+    /**
+     * @return self::BASIS_*
+     */
+    public function normalizeRentBasis(mixed $basis): string
+    {
+        $value = is_string($basis) ? strtolower(trim($basis)) : self::BASIS_DAILY;
+
+        return in_array($value, [self::BASIS_DAILY, self::BASIS_WEEKLY, self::BASIS_MONTHLY], true)
+            ? $value
+            : self::BASIS_DAILY;
+    }
+
+    /**
+     * وحدات كاملة بسعر الباقة + أيام زيادة بنفس تكلفة يوم الوحدة.
+     */
+    public function unitPackRent(int $days, int $unitDays, int $unitRate): int
+    {
+        if ($days < 1 || $unitDays < 1 || $unitRate < 1) {
+            return 0;
+        }
+
+        $fullUnits = intdiv($days, $unitDays);
+        $extraDays = $days % $unitDays;
+        $extraCharge = (int) round(($extraDays * $unitRate) / $unitDays);
+
+        return ($fullUnits * $unitRate) + $extraCharge;
+    }
+
     /**
      * Full rental days without auto-billing an extra day for a fractional
      * remainder past the start hour. Optional threshold (hours): when the
