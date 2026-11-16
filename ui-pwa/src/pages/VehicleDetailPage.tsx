@@ -1238,49 +1238,54 @@ export function VehicleDetailPage() {
         <p>{v.owner ? 'عربيات الغير' : 'ملك المركز'}</p>
       </div>
       {v.owner ? (
-        <div className="vd-owner">
-          <div className="vd-owner__row">
-            <div className="vd-owner__avatar" aria-hidden>{ownerInitial}</div>
-            <div className="vd-owner__meta">
-              <strong>{v.owner.full_name}</strong>
-              {v.owner.phone ? (
-                <PhoneActions phone={v.owner.phone} name={v.owner.full_name} />
-              ) : (
-                <span>بدون هاتف</span>
-              )}
-              <span>شهري {formatMoney(v.owner_monthly_amount || 0)} · ربط منذ {v.owner_since || '—'}</span>
+        <>
+          <div className="vd-owner">
+            <div className="vd-owner__row">
+              <div className="vd-owner__avatar" aria-hidden>{ownerInitial}</div>
+              <div className="vd-owner__meta">
+                <strong>{v.owner.full_name}</strong>
+                {v.owner.phone ? (
+                  <PhoneActions phone={v.owner.phone} name={v.owner.full_name} />
+                ) : (
+                  <span>بدون هاتف</span>
+                )}
+                <span>شهري {formatMoney(v.owner_monthly_amount || 0)} · ربط منذ {shortDate(v.owner_since)}</span>
+              </div>
+            </div>
+            <div className="vd-facts vd-owner__facts">
+              <Fact label="بداية العقد" value={shortDate(v.owner_agreement_starts_on)} />
+              <Fact label="نهاية العقد" value={shortDate(v.owner_agreement_ends_on)} />
+              <Fact label="الإيجار الشهري" value={formatMoney(v.owner_monthly_amount || 0)} />
+              <Fact label="تاريخ الربط" value={shortDate(v.owner_since)} />
+            </div>
+            <div className="vd-owner__actions vd-no-print">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  void api<{ data: { html: string } }>(`/vehicles/${v.id}/owner-agreement/print`)
+                    .then((res) => {
+                      printHtmlDocument(shellOwnerAgreementHtml(res.data.html))
+                    })
+                    .catch((e) => toast.error((e as ApiError).message || 'تعذّرت طباعة عقد المالك.'))
+                }}
+              >
+                طباعة عقد المالك
+              </Button>
+              <Link className="rpm-link-btn" to={`/owners/${v.owner.id}`}>ملف المالك</Link>
+              {canUpdateVehicle ? (
+                <Button size="sm" loading={custodyIssuing} onClick={() => void issueCustodyAgreement()}>
+                  إصدار عقد اعتماد وطباعة
+                </Button>
+              ) : null}
             </div>
           </div>
-          <div className="vd-facts" style={{ marginBlockStart: '0.75rem' }}>
-            <Fact label="بداية العقد" value={shortDate(v.owner_agreement_starts_on)} />
-            <Fact label="نهاية العقد" value={shortDate(v.owner_agreement_ends_on)} />
-          </div>
-          <div className="vd-no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBlockStart: '0.75rem', alignItems: 'center' }}>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                void api<{ data: { html: string } }>(`/vehicles/${v.id}/owner-agreement/print`)
-                  .then((res) => {
-                    printHtmlDocument(shellOwnerAgreementHtml(res.data.html))
-                  })
-                  .catch((e) => toast.error((e as ApiError).message || 'تعذّرت طباعة عقد المالك.'))
-              }}
-            >
-              طباعة عقد المالك
-            </Button>
-            <Link className="rpm-link-btn" to={`/owners/${v.owner.id}`}>ملف المالك</Link>
-            {canUpdateVehicle ? (
-              <Button size="sm" loading={custodyIssuing} onClick={() => void issueCustodyAgreement()}>
-                إصدار عقد اعتماد وطباعة
-              </Button>
-            ) : null}
-          </div>
-          <div style={{ marginBlockStart: '1rem' }}>
-            <h3 style={{ margin: '0 0 0.35rem' }}>نسخ عقد الاعتماد الصادرة</h3>
-            <p className="muted" style={{ margin: '0 0 0.55rem', fontSize: '0.82rem' }}>
-              تُملأ تلقائياً ببيانات المركز والمالك والعربية. النسخة الصادرة ثابتة ولا تتأثر بتعديل القالب لاحقاً — وهذا مستقل عن عقود تأجير العملاء.
-            </p>
+
+          <div className="vd-owner-custody">
+            <div className="vd-panel__head">
+              <h2>نسخ عقد الاعتماد الصادرة</h2>
+              <p>ثابتة بعد الإصدار — مستقلة عن عقود تأجير العملاء</p>
+            </div>
             {custodyLoading ? (
               <p className="muted">جاري تحميل العقود…</p>
             ) : custodyAgreements.length === 0 ? (
@@ -1325,12 +1330,12 @@ export function VehicleDetailPage() {
               </div>
             )}
           </div>
-        </div>
+        </>
       ) : (
         <Empty>هذه العربية ملك المركز — لا يوجد مالك خارجي مرتبط. عقد الاعتماد للمالك الخارجي فقط.</Empty>
       )}
       {(dossier.owner_dues.length > 0 || dossier.owner_payouts.length > 0) ? (
-        <div className="vd-split">
+        <div className="vd-split vd-owner-money">
           <div>
             <h3>المستحقات الشهرية</h3>
             {dossier.owner_dues.length === 0 ? <Empty>لا مستحقات</Empty> : (
@@ -1367,16 +1372,6 @@ export function VehicleDetailPage() {
           </div>
         </div>
       ) : null}
-      <div className="vd-panel__head" style={{ marginTop: '0.35rem' }}>
-        <h2>رمز QR</h2>
-      </div>
-      <QrCode
-        className="vd-qr-panel"
-        value={dossier.qr.payload}
-        label={dossier.qr.label}
-        fileName={`rpm-${v.code}-qr`}
-        size={176}
-      />
     </section>
   )
 
