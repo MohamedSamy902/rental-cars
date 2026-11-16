@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { useNewContract } from '@/shared/contracts/newContractContext'
-import { formatMoney, formatMoneyPlain, formatDate } from '@/shared/lib/format'
+import { formatMoney, formatDate } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
+import { openWhatsAppText, vehicleWhatsAppText } from '@/shared/lib/whatsappShare'
 import { PageHeader, EmptyState, SkeletonBlock, ErrorState, StatusPill, Button } from '@/shared/ui'
 import './pages.css'
 import './ShowroomPage.css'
@@ -33,6 +34,7 @@ export function ShowroomPage() {
   const { openNewContract } = useNewContract()
   const [center, setCenter] = useState('')
   const [centerPhone, setCenterPhone] = useState('')
+  const [minDays, setMinDays] = useState(5)
   const [rows, setRows] = useState<ShowroomVehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -42,9 +44,18 @@ export function ShowroomPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await api<{ data: { center_name?: string; center_phone?: string; vehicles: ShowroomVehicle[] } }>('/showroom')
+      const res = await api<{
+        data: {
+          center_name?: string
+          center_phone?: string
+          min_rental_days?: number
+          vehicles: ShowroomVehicle[]
+        }
+      }>('/showroom')
       setCenter(res.data.center_name || 'المعرض')
       setCenterPhone(res.data.center_phone || '')
+      const min = Number(res.data.min_rental_days)
+      setMinDays(Number.isFinite(min) && min > 0 ? min : 5)
       setRows(res.data.vehicles || [])
     } catch (e) {
       setError((e as ApiError).message)
@@ -65,30 +76,12 @@ export function ShowroomPage() {
     return rows
   }, [rows, chip])
 
-  function catalogText(v: ShowroomVehicle) {
-    const status = v.available
-      ? 'متاحة الآن'
-      : v.returning_on
-        ? `تعود ${formatDate(v.returning_on)}`
-        : 'غير متاحة حالياً'
-    const lines = [
-      `${center || 'RPM'} — كتالوج التأجير`,
-      `${v.brand} ${v.model} ${v.year}`,
-    ]
-    if (v.plate) lines.push(`اللوحة: ${v.plate}`)
-    lines.push(
-      `الفئة: ${v.category} · ${v.fuel_type}${v.transmission ? ` · ${v.transmission}` : ''}`,
-      `يومي ${formatMoneyPlain(v.daily_rate)} · نص شهر (١٥ يوماً) ${formatMoneyPlain(v.half_monthly_rate)} · شهري (٣٠ يوماً) ${formatMoneyPlain(v.monthly_rate)}`,
-      `التأمين النقدي: ${formatMoneyPlain(v.default_deposit)}`,
-      `الحالة: ${status}`,
-    )
-    if (centerPhone) lines.push(`للتواصل: ${centerPhone}`)
-    return lines.join('\n')
-  }
-
   function shareWhatsApp(v: ShowroomVehicle) {
-    const url = `https://wa.me/?text=${encodeURIComponent(catalogText(v))}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    openWhatsAppText(vehicleWhatsAppText(v, {
+      centerName: center || 'شركة آر بي إم للتأجير',
+      phone: centerPhone,
+      minDays,
+    }))
   }
 
   return (

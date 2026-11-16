@@ -52,6 +52,7 @@ class ShowroomCatalogTest extends TestCase
         $res = $this->getJson('/api/showroom')->assertOk();
         $res->assertJsonPath('data.center_name', 'شركة آر بي إم للتأجير');
         $res->assertJsonPath('data.center_phone', '01125253888');
+        $res->assertJsonPath('data.min_rental_days', 5);
 
         $row = collect($res->json('data.vehicles'))->firstWhere('brand', 'نيسان');
         $this->assertNotNull($row);

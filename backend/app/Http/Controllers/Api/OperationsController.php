@@ -115,10 +115,17 @@ class OperationsController extends Controller
             })
             ->values();
 
+        $minRentalDays = is_numeric($ops['default_min_days'] ?? null)
+            ? max(1, (int) $ops['default_min_days'])
+            : (is_numeric($ops['showroom_min_rental_days'] ?? null)
+                ? max(1, (int) $ops['showroom_min_rental_days'])
+                : 5);
+
         return response()->json([
             'data' => [
                 'center_name' => $settings?->center_name,
                 'center_phone' => $phone,
+                'min_rental_days' => $minRentalDays,
                 'vehicles' => $rows,
             ],
         ]);
