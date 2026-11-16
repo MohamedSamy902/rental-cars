@@ -613,12 +613,23 @@ class VehicleOwnerService
      *   month: string,
      *   month_accrued: int,
      *   month_paid: int,
-     *   vehicles_monthly_total: int
+     *   vehicles_monthly_total: int,
+     *   vehicles_breakdown: list<array{
+     *     vehicle_id: int,
+     *     plate: string|null,
+     *     code: string|null,
+     *     monthly: int,
+     *     agreement_starts_on: string|null,
+     *     agreement_ends_on: string|null,
+     *     earned: int,
+     *     shares: array<string, int>
+     *   }>
      * }
      */
     /**
      * Read-only. Does NOT post journals.
      * earned_total = مجموع نصيب الشهور المدنية المكتملة من جدول العقد (OwnerRentSchedule).
+     * الشهر الجاري لا يُحسب أبداً — مثال: بداية عقد ١٥/١١ واليوم ١٦/١١ ⇒ earned=0 ⇒ overdue=0.
      * overdue = max(0, earned_total − paid_total) — فلوس شهور عدّت ولم تُصرف بعد.
      */
     public function balance(VehicleOwner $owner, ?string $yearMonth = null): array
@@ -628,23 +639,31 @@ class VehicleOwnerService
         $today = now()->timezone($tz)->toDateString();
 
         $earnedTotal = 0;
+        $breakdown = [];
         $vehicles = Vehicle::query()
             ->where('owner_id', $owner->id)
             ->where('is_active', true)
             ->whereNotNull('owner_monthly_amount')
             ->where('owner_monthly_amount', '>', 0)
-            ->get(['id', 'owner_monthly_amount', 'owner_agreement_starts_on', 'owner_agreement_ends_on']);
+            ->get(['id', 'code', 'plate', 'owner_monthly_amount', 'owner_agreement_starts_on', 'owner_agreement_ends_on']);
 
         foreach ($vehicles as $vehicle) {
             $start = $vehicle->owner_agreement_starts_on?->toDateString();
             $end = $vehicle->owner_agreement_ends_on?->toDateString();
-            $shares = $this->rentSchedule->shares(
-                $start,
-                $end,
-                (int) $vehicle->owner_monthly_amount,
-                $today,
-            );
-            $earnedTotal += (int) array_sum($shares);
+            $monthly = (int) $vehicle->owner_monthly_amount;
+            $shares = $this->rentSchedule->shares($start, $end, $monthly, $today);
+            $earned = (int) array_sum($shares);
+            $earnedTotal += $earned;
+            $breakdown[] = [
+                'vehicle_id' => (int) $vehicle->id,
+                'plate' => $vehicle->plate,
+                'code' => $vehicle->code,
+                'monthly' => $monthly,
+                'agreement_starts_on' => $start,
+                'agreement_ends_on' => $end,
+                'earned' => $earned,
+                'shares' => $shares,
+            ];
         }
 
         $paidTotal = (int) OwnerPayout::query()->where('owner_id', $owner->id)->sum('amount');
@@ -666,6 +685,7 @@ class VehicleOwnerService
             'month_accrued' => 0,
             'month_paid' => $monthPaid,
             'vehicles_monthly_total' => $vehiclesMonthly,
+            'vehicles_breakdown' => $breakdown,
         ];
     }
 

@@ -93,4 +93,85 @@ class OwnerOverdueBalanceTest extends TestCase
         $cleared = $this->getJson('/api/owners/'.$owner->id)->assertOk()->json('data');
         $this->assertSame(0, $cleared['balance']['overdue']);
     }
+
+    public function test_agreement_starting_mid_current_month_has_zero_overdue(): void
+    {
+        $owner = VehicleOwner::query()->create([
+            'full_name' => 'مناديلي اختبار',
+            'phone' => '01114449023',
+            'is_active' => true,
+        ]);
+        Vehicle::query()->create([
+            'code' => 'OWN-NOV15',
+            'plate' => 'م ن 15',
+            'brand' => 'نيسان',
+            'model' => 'صني',
+            'year' => 2024,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 900,
+            'default_deposit' => 0,
+            'is_active' => true,
+            'owner_id' => $owner->id,
+            'owner_monthly_amount' => 29000,
+            'owner_agreement_starts_on' => '2026-11-15',
+            'owner_agreement_ends_on' => '2027-11-15',
+        ]);
+        Vehicle::query()->create([
+            'code' => 'OWN-NOV15B',
+            'plate' => 'م ن 16',
+            'brand' => 'هيونداي',
+            'model' => 'إلينترا',
+            'year' => 2024,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 900,
+            'default_deposit' => 0,
+            'is_active' => true,
+            'owner_id' => $owner->id,
+            'owner_monthly_amount' => 24000,
+            'owner_agreement_starts_on' => '2026-11-15',
+            'owner_agreement_ends_on' => '2027-11-15',
+        ]);
+
+        $show = $this->getJson('/api/owners/'.$owner->id)->assertOk()->json('data');
+        $this->assertSame(53000, $show['balance']['vehicles_monthly_total']);
+        $this->assertSame(0, $show['balance']['earned_total']);
+        $this->assertSame(0, $show['balance']['overdue']);
+        $this->assertSame('2026-11-15', $show['vehicles'][0]['owner_agreement_starts_on']);
+        $this->assertSame(0, $show['vehicles'][0]['earned_completed']);
+    }
+
+    public function test_october_start_shows_completed_october_share_as_overdue(): void
+    {
+        $owner = VehicleOwner::query()->create([
+            'full_name' => 'مالك أكتوبر',
+            'phone' => '01114449999',
+            'is_active' => true,
+        ]);
+        Vehicle::query()->create([
+            'code' => 'OWN-OCT',
+            'plate' => 'ك ت 1',
+            'brand' => 'كيان',
+            'model' => 'سبورتاج',
+            'year' => 2023,
+            'category' => 'SUV',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 1200,
+            'default_deposit' => 0,
+            'is_active' => true,
+            'owner_id' => $owner->id,
+            'owner_monthly_amount' => 29000,
+            'owner_agreement_starts_on' => '2026-10-01',
+            'owner_agreement_ends_on' => '2027-10-01',
+        ]);
+
+        $show = $this->getJson('/api/owners/'.$owner->id)->assertOk()->json('data');
+        $this->assertSame(29000, $show['balance']['earned_total']);
+        $this->assertSame(29000, $show['balance']['overdue']);
+        $this->assertSame(['2026-10' => 29000], $show['balance']['vehicles_breakdown'][0]['shares']);
+    }
 }

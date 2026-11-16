@@ -20,6 +20,12 @@ type Balance = {
   overdue?: number
   remaining: number
   vehicles_monthly_total: number
+  vehicles_breakdown?: Array<{
+    vehicle_id: number
+    earned: number
+    shares: Record<string, number>
+    agreement_starts_on?: string | null
+  }>
 }
 
 type OwnerVehicle = {
@@ -30,6 +36,10 @@ type OwnerVehicle = {
   model: string
   owner_monthly_amount?: number | null
   owner_since?: string | null
+  owner_agreement_starts_on?: string | null
+  owner_agreement_ends_on?: string | null
+  earned_completed?: number
+  earned_shares?: Record<string, number>
   is_active: boolean
 }
 
@@ -196,7 +206,7 @@ export function OwnerDetailPage() {
     <div className="rpm-stack">
       <PageHeader
         title={owner.full_name}
-        subtitle="ملف مالك العربيات · المبلغ الشهري التعاقدي · الصرف · المستندات"
+        subtitle="متأخر = شهور مدنية مكتملة فقط − المصروف · الشهر الجاري لا يُحسب"
         action={
           <>
             <BackNavButton to="/owners" label="رجوع للملاك" />
@@ -256,13 +266,25 @@ export function OwnerDetailPage() {
           <div className="rpm-card-list">
             {(owner.vehicles || []).map((v) => {
               const label = `${v.brand} ${v.model} · ${v.plate}`
+              const startOn = v.owner_agreement_starts_on || v.owner_since
+              const shares = Object.entries(v.earned_shares || {})
               return (
               <article key={v.id} className="rpm-card">
                 <div className="rpm-card__row">
                   <strong><Link to={`/vehicles/${v.id}`}>{v.brand} {v.model}</Link></strong>
                   <strong className="tabular-nums">{v.owner_monthly_amount != null ? formatMoney(v.owner_monthly_amount) : '—'}</strong>
                 </div>
-                <p className="muted">{v.code} · {v.plate} · منذ {formatDate(v.owner_since)}</p>
+                <p className="muted">
+                  {v.code} · {v.plate}
+                  {' · '}بداية العقد {startOn ? formatDate(startOn) : '—'}
+                  {v.owner_agreement_ends_on ? ` · نهاية ${formatDate(v.owner_agreement_ends_on)}` : ''}
+                </p>
+                <p className="muted">
+                  مستحق شهور مكتملة: {formatMoney(v.earned_completed || 0)}
+                  {shares.length > 0
+                    ? ` · ${shares.map(([ym, amt]) => `${ym}: ${formatMoney(amt)}`).join(' · ')}`
+                    : ' · لا شهر مكتمل بعد'}
+                </p>
                 <div className="rpm-card__actions">
                   <Button
                     size="sm"
