@@ -121,12 +121,10 @@ class AttentionSignalsTest extends TestCase
         ]);
     }
 
-    public function test_attention_counts_unpaid_owners(): void
+    public function test_attention_ignores_owner_accrual_remaining(): void
     {
         $dueOwner = VehicleOwner::query()->create(['full_name' => 'مالك مستحق', 'is_active' => true]);
-        $paidOwner = VehicleOwner::query()->create(['full_name' => 'مالك مسدد', 'is_active' => true]);
         $vehicle = $this->vehicle('OWN-DUE', $dueOwner->id);
-        $paidVehicle = $this->vehicle('OWN-PAID', $paidOwner->id);
 
         OwnerMonthDue::query()->create([
             'owner_id' => $dueOwner->id,
@@ -134,22 +132,9 @@ class AttentionSignalsTest extends TestCase
             'year_month' => now()->format('Y-m'),
             'amount' => 5000,
         ]);
-        OwnerMonthDue::query()->create([
-            'owner_id' => $paidOwner->id,
-            'vehicle_id' => $paidVehicle->id,
-            'year_month' => now()->format('Y-m'),
-            'amount' => 2000,
-        ]);
-        OwnerPayout::query()->create([
-            'owner_id' => $paidOwner->id,
-            'vehicle_id' => $paidVehicle->id,
-            'amount' => 2000,
-            'paid_on' => now()->toDateString(),
-            'payment_method' => 'cash',
-        ]);
 
         $res = $this->getJson('/api/attention')->assertOk();
-        $res->assertJsonPath('data.owners_unpaid', 1);
+        $res->assertJsonPath('data.owners_unpaid', 0);
     }
 
     private function vehicle(string $code, int $ownerId): Vehicle

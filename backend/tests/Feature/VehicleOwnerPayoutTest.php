@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
+use App\Models\JournalLine;
 use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -25,7 +27,6 @@ class VehicleOwnerPayoutTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Freeze calendar so owner accrual months are deterministic across CI timezones.
         $frozen = CarbonImmutable::parse('2026-12-01 12:00:00', 'Africa/Cairo');
         Carbon::setTestNow($frozen);
         CarbonImmutable::setTestNow($frozen);
@@ -54,7 +55,7 @@ class VehicleOwnerPayoutTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_owner_with_two_vehicles_accrues_and_partial_payout(): void
+    public function test_owner_monthly_payout_posts_expense_without_accrual_cap(): void
     {
         $owner = $this->postJson('/api/owners', [
             'full_name' => 'حسام المالك',
@@ -66,67 +67,45 @@ class VehicleOwnerPayoutTest extends TestCase
             'code' => 'O-1', 'plate' => 'OWN 1', 'brand' => 'هيونداي', 'model' => 'إلينترا',
             'year' => 2021, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين',
             'odometer' => 10000, 'daily_rate' => 900, 'default_deposit' => 2000, 'is_active' => true,
-            'owner_id' => $owner['id'], 'owner_monthly_amount' => 5000,
+            'owner_id' => $owner['id'], 'owner_monthly_amount' => 20000,
             'owner_since' => $since,
             'owner_agreement_starts_on' => $since,
             'owner_agreement_ends_on' => '2027-11-01',
         ]);
-        $v2 = Vehicle::query()->create([
-            'code' => 'O-2', 'plate' => 'OWN 2', 'brand' => 'كيا', 'model' => 'سيراتو',
-            'year' => 2022, 'category' => 'اقتصادي', 'fuel_type' => 'بنزين',
-            'odometer' => 8000, 'daily_rate' => 850, 'default_deposit' => 2000, 'is_active' => true,
-            'owner_id' => $owner['id'], 'owner_monthly_amount' => 4000,
-            'owner_since' => $since,
-            'owner_agreement_starts_on' => $since,
-            'owner_agreement_ends_on' => '2027-11-01',
-        ]);
-
-        $this->assertSame(5000, (int) $v1->fresh()->owner_monthly_amount);
-        $this->assertSame(4000, (int) $v2->fresh()->owner_monthly_amount);
-
-        // Accrual is explicit (V4-03) — GET must not post; payout also accrues before paying.
-        $this->artisan('owners:accrue-dues', ['--owner' => $owner['id']])->assertSuccessful();
 
         $show = $this->getJson('/api/owners/'.$owner['id'])->assertOk()->json('data');
-        $this->assertSame(2, count($show['vehicles']));
-        $this->assertSame(9000, $show['balance']['accrued_total']);
-        $this->assertSame(9000, $show['balance']['remaining']);
-        $this->assertSame(9000, $show['balance']['vehicles_monthly_total']);
-
-        $this->assertDatabaseHas('owner_month_dues', [
-            'owner_id' => $owner['id'],
-            'vehicle_id' => $v1->id,
-            'year_month' => '2026-11',
-            'amount' => 5000,
-        ]);
-        $this->assertDatabaseHas('owner_month_dues', [
-            'owner_id' => $owner['id'],
-            'vehicle_id' => $v2->id,
-            'amount' => 4000,
-        ]);
+        $this->assertSame(20000, $show['balance']['vehicles_monthly_total']);
+        $this->assertSame(0, $show['balance']['remaining']);
 
         $payout = $this->postJson('/api/owners/'.$owner['id'].'/payouts', [
-            'amount' => 3000,
+            'amount' => 20000,
             'paid_on' => now()->toDateString(),
             'payment_method' => 'cash',
             'vehicle_id' => $v1->id,
-            'notes' => 'دفعة جزئية',
+            'notes' => 'صرف الشهر',
         ])->assertCreated();
 
-        $this->assertSame(3000, $payout->json('data.amount'));
-        $this->assertSame(6000, $payout->json('balance.remaining'));
+        $this->assertSame(20000, $payout->json('data.amount'));
+        $this->assertSame(20000, $payout->json('balance.paid_total'));
+        $this->assertSame(0, $payout->json('balance.remaining'));
         $this->assertDatabaseCount('owner_payouts', 1);
+        $this->assertDatabaseCount('owner_month_dues', 0);
 
-        $this->postJson('/api/owners/'.$owner['id'].'/payouts', [
-            'amount' => 7000,
-            'paid_on' => now()->toDateString(),
-        ])->assertStatus(422);
+        $expense = Account::query()->where('code', '5200')->firstOrFail();
+        $cash = Account::query()->where('code', '1000')->firstOrFail();
+        $this->assertTrue(
+            JournalLine::query()->where('account_id', $expense->id)->where('debit', 20000)->exists()
+        );
+        $this->assertTrue(
+            JournalLine::query()->where('account_id', $cash->id)->where('credit', 20000)->exists()
+        );
 
+        // صرف إضافي مسموح (لا سقف متبقي محاسبي)
         $this->postJson('/api/owners/'.$owner['id'].'/payouts', [
-            'amount' => 6000,
+            'amount' => 5000,
             'paid_on' => now()->toDateString(),
             'payment_method' => 'transfer',
-        ])->assertCreated()->assertJsonPath('balance.remaining', 0);
+        ])->assertCreated()->assertJsonPath('balance.paid_total', 25000);
     }
 
     public function test_vehicle_store_links_owner_monthly_amount(): void

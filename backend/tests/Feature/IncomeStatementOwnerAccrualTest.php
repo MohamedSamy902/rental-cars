@@ -32,12 +32,11 @@ class IncomeStatementOwnerAccrualTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role_id' => $admin->id, 'is_active' => true]));
     }
 
-    public function test_income_statement_separates_owner_accrual_from_operating_expenses(): void
+    public function test_income_statement_includes_owner_cash_payout_in_operating_expenses(): void
     {
         $expenseOps = Account::query()->where('code', '5100')->firstOrFail();
         $expenseOwner = Account::query()->where('code', '5200')->firstOrFail();
         $cash = Account::query()->where('code', '1000')->firstOrFail();
-        $payable = Account::query()->where('code', '2100')->firstOrFail();
         $income = Account::query()->where('code', '4000')->firstOrFail();
 
         $rent = JournalEntry::query()->create([
@@ -64,26 +63,25 @@ class IncomeStatementOwnerAccrualTest extends TestCase
             'journal_entry_id' => $ops->id, 'account_id' => $cash->id, 'debit' => 0, 'credit' => 5000,
         ]);
 
-        $accrual = JournalEntry::query()->create([
+        $payout = JournalEntry::query()->create([
             'entry_date' => now()->toDateString(),
-            'narration' => 'استحقاق مالك',
-            'source' => 'owner_accrual:test',
+            'narration' => 'صرف شهري لمالك',
+            'source' => 'owner_payout:test',
         ]);
         JournalLine::query()->create([
-            'journal_entry_id' => $accrual->id, 'account_id' => $expenseOwner->id, 'debit' => 396824, 'credit' => 0,
+            'journal_entry_id' => $payout->id, 'account_id' => $expenseOwner->id, 'debit' => 20000, 'credit' => 0,
         ]);
         JournalLine::query()->create([
-            'journal_entry_id' => $accrual->id, 'account_id' => $payable->id, 'debit' => 0, 'credit' => 396824,
+            'journal_entry_id' => $payout->id, 'account_id' => $cash->id, 'debit' => 0, 'credit' => 20000,
         ]);
 
         $res = $this->getJson('/api/reports/income-statement')->assertOk()->json('data');
 
         $this->assertSame(44000, $res['income_total']);
-        $this->assertSame(5000, $res['expense_total']);
-        $this->assertSame(396824, $res['owner_accrual_total']);
-        $this->assertSame(39000, $res['net']);
-        $this->assertSame(39000 - 396824, $res['net_with_owner_accrual']);
-        $this->assertSame(['5100'], collect($res['expenses'])->pluck('code')->all());
-        $this->assertSame(['5200'], collect($res['owner_accruals'])->pluck('code')->all());
+        $this->assertSame(25000, $res['expense_total']);
+        $this->assertSame(0, $res['owner_accrual_total']);
+        $this->assertSame(19000, $res['net']);
+        $this->assertSame([], $res['owner_accruals']);
+        $this->assertEqualsCanonicalizing(['5100', '5200'], collect($res['expenses'])->pluck('code')->all());
     }
 }

@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
-import { useQueryTab } from '@/shared/lib/useQueryTab'
-import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, DataTable, TextField, TextAreaField, SwitchField,
   StatusPill, useToast, IconEye, MediaUpload, PhoneActions, type DataColumn,
@@ -39,7 +37,6 @@ const emptyForm = {
   notes: '', is_active: true,
 }
 
-const OwnersPageTabs = ['all', 'due'] as const
 const LIST_PER_PAGE = 50
 
 type PageMeta = { current_page: number; last_page: number; total: number }
@@ -56,25 +53,6 @@ export function OwnersPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [chip, setChip] = useQueryTab({ allowed: OwnersPageTabs, defaultValue: 'all' })
-  const { counts: attention } = useAttentionSignals(true)
-
-  const chips = useMemo(
-    () => [
-      { id: 'all', label: 'الكل' },
-      {
-        id: 'due',
-        label: 'مستحق',
-        attention: attention.owners_unpaid > 0 ? ('warning' as const) : null,
-        attentionLabel: `${attention.owners_unpaid} مالك له رصيد متبقٍ`,
-      },
-    ],
-    [attention.owners_unpaid],
-  )
-  const visible = useMemo(
-    () => (chip === 'due' ? rows.filter((o) => Number(o.balance?.remaining || 0) > 0) : rows),
-    [rows, chip],
-  )
 
   async function load(nextPage = page) {
     setLoading(true)
@@ -189,15 +167,9 @@ export function OwnersPage() {
     { id: 'vehicles', header: 'العربيات', cell: (o) => o.vehicles_count ?? 0, sortValue: (o) => o.vehicles_count ?? 0 },
     {
       id: 'monthly',
-      header: 'الشهري التعاقدي',
+      header: 'المبلغ الشهري',
       cell: (o) => formatMoney(o.balance?.vehicles_monthly_total || 0),
       sortValue: (o) => Number(o.balance?.vehicles_monthly_total || 0),
-    },
-    {
-      id: 'remaining',
-      header: 'المتبقي المستحق',
-      cell: (o) => formatMoney(o.balance?.remaining || 0),
-      sortValue: (o) => Number(o.balance?.remaining || 0),
     },
     {
       id: 'status',
@@ -212,7 +184,7 @@ export function OwnersPage() {
     <div className="rpm-stack">
       <PageHeader
         title="ملاك العربيات"
-        subtitle="عربيات الغير · مبلغ شهري · سحب جزئي ورصيد متبقي"
+        subtitle="عربيات الغير · المبلغ الشهري التعاقدي فقط (بلا رصيد متراكم)"
         action={<Button onClick={() => { setForm(emptyForm); setFieldErrors({}); setOpen(true) }}>إضافة مالك</Button>}
         mobileFab
       />
@@ -221,13 +193,13 @@ export function OwnersPage() {
         search={search}
         onSearchChange={(v) => { setSearch(v); setPage(1) }}
         placeholder="بحث بالاسم أو الهاتف…"
-        chips={chips}
-        activeChip={chip}
-        onChipChange={(id) => { setChip(id); setPage(1) }}
+        chips={[{ id: 'all', label: 'الكل' }]}
+        activeChip="all"
+        onChipChange={() => undefined}
       />
       <DataTable
         label="الملاك"
-        rows={visible}
+        rows={rows}
         columns={ownerColumns}
         rowKey={(o) => o.id}
         rowLabel={(o) => o.full_name}
@@ -239,13 +211,13 @@ export function OwnersPage() {
         ]}
         emptyTitle="لا ملاك بعد"
         emptyDescription="أضف مالكاً ثم اربطه من شاشة العربيات مع المبلغ الشهري"
-        serverPagination={chip === 'all' ? {
+        serverPagination={{
           page: meta.current_page,
           lastPage: meta.last_page,
           total: meta.total,
           perPage: LIST_PER_PAGE,
           onPageChange: setPage,
-        } : undefined}
+        }}
       />
 
       <Sheet open={open} title="إضافة مالك" onClose={() => setOpen(false)} footer={<><Button loading={saving} onClick={() => void onSave()}>حفظ</Button><Button variant="secondary" onClick={() => setOpen(false)}>إلغاء</Button></>}>

@@ -517,39 +517,10 @@ class DueNotificationService
      */
     private function ownerBalanceAlerts(array &$scanned): array
     {
-        if (! Schema::hasTable('vehicle_owners') || ! Schema::hasTable('owner_month_dues') || ! Schema::hasTable('owner_payouts')) {
-            return [];
-        }
-
+        // توقّف تنبيه «متبقي محاسبي» — رصيد المالك التشغيلي = المبلغ الشهري فقط.
         $this->mark($scanned, 'owner_balance');
 
-        $rows = DB::table('vehicle_owners as owners')
-            ->whereNull('owners.deleted_at')
-            ->where('owners.is_active', true)
-            ->select('owners.id', 'owners.full_name')
-            ->selectRaw('(SELECT COALESCE(SUM(dues.amount), 0) FROM owner_month_dues dues WHERE dues.owner_id = owners.id) as due_sum')
-            ->selectRaw('(SELECT COALESCE(SUM(payouts.amount), 0) FROM owner_payouts payouts WHERE payouts.owner_id = owners.id) as paid_sum')
-            ->get();
-
-        $alerts = [];
-        foreach ($rows as $row) {
-            $balance = (int) $row->due_sum - (int) $row->paid_sum;
-            if ($balance < 1) {
-                continue;
-            }
-            $alerts[] = new DueAlert(
-                ruleKey: 'owner_balance',
-                subjectType: 'owner',
-                subjectId: (int) $row->id,
-                title: "مستحق مالك لم يُصرف: {$row->full_name}",
-                body: "المتبقي {$this->money($balance)}.",
-                linkType: 'owner',
-                linkId: (int) $row->id,
-                permissions: ['owners.view'],
-            );
-        }
-
-        return $alerts;
+        return [];
     }
 
     /**

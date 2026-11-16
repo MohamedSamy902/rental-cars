@@ -8,7 +8,7 @@ import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
 import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
-  SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconWallet, IconCash, IconTrend, IconKey,
+  SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconCash, IconKey,
   PhoneActions,
 } from '@/shared/ui'
 import './pages.css'
@@ -194,23 +194,30 @@ export function OwnerDetailPage() {
     <div className="rpm-stack">
       <PageHeader
         title={owner.full_name}
-        subtitle="ملف مالك العربيات · المستحقات · الصرف · المستندات"
+        subtitle="ملف مالك العربيات · المبلغ الشهري التعاقدي · الصرف · المستندات"
         action={
           <>
             <BackNavButton to="/owners" label="رجوع للملاك" />
             <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
-            <Button onClick={() => setPayoutOpen(true)}>صرف مستحقات</Button>
+            <Button onClick={() => {
+              setPayoutForm({
+                amount: String(balance?.vehicles_monthly_total || ''),
+                paid_on: todayCivilIso(),
+                payment_method: 'cash',
+                vehicle_id: '',
+                notes: '',
+              })
+              setPayoutOpen(true)
+            }}>تسجيل صرف</Button>
           </>
         }
       />
 
       <MetricCardGrid
-        label="ملخص المستحقات"
+        label="المبلغ الشهري التعاقدي"
         items={[
-          { id: 'monthly', label: 'إجمالي الشهري', value: balance?.vehicles_monthly_total || 0, format: 'money', icon: <IconKey size={16} /> },
-          { id: 'accrued', label: 'إجمالي المستحق', value: balance?.accrued_total || 0, format: 'money', icon: <IconWallet size={16} /> },
-          { id: 'paid', label: 'إجمالي المصروف', value: balance?.paid_total || 0, format: 'money', tone: 'success', icon: <IconCash size={16} /> },
-          { id: 'left', label: 'المتبقي', value: balance?.remaining || 0, format: 'money', tone: 'warning', icon: <IconTrend size={16} /> },
+          { id: 'monthly', label: 'المبلغ الشهري', value: balance?.vehicles_monthly_total || 0, format: 'money', tone: 'success', icon: <IconKey size={16} /> },
+          { id: 'paid', label: 'إجمالي المصروف المسجّل', value: balance?.paid_total || 0, format: 'money', icon: <IconCash size={16} /> },
         ]}
       />
 
@@ -283,8 +290,11 @@ export function OwnerDetailPage() {
       </section>
 
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>المستحقات الشهرية</h3></div>
-        {(owner.dues || []).length === 0 ? <p className="muted">لا مستحقات مسجّلة.</p> : (
+        <div className="rpm-panel__head">
+          <h3>سجل الترحيل المحاسبي</h3>
+          <p className="muted" style={{ margin: 0 }}>للتوثيق فقط — رصيد المالك التشغيلي هو المبلغ الشهري أعلاه، بلا متبقي متراكم</p>
+        </div>
+        {(owner.dues || []).length === 0 ? <p className="muted">لا ترحيلات مسجّلة.</p> : (
           <div className="rpm-card-list">
             {(owner.dues || []).slice(0, 24).map((d) => (
               <article key={d.id} className="rpm-card">
@@ -325,7 +335,7 @@ export function OwnerDetailPage() {
         onSaved={() => void load()}
       />
 
-      <Sheet open={payoutOpen} title="صرف مستحقات" onClose={() => setPayoutOpen(false)} footer={<><Button loading={saving} onClick={() => void onPayout()}>تأكيد الصرف</Button><Button variant="secondary" onClick={() => setPayoutOpen(false)}>إلغاء</Button></>}>
+      <Sheet open={payoutOpen} title="تسجيل صرف للمالك" onClose={() => setPayoutOpen(false)} footer={<><Button loading={saving} onClick={() => void onPayout()}>تأكيد الصرف</Button><Button variant="secondary" onClick={() => setPayoutOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">
           <MoneyField label="المبلغ" required value={payoutForm.amount} onChange={(e) => setPayoutForm({ ...payoutForm, amount: e.target.value })} />
           <TextField label="تاريخ الصرف" type="date" required value={payoutForm.paid_on} onChange={(e) => setPayoutForm({ ...payoutForm, paid_on: e.target.value })} />

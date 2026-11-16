@@ -122,9 +122,10 @@ export function attentionForPath(path: string, c: AttentionCounts): NavAttention
       label: `${c.blacklisted_customers} عميل في القائمة السوداء`,
     },
     '/owners': {
+      // رصيد المالك التشغيلي = المبلغ الشهري فقط — لا ننبّه على «متبقي» محاسبي متراكم
       critical: 0,
-      warning: c.owners_unpaid,
-      label: `${c.owners_unpaid} مالك له رصيد متبقٍ`,
+      warning: 0,
+      label: '',
     },
   }
 
