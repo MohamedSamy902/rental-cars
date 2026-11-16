@@ -146,7 +146,7 @@ class DemoSeeder extends Seeder
 
         $tenant = TenantSetting::query()->firstOrCreate([]);
         $tenant->fill([
-            'center_name' => 'مركز آر بي إم للتأجير',
+            'center_name' => 'شركة آر بي إم للتأجير',
             'multi_branch' => false,
             'inventory_mode' => 'unified',
             'colors' => [
@@ -162,7 +162,7 @@ class DemoSeeder extends Seeder
                 'chat' => true,
                 'hr' => true,
             ],
-            'print_footer' => 'مركز آر بي إم للتأجير — نسخة داخلية',
+            'print_footer' => 'شركة آر بي إم للتأجير — نسخة داخلية',
             'operational' => [
                 'default_daily_km' => 200,
                 'excess_km_rate' => 5,

@@ -501,7 +501,7 @@ class DueNotificationService
                 subjectType: 'deposit',
                 subjectId: (int) $deposit->id,
                 title: "تأمين بانتظار الرد للعقد {$deposit->contract->number}",
-                body: "المتبقي لدى المركز {$this->money($remaining)} بعد إقفال العقد.",
+                body: "المتبقي لدى الشركة {$this->money($remaining)} بعد إقفال العقد.",
                 linkType: 'contract',
                 linkId: (int) $deposit->contract_id,
                 permissions: ['deposits.view'],

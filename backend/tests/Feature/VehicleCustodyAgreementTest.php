@@ -27,7 +27,7 @@ class VehicleCustodyAgreementTest extends TestCase
         PermissionCatalog::ensureSeeded();
         app(AccountingService::class)->ensureChartOfAccounts();
         TenantSetting::query()->create([
-            'center_name' => 'مركز اعتماد الاختبار',
+            'center_name' => 'شركة اعتماد الاختبار',
             'print_footer' => 'تذييل اعتماد',
             'feature_flags' => [],
             'operational' => [
@@ -56,7 +56,7 @@ class VehicleCustodyAgreementTest extends TestCase
             ->assertJsonPath('data.owner.full_name', 'مالك الاعتماد');
 
         $html = (string) $issue->json('data.rendered_html');
-        $this->assertStringContainsString('مركز اعتماد الاختبار', $html);
+        $this->assertStringContainsString('شركة اعتماد الاختبار', $html);
         $this->assertStringContainsString('مالك الاعتماد', $html);
         $this->assertStringContainsString('أ ب ج 7788', $html);
         $this->assertStringContainsString('هيونداي', $html);
@@ -81,7 +81,7 @@ class VehicleCustodyAgreementTest extends TestCase
 
         $printed = (string) $print->json('data.html');
         $this->assertStringContainsString('مالك الاعتماد', $printed);
-        $this->assertStringContainsString('مركز اعتماد الاختبار', $printed);
+        $this->assertStringContainsString('شركة اعتماد الاختبار', $printed);
         $this->assertStringNotContainsString('نص جديد بالكامل بدون بيانات', $printed);
         $this->assertTrue((bool) $print->json('data.immutable'));
     }

@@ -39,7 +39,7 @@ return new class extends Migration
 
         Schema::create('tenant_settings', function (Blueprint $table) {
             $table->id();
-            $table->string('center_name')->default('مركز التأجير');
+            $table->string('center_name')->default('شركة التأجير');
             $table->string('logo_path')->nullable();
             $table->json('colors')->nullable();
             $table->boolean('multi_branch')->default(false);

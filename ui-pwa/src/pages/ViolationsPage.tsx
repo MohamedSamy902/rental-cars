@@ -386,7 +386,7 @@ export function ViolationsPage() {
                   { value: 'paid', label: statusLabel.paid },
                 ]}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
-                hint="تم السداد = العميل سدّد للمركز · مدفوعة للجهة = سُدّدت للمخالفات/المرور"
+                hint="تم السداد = العميل سدّد للشركة · مدفوعة للجهة = سُدّدت للمخالفات/المرور"
               />
             </>
           ) : null}

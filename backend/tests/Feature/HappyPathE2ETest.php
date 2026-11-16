@@ -38,7 +38,7 @@ class HappyPathE2ETest extends TestCase
         parent::setUp();
         PermissionCatalog::ensureSeeded();
         TenantSetting::query()->create([
-            'center_name' => 'مركز اختبار E2E',
+            'center_name' => 'شركة اختبار E2E',
             'print_footer' => 'تذييل طباعة E2E',
             'feature_flags' => [
                 'showroom' => true, 'petty_cash' => true, 'inventory' => true,

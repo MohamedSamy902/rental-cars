@@ -567,7 +567,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
               value={form.owner_mode}
               onChange={(e) => setForm({ ...form, owner_mode: e.target.value as FormState['owner_mode'], owner_id: '' })}
               options={[
-                { value: 'none', label: '— ملك المركز —' },
+                { value: 'none', label: '— ملك الشركة —' },
                 { value: 'existing', label: 'مالك مسجّل' },
                 { value: 'new', label: 'إنشاء مالك جديد من هنا' },
               ]}
@@ -630,7 +630,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
               value={form.owner_id}
               onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
               options={[
-                { value: '', label: '— ملك المركز —' },
+                { value: '', label: '— ملك الشركة —' },
                 ...owners.map((o) => ({ value: String(o.id), label: o.full_name + (o.phone ? ` · ${o.phone}` : '') })),
               ]}
             />

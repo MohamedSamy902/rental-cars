@@ -8,7 +8,7 @@ use App\Models\Vehicle;
 use App\Support\PublicAppUrl;
 
 /**
- * بطاقة الرمز السريع للزائر — بيانات مركز فقط (+ مستأجر حالي إن وُجد).
+ * بطاقة الرمز السريع للزائر — بيانات شركة فقط (+ مستأجر حالي إن وُجد).
  * بلا أرقام قومية ولا حسابات ولا مستندات حسّاسة (RSD ٦).
  */
 final class VehicleQrVisitorService
@@ -51,7 +51,7 @@ final class VehicleQrVisitorService
                 'year' => $vehicle->year !== null ? (int) $vehicle->year : null,
             ],
             'center' => [
-                'name' => (string) ($tenant?->center_name ?: 'مركز التأجير'),
+                'name' => (string) ($tenant?->center_name ?: 'شركة التأجير'),
                 'tagline' => $this->stringOrNull($ops['company_tagline'] ?? null)
                     ?? $this->stringOrNull(config('rpm.center_public_tagline')),
                 'phone' => $this->stringOrNull($ops['print_phone'] ?? null)

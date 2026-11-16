@@ -1331,7 +1331,7 @@ export function VehicleDetailPage() {
     <section className="vd-panel" key="owner">
       <div className="vd-panel__head">
         <h2>المالك الأساسي</h2>
-        <p>{v.owner ? 'عربيات الغير' : 'ملك المركز'}</p>
+        <p>{v.owner ? 'عربيات الغير' : 'ملك الشركة'}</p>
       </div>
       {v.owner ? (
         <>
@@ -1428,7 +1428,7 @@ export function VehicleDetailPage() {
           </div>
         </>
       ) : (
-        <Empty>هذه العربية ملك المركز — لا يوجد مالك خارجي مرتبط. عقد الاعتماد للمالك الخارجي فقط.</Empty>
+        <Empty>هذه العربية ملك الشركة — لا يوجد مالك خارجي مرتبط. عقد الاعتماد للمالك الخارجي فقط.</Empty>
       )}
       {(dossier.owner_dues.length > 0 || dossier.owner_payouts.length > 0) ? (
         <div className="vd-split vd-owner-money">
@@ -1634,7 +1634,7 @@ export function VehicleDetailPage() {
               <span className="vd-tag">{v.fuel_type}</span>
               <span className="vd-tag">{formatNumber(v.odometer)} كم</span>
               {v.seats ? <span className="vd-tag">{v.seats} مقاعد</span> : null}
-              {v.owner ? <span className="vd-tag">مالك: {v.owner.full_name}</span> : <span className="vd-tag">ملك المركز</span>}
+              {v.owner ? <span className="vd-tag">مالك: {v.owner.full_name}</span> : <span className="vd-tag">ملك الشركة</span>}
             </div>
           </div>
           <aside className="vd-hero__side">

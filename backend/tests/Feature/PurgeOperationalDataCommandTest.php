@@ -27,7 +27,7 @@ class PurgeOperationalDataCommandTest extends TestCase
         PermissionCatalog::ensureSeeded();
         app(AccountingService::class)->ensureChartOfAccounts();
         TenantSetting::query()->create([
-            'center_name' => 'مركز اختبار',
+            'center_name' => 'شركة اختبار',
             'feature_flags' => [],
             'operational' => [],
         ]);
@@ -123,7 +123,7 @@ class PurgeOperationalDataCommandTest extends TestCase
 
         $this->assertDatabaseHas('users', ['id' => $admin->id, 'email' => 'admin@purge.test']);
         $this->assertDatabaseHas('users', ['id' => $ops->id, 'email' => 'ops@purge.test']);
-        $this->assertDatabaseHas('tenant_settings', ['center_name' => 'مركز اختبار']);
+        $this->assertDatabaseHas('tenant_settings', ['center_name' => 'شركة اختبار']);
         $this->assertSame(17, Account::query()->count());
         $this->assertSame(0, Contract::withTrashed()->count());
         $this->assertSame(0, Customer::withTrashed()->count());

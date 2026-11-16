@@ -192,7 +192,7 @@ class OperationsController extends Controller
 
         return response()->json([
             'data' => [
-                'center_name' => $settings?->center_name ?: 'مركز آر بي إم للتأجير',
+                'center_name' => $settings?->center_name ?: 'شركة آر بي إم للتأجير',
                 'signer_name' => $signer,
                 'tagline' => $tagline,
                 'logo_path' => $settings?->logo_path,

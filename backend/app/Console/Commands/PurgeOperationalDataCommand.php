@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * يمسح كل البيانات التشغيلية ويصفّر القيود، مع الإبقاء على مستخدمي النظام والصلاحيات وإعدادات المركز ودليل الحسابات.
+ * يمسح كل البيانات التشغيلية ويصفّر القيود، مع الإبقاء على مستخدمي النظام والصلاحيات وإعدادات الشركة ودليل الحسابات.
  */
 class PurgeOperationalDataCommand extends Command
 {
@@ -40,7 +40,7 @@ class PurgeOperationalDataCommand extends Command
     public function handle(AccountingService $accounting): int
     {
         if (! $this->option('force')) {
-            if (! $this->confirm('سيتم مسح كل البيانات التشغيلية وتصفير القيود. المتبقي: المستخدمون والصلاحيات وإعدادات المركز ودليل الحسابات. متأكد؟', false)) {
+            if (! $this->confirm('سيتم مسح كل البيانات التشغيلية وتصفير القيود. المتبقي: المستخدمون والصلاحيات وإعدادات الشركة ودليل الحسابات. متأكد؟', false)) {
                 $this->warn('أُلغي المسح.');
 
                 return self::FAILURE;

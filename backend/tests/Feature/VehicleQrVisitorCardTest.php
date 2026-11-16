@@ -26,7 +26,7 @@ class VehicleQrVisitorCardTest extends TestCase
         parent::setUp();
         PermissionCatalog::ensureSeeded();
         TenantSetting::query()->create([
-            'center_name' => 'مركز آر بي إم',
+            'center_name' => 'شركة آر بي إم',
             'logo_path' => null,
             'operational' => [
                 'print_phone' => '01125253888',
@@ -62,7 +62,7 @@ class VehicleQrVisitorCardTest extends TestCase
     {
         $res = $this->getJson('/api/public/vehicles/'.$this->vehicle->id.'/qr-card')->assertOk();
 
-        $res->assertJsonPath('data.center.name', 'مركز آر بي إم')
+        $res->assertJsonPath('data.center.name', 'شركة آر بي إم')
             ->assertJsonPath('data.center.phone', '01125253888')
             ->assertJsonPath('data.center.address', 'حدائق حلوان — القاهرة')
             ->assertJsonPath('data.center.map_url', 'https://maps.app.goo.gl/7xn2CMaJ3socdB6r9?g_st=ic')

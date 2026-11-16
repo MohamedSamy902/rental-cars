@@ -22,7 +22,7 @@ class DepartmentNoticeStatementTest extends TestCase
         parent::setUp();
         PermissionCatalog::ensureSeeded();
         TenantSetting::query()->create([
-            'center_name' => 'مركز آر بي إم للتأجير',
+            'center_name' => 'شركة آر بي إم للتأجير',
             'operational' => [
                 'print_phone' => '01125253888',
                 'print_signer_name' => 'أ/ محمد عبدالقادر',

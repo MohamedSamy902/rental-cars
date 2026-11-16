@@ -168,7 +168,7 @@ function headerBlock(tenant: PrintTenant) {
     <header class="print-head">
       <img class="print-logo" src="${esc(logo)}" alt="شعار الشركة" />
       <div>
-        <h1>${esc(tenant.center_name || 'مركز التأجير')}</h1>
+        <h1>${esc(tenant.center_name || 'شركة التأجير')}</h1>
         ${meta ? `<p class="muted">${meta}</p>` : ''}
       </div>
     </header>`

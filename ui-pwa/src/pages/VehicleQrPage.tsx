@@ -170,7 +170,7 @@ export function VehicleQrPage() {
               </header>
 
               {(card.center.phone || card.center.address) ? (
-                <section className="vqr__promo" aria-label="تواصل مع المركز">
+                <section className="vqr__promo" aria-label="تواصل مع الشركة">
                   {card.center.phone ? (
                     <div className="vqr__cta-row">
                       <a className="vqr__cta vqr__cta--call" href={telHref(card.center.phone)}>
@@ -184,7 +184,7 @@ export function VehicleQrPage() {
                         rel="noopener noreferrer"
                       >
                         <span className="vqr__cta-kicker">واتساب</span>
-                        <strong>راسل المركز</strong>
+                        <strong>راسل الشركة</strong>
                       </a>
                     </div>
                   ) : null}
@@ -205,7 +205,7 @@ export function VehicleQrPage() {
               ) : null}
 
               {Object.keys(card.center.social).length > 0 ? (
-                <nav className="vqr__social" aria-label="حسابات المركز">
+                <nav className="vqr__social" aria-label="حسابات الشركة">
                   {Object.entries(card.center.social).map(([key, href]) => (
                     <a key={key} href={href} target="_blank" rel="noopener noreferrer">
                       {SOCIAL_LABELS[key] || key}

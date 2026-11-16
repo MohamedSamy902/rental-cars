@@ -114,9 +114,9 @@ export function SettingsPage() {
       />
 
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>المركز</h3></div>
+        <div className="rpm-panel__head"><h3>الشركة</h3></div>
         <div className="rpm-form-grid">
-          <TextField label="اسم المركز" value={centerName} onChange={(e) => setCenterName(e.target.value)} />
+          <TextField label="اسم الشركة" value={centerName} onChange={(e) => setCenterName(e.target.value)} />
         </div>
       </section>
 

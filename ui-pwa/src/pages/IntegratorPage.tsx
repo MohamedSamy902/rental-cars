@@ -79,13 +79,13 @@ export function IntegratorPage() {
     <div className="rpm-stack">
       <PageHeader
         title="لوحة المُدمج"
-        subtitle="خاصة بمقدّم النظام فقط — فيتشر فلاج · ألوان · تعدد فروع · هوية المركز"
+        subtitle="خاصة بمقدّم النظام فقط — فيتشر فلاج · ألوان · تعدد فروع · هوية الشركة"
         action={<Button loading={saving} onClick={() => void save()}>حفظ</Button>}
       />
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>هوية المركز</h3></div>
+        <div className="rpm-panel__head"><h3>هوية الشركة</h3></div>
         <div className="rpm-form-grid">
-          <TextField label="اسم المركز" value={centerName} onChange={(e) => setCenterName(e.target.value)} />
+          <TextField label="اسم الشركة" value={centerName} onChange={(e) => setCenterName(e.target.value)} />
           <TextField label="تذييل الطباعة" value={printFooter} onChange={(e) => setPrintFooter(e.target.value)} />
           <TextField label="لون العلامة" type="color" value={brand} onChange={(e) => setBrand(e.target.value)} />
           <SwitchField label="تعدد الفروع" checked={multiBranch} onChange={setMultiBranch} />

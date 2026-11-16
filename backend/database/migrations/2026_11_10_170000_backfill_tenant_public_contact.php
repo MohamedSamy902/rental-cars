@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * بطاقة QR للزائر تحتاج هاتف/عنوان المركز. إن كانت فارغة في operational نعبّئ القيم المعتمدة للطباعة.
+ * بطاقة QR للزائر تحتاج هاتف/عنوان الشركة. إن كانت فارغة في operational نعبّئ القيم المعتمدة للطباعة.
  */
 return new class extends Migration
 {

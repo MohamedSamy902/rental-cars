@@ -124,7 +124,7 @@ class DashboardController extends Controller
             ->filter(fn (InventoryItem $item) => (int) ($item->remaining_sum ?? 0) <= (int) $item->reorder_level)
             ->count();
 
-        $center = TenantSetting::query()->value('center_name') ?: 'مركز التأجير';
+        $center = TenantSetting::query()->value('center_name') ?: 'شركة التأجير';
 
         $occupancyPct = $this->occupancy->percent(now()->startOfMonth(), now());
 

@@ -31,7 +31,7 @@ type TemplateRow = {
 
 const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
   contract: {
-    title: 'عقد إيجار سيارة (نموذج المركز)',
+    title: 'عقد إيجار سيارة (نموذج الشركة)',
     hint: 'عدّل البنود والنصوص كما تظهر في الطباعة. الحقول الجاهزة بالأسفل تُدرج بيانات العقد تلقائياً.',
   },
   handover_receipt: {
@@ -39,16 +39,16 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
     hint: 'يُستخدم عند طباعة إقرار الاستلام والتسليم (مع بيانات التأمين والعداد).',
   },
   owner_agreement: {
-    title: 'عقد إدارة وتشغيل مركبة (مالك ↔ مركز)',
-    hint: 'يُملأ تلقائياً ببيانات المركز والمالك والعربية عند الحفظ/الطباعة.',
+    title: 'عقد إدارة وتشغيل مركبة (مالك ↔ شركة)',
+    hint: 'يُملأ تلقائياً ببيانات الشركة والمالك والعربية عند الحفظ/الطباعة.',
   },
   custody_agreement: {
     title: 'قالب عقد الاعتماد',
-    hint: 'نسخ صادرة ثابتة من ملف العربية (مركز + مالك + عربية + مدة).',
+    hint: 'نسخ صادرة ثابتة من ملف العربية (شركة + مالك + عربية + مدة).',
   },
 }
 
-const GROUP_ORDER = ['المركز', 'العميل', 'العربية', 'العقد', 'التأمين', 'المالك', 'أخرى']
+const GROUP_ORDER = ['الشركة', 'العميل', 'العربية', 'العقد', 'التأمين', 'المالك', 'أخرى']
 
 /** عناصر زخرفية/ترويسة تُطوى في المحرر البصري حتى لا تعطل الكتابة. */
 const DECOR_SELECTORS = [
@@ -209,7 +209,7 @@ function TemplatePreviewSheet({
 function assetLabel(node: HTMLElement): string {
   if (node.matches('header.rpm-lc-head, header.print-head')) return 'ترويسة العقد (محمية)'
   if (node.matches('.rpm-lc-ribbon')) return 'شريط علوي (محمي)'
-  if (node.matches('.rpm-lc-stamp')) return 'ختم المركز (محمي)'
+  if (node.matches('.rpm-lc-stamp')) return 'ختم الشركة (محمي)'
   if (node.matches('.rpm-lc-float-ico')) return 'أيقونة تصميم (محمية)'
   if (node.matches('.page-break')) return 'فاصل صفحة (محمي)'
   if (node.matches('img')) return 'صورة / شعار (محمي)'

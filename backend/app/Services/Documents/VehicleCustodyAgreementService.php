@@ -172,7 +172,7 @@ class VehicleCustodyAgreementService
         $owner = $vehicle->owner;
 
         $map = [
-            'company_name' => (string) ($tenant?->center_name ?: 'مركز التأجير'),
+            'company_name' => (string) ($tenant?->center_name ?: 'شركة التأجير'),
             'company_phone' => (string) ($ops['print_phone'] ?? ''),
             'company_address' => (string) ($ops['print_address'] ?? ''),
             'company_cr' => (string) ($ops['print_commercial_register'] ?? ''),

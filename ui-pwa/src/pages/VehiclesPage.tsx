@@ -406,8 +406,8 @@ export function VehiclesPage() {
       {
         id: 'owner',
         header: 'المالك',
-        cell: (v) => v.owner?.full_name || 'المركز',
-        sortValue: (v) => v.owner?.full_name || 'المركز',
+        cell: (v) => v.owner?.full_name || 'الشركة',
+        sortValue: (v) => v.owner?.full_name || 'الشركة',
         mobile: 'hidden',
       },
     ]

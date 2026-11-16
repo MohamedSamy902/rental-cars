@@ -30,7 +30,7 @@ class DocumentTemplateTest extends TestCase
         PermissionCatalog::ensureSeeded();
         app(AccountingService::class)->ensureChartOfAccounts();
         TenantSetting::query()->create([
-            'center_name' => 'مركز قوالب الاختبار',
+            'center_name' => 'شركة قوالب الاختبار',
             'print_footer' => 'تذييل اختبار',
             'feature_flags' => [],
             'operational' => [

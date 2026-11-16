@@ -20,7 +20,7 @@ class ShowroomCatalogTest extends TestCase
         parent::setUp();
         PermissionCatalog::ensureSeeded();
         TenantSetting::query()->create([
-            'center_name' => 'مركز آر بي إم للتأجير',
+            'center_name' => 'شركة آر بي إم للتأجير',
             'feature_flags' => ['showroom' => true],
             'operational' => [
                 'print_phone' => '01125253888',
@@ -50,7 +50,7 @@ class ShowroomCatalogTest extends TestCase
         ]);
 
         $res = $this->getJson('/api/showroom')->assertOk();
-        $res->assertJsonPath('data.center_name', 'مركز آر بي إم للتأجير');
+        $res->assertJsonPath('data.center_name', 'شركة آر بي إم للتأجير');
         $res->assertJsonPath('data.center_phone', '01125253888');
 
         $row = collect($res->json('data.vehicles'))->firstWhere('brand', 'نيسان');

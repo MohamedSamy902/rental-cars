@@ -87,7 +87,7 @@ function statementHtml(row: StatementRow, meta: NoticePayload & { logo_src: stri
         <div class="phones">${phones || '—'}</div>
       </div>
       <div class="sheet-logo">
-        <img src="${escapeHtml(meta.logo_src)}" alt="شعار المركز" />
+        <img src="${escapeHtml(meta.logo_src)}" alt="شعار الشركة" />
       </div>
     </header>
     <h2 class="sheet-title">بيان سيارة مؤجرة</h2>

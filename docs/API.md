@@ -170,7 +170,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 **Body (جزئي مسموح)**
 ```json
 {
-  "center_name": "مركز آر بي إم للتأجير",
+  "center_name": "شركة آر بي إم للتأجير",
   "print_footer": "نسخة داخلية",
   "multi_branch": false,
   "inventory_mode": "unified",
@@ -187,7 +187,7 @@ Query شائع: `?per_page=50&page=1&search=...`
   }
 }
 ```
-**Response:** `{ "data": {...}, "message": "تم حفظ إعدادات المركز." }`
+**Response:** `{ "data": {...}, "message": "تم حفظ إعدادات الشركة." }`
 
 > فيتشر فلاج / تعدد فروع / ألوان = لوحة المُدمج فقط في الواجهة.  
 > API لا يفرّق بعد بين مُدمج ومدير معرض على هذا المسار (فجوة موثَّقة).
@@ -262,7 +262,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 **POST /vehicles — حقول أساسية**
 `plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit` · **`chassis_number` (مطلوب)**  
 الكود: يُولَّد تلقائياً إن لم يُرسل.  
-اختياري: `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_inline{full_name,phone,national_id,id_front_path,id_back_path,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}` — عند ربط مالك تُرجع الاستجابة أيضاً `owner_agreement` (عقد إدارة وتشغيل متعدد الصفحات مملوء ببيانات المركز/المالك/العربية) للطباعة. `GET /vehicles/{id}/owner-agreement/print`  
+اختياري: `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_inline{full_name,phone,national_id,id_front_path,id_back_path,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}` — عند ربط مالك تُرجع الاستجابة أيضاً `owner_agreement` (عقد إدارة وتشغيل متعدد الصفحات مملوء ببيانات الشركة/المالك/العربية) للطباعة. `GET /vehicles/{id}/owner-agreement/print`  
 `owner_inline`: عند الإنشاء المضمّن يلزم الهاتف + الرقم القومي + وش/ضهر البطاقة.  
 **ملغى:** `rental_priority` · قائمة الانتظار · `fuel_level` في الفحص.
 
@@ -291,7 +291,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 عند إنشاء عقد: **`payment_amount` مطلوب ≥ ١** ولا يتجاوز إجمالي الإيجار التقديري (أيام × السعر اليومي). لا تأجير بلا دفع. إن بقي رصيد تُرسل الواجهة `balance_due_on` (تاريخ تحصيل الباقي) إلزامياً. الـ API يقبل `balance_due_on` اختيارياً للتوافق. عند السداد الكامل يُمسح الحقل تلقائياً ويتوقف تنبيه الاستحقاق.
 
 ### `GET /public/vehicles/{id}/qr-card` (عام — بلا توكن)
-بطاقة الزائر بعد مسح QR: مركز (`name` · `tagline` · `phone` · `address` · لوجو عام إن وُجد · سوشيال) + `current_renter` (اسم/هاتف) عند عقد `active` فقط، وإلا `is_rented: false` بلا رسالة «غير مؤجرة». إن نقص الهاتف/العنوان في الإعدادات تُستخدم قيم `config/rpm.php` الاحتياطية. يتضمن `credit` (اسم المطوّر + واتساب). بلا أرقام قومية ولا مبالغ.
+بطاقة الزائر بعد مسح QR: شركة (`name` · `tagline` · `phone` · `address` · لوجو عام إن وُجد · سوشيال) + `current_renter` (اسم/هاتف) عند عقد `active` فقط، وإلا `is_rented: false` بلا رسالة «غير مؤجرة». إن نقص الهاتف/العنوان في الإعدادات تُستخدم قيم `config/rpm.php` الاحتياطية. يتضمن `credit` (اسم المطوّر + واتساب). بلا أرقام قومية ولا مبالغ.
 
 ---
 
@@ -741,7 +741,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 ## ١٦‑ب) ملاك العربيات (عربيات الغير)
 
-بعض العربيات ليست ملك المركز — تُربط بمالك وتُستحق له مبلغ شهري ثابت عند إضافة/تعديل المركبة. يمكن صرف جزء من المستحق في أي يوم، مع رصيد: مستحق · مصروف · متبقي.
+بعض العربيات ليست ملك الشركة — تُربط بمالك وتُستحق له مبلغ شهري ثابت عند إضافة/تعديل المركبة. يمكن صرف جزء من المستحق في أي يوم، مع رصيد: مستحق · مصروف · متبقي.
 
 | Method | Path | صلاحية |
 |--------|------|--------|
@@ -756,12 +756,12 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 **على المركبة:** `owner_id` · `owner_monthly_amount` · `owner_since` · حقول مدة عقد الاعتماد (`owner_agreement_*`)
 
-**عقد الاعتماد (custody agreement)** — بين المركز ومالك العربية عند اعتماد السيارة للتأجير (مستقل عن عقود العملاء):
+**عقد الاعتماد (custody agreement)** — بين الشركة ومالك العربية عند اعتماد السيارة للتأجير (مستقل عن عقود العملاء):
 
 | Method | Path | صلاحية |
 |--------|------|--------|
 | GET | `/vehicles/{id}/custody-agreements` | `vehicles.view` |
-| POST | `/vehicles/{id}/custody-agreements` | `vehicles.update` — يصدر نسخة ثابتة من القالب النشط `custody_agreement` بعد ملء بيانات المركز/المالك/العربية/المدة |
+| POST | `/vehicles/{id}/custody-agreements` | `vehicles.update` — يصدر نسخة ثابتة من القالب النشط `custody_agreement` بعد ملء بيانات الشركة/المالك/العربية/المدة |
 | GET | `/vehicles/{id}/custody-agreements/{aid}` | `vehicles.view` |
 | GET | `/vehicles/{id}/custody-agreements/{aid}/print` | `vehicles.view` — يعيد `html` المجمد عند الإصدار |
 
@@ -827,7 +827,7 @@ password: password
 | GET/POST | `/employee-assignments` · `…/acknowledge` | `hr.custody` — تأكيد استلام الأدمن |
 | GET | `/vehicles/recommend` | العربيات المتاحة في الفترة (بلا أوزان/درجات) |
 | GET/POST | `/vehicles/{id}/tires|batteries|downtime|consumables` | أصول المركبة ٦٫٩–٦٫١١ · ١٤٫١ |
-| GET/POST | `/vehicles/{id}/custody-agreements` · `…/{aid}/print` | عقد اعتماد مالك↔مركز · نسخة ثابتة قابلة للطباعة |
+| GET/POST | `/vehicles/{id}/custody-agreements` · `…/{aid}/print` | عقد اعتماد مالك↔شركة · نسخة ثابتة قابلة للطباعة |
 | GET/POST | `/document-templates` · `/document-templates/preview` | قوالب العقد · إيصال الاستلام · **عقد الاعتماد** (`custody_agreement`) |
 | GET/POST | `/consumable-templates` | قوالب قطع استهلاكية |
 | ~~GET/POST `/evaluations`~~ | **موقوف** — لا مسارات؛ التقييمات خارج التشغيل |

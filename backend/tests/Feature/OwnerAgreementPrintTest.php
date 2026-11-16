@@ -24,7 +24,7 @@ class OwnerAgreementPrintTest extends TestCase
         PermissionCatalog::ensureSeeded();
         app(AccountingService::class)->ensureChartOfAccounts();
         TenantSetting::query()->create([
-            'center_name' => 'مركز اختبار المالك',
+            'center_name' => 'شركة اختبار المالك',
             'feature_flags' => [],
             'operational' => ['print_phone' => '01000000000'],
         ]);
@@ -67,7 +67,7 @@ class OwnerAgreementPrintTest extends TestCase
         $this->assertStringContainsString('مالك تجريبي', $html);
         $this->assertStringContainsString('OWN-', $res->json('owner_agreement.number'));
         $this->assertStringContainsString('المادة الأولى', $html);
-        $this->assertStringContainsString('مركز اختبار المالك', $html);
+        $this->assertStringContainsString('شركة اختبار المالك', $html);
         $this->assertStringContainsString('هيونداي', $html);
 
         $vehicleId = (int) $res->json('data.id');
