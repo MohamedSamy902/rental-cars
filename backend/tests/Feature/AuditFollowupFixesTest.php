@@ -46,7 +46,7 @@ class AuditFollowupFixesTest extends TestCase
         $this->life = app(ContractLifecycleService::class);
     }
 
-    public function test_approve_freezes_current_vehicle_rates(): void
+    public function test_approve_keeps_create_time_frozen_rates(): void
     {
         $opsRole = Role::query()->where('name', 'ops_manager')->firstOrFail();
         $opsRole->permissions()->syncWithoutDetaching(
@@ -63,12 +63,14 @@ class AuditFollowupFixesTest extends TestCase
         ], $this->admin->id);
 
         $this->assertSame(900, (int) $c->frozen_daily_rate);
+        $this->assertSame(2000, (int) $c->frozen_agreed_deposit);
 
         $vehicle->update(['daily_rate' => 1100, 'default_deposit' => 3000]);
         $approved = $this->life->approve($c, $this->admin->id);
 
-        $this->assertSame(1100, (int) $approved->frozen_daily_rate);
-        $this->assertSame(3000, (int) $approved->frozen_agreed_deposit);
+        // ن٫٥: الاعتماد لا يستبدل الأسعار المجمّدة عند الإنشاء بسعر العربية الحيّ.
+        $this->assertSame(900, (int) $approved->frozen_daily_rate);
+        $this->assertSame(2000, (int) $approved->frozen_agreed_deposit);
         $this->assertTrue(Notification::query()->where('link_type', 'contract')->where('link_id', $approved->id)->exists());
     }
 
