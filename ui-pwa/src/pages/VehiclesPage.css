@@ -1,12 +1,13 @@
-/* Compact single-row toolbar for «قاربت على الانتهاء» day window */
+/* Toolbar for day-window / SIM filters — wraps on narrow screens, no page-wide overflow */
 .vh-expiring-bar {
-  display: inline-flex;
-  flex-wrap: nowrap;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   margin-block: 0.15rem 0.35rem;
   margin-inline: 0;
   padding: 8px 14px;
@@ -14,6 +15,13 @@
   border: 1px solid var(--border);
   background: var(--surface-2);
   box-sizing: border-box;
+}
+
+.vh-sim-num {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .vh-expiring-bar__label {
@@ -88,9 +96,18 @@
 
 @media (max-width: 640px) {
   .vh-expiring-bar {
+    gap: 0.5rem 0.65rem;
+    padding-block: 0.65rem;
+    padding-inline: 0.75rem;
+  }
+
+  .vh-expiring-bar__pills {
+    flex-wrap: wrap;
     max-width: 100%;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
+  }
+
+  .vh-expiring-bar__custom {
+    flex-wrap: wrap;
+    width: 100%;
   }
 }
