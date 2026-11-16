@@ -78,7 +78,9 @@ if [[ "$SEED_FIRST" == "1" ]]; then
   "$PHP_BIN" artisan db:seed --force
 fi
 
-echo "==> إثراء بيانات الديمو المتنوعة (idempotent)"
+echo "==> تنظيف DEMO + محاذاة مستحقات الملاك + ترحيل إيجار آمن"
+"$PHP_BIN" artisan rpm:purge-demo-contracts --force 2>/dev/null || echo "تنبيه: rpm:purge-demo-contracts تُخطّي أو غير متاح بعد"
+"$PHP_BIN" artisan owners:accrue-dues --reconcile 2>/dev/null || echo "تنبيه: owners:accrue-dues --reconcile تُخطّي أو غير متاح بعد"
 "$PHP_BIN" artisan rpm:enrich-live-demo 2>/dev/null || echo "تنبيه: rpm:enrich-live-demo تُخطّي أو غير متاح بعد"
 
 "$PHP_BIN" artisan config:cache

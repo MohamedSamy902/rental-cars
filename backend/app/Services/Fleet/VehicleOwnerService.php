@@ -115,6 +115,130 @@ class VehicleOwnerService
     }
 
     /**
+     * يعكس استحقاقات مرحَّلة تخالف جدول الأيام (شهر غير مكتمل / خارج الاتفاقية) ويصلح المبالغ.
+     *
+     * @return int عدد الصفوف المعكوسة أو المصحَّحة
+     */
+    public function reconcileAccrualsToSchedule(VehicleOwner $owner, ?int $userId = null): int
+    {
+        $this->accounting->ensureChartOfAccounts();
+        $this->ensureOwnerAccounts();
+        $today = now()->timezone(config('app.timezone', 'Africa/Cairo'))->toDateString();
+        $changed = 0;
+
+        $dues = OwnerMonthDue::query()
+            ->where('owner_id', $owner->id)
+            ->orderBy('year_month')
+            ->get();
+
+        foreach ($dues as $due) {
+            $vehicle = Vehicle::query()->find($due->vehicle_id);
+            if (! $vehicle) {
+                $changed += $this->reverseInvalidDue($due, $userId, 'vehicle_missing') ? 1 : 0;
+
+                continue;
+            }
+
+            $start = $vehicle->owner_agreement_starts_on?->toDateString();
+            $end = $vehicle->owner_agreement_ends_on?->toDateString();
+            $shares = $this->rentSchedule->shares(
+                $start,
+                $end,
+                (int) ($vehicle->owner_monthly_amount ?? 0),
+                $today,
+            );
+            $needed = (int) ($shares[$due->year_month] ?? 0);
+
+            if ($needed < 1 || ! $vehicle->is_active) {
+                $changed += $this->reverseInvalidDue($due, $userId, 'outside_schedule') ? 1 : 0;
+
+                continue;
+            }
+
+            if ((int) $due->amount !== $needed) {
+                $changed += $this->repairDueAmount($due, $needed) ? 1 : 0;
+            }
+        }
+
+        return $changed;
+    }
+
+    /**
+     * يعكس قيد الاستحقاق ويحذف صف owner_month_dues إن كان الشهر مفتوحاً.
+     */
+    private function reverseInvalidDue(OwnerMonthDue $due, ?int $userId, string $reason): bool
+    {
+        try {
+            $this->assertMonthOpenForAccrual($due->year_month);
+        } catch (DomainException) {
+            return false;
+        }
+
+        return (bool) DB::transaction(function () use ($due, $userId, $reason) {
+            $locked = OwnerMonthDue::query()->whereKey($due->id)->lockForUpdate()->first();
+            if (! $locked) {
+                return false;
+            }
+
+            $amount = (int) $locked->amount;
+            if ($amount > 0) {
+                $payable = Account::query()->where('code', '2100')->firstOrFail();
+                $expense = Account::query()->where('code', '5200')->firstOrFail();
+                $adjSource = sprintf('owner_accrual_adj:%d:%s', $locked->vehicle_id, $locked->year_month);
+                $entry = JournalEntry::query()->where('source', $adjSource)->lockForUpdate()->first();
+                if (! $entry) {
+                    $entry = JournalEntry::query()->create([
+                        'entry_date' => $locked->year_month.'-01',
+                        'narration' => "عكس استحقاق مالك غير مستحق · {$locked->year_month}",
+                        'source' => $adjSource,
+                        'posted_by' => $userId,
+                    ]);
+                    JournalLine::query()->create([
+                        'journal_entry_id' => $entry->id,
+                        'account_id' => $payable->id,
+                        'debit' => $amount,
+                        'credit' => 0,
+                        'vehicle_id' => $locked->vehicle_id,
+                    ]);
+                    JournalLine::query()->create([
+                        'journal_entry_id' => $entry->id,
+                        'account_id' => $expense->id,
+                        'debit' => 0,
+                        'credit' => $amount,
+                        'vehicle_id' => $locked->vehicle_id,
+                    ]);
+                }
+            }
+
+            if ($locked->journal_entry_id) {
+                $primary = JournalEntry::query()->whereKey($locked->journal_entry_id)->first();
+                if ($primary) {
+                    JournalLine::query()->where('journal_entry_id', $primary->id)->delete();
+                    $primary->delete();
+                }
+            }
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'owner_month_accrual_reversed',
+                'record_type' => OwnerMonthDue::class,
+                'record_id' => $locked->id,
+                'after' => [
+                    'year_month' => $locked->year_month,
+                    'amount' => $amount,
+                    'vehicle_id' => $locked->vehicle_id,
+                    'owner_id' => $locked->owner_id,
+                    'reason' => $reason,
+                ],
+            ]);
+
+            $locked->delete();
+
+            return true;
+        });
+    }
+
+    /**
      * يصحّح مبلغ استحقاق في شهر غير مقفل ليطابق جدول الأيام المدنية.
      */
     private function repairDueAmount(OwnerMonthDue $due, int $amount): bool

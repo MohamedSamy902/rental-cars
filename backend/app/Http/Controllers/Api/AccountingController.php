@@ -97,9 +97,18 @@ class AccountingController extends Controller
 
     public function payments(Request $request): JsonResponse
     {
-        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+        $data = $request->validate([
+            'direction' => ['nullable', 'in:in,out'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $perPage = PaginationInput::perPage($request, 20, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
-        $rows = Payment::query()->latest('id')->paginate($perPage, ['*'], 'page', $page);
+        $query = Payment::query()->latest('id');
+        if (! empty($data['direction'])) {
+            $query->where('direction', $data['direction']);
+        }
+        $rows = $query->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'data' => $rows->items(),
@@ -107,6 +116,7 @@ class AccountingController extends Controller
                 'current_page' => $rows->currentPage(),
                 'last_page' => $rows->lastPage(),
                 'total' => $rows->total(),
+                'per_page' => $rows->perPage(),
             ],
         ]);
     }

@@ -14,7 +14,7 @@ import { IconCheck, IconChevron, IconSearch } from './Icons'
 import './Field.css'
 import './SelectField.css'
 
-type Option = { value: string; label: string }
+type Option = { value: string; label: string; description?: string }
 
 type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'children'> & {
   label: string
@@ -75,7 +75,10 @@ export function SelectField({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return options
-    return options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
+    return options.filter((o) =>
+      o.label.toLowerCase().includes(q)
+      || (o.description || '').toLowerCase().includes(q)
+      || o.value.toLowerCase().includes(q))
   }, [options, query])
 
   function emit(next: string) {
@@ -298,7 +301,12 @@ export function SelectField({
                     <span className="rpm-select-panel__check" aria-hidden>
                       {isSelected ? <IconCheck size={15} /> : null}
                     </span>
-                    <span className="rpm-select-panel__text">{opt.label}</span>
+                    <span className="rpm-select-panel__copy">
+                      <span className="rpm-select-panel__text">{opt.label}</span>
+                      {opt.description ? (
+                        <span className="rpm-select-panel__desc">{opt.description}</span>
+                      ) : null}
+                    </span>
                   </button>
                 )
               })
@@ -331,7 +339,16 @@ export function SelectField({
         onKeyDown={onTriggerKey}
         onBlur={onBlur as never}
       >
-        <span className="rpm-select-trigger__value">{selected?.label || placeholder}</span>
+        <span className="rpm-select-trigger__value">
+          {selected ? (
+            <>
+              <span className="rpm-select-trigger__primary">{selected.label}</span>
+              {selected.description ? (
+                <span className="rpm-select-trigger__secondary">{selected.description}</span>
+              ) : null}
+            </>
+          ) : placeholder}
+        </span>
         <IconChevron size={16} className="rpm-select-trigger__chev" />
       </button>
 

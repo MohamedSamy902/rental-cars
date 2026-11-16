@@ -19,12 +19,27 @@
 }
 
 .rpm-select-trigger__value {
+  display: grid;
+  gap: 0.1rem;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-align: start;
+}
+
+.rpm-select-trigger__primary,
+.rpm-select-trigger__secondary {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+}
+
+.rpm-select-trigger__secondary {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .rpm-select-trigger__chev {
@@ -135,11 +150,11 @@
 
 .rpm-select-panel__option {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   width: 100%;
-  min-height: 2.25rem;
-  padding-block: 0.45rem;
+  min-height: 2.75rem;
+  padding-block: 0.55rem;
   padding-inline: 0.5rem 0.75rem;
   border: 0;
   border-radius: 0.5rem;
@@ -162,12 +177,34 @@
   color: var(--accent-ink);
 }
 
-.rpm-select-panel__text {
+.rpm-select-panel__copy {
+  display: grid;
+  gap: 0.15rem;
   flex: 1;
+  min-width: 0;
+  text-align: start;
+}
+
+.rpm-select-panel__text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.rpm-select-panel__desc {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+@media (max-width: 980px) {
+  .rpm-select-panel__text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 .rpm-select-panel__option:hover,

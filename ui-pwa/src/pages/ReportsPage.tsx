@@ -89,14 +89,6 @@ const fleetMeta: Record<string, { label: string; tone: string }> = {
   maintenance: { label: 'في الصيانة', tone: 'danger' },
 }
 
-const accountTypeLabel: Record<string, string> = {
-  asset: 'أصل',
-  liability: 'التزام',
-  equity: 'حقوق ملكية',
-  income: 'إيراد',
-  expense: 'مصروف',
-}
-
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 
 function ymLabel(ym: string) {
@@ -164,15 +156,14 @@ function printCustomerStatement(statement: CustomerStatement) {
   </body></html>`)
 }
 
-type TabId = 'overview' | 'trial' | 'income' | 'payments' | 'customer' | 'profit'
+type TabId = 'overview' | 'income' | 'payments' | 'customer' | 'profit'
 
-const ReportsPageTabs = ['overview', 'trial', 'income', 'payments', 'customer', 'profit'] as const satisfies readonly TabId[]
+const ReportsPageTabs = ['overview', 'income', 'payments', 'customer', 'profit'] as const satisfies readonly TabId[]
 
 export function ReportsPage() {
   const [data, setData] = useState<Report | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useQueryTab<TabId>({ allowed: ReportsPageTabs, defaultValue: 'overview' })
-  const [trial, setTrial] = useState<TrialRow[] | null>(null)
   const [income, setIncome] = useState<IncomeStatement | null>(null)
   const [methods, setMethods] = useState<PayMethod[] | null>(null)
   const [profit, setProfit] = useState<ProfitCompare | null>(null)
@@ -195,10 +186,7 @@ export function ReportsPage() {
     setTabLoading(true)
     const run = async () => {
       try {
-        if (tab === 'trial') {
-          const r = await api<{ data: TrialRow[] }>('/reports/trial-balance')
-          setTrial(r.data)
-        } else if (tab === 'income') {
+        if (tab === 'income') {
           const r = await api<{ data: IncomeStatement }>('/reports/income-statement')
           setIncome(r.data)
         } else if (tab === 'payments') {
@@ -255,7 +243,6 @@ export function ReportsPage() {
   const chips = [
     { id: 'overview', label: 'ملخص' },
     { id: 'profit', label: 'ربحية شهر بشهر' },
-    { id: 'trial', label: 'ميزان مراجعة' },
     { id: 'income', label: 'قائمة دخل' },
     { id: 'payments', label: 'أرصدة طرق الدفع' },
     { id: 'customer', label: 'كشف عميل' },
@@ -265,7 +252,7 @@ export function ReportsPage() {
     <div className="rpm-stack rp-page">
       <PageHeader
         title="التقارير"
-        subtitle="إشغال أيامي · ميزان مراجعة · قائمة دخل · ربحية تشغيل"
+        subtitle="إشغال أيامي · قائمة دخل · ربحية تشغيل"
         action={<Button onClick={() => void openMom()}>مقارنة ربحية شهر بشهر</Button>}
       />
 
@@ -372,35 +359,6 @@ export function ReportsPage() {
       {tabLoading ? <SkeletonBlock rows={4} /> : null}
       {tabError ? <ErrorState title="تعذّر تحميل هذا القسم" description={tabError} /> : null}
 
-      {tab === 'trial' && trial ? (
-        <section className="rpm-panel rp-section">
-          <div className="rpm-panel__head"><h3>ميزان مراجعة</h3></div>
-          <div className="rp-section__body">
-            {trial.every((r) => r.debit === 0 && r.credit === 0) ? (
-              <p className="muted">لا قيود مرحّلة بعد — يظهر الرصيد بعد إثبات الإيجار أو تسجيل مصروف/دفعة مرحّلة.</p>
-            ) : null}
-            <div className="rp-table-scroll">
-              <table className="rpm-table rpm-table--stack">
-                <thead>
-                  <tr><th>الحساب</th><th>النوع</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr>
-                </thead>
-                <tbody>
-                  {trial.filter((r) => r.debit !== 0 || r.credit !== 0).map((r) => (
-                    <tr key={r.code}>
-                      <td data-label="الحساب"><strong className="rpm-table__primary">{r.code} · {r.name}</strong></td>
-                      <td data-label="النوع"><span className="rp-account-type">{accountTypeLabel[r.type] || r.type}</span></td>
-                      <td data-label="مدين" className="tabular-nums">{formatMoney(r.debit)}</td>
-                      <td data-label="دائن" className="tabular-nums">{formatMoney(r.credit)}</td>
-                      <td data-label="الرصيد" className="tabular-nums">{formatMoney(r.balance)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       {tab === 'income' && income ? (
         <section className="rpm-panel rp-section">
           <div className="rpm-panel__head">
@@ -430,40 +388,39 @@ export function ReportsPage() {
                 ? ` · صافي بعد الاستحقاق ${formatMoney(income.net_with_owner_accrual)}`
                 : ''}
             </p>
-            <div className="rp-table-scroll">
-              <table className="rpm-table rpm-table--stack">
-                <thead><tr><th>البند</th><th>النوع</th><th>المبلغ</th></tr></thead>
-                <tbody>
-                  {income.income.length === 0
-                    && income.expenses.length === 0
-                    && (income.owner_accruals || []).length === 0 ? (
-                    <tr>
-                      <td colSpan={3} data-label="البند">لا بنود دخل/مصروف مرحّلة في الفترة.</td>
-                    </tr>
-                  ) : null}
-                  {income.income.map((r) => (
-                    <tr key={`i-${r.code}`}>
-                      <td data-label="البند">{r.code} · {r.name}</td>
-                      <td data-label="النوع"><span className="rp-account-type">إيراد</span></td>
-                      <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
-                    </tr>
-                  ))}
-                  {income.expenses.map((r) => (
-                    <tr key={`e-${r.code}`}>
-                      <td data-label="البند">{r.code} · {r.name}</td>
-                      <td data-label="النوع"><span className="rp-account-type">مصروف تشغيل</span></td>
-                      <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
-                    </tr>
-                  ))}
-                  {(income.owner_accruals || []).map((r) => (
-                    <tr key={`o-${r.code}`}>
-                      <td data-label="البند">{r.code} · {r.name}</td>
-                      <td data-label="النوع"><span className="rp-account-type">استحقاق ملاك</span></td>
-                      <td data-label="المبلغ" className="tabular-nums">{formatMoney(r.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="rp-income-rows" role="list" aria-label="بنود قائمة الدخل">
+              {income.income.length === 0
+                && income.expenses.length === 0
+                && (income.owner_accruals || []).length === 0 ? (
+                <p className="muted">لا بنود دخل/مصروف مرحّلة في الفترة.</p>
+              ) : null}
+              {income.income.map((r) => (
+                <article key={`i-${r.code}`} className="rp-income-row" role="listitem">
+                  <div>
+                    <strong>{r.code} · {r.name}</strong>
+                    <span className="rp-account-type">إيراد</span>
+                  </div>
+                  <strong className="tabular-nums">{formatMoney(r.amount)}</strong>
+                </article>
+              ))}
+              {income.expenses.map((r) => (
+                <article key={`e-${r.code}`} className="rp-income-row" role="listitem">
+                  <div>
+                    <strong>{r.code} · {r.name}</strong>
+                    <span className="rp-account-type">مصروف تشغيل</span>
+                  </div>
+                  <strong className="tabular-nums">{formatMoney(r.amount)}</strong>
+                </article>
+              ))}
+              {(income.owner_accruals || []).map((r) => (
+                <article key={`o-${r.code}`} className="rp-income-row" role="listitem">
+                  <div>
+                    <strong>{r.code} · {r.name}</strong>
+                    <span className="rp-account-type">استحقاق ملاك</span>
+                  </div>
+                  <strong className="tabular-nums">{formatMoney(r.amount)}</strong>
+                </article>
+              ))}
             </div>
           </div>
         </section>

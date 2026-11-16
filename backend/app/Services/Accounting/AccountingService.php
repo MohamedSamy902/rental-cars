@@ -1061,7 +1061,8 @@ class AccountingService
     {
         $tz = config('app.timezone');
         $today = CarbonImmutable::instance(($now ?? now($tz))->copy()->timezone($tz))->startOfMonth();
-        $from = $today->subMonths(5);
+        // Sync window: look back far enough for recognition, then overview filters empty past cards.
+        $from = $today->subMonths(17);
         $to = $today;
 
         $horizonRaw = Contract::query()
@@ -1099,10 +1100,14 @@ class AccountingService
         $keysAsc = $this->overviewMonthKeys();
         $this->syncRentRecognition($keysAsc);
 
+        $tz = config('app.timezone');
+        $currentYm = now($tz)->format('Y-m');
         $months = [];
         foreach (array_reverse($keysAsc) as [$year, $month]) {
-            $dt = CarbonImmutable::create($year, $month, 1, 0, 0, 0, config('app.timezone'));
+            $dt = CarbonImmutable::create($year, $month, 1, 0, 0, 0, $tz);
+            $ym = sprintf('%04d-%02d', $year, $month);
             $lock = MonthLock::query()->where(compact('year', 'month'))->first();
+            $locked = $lock?->isLocked() ?? false;
             $rentCredit = (int) JournalLine::query()
                 ->whereHas('account', fn ($q) => $q->where('code', '4000'))
                 ->whereHas('entry', function ($q) use ($year, $month) {
@@ -1135,22 +1140,40 @@ class AccountingService
                 ->whereYear('paid_on', $year)
                 ->whereMonth('paid_on', $month)
                 ->sum('amount');
+            $completed = Contract::query()
+                ->where('status', 'completed')
+                ->whereYear('actual_ends_at', $year)
+                ->whereMonth('actual_ends_at', $month)
+                ->count();
+
+            $isCurrent = $ym === $currentYm;
+            $isFuture = $ym > $currentYm;
+            $hasActivity = $locked
+                || $rentCredit !== 0
+                || $feesCredit !== 0
+                || $expensesTotal !== 0
+                || $payrollPaid !== 0
+                || $completed > 0;
+            // Always show current month; past/future only when they carry activity.
+            if (! $isCurrent && ! $hasActivity) {
+                continue;
+            }
+            if ($isFuture && $rentCredit === 0 && $feesCredit === 0 && ! $locked) {
+                continue;
+            }
+
             $months[] = [
                 'year' => $year,
                 'month' => $month,
                 'label' => $dt->locale(app()->getLocale())->translatedFormat('F Y'),
-                'locked' => $lock?->isLocked() ?? false,
+                'locked' => $locked,
                 'rent_revenue' => $rentCredit,
                 'fees_revenue' => $feesCredit,
                 'expenses' => $expensesTotal,
                 'payroll_paid' => $payrollPaid,
                 // صافي الربح التشغيلي = إيجار مثبت + رسوم − مصروفات − رواتب مصروفة
                 'net_operating' => $rentCredit + $feesCredit - $expensesTotal - $payrollPaid,
-                'completed_contracts' => Contract::query()
-                    ->where('status', 'completed')
-                    ->whereYear('actual_ends_at', $year)
-                    ->whereMonth('actual_ends_at', $month)
-                    ->count(),
+                'completed_contracts' => $completed,
             ];
         }
 

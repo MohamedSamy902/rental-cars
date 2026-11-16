@@ -24,9 +24,9 @@ use Illuminate\Support\Facades\DB;
  */
 class EnrichLiveDemoCommand extends Command
 {
-    protected $signature = 'rpm:enrich-live-demo';
+    protected $signature = 'rpm:enrich-live-demo {--samples : إنشاء عينات DEMO (ممنوع في production)}';
 
-    protected $description = 'تعبئة بيانات تجريبية متنوعة على البيئة الحية (عقود بكل الحالات، صيانة XOR، سجل إقفال، ترحيل إيراد إيجار)';
+    protected $description = 'ترحيل إيراد إيجار ناقص + (اختياري خارج الإنتاج) عينات DEMO للحالات';
 
     public function handle(AccountingService $accounting, ContractPricingService $pricing): int
     {
@@ -37,23 +37,28 @@ class EnrichLiveDemoCommand extends Command
             return self::FAILURE;
         }
 
+        $allowSamples = (bool) $this->option('samples') && ! app()->environment('production');
+        if ((bool) $this->option('samples') && app()->environment('production')) {
+            $this->warn('إنتاج: تُتخطّى عينات DEMO. يُنفَّذ فقط ترحيل الإيجار الآمن.');
+        }
+
         $created = [
-            'customers_addressed' => $this->fillCustomerAddresses(),
-            'contracts' => $this->ensureContractStatuses($actor->id),
-            'work_orders' => $this->ensureWorkOrdersXor(),
-            'expenses' => $this->ensureExpenses($actor->id),
-            'payments' => $this->ensureSamplePayments($actor->id),
-            'month_lock_audit' => $this->ensureMonthLockAudit($actor->id),
+            'customers_addressed' => $allowSamples ? $this->fillCustomerAddresses() : 0,
+            'contracts' => $allowSamples ? $this->ensureContractStatuses($actor->id) : 0,
+            'work_orders' => $allowSamples ? $this->ensureWorkOrdersXor() : 0,
+            'expenses' => $allowSamples ? $this->ensureExpenses($actor->id) : 0,
+            'payments' => $allowSamples ? $this->ensureSamplePayments($actor->id) : 0,
+            'month_lock_audit' => $allowSamples ? $this->ensureMonthLockAudit($actor->id) : 0,
             'period_rent_filled' => $this->ensurePeriodRent($pricing),
             'rent_journals' => $this->ensureRentJournals($accounting, $actor->id),
         ];
 
-        $this->info('تم إثراء البيانات التجريبية:');
+        $this->info($allowSamples ? 'تم إثراء البيانات التجريبية:' : 'تم ترحيل الإيجار الآمن (بلا عينات DEMO):');
         foreach ($created as $key => $count) {
             $this->line("  · {$key}: {$count}");
         }
         if (($created['rent_journals'] ?? 0) === 0 && ($created['contracts'] ?? 0) === 0) {
-            $this->comment('ملاحظة: الأصفار تعني أن العينات والقيود موجودة مسبقاً (الأمر لا يعيد الكتابة).');
+            $this->comment('ملاحظة: الأصفار تعني أن العينات والقيود موجودة مسبقاً أو أن العينات مُعطَّلة.');
         }
 
         return self::SUCCESS;

@@ -435,6 +435,11 @@
   margin: 0;
 }
 
+/* Avoid an empty orphan cell when an odd number of metric fields fills the 2-col grid */
+.rpm-dt-card__grid > .rpm-dt-card__field:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .rpm-dt-card__field {
   display: grid;
   gap: 0.15rem;

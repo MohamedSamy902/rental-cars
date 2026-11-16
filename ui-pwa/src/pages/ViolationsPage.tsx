@@ -42,7 +42,7 @@ function todayDateOnly(): string {
   return todayCivilIso()
 }
 
-function contractLabel(c: ContractOption): string {
+function contractOption(c: ContractOption): { value: string; label: string; description?: string } {
   const raw = (c.number || c.code || '').trim()
   const no = raw || `CNT-${String(c.id).padStart(5, '0')}`
   const customer = c.customer?.full_name || 'عميل'
@@ -50,7 +50,16 @@ function contractLabel(c: ContractOption): string {
   const car = c.vehicle
     ? `${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}`.trim()
     : ''
-  return car ? `${no} · ${customer} · ${day} (${car})` : `${no} · ${customer} · ${day}`
+  return {
+    value: String(c.id),
+    label: `${no} · ${customer}`,
+    description: car ? `${day} · ${car}` : day,
+  }
+}
+
+function isDemoContract(c: ContractOption): boolean {
+  const raw = (c.number || c.code || '').trim().toUpperCase()
+  return raw.startsWith('DEMO-')
 }
 
 const statusLabel: Record<string, string> = {
@@ -158,8 +167,22 @@ export function ViolationsPage() {
   useEffect(() => { void load() }, [])
 
   async function ensureLookups() {
-    const c = await api<{ data: ContractOption[] }>('/contracts?per_page=100').catch(() => api<{ data: ContractOption[] }>('/bookings?per_page=100'))
-    setContracts(c.data)
+    const statuses = ['active', 'approved', 'completed']
+    const batches = await Promise.all(
+      statuses.map((status) =>
+        api<{ data: ContractOption[] }>(`/contracts?per_page=100&status=${status}`)
+          .catch(() => api<{ data: ContractOption[] }>(`/bookings?per_page=100&status=${status}`))
+          .catch(() => ({ data: [] as ContractOption[] })),
+      ),
+    )
+    const byId = new Map<number, ContractOption>()
+    for (const batch of batches) {
+      for (const row of batch.data) {
+        if (isDemoContract(row) || row.status === 'cancelled') continue
+        byId.set(row.id, row)
+      }
+    }
+    setContracts([...byId.values()].sort((a, b) => b.id - a.id))
   }
 
   function photosFromRow(row: Violation): string[] {
@@ -309,10 +332,7 @@ export function ViolationsPage() {
             hint="تُربط المخالفة بالحجز والعميل والعربية تلقائياً"
             options={[
               { value: '', label: 'اختر الحجز…' },
-              ...contracts.map((c) => ({
-                value: String(c.id),
-                label: contractLabel(c),
-              })),
+              ...contracts.map((c) => contractOption(c)),
             ]}
             value={form.contract_id}
             onChange={(e) => setForm({ ...form, contract_id: e.target.value })}

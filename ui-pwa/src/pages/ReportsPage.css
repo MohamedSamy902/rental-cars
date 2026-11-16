@@ -256,6 +256,37 @@
   min-width: 820px;
 }
 
+.rp-table-scroll:has(.rpm-table--stack) {
+  overflow-x: visible;
+}
+
+.rp-income-rows {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.rp-income-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+  padding-inline: 0.875rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.rp-income-row > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.rp-income-row strong {
+  overflow-wrap: anywhere;
+}
+
 .rp-account-type {
   display: inline-block;
   padding-block: 0.1rem;
@@ -302,7 +333,11 @@
   }
 
   .rp-table-scroll .rpm-table {
-    min-width: 640px;
+    min-width: 0;
+  }
+
+  .rp-table-scroll .rpm-table--stack {
+    min-width: 0 !important;
   }
 
   .rp-customer-toolbar {

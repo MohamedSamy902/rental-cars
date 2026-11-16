@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
@@ -11,6 +11,17 @@ import {
 } from '@/shared/ui'
 import './pages.css'
 import './AccountsPage.css'
+
+const ACCOUNTS_PER_PAGE = 20
+const PAYMENTS_PER_PAGE = 20
+
+const accountTypeLabel: Record<string, string> = {
+  asset: 'أصل',
+  liability: 'التزام',
+  equity: 'حقوق ملكية',
+  income: 'إيراد',
+  expense: 'مصروف',
+}
 
 type MonthRow = {
   year: number
@@ -69,25 +80,50 @@ export function AccountsPage() {
   const [daily, setDaily] = useState<DailyCash | null>(null)
   const [dailyLoading, setDailyLoading] = useState(true)
   const [dailyError, setDailyError] = useState('')
+  const [accountsPage, setAccountsPage] = useState(1)
+  const [paymentsPage, setPaymentsPage] = useState(1)
+  const [paymentsMeta, setPaymentsMeta] = useState({ current_page: 1, last_page: 1, total: 0 })
+
+  async function loadPayments(page = paymentsPage) {
+    const qs = new URLSearchParams({
+      direction: 'in',
+      per_page: String(PAYMENTS_PER_PAGE),
+      page: String(page),
+    })
+    const pay = await api<{ data: Payment[]; meta: { current_page: number; last_page: number; total: number } }>(
+      `/accounting/payments?${qs}`,
+    )
+    setPayments(pay.data)
+    setPaymentsMeta({
+      current_page: pay.meta.current_page,
+      last_page: pay.meta.last_page,
+      total: pay.meta.total,
+    })
+    setPaymentsPage(pay.meta.current_page)
+  }
 
   async function load() {
     setLoading(true)
     setError('')
     try {
-      const [overview, pay] = await Promise.all([
-        api<{ data: { months: MonthRow[]; accounts: Account[]; payments_in: number } }>('/accounting/overview'),
-        api<{ data: Payment[] }>('/accounting/payments?per_page=50'),
-      ])
+      const overview = await api<{ data: { months: MonthRow[]; accounts: Account[]; payments_in: number } }>('/accounting/overview')
       setMonths(overview.data.months)
       setAccounts(overview.data.accounts)
       setTotals({ payments_in: overview.data.payments_in })
-      setPayments(pay.data.filter((p) => p.direction === 'in'))
+      setAccountsPage(1)
+      await loadPayments(1)
     } catch (e) {
       setError((e as ApiError).message)
     } finally {
       setLoading(false)
     }
   }
+
+  const pagedAccounts = useMemo(() => {
+    const start = (accountsPage - 1) * ACCOUNTS_PER_PAGE
+    return accounts.slice(start, start + ACCOUNTS_PER_PAGE)
+  }, [accounts, accountsPage])
+  const accountsLastPage = Math.max(1, Math.ceil(accounts.length / ACCOUNTS_PER_PAGE))
 
   async function loadDaily(date = cashDate) {
     setDailyLoading(true)
@@ -289,21 +325,38 @@ export function AccountsPage() {
       </section>
 
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>دليل الحسابات</h3></div>
+        <div className="rpm-panel__head">
+          <h3>دليل الحسابات</h3>
+          <span className="muted">{accounts.length} حساب</span>
+        </div>
         <div className="rpm-dense-list">
-          {accounts.map((a) => (
+          {pagedAccounts.map((a) => (
             <div key={a.id} className="rpm-dense-row">
               <div>
                 <strong>{a.code} — {a.name}</strong>
-                <p className="muted">{a.type}</p>
+                <p className="muted">{accountTypeLabel[a.type] || a.type}</p>
               </div>
             </div>
           ))}
         </div>
+        {accountsLastPage > 1 ? (
+          <div className="ac-pager">
+            <Button size="sm" variant="secondary" disabled={accountsPage <= 1} onClick={() => setAccountsPage((p) => Math.max(1, p - 1))}>
+              السابق
+            </Button>
+            <span className="muted tabular-nums">{accountsPage} / {accountsLastPage}</span>
+            <Button size="sm" variant="secondary" disabled={accountsPage >= accountsLastPage} onClick={() => setAccountsPage((p) => Math.min(accountsLastPage, p + 1))}>
+              التالي
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>آخر المقبوضات</h3></div>
+        <div className="rpm-panel__head">
+          <h3>آخر المقبوضات</h3>
+          <span className="muted">{paymentsMeta.total} حركة</span>
+        </div>
         {payments.length === 0 ? (
           <div className="rpm-dense-list">
             <div className="rpm-dense-row">
@@ -316,7 +369,7 @@ export function AccountsPage() {
           </div>
         ) : (
           <div className="rpm-dense-list">
-            {payments.slice(0, 20).map((p) => (
+            {payments.map((p) => (
               <div key={p.id} className="rpm-dense-row">
                 <div>
                   <strong>مقبوض · {formatMoney(p.amount)}</strong>
@@ -326,6 +379,27 @@ export function AccountsPage() {
             ))}
           </div>
         )}
+        {paymentsMeta.last_page > 1 ? (
+          <div className="ac-pager">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={paymentsMeta.current_page <= 1}
+              onClick={() => void loadPayments(paymentsMeta.current_page - 1)}
+            >
+              السابق
+            </Button>
+            <span className="muted tabular-nums">{paymentsMeta.current_page} / {paymentsMeta.last_page}</span>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={paymentsMeta.current_page >= paymentsMeta.last_page}
+              onClick={() => void loadPayments(paymentsMeta.current_page + 1)}
+            >
+              التالي
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       <Sheet

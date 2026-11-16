@@ -29,3 +29,10 @@
 .viq-page .rpm-dt__table td {
   vertical-align: middle;
 }
+
+.viq-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
