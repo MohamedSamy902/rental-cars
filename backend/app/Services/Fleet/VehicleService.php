@@ -639,7 +639,11 @@ class VehicleService
     public function trackerSimRechargeLog(Vehicle $vehicle, int $limit = 40): array
     {
         return VehicleTrackerSimRecharge::query()
-            ->with('creator:id,name')
+            ->with([
+                'creator:id,name,phone,email,role_id,employee_id',
+                'creator.role:id,name,label',
+                'creator.employee:id,name',
+            ])
             ->where('vehicle_id', $vehicle->id)
             ->orderByDesc('recharged_on')
             ->orderByDesc('id')
@@ -651,7 +655,7 @@ class VehicleService
                 'recharged_on' => $r->recharged_on?->toDateString(),
                 'next_recharge_on' => $r->next_recharge_on?->toDateString(),
                 'notes' => $r->notes,
-                'created_by_name' => $r->creator?->name,
+                'created_by_name' => $r->creator?->displayName(),
                 'created_at' => $r->created_at?->toIso8601String(),
             ])
             ->all();

@@ -30,7 +30,15 @@ class ContractDossierService
      */
     public function build(Contract $contract, ?User $user = null): array
     {
-        $contract->load(['customer', 'vehicle', 'deposit.deductions', 'inspections.damages', 'salesUser:id,name']);
+        $contract->load([
+            'customer',
+            'vehicle',
+            'deposit.deductions',
+            'inspections.damages',
+            'salesUser:id,name,phone,email,role_id,employee_id',
+            'salesUser.role:id,name,label',
+            'salesUser.employee:id,name',
+        ]);
 
         $depositId = $contract->deposit?->id;
         $payments = Payment::query()
@@ -126,7 +134,11 @@ class ContractDossierService
         $in = $ledgerTotals['paid'];
 
         $openViolations = Violation::query()
-            ->with('creator:id,name')
+            ->with([
+                'creator:id,name,phone,email,role_id,employee_id',
+                'creator.role:id,name,label',
+                'creator.employee:id,name',
+            ])
             ->where('contract_id', $contract->id)
             ->open()
             ->orderByDesc('occurred_at')
@@ -137,7 +149,7 @@ class ContractDossierService
                 'occurred_at' => $v->occurred_at?->toDateString(),
                 'status' => $v->status,
                 'photo_paths' => $v->resolvedPhotoPaths(),
-                'created_by_name' => $v->creator?->name,
+                'created_by_name' => $v->creator?->displayName(),
             ])->values();
         $openViolationsTotal = (int) $openViolations->sum('amount');
 
@@ -153,9 +165,9 @@ class ContractDossierService
 
         return [
             ...$payload,
-            'created_by' => $contract->salesUser?->name,
+            'created_by' => $contract->salesUser?->displayName(),
             'sales_user' => $contract->salesUser
-                ? ['id' => $contract->salesUser->id, 'name' => $contract->salesUser->name]
+                ? ['id' => $contract->salesUser->id, 'name' => $contract->salesUser->displayName()]
                 : null,
             'progress' => $this->progress->forContract($contract),
             'payments' => $payments,

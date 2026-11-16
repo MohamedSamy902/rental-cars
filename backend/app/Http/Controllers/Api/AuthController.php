@@ -191,6 +191,7 @@ class AuthController extends Controller
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'display_name' => $user->displayName(),
             'email' => $user->email,
             'phone' => $user->phone,
             'employee_id' => $user->employee_id ? (int) $user->employee_id : null,

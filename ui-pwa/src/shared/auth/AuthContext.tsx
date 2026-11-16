@@ -5,6 +5,8 @@ import { normalizePermissions, type PermissionRef } from '@/shared/auth/routeAcc
 export type AuthUser = {
   id: number
   name: string
+  /** Person-facing label — never a bare role title when identity exists. */
+  display_name?: string | null
   email: string
   phone?: string | null
   /** Linked HR employee — used to lock petty-cash spend to self. */

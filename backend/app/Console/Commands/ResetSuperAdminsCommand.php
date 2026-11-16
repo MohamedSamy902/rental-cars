@@ -21,8 +21,8 @@ class ResetSuperAdminsCommand extends Command
                             {--phone2=01125253888 : موبايل المدير الثاني}
                             {--password1= : كلمة مرور المدير الأول (توليد تلقائي إن غابت)}
                             {--password2= : كلمة مرور المدير الثاني (توليد تلقائي إن غابت)}
-                            {--name1=مدير أعلى : اسم المدير الأول}
-                            {--name2=مدير أعلى : اسم المدير الثاني}';
+                            {--name1=المدير الأول : اسم المدير الأول (شخص — ليس اسم الصلاحية)}
+                            {--name2=المدير الثاني : اسم المدير الثاني (شخص — ليس اسم الصلاحية)}';
 
     protected $description = 'مسح كل المستخدمين وإنشاء مديرين أعلى غير ظاهرين في قائمة الموظفين';
 
@@ -84,7 +84,7 @@ class ResetSuperAdminsCommand extends Command
             User::query()->delete();
 
             User::query()->create([
-                'name' => trim((string) $this->option('name1')) ?: 'مدير أعلى',
+                'name' => trim((string) $this->option('name1')) ?: 'المدير الأول',
                 'email' => null,
                 'phone' => $phone1,
                 'password' => $password1,
@@ -94,7 +94,7 @@ class ResetSuperAdminsCommand extends Command
             ]);
 
             User::query()->create([
-                'name' => trim((string) $this->option('name2')) ?: 'مدير أعلى',
+                'name' => trim((string) $this->option('name2')) ?: 'المدير الثاني',
                 'email' => null,
                 'phone' => $phone2,
                 'password' => $password2,

@@ -68,11 +68,11 @@ class AuditNarrator
             return $this->summarize($log, null, null);
         }
 
-        return $this->summarize($log, $user->name, $this->resolveRoleTitle($user));
+        return $this->summarize($log, $user->displayName(), $this->resolveRoleTitle($user));
     }
 
     /**
-     * Build «المحاسب (أحمد محمد)» — role/title outside, name in parentheses.
+     * Build «أحمد محمد (المحاسب)» — person name first, role/title in parentheses.
      */
     public function actorPhrase(?string $userName, ?string $roleTitle = null): string
     {
@@ -90,10 +90,11 @@ class AuditNarrator
         }
         // Seeded demos sometimes used the role as the user name — avoid «المحاسب (محاسب)»
         if ($this->sameActorIdentity($name, $title)) {
-            return $title;
+            return $name;
         }
 
-        return "{$title} ({$name})";
+        // Person name first — role is secondary context, not the identity.
+        return "{$name} ({$title})";
     }
 
     /**
@@ -342,10 +343,11 @@ class AuditNarrator
                 continue;
             }
             $title = $this->resolveRoleTitle($user);
+            $person = $user->displayName();
             $out[(int) $id] = [
-                'name' => (string) $user->name,
+                'name' => $person,
                 'role_title' => $title,
-                'phrase' => $this->actorPhrase($user->name, $title),
+                'phrase' => $this->actorPhrase($person, $title),
             ];
         }
 
