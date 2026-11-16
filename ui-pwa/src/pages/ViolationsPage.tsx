@@ -4,6 +4,12 @@ import { civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney, toApiDateTime } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
+  absoluteMediaUrls,
+  collectViolationPhotoPaths,
+  openWhatsAppText,
+  violationsWhatsAppText,
+} from '@/shared/lib/whatsappShare'
+import {
   PageHeader, FilterBar, Button, Sheet, Fab, SelectField, MoneyField, DateField, StatusPill, useToast, DataTable, IconCheck, IconEdit,
   MediaUpload, type DataColumn,
 } from '@/shared/ui'
@@ -18,11 +24,12 @@ type Violation = {
   photo_paths?: string[] | null
   vehicle_id?: number
   contract_id?: number | null
+  customer_id?: number | null
   created_by?: number | null
   created_by_name?: string | null
   creator?: { id: number; name: string } | null
   vehicle?: { id?: number; brand: string; model: string; plate: string }
-  customer?: { full_name: string }
+  customer?: { id?: number; full_name: string; phone?: string | null }
   contract?: { id: number; code?: string; number?: string } | null
 }
 
@@ -277,6 +284,49 @@ export function ViolationsPage() {
     }
   }
 
+  async function shareViolationsWhatsApp(items: Violation[], mode: 'one' | 'customer') {
+    if (items.length === 0) {
+      toast.error('لا توجد مخالفات للمشاركة.')
+      return
+    }
+    const withPhone = items.find((r) => r.customer?.phone?.trim())
+      || rows.find((r) => customerKey(r) === customerKey(items[0]) && r.customer?.phone?.trim())
+    const customer = withPhone?.customer
+      || items.find((r) => r.customer?.full_name)?.customer
+    const phone = customer?.phone || ''
+    if (!phone.trim()) {
+      toast.error('لا يوجد رقم واتساب للعميل على هذه المخالفة.')
+      return
+    }
+    let centerName = 'شركة آر بي إم للتأجير'
+    try {
+      const settings = await api<{ data: { center_name?: string } }>('/settings/tenant')
+      if (settings.data.center_name) centerName = settings.data.center_name
+    } catch {
+      /* الاسم الافتراضي يكفي */
+    }
+    const photoPaths = collectViolationPhotoPaths(items)
+    const text = violationsWhatsAppText(items, {
+      centerName,
+      customerName: customer?.full_name,
+      absolutePhotoUrls: absoluteMediaUrls(photoPaths),
+    })
+    openWhatsAppText(text, phone)
+    const photoCount = photoPaths.length
+    toast.success(
+      mode === 'customer'
+        ? `تم فتح واتساب بـ ${items.length} مخالفة${photoCount ? ` · ${photoCount} صورة كروابط` : ''}.`
+        : `تم فتح واتساب بالمخالفة${photoCount ? ` · ${photoCount} صورة كروابط` : ''}.`,
+    )
+  }
+
+  function customerKey(r: Violation): string {
+    if (r.customer_id) return `id:${r.customer_id}`
+    if (r.customer?.id) return `id:${r.customer.id}`
+    if (r.customer?.phone) return `phone:${r.customer.phone}`
+    return `name:${r.customer?.full_name || r.id}`
+  }
+
   const selectedContract = contracts.find((c) => String(c.id) === form.contract_id)
 
   return (
@@ -304,12 +354,34 @@ export function ViolationsPage() {
         rowLabel={(r) => `مخالفة · ${r.vehicle?.plate ?? ''}`}
         loading={loading}
         defaultSort={{ id: 'date', dir: 'desc' }}
-        rowActions={(r) => [
-          { id: 'edit', label: 'تعديل', icon: <IconEdit size={16} />, onSelect: () => void openEdit(r) },
-          ...(r.status !== 'confirmed'
-            ? [{ id: 'confirm', label: 'تأكيد السداد', icon: <IconCheck size={16} />, onSelect: () => void confirm(r.id) }]
-            : []),
-        ]}
+        rowActions={(r) => {
+          const siblings = rows.filter((x) => customerKey(x) === customerKey(r))
+          const hasPhone = Boolean(siblings.find((x) => x.customer?.phone)?.customer?.phone || r.customer?.phone)
+          return [
+            { id: 'edit', label: 'تعديل', icon: <IconEdit size={16} />, onSelect: () => void openEdit(r) },
+            ...(hasPhone
+              ? [
+                  {
+                    id: 'wa-one',
+                    label: 'واتساب للعميل',
+                    icon: <IconCheck size={16} />,
+                    onSelect: () => void shareViolationsWhatsApp([r], 'one'),
+                  },
+                  ...(siblings.length > 1
+                    ? [{
+                        id: 'wa-all',
+                        label: `واتساب كل مخالفات العميل (${siblings.length})`,
+                        icon: <IconCheck size={16} />,
+                        onSelect: () => void shareViolationsWhatsApp(siblings, 'customer'),
+                      }]
+                    : []),
+                ]
+              : []),
+            ...(r.status !== 'confirmed'
+              ? [{ id: 'confirm', label: 'تأكيد السداد', icon: <IconCheck size={16} />, onSelect: () => void confirm(r.id) }]
+              : []),
+          ]
+        }}
         emptyTitle="لا توجد مخالفات"
         emptyDescription="المخالفات المسجّلة على الحجوزات تظهر هنا."
       />
