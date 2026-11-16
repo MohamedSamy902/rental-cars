@@ -144,11 +144,7 @@ export const bookingStatusLabel: Record<BookingStatus, string> = {
   cancelled: 'تم الإلغاء',
 }
 
-export const categoryOptions = [
-  { value: 'economy', label: 'اقتصادي' },
-  { value: 'suv', label: 'دفع رباعي' },
-  { value: 'luxury', label: 'فاخر' },
-]
+export { VEHICLE_CATEGORY_OPTIONS as categoryOptions } from '@/shared/lib/vehicleCategories'
 
 export const fuelOptions = [
   { value: 'petrol', label: 'بنزين' },

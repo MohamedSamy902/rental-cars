@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { addCivilDays, civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
+import { vehicleCategorySelectOptions } from '@/shared/lib/vehicleCategories'
 import { BrandSelectField } from '@/shared/forms/BrandSelectField'
 import {
   Button, Sheet, TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
@@ -491,7 +492,13 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         />
         <TextField label="الموديل" required value={form.model} error={errors.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
         <NumberField label="سنة الصنع" required value={form.year} error={errors.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
-        <SelectField label="الفئة" required options={[{ value: 'اقتصادي', label: 'اقتصادي' }, { value: 'دفع رباعي', label: 'دفع رباعي' }, { value: 'فاخر', label: 'فاخر' }]} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+        <SelectField
+          label="الفئة"
+          required
+          options={vehicleCategorySelectOptions(form.category)}
+          value={form.category}
+          onChange={(e) => setForm({ ...form, category: e.target.value })}
+        />
         <SelectField label="نوع الوقود" required options={[{ value: 'بنزين', label: 'بنزين' }, { value: 'ديزل', label: 'ديزل' }, { value: 'هجين', label: 'هجين' }]} value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} />
         <TextField label="اللون" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
         <SelectField label="ناقل الحركة" options={[{ value: 'أوتوماتيك', label: 'أوتوماتيك' }, { value: 'مانيوال', label: 'مانيوال' }]} value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} />

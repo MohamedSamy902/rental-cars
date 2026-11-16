@@ -531,6 +531,23 @@ class VehicleService
     }
 
     /**
+     * Canonical fleet category labels for create/edit selects.
+     *
+     * @return list<string>
+     */
+    public function categoryOptions(): array
+    {
+        return [
+            'اقتصادي',
+            'سيدان',
+            'SUV',
+            'دفع رباعي',
+            'فاخر',
+            'لاكشري',
+        ];
+    }
+
+    /**
      * Add a brand to the master list from the vehicle create/edit flow (RSD 6.1.1 · UX 3.21).
      */
     public function createBrand(string $name): VehicleBrand

@@ -59,6 +59,11 @@ class VehicleClientRefinementsTest extends TestCase
         $this->assertNotEmpty($catalog->json('data.brands'));
         $this->assertNotEmpty($catalog->json('data.addons'));
         $this->assertSame('VEH-0002', $catalog->json('data.next_code'));
+        $categories = $catalog->json('data.categories');
+        $this->assertIsArray($categories);
+        foreach (['اقتصادي', 'سيدان', 'SUV', 'فاخر', 'لاكشري'] as $needed) {
+            $this->assertContains($needed, $categories);
+        }
     }
 
     public function test_can_add_brand_from_vehicle_form_flow(): void
