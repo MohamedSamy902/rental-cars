@@ -3,9 +3,6 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
-import { useNewContract } from '@/shared/contracts/newContractContext'
-import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
-import { ExpenseSheet } from '@/shared/forms/ExpenseSheet'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
   SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconCash, IconKey, IconTrend,
@@ -20,12 +17,6 @@ type Balance = {
   overdue?: number
   remaining: number
   vehicles_monthly_total: number
-  vehicles_breakdown?: Array<{
-    vehicle_id: number
-    earned: number
-    shares: Record<string, number>
-    agreement_starts_on?: string | null
-  }>
 }
 
 type OwnerVehicle = {
@@ -52,13 +43,6 @@ type Payout = {
   vehicle?: { id: number; code: string; plate: string } | null
 }
 
-type Due = {
-  id: number
-  year_month: string
-  amount: number
-  vehicle?: { id: number; code: string; plate: string; brand?: string; model?: string } | null
-}
-
 type Owner = {
   id: number
   full_name: string
@@ -71,7 +55,6 @@ type Owner = {
   is_active: boolean
   balance?: Balance | null
   vehicles?: OwnerVehicle[]
-  dues?: Due[]
   payouts?: Payout[]
 }
 
@@ -80,11 +63,11 @@ const emptyForm = {
   id_front_path: '', id_back_path: '',
 }
 
+/** ملف المالك = بيانات + عربيات مربوطة + صرف شهري. ممنوع عقود تأجير / صيانة / مصروف / ترحيل محاسبي. */
 export function OwnerDetailPage() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const toast = useToast()
-  const { openNewContract } = useNewContract()
   const [owner, setOwner] = useState<Owner | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -96,8 +79,6 @@ export function OwnerDetailPage() {
   const [payoutForm, setPayoutForm] = useState({
     amount: '', paid_on: todayCivilIso(), payment_method: 'cash', vehicle_id: '', notes: '',
   })
-  const [woVehicle, setWoVehicle] = useState<{ id: number; label: string } | null>(null)
-  const [expVehicle, setExpVehicle] = useState<{ id: number; label: string } | null>(null)
 
   async function load() {
     if (!id) return
@@ -201,12 +182,13 @@ export function OwnerDetailPage() {
   }
 
   const balance = owner.balance
+  const overdue = balance?.overdue ?? balance?.remaining ?? 0
 
   return (
     <div className="rpm-stack">
       <PageHeader
         title={owner.full_name}
-        subtitle="متأخر = شهور مدنية مكتملة فقط − المصروف · الشهر الجاري لا يُحسب"
+        subtitle="ملف مالك · المبلغ الشهري لعقد الإدارة · الصرف للمالك فقط (بلا عقود تأجير ولا حسابات)"
         action={
           <>
             <BackNavButton to="/owners" label="رجوع للملاك" />
@@ -226,17 +208,17 @@ export function OwnerDetailPage() {
       />
 
       <MetricCardGrid
-        label="ملخص المالك"
+        label="مستحقات المالك (عقد الإدارة)"
         items={[
           { id: 'monthly', label: 'المبلغ الشهري', value: balance?.vehicles_monthly_total || 0, format: 'money', tone: 'success', icon: <IconKey size={16} /> },
           { id: 'earned', label: 'مستحق شهور مكتملة', value: balance?.earned_total ?? balance?.accrued_total ?? 0, format: 'money', icon: <IconCash size={16} /> },
-          { id: 'paid', label: 'إجمالي المصروف', value: balance?.paid_total || 0, format: 'money', icon: <IconCash size={16} /> },
+          { id: 'paid', label: 'إجمالي المصروف للمالك', value: balance?.paid_total || 0, format: 'money', icon: <IconCash size={16} /> },
           {
             id: 'overdue',
-            label: 'متأخر',
-            value: balance?.overdue ?? balance?.remaining ?? 0,
+            label: 'متأخر للمالك',
+            value: overdue,
             format: 'money',
-            tone: (balance?.overdue ?? balance?.remaining ?? 0) > 0 ? 'warning' : 'success',
+            tone: overdue > 0 ? 'warning' : 'success',
             icon: <IconTrend size={16} />,
           },
         ]}
@@ -265,40 +247,36 @@ export function OwnerDetailPage() {
         {(owner.vehicles || []).length === 0 ? <p className="muted">لا عربيات مربوطة — اربط من شاشة العربيات.</p> : (
           <div className="rpm-card-list">
             {(owner.vehicles || []).map((v) => {
-              const label = `${v.brand} ${v.model} · ${v.plate}`
               const startOn = v.owner_agreement_starts_on || v.owner_since
               const shares = Object.entries(v.earned_shares || {})
               return (
-              <article key={v.id} className="rpm-card">
-                <div className="rpm-card__row">
-                  <strong><Link to={`/vehicles/${v.id}`}>{v.brand} {v.model}</Link></strong>
-                  <strong className="tabular-nums">{v.owner_monthly_amount != null ? formatMoney(v.owner_monthly_amount) : '—'}</strong>
-                </div>
-                <p className="muted">
-                  {v.code} · {v.plate}
-                  {' · '}بداية العقد {startOn ? formatDate(startOn) : '—'}
-                  {v.owner_agreement_ends_on ? ` · نهاية ${formatDate(v.owner_agreement_ends_on)}` : ''}
-                </p>
-                <p className="muted">
-                  مستحق شهور مكتملة: {formatMoney(v.earned_completed || 0)}
-                  {shares.length > 0
-                    ? ` · ${shares.map(([ym, amt]) => `${ym}: ${formatMoney(amt)}`).join(' · ')}`
-                    : ' · لا شهر مكتمل بعد'}
-                </p>
-                <div className="rpm-card__actions">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    loading={printingAgreementId === v.id}
-                    onClick={() => void printOwnerAgreement(v.id)}
-                  >
-                    طباعة عقد المالك
-                  </Button>
-                  <Button size="sm" variant="accent" onClick={() => openNewContract({ vehicleId: v.id })}>عقد تأجير جديد</Button>
-                  <Button size="sm" variant="secondary" onClick={() => setWoVehicle({ id: v.id, label })}>أمر صيانة</Button>
-                  <Button size="sm" variant="secondary" onClick={() => setExpVehicle({ id: v.id, label })}>مصروف</Button>
-                </div>
-              </article>
+                <article key={v.id} className="rpm-card">
+                  <div className="rpm-card__row">
+                    <strong><Link to={`/vehicles/${v.id}`}>{v.brand} {v.model}</Link></strong>
+                    <strong className="tabular-nums">{v.owner_monthly_amount != null ? formatMoney(v.owner_monthly_amount) : '—'}</strong>
+                  </div>
+                  <p className="muted">
+                    {v.code} · {v.plate}
+                    {' · '}بداية عقد المالك {startOn ? formatDate(startOn) : '—'}
+                    {v.owner_agreement_ends_on ? ` · نهاية ${formatDate(v.owner_agreement_ends_on)}` : ''}
+                  </p>
+                  <p className="muted">
+                    مستحق شهور مكتملة: {formatMoney(v.earned_completed || 0)}
+                    {shares.length > 0
+                      ? ` · ${shares.map(([ym, amt]) => `${ym}: ${formatMoney(amt)}`).join(' · ')}`
+                      : ' · لا شهر مكتمل بعد'}
+                  </p>
+                  <div className="rpm-card__actions">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={printingAgreementId === v.id}
+                      onClick={() => void printOwnerAgreement(v.id)}
+                    >
+                      طباعة عقد المالك
+                    </Button>
+                  </div>
+                </article>
               )
             })}
           </div>
@@ -306,7 +284,7 @@ export function OwnerDetailPage() {
       </section>
 
       <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>سجل الصرف</h3></div>
+        <div className="rpm-panel__head"><h3>سجل الصرف للمالك</h3></div>
         {(owner.payouts || []).length === 0 ? <p className="muted">لا مدفوعات بعد.</p> : (
           <div className="rpm-card-list">
             {(owner.payouts || []).map((p) => (
@@ -316,26 +294,6 @@ export function OwnerDetailPage() {
                   <span>{formatDate(p.paid_on)}</span>
                 </div>
                 <p className="muted">{p.payment_method}{p.vehicle ? ` · ${p.vehicle.plate}` : ''}{p.notes ? ` · ${p.notes}` : ''}</p>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="rpm-panel">
-        <div className="rpm-panel__head">
-          <h3>سجل الترحيل المحاسبي</h3>
-          <p className="muted" style={{ margin: 0 }}>للتوثيق فقط — رصيد المالك التشغيلي هو المبلغ الشهري أعلاه، بلا متبقي متراكم</p>
-        </div>
-        {(owner.dues || []).length === 0 ? <p className="muted">لا ترحيلات مسجّلة.</p> : (
-          <div className="rpm-card-list">
-            {(owner.dues || []).slice(0, 24).map((d) => (
-              <article key={d.id} className="rpm-card">
-                <div className="rpm-card__row">
-                  <strong>{d.year_month}</strong>
-                  <strong className="tabular-nums">{formatMoney(d.amount)}</strong>
-                </div>
-                <p className="muted">{d.vehicle ? `${d.vehicle.brand || ''} ${d.vehicle.model || ''} · ${d.vehicle.plate}` : '—'}</p>
               </article>
             ))}
           </div>
@@ -354,19 +312,6 @@ export function OwnerDetailPage() {
           <MediaUpload label="بطاقة — ضهر" required value={form.id_back_path || null} collection="owners_id" purpose="id_back" accept="image" onChange={(path) => setForm({ ...form, id_back_path: path || '' })} />
         </div>
       </Sheet>
-
-      <WorkOrderSheet
-        open={!!woVehicle}
-        vehicle={woVehicle || undefined}
-        onClose={() => setWoVehicle(null)}
-        onSaved={() => void load()}
-      />
-      <ExpenseSheet
-        open={!!expVehicle}
-        vehicle={expVehicle || undefined}
-        onClose={() => setExpVehicle(null)}
-        onSaved={() => void load()}
-      />
 
       <Sheet open={payoutOpen} title="تسجيل صرف للمالك" onClose={() => setPayoutOpen(false)} footer={<><Button loading={saving} onClick={() => void onPayout()}>تأكيد الصرف</Button><Button variant="secondary" onClick={() => setPayoutOpen(false)}>إلغاء</Button></>}>
         <div className="rpm-form-grid">

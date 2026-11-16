@@ -222,7 +222,7 @@ export function OwnersPage() {
     <div className="rpm-stack">
       <PageHeader
         title="ملاك العربيات"
-        subtitle="المتأخر = شهور مدنية مكتملة فقط − المصروف (الشهر الجاري لا يُحسب)"
+        subtitle="مستحقات عقد الإدارة فقط · بلا عقود تأجير ولا حسابات · المتأخر = شهور مكتملة − صرف"
         action={<Button onClick={() => { setForm(emptyForm); setFieldErrors({}); setOpen(true) }}>إضافة مالك</Button>}
         mobileFab
       />
