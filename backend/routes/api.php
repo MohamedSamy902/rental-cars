@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\VehicleCustodyAgreementController;
 use App\Http\Controllers\Api\VehicleOwnerController;
 use App\Http\Controllers\Api\ViolationController;
 use App\Http\Controllers\Api\ViolationInquiryController;
+use App\Http\Controllers\Api\ViolationShareController;
 use App\Http\Controllers\Api\WorkOrderController;
 use App\Models\Notification;
 use App\Models\TenantSetting;
@@ -38,6 +39,14 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,
 /** بطاقة QR للزائر — عامة (RSD ٦): شركة + مستأجر حالي إن وُجد فقط. */
 Route::get('/public/vehicles/{vehicle}/qr-card', [OperationsController::class, 'vehicleQrVisitorCard'])
     ->middleware('throttle:60,1');
+
+/** مشاركة مخالفات/ميديا موقّعة للعميل عبر واتساب — بلا تسجيل دخول (توقيع نسبي). */
+Route::get('/public/media/{medium}/file', [ViolationShareController::class, 'publicMediaFile'])
+    ->middleware(['signed:relative', 'throttle:120,1'])
+    ->name('public.media.file');
+Route::get('/public/violations/share', [ViolationShareController::class, 'publicShare'])
+    ->middleware(['signed:relative', 'throttle:60,1'])
+    ->name('public.violations.share');
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -259,6 +268,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/violations', [ViolationController::class, 'store'])->middleware('permission:violations.create');
     Route::put('/violations/{violation}', [ViolationController::class, 'update'])->middleware('permission:violations.update');
     Route::post('/violations/{violation}/confirm', [ViolationController::class, 'confirmPayment'])->middleware('permission:violations.update');
+    Route::post('/violations/share', [ViolationShareController::class, 'prepare'])->middleware('permission:violations.view');
 
     Route::get('/violation-inquiries', [ViolationInquiryController::class, 'index'])->middleware('permission:violations.view');
     Route::post('/violation-inquiries/reset-all', [ViolationInquiryController::class, 'resetAll'])->middleware('permission:violations.update');
