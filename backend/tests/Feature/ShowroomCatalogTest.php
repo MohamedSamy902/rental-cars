@@ -24,7 +24,7 @@ class ShowroomCatalogTest extends TestCase
             'feature_flags' => ['showroom' => true],
             'operational' => [
                 'print_phone' => '01125253888',
-                'showroom_weekly_factor' => 6,
+                'showroom_half_monthly_factor' => 15,
                 'showroom_monthly_factor' => 22,
             ],
         ]);
@@ -58,7 +58,7 @@ class ShowroomCatalogTest extends TestCase
         $this->assertSame('نيسان', $row['brand']);
         $this->assertSame('صني', $row['model']);
         $this->assertSame(1475, $row['daily_rate']);
-        $this->assertSame(1475 * 6, $row['weekly_rate']);
+        $this->assertSame(1475 * 15, $row['half_monthly_rate']);
         $this->assertSame(1475 * 22, $row['monthly_rate']);
         $this->assertSame(4700, $row['default_deposit']);
     }

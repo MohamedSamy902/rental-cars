@@ -65,7 +65,7 @@ class UpdatePendingContractRequest extends FormRequest
             'starts_at' => ['sometimes', 'required', 'date'],
             'planned_ends_at' => ['sometimes', 'required', 'date', 'after:starts_at', 'before:2100-01-01'],
             'daily_rate' => ['nullable', 'integer', 'min:0'],
-            'rent_basis' => ['nullable', 'string', 'in:daily,weekly,monthly'],
+            'half_monthly_rate' => ['nullable', 'integer', 'min:0'],
             'weekly_rate' => ['nullable', 'integer', 'min:0'],
             'monthly_rate' => ['nullable', 'integer', 'min:0'],
             'daily_km_allowance' => ['nullable', 'integer', 'min:0'],

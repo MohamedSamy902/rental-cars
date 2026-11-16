@@ -10,46 +10,78 @@ class ContractPricingService
 {
     public const BASIS_DAILY = 'daily';
 
-    public const BASIS_WEEKLY = 'weekly';
+    public const BASIS_HALF_MONTHLY = 'half_monthly';
 
     public const BASIS_MONTHLY = 'monthly';
 
-    /** أيام وحدة الأسبوع التعاقدية. */
-    public const WEEK_UNIT_DAYS = 7;
+    /** نص الشهر = سعر وحدة ١٥ يوماً. */
+    public const HALF_MONTH_UNIT_DAYS = 15;
 
-    /** أيام وحدة الشهر التعاقدية (شهر إيجار = ٣٠ يوماً). */
+    /** الشهر = سعر وحدة ٣٠ يوماً. */
     public const MONTH_UNIT_DAYS = 30;
 
-    /** معامل المعرض الافتراضي: أسبوعي = يومي × ٦. */
-    public const DEFAULT_WEEKLY_FACTOR = 6.0;
+    /** شريحة يومي: ١–١٠ أيام. */
+    public const DAILY_TIER_MAX_DAYS = 10;
 
-    /** معامل المعرض الافتراضي: شهري = يومي × ٢٢. */
+    /** شريحة نص شهري: ١١–٢٠ يوماً. */
+    public const HALF_MONTHLY_TIER_MAX_DAYS = 20;
+
+    /** افتراضي نص شهري = يومي × ١٥ (سعر ١٥ يوماً). */
+    public const DEFAULT_HALF_MONTHLY_FACTOR = 15.0;
+
+    /** افتراضي شهري = يومي × ٢٢ (متوافق مع المعرض). */
     public const DEFAULT_MONTHLY_FACTOR = 22.0;
 
     /**
-     * إيجار المدة حسب أساس التسعير:
-     * - daily: أيام × السعر اليومي
-     * - weekly: أسابيع كاملة × الأسبوعي + أيام زيادة × (الأسبوعي ÷ ٧)
-     * - monthly: شهور كاملة (٣٠ يوماً) × الشهري + أيام زيادة × (الشهري ÷ ٣٠)
+     * شريحة التسعير من مدة العقد:
+     * ١–١٠ → يومي · ١١–٢٠ → نص شهري · ٢١+ → شهري.
+     *
+     * @return self::BASIS_*
+     */
+    public function resolveRentBasisFromDays(int $days): string
+    {
+        $days = max(0, $days);
+        if ($days <= self::DAILY_TIER_MAX_DAYS) {
+            return self::BASIS_DAILY;
+        }
+        if ($days <= self::HALF_MONTHLY_TIER_MAX_DAYS) {
+            return self::BASIS_HALF_MONTHLY;
+        }
+
+        return self::BASIS_MONTHLY;
+    }
+
+    /**
+     * إيجار المدة حسب شريحة الأيام والأسعار المجمّدة:
+     * - daily: أيام × اليومي
+     * - half_monthly: وحدات ١٥ يوماً × نص الشهري + أيام زيادة × (نص الشهري ÷ ١٥)
+     * - monthly: وحدات ٣٠ يوماً × الشهري + أيام زيادة × (الشهري ÷ ٣٠)
+     *
+     * إن لم يُمرَّر $basis تُستنتج الشريحة من عدد الأيام.
      */
     public function periodRent(
         int $days,
-        string $basis,
+        ?string $basis,
         int $dailyRate,
-        ?int $weeklyRate = null,
+        ?int $halfMonthlyRate = null,
         ?int $monthlyRate = null,
-        float $weeklyFactor = self::DEFAULT_WEEKLY_FACTOR,
+        float $halfMonthlyFactor = self::DEFAULT_HALF_MONTHLY_FACTOR,
         float $monthlyFactor = self::DEFAULT_MONTHLY_FACTOR,
     ): int {
         $days = max(0, $days);
         $dailyRate = max(0, $dailyRate);
-        $basis = $this->normalizeRentBasis($basis);
+        $basis = $basis !== null && $basis !== ''
+            ? $this->normalizeRentBasis($basis)
+            : $this->resolveRentBasisFromDays($days);
+
+        // عند الحساب الفعلي نفضّل الشريحة من الأيام حتى لو تغيّرت المدة عن المخطط.
+        $basis = $this->resolveRentBasisFromDays($days);
 
         return match ($basis) {
-            self::BASIS_WEEKLY => $this->unitPackRent(
+            self::BASIS_HALF_MONTHLY => $this->unitPackRent(
                 $days,
-                self::WEEK_UNIT_DAYS,
-                max(0, $weeklyRate ?? (int) round($dailyRate * $weeklyFactor)),
+                self::HALF_MONTH_UNIT_DAYS,
+                max(0, $halfMonthlyRate ?? (int) round($dailyRate * $halfMonthlyFactor)),
             ),
             self::BASIS_MONTHLY => $this->unitPackRent(
                 $days,
@@ -66,8 +98,12 @@ class ContractPricingService
     public function normalizeRentBasis(mixed $basis): string
     {
         $value = is_string($basis) ? strtolower(trim($basis)) : self::BASIS_DAILY;
+        // توافق أسماء قديمة إن وُجدت في بيانات مرحلية.
+        if (in_array($value, ['weekly', 'half', 'half-month', 'half_month'], true)) {
+            $value = self::BASIS_HALF_MONTHLY;
+        }
 
-        return in_array($value, [self::BASIS_DAILY, self::BASIS_WEEKLY, self::BASIS_MONTHLY], true)
+        return in_array($value, [self::BASIS_DAILY, self::BASIS_HALF_MONTHLY, self::BASIS_MONTHLY], true)
             ? $value
             : self::BASIS_DAILY;
     }

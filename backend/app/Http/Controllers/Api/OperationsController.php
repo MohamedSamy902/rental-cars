@@ -50,18 +50,20 @@ class OperationsController extends Controller
             ->flip();
 
         $ops = is_array($settings?->operational) ? $settings->operational : [];
-        $weeklyFactor = is_numeric($ops['showroom_weekly_factor'] ?? null)
-            ? (float) $ops['showroom_weekly_factor']
-            : 6.0; // أسبوع تجاري = ٦ أيام
+        $halfMonthlyFactor = is_numeric($ops['showroom_half_monthly_factor'] ?? null)
+            ? (float) $ops['showroom_half_monthly_factor']
+            : (is_numeric($ops['showroom_weekly_factor'] ?? null)
+                ? (float) $ops['showroom_weekly_factor'] // توافق إعداد قديم
+                : \App\Services\Contracts\ContractPricingService::DEFAULT_HALF_MONTHLY_FACTOR);
         $monthlyFactor = is_numeric($ops['showroom_monthly_factor'] ?? null)
             ? (float) $ops['showroom_monthly_factor']
-            : 22.0; // شهر تجاري ≈ ٢٢ يوم عمل
+            : \App\Services\Contracts\ContractPricingService::DEFAULT_MONTHLY_FACTOR;
         $phone = is_string($ops['print_phone'] ?? null) && trim((string) $ops['print_phone']) !== ''
             ? trim((string) $ops['print_phone'])
             : (string) config('rpm.center_public_phone', '01125253888');
 
         $rows = Vehicle::query()->where('is_active', true)->orderBy('brand')->orderBy('model')->get()
-            ->map(function (Vehicle $v) use ($activeIds, $reservedIds, $weeklyFactor, $monthlyFactor) {
+            ->map(function (Vehicle $v) use ($activeIds, $reservedIds, $halfMonthlyFactor, $monthlyFactor) {
                 $status = $this->availability->statusOnDate([
                     'manual_status' => $v->manual_status,
                     'has_active_handover' => $activeIds->has($v->id),
@@ -97,7 +99,7 @@ class OperationsController extends Controller
                     'seats' => $v->seats,
                     'plate' => $v->plate,
                     'daily_rate' => $daily,
-                    'weekly_rate' => (int) round($daily * $weeklyFactor),
+                    'half_monthly_rate' => (int) round($daily * $halfMonthlyFactor),
                     'monthly_rate' => (int) round($daily * $monthlyFactor),
                     'default_deposit' => (int) $v->default_deposit,
                     'status' => $status,

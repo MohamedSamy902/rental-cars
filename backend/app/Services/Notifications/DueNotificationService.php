@@ -1075,7 +1075,7 @@ class DueNotificationService
             max(1, $days),
             (string) ($contract->rent_basis ?? \App\Services\Contracts\ContractPricingService::BASIS_DAILY),
             $rate,
-            $contract->frozen_weekly_rate !== null ? (int) $contract->frozen_weekly_rate : null,
+            $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
             $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
         );
     }

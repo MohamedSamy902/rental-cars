@@ -73,7 +73,7 @@ class ContractLedgerMath
             $days,
             (string) ($contract->rent_basis ?? ContractPricingService::BASIS_DAILY),
             (int) $contract->frozen_daily_rate,
-            $contract->frozen_weekly_rate !== null ? (int) $contract->frozen_weekly_rate : null,
+            $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
             $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
         );
 

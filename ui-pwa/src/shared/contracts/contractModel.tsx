@@ -55,8 +55,8 @@ export type Contract = {
   planned_ends_at: string
   actual_ends_at?: string | null
   frozen_daily_rate: number
-  rent_basis?: 'daily' | 'weekly' | 'monthly' | string
-  frozen_weekly_rate?: number | null
+  rent_basis?: 'daily' | 'half_monthly' | 'monthly' | string
+  frozen_half_monthly_rate?: number | null
   frozen_monthly_rate?: number | null
   frozen_daily_km_allowance?: number | null
   frozen_excess_km_rate?: number | null

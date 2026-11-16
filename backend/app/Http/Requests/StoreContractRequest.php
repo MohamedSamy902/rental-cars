@@ -67,8 +67,8 @@ class StoreContractRequest extends FormRequest
             'starts_at' => ['required', 'date'],
             'planned_ends_at' => ['required', 'date', 'after:starts_at', 'before:2100-01-01'],
             'daily_rate' => ['nullable', 'integer', 'min:0'],
-            'rent_basis' => ['nullable', 'string', 'in:daily,weekly,monthly'],
-            'weekly_rate' => ['nullable', 'integer', 'min:0'],
+            'half_monthly_rate' => ['nullable', 'integer', 'min:0'],
+            'weekly_rate' => ['nullable', 'integer', 'min:0'], // توافق مؤقت → نص شهري
             'monthly_rate' => ['nullable', 'integer', 'min:0'],
             'daily_km_allowance' => ['nullable', 'integer', 'min:0'],
             'excess_km_rate' => ['nullable', 'integer', 'min:0'],
@@ -149,21 +149,21 @@ class StoreContractRequest extends FormRequest
                 : (int) $excessRateInput;
             $prepaidKm = max(0, (int) $this->input('prepaid_excess_km', 0));
             $prepaidAmount = $prepaidKm * max(0, $excessRate);
-            $weeklyFactor = is_numeric($ops['showroom_weekly_factor'] ?? null)
-                ? (float) $ops['showroom_weekly_factor']
-                : \App\Services\Contracts\ContractPricingService::DEFAULT_WEEKLY_FACTOR;
+            $halfFactor = is_numeric($ops['showroom_half_monthly_factor'] ?? null)
+                ? (float) $ops['showroom_half_monthly_factor']
+                : \App\Services\Contracts\ContractPricingService::DEFAULT_HALF_MONTHLY_FACTOR;
             $monthlyFactor = is_numeric($ops['showroom_monthly_factor'] ?? null)
                 ? (float) $ops['showroom_monthly_factor']
                 : \App\Services\Contracts\ContractPricingService::DEFAULT_MONTHLY_FACTOR;
-            $weekly = $this->input('weekly_rate');
+            $half = $this->input('half_monthly_rate', $this->input('weekly_rate'));
             $monthly = $this->input('monthly_rate');
             $rent = app(\App\Services\Contracts\ContractPricingService::class)->periodRent(
                 $days,
-                (string) ($this->input('rent_basis') ?: 'daily'),
+                null,
                 $rate,
-                ($weekly === null || $weekly === '') ? null : (int) $weekly,
+                ($half === null || $half === '') ? null : (int) $half,
                 ($monthly === null || $monthly === '') ? null : (int) $monthly,
-                $weeklyFactor,
+                $halfFactor,
                 $monthlyFactor,
             );
             $total = max(0, $rent + $deliveryFee + $otherFees + $prepaidAmount - $discount);
@@ -188,9 +188,8 @@ class StoreContractRequest extends FormRequest
             'starts_at' => 'وقت البداية',
             'planned_ends_at' => 'وقت النهاية المخطط',
             'daily_rate' => 'الإيجار اليومي',
-            'rent_basis' => 'أساس الإيجار',
-            'weekly_rate' => 'الإيجار الأسبوعي',
-            'monthly_rate' => 'الإيجار الشهري',
+            'half_monthly_rate' => 'إيجار نص الشهر (١٥ يوماً)',
+            'monthly_rate' => 'الإيجار الشهري (٣٠ يوماً)',
             'daily_km_allowance' => 'بدل الكيلومترات اليومي',
             'excess_km_rate' => 'سعر الكيلومتر الزائد',
             'prepaid_excess_km' => 'كيلومترات زيادة مدفوعة مقدماً',

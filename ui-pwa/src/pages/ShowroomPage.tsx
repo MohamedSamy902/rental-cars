@@ -19,7 +19,7 @@ type ShowroomVehicle = {
   seats?: number | null
   plate?: string
   daily_rate: number
-  weekly_rate: number
+  half_monthly_rate: number
   monthly_rate: number
   default_deposit: number
   status: string
@@ -78,7 +78,7 @@ export function ShowroomPage() {
     if (v.plate) lines.push(`اللوحة: ${v.plate}`)
     lines.push(
       `الفئة: ${v.category} · ${v.fuel_type}${v.transmission ? ` · ${v.transmission}` : ''}`,
-      `يومي ${formatMoneyPlain(v.daily_rate)} · أسبوعي ${formatMoneyPlain(v.weekly_rate)} · شهري ${formatMoneyPlain(v.monthly_rate)}`,
+      `يومي ${formatMoneyPlain(v.daily_rate)} · نص شهر (١٥ يوماً) ${formatMoneyPlain(v.half_monthly_rate)} · شهري (٣٠ يوماً) ${formatMoneyPlain(v.monthly_rate)}`,
       `التأمين النقدي: ${formatMoneyPlain(v.default_deposit)}`,
       `الحالة: ${status}`,
     )
@@ -148,7 +148,7 @@ export function ShowroomPage() {
 
               <div className="rpm-showroom__rates">
                 <div className="rpm-showroom__rate"><span>يومي</span><strong>{formatMoney(v.daily_rate)}</strong></div>
-                <div className="rpm-showroom__rate"><span>أسبوعي</span><strong>{formatMoney(v.weekly_rate)}</strong></div>
+                <div className="rpm-showroom__rate"><span>نص شهر</span><strong>{formatMoney(v.half_monthly_rate)}</strong></div>
                 <div className="rpm-showroom__rate"><span>شهري</span><strong>{formatMoney(v.monthly_rate)}</strong></div>
               </div>
 

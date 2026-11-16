@@ -23,9 +23,9 @@ const DEFAULT_DELIVERY_FEE = 1000
 const DEFAULT_DAILY_KM = 200
 const DEFAULT_EXCESS_KM_RATE = 5
 
-const WEEKLY_FACTOR = 6
+const HALF_MONTHLY_FACTOR = 15
 const MONTHLY_FACTOR = 22
-const WEEK_UNIT_DAYS = 7
+const HALF_MONTH_UNIT_DAYS = 15
 const MONTH_UNIT_DAYS = 30
 
 function packRent(days: number, unitDays: number, unitRate: number): number {
@@ -35,17 +35,27 @@ function packRent(days: number, unitDays: number, unitRate: number): number {
   return full * unitRate + Math.round((extra * unitRate) / unitDays)
 }
 
-function estimatePeriodRent(days: number, basis: string, daily: number, weekly: number, monthly: number): number {
+function resolveRentTier(days: number): 'daily' | 'half_monthly' | 'monthly' {
+  if (days <= 10) return 'daily'
+  if (days <= 20) return 'half_monthly'
+  return 'monthly'
+}
+
+function estimatePeriodRent(days: number, daily: number, halfMonthly: number, monthly: number): number {
   if (!days || !daily) return 0
-  if (basis === 'weekly') return packRent(days, WEEK_UNIT_DAYS, weekly || Math.round(daily * WEEKLY_FACTOR))
-  if (basis === 'monthly') return packRent(days, MONTH_UNIT_DAYS, monthly || Math.round(daily * MONTHLY_FACTOR))
+  const tier = resolveRentTier(days)
+  if (tier === 'half_monthly') {
+    return packRent(days, HALF_MONTH_UNIT_DAYS, halfMonthly || Math.round(daily * HALF_MONTHLY_FACTOR))
+  }
+  if (tier === 'monthly') {
+    return packRent(days, MONTH_UNIT_DAYS, monthly || Math.round(daily * MONTHLY_FACTOR))
+  }
   return days * daily
 }
 
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
-  rent_basis: 'daily',
-  daily_rate: '', weekly_rate: '', monthly_rate: '',
+  daily_rate: '', half_monthly_rate: '', monthly_rate: '',
   deposit: '', odometer: '', notes: '',
   daily_km_allowance: String(DEFAULT_DAILY_KM),
   excess_km_rate: String(DEFAULT_EXCESS_KM_RATE),
@@ -114,7 +124,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       ...prev,
       vehicle_id: String(v.id),
       daily_rate: String(v.daily_rate),
-      weekly_rate: String(Math.round(daily * WEEKLY_FACTOR)),
+      half_monthly_rate: String(Math.round(daily * HALF_MONTHLY_FACTOR)),
       monthly_rate: String(Math.round(daily * MONTHLY_FACTOR)),
       deposit: String(v.default_deposit),
       odometer: v.odometer != null ? String(v.odometer) : prev.odometer,
@@ -218,7 +228,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     const paidRaw = form.payment_amount.trim()
     const paid = paidRaw !== '' ? Number(paidRaw) : NaN
     const rate = Number(form.daily_rate || 0)
-    const weekly = Number(form.weekly_rate || 0)
+    const halfMonthly = Number(form.half_monthly_rate || 0)
     const monthly = Number(form.monthly_rate || 0)
     let days = 0
     if (form.starts_at && form.planned_ends_at) {
@@ -232,7 +242,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     const prepaidKm = Math.max(0, Number(form.prepaid_excess_km || 0))
     const prepaidAmount = prepaidKm * (Number.isFinite(excessRate) ? excessRate : 0)
     const deliveryNow = form.has_delivery_service ? Math.max(0, Number(form.delivery_service_fee || 0)) : 0
-    const rentNow = days && rate ? estimatePeriodRent(days, form.rent_basis, rate, weekly, monthly) : 0
+    const rentNow = days && rate ? estimatePeriodRent(days, rate, halfMonthly, monthly) : 0
     const total = rentNow ? rentNow + deliveryNow + prepaidAmount : 0
     if (!Number.isFinite(paid) || paid < 1) {
       setErrors({ payment_amount: 'دفعة عند الإنشاء مطلوبة وأكبر من صفر' })
@@ -265,9 +275,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           vehicle_id: Number(form.vehicle_id),
           starts_at: toApiDateTime(form.starts_at),
           planned_ends_at: toApiDateTime(form.planned_ends_at),
-          rent_basis: form.rent_basis || 'daily',
           daily_rate: form.daily_rate ? Number(form.daily_rate) : undefined,
-          weekly_rate: form.weekly_rate ? Number(form.weekly_rate) : undefined,
+          half_monthly_rate: form.half_monthly_rate ? Number(form.half_monthly_rate) : undefined,
           monthly_rate: form.monthly_rate ? Number(form.monthly_rate) : undefined,
           deposit: form.deposit ? Number(form.deposit) : undefined,
           daily_km_allowance: form.daily_km_allowance !== '' ? Number(form.daily_km_allowance) : undefined,
@@ -318,17 +327,17 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     return Math.max(1, Math.ceil(ms / 86400000))
   }, [form.starts_at, form.planned_ends_at])
 
+  const rentTier = useMemo(() => resolveRentTier(estimatedDays), [estimatedDays])
   const rentEstimate = useMemo(() => {
     const rate = Number(form.daily_rate || 0)
     if (!estimatedDays || !rate) return 0
     return estimatePeriodRent(
       estimatedDays,
-      form.rent_basis,
       rate,
-      Number(form.weekly_rate || 0),
+      Number(form.half_monthly_rate || 0),
       Number(form.monthly_rate || 0),
     )
-  }, [estimatedDays, form.daily_rate, form.rent_basis, form.weekly_rate, form.monthly_rate])
+  }, [estimatedDays, form.daily_rate, form.half_monthly_rate, form.monthly_rate])
 
   const prepaidKmEstimate = Math.max(0, Number(form.prepaid_excess_km || 0))
   const prepaidAmountEstimate = prepaidKmEstimate * Math.max(0, Number(form.excess_km_rate || 0))
@@ -452,18 +461,6 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             }}
           />
 
-          <SelectField
-            label="أساس الإيجار"
-            required
-            options={[
-              { value: 'daily', label: 'يومي' },
-              { value: 'weekly', label: 'أسبوعي (٧ أيام + زيادة بنفس يوم الأسبوع)' },
-              { value: 'monthly', label: 'شهري (٣٠ يوماً + زيادة بنفس يوم الشهر)' },
-            ]}
-            value={form.rent_basis}
-            error={errors.rent_basis}
-            onChange={(e) => setForm({ ...form, rent_basis: e.target.value })}
-          />
           <MoneyField
             label="السعر اليومي"
             required
@@ -474,35 +471,37 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               setForm({
                 ...form,
                 daily_rate: e.target.value,
-                weekly_rate: Number.isFinite(daily) && daily > 0
-                  ? String(Math.round(daily * WEEKLY_FACTOR))
-                  : form.weekly_rate,
+                half_monthly_rate: Number.isFinite(daily) && daily > 0
+                  ? String(Math.round(daily * HALF_MONTHLY_FACTOR))
+                  : form.half_monthly_rate,
                 monthly_rate: Number.isFinite(daily) && daily > 0
                   ? String(Math.round(daily * MONTHLY_FACTOR))
                   : form.monthly_rate,
               })
             }}
-            hint="يُعبَّأ تلقائياً من العربية ويمكن تعديله"
+            hint="يُستخدم لمدة ١–١٠ أيام"
           />
-          {form.rent_basis === 'weekly' || form.rent_basis === 'monthly' ? (
-            <>
-              <MoneyField
-                label="السعر الأسبوعي"
-                required={form.rent_basis === 'weekly'}
-                value={form.weekly_rate}
-                error={errors.weekly_rate}
-                onChange={(e) => setForm({ ...form, weekly_rate: e.target.value })}
-                hint={`يوم الزيادة = الأسبوعي ÷ ${WEEK_UNIT_DAYS}`}
-              />
-              <MoneyField
-                label="السعر الشهري"
-                required={form.rent_basis === 'monthly'}
-                value={form.monthly_rate}
-                error={errors.monthly_rate}
-                onChange={(e) => setForm({ ...form, monthly_rate: e.target.value })}
-                hint={`يوم الزيادة = الشهري ÷ ${MONTH_UNIT_DAYS}`}
-              />
-            </>
+          <MoneyField
+            label="سعر نص الشهر (١٥ يوماً)"
+            required
+            value={form.half_monthly_rate}
+            error={errors.half_monthly_rate}
+            onChange={(e) => setForm({ ...form, half_monthly_rate: e.target.value })}
+            hint={`لمدة ١١–٢٠ يوماً · يوم الزيادة = السعر ÷ ${HALF_MONTH_UNIT_DAYS}`}
+          />
+          <MoneyField
+            label="السعر الشهري (٣٠ يوماً)"
+            required
+            value={form.monthly_rate}
+            error={errors.monthly_rate}
+            onChange={(e) => setForm({ ...form, monthly_rate: e.target.value })}
+            hint={`لمدة ٢١ يوماً فأكثر · يوم الزيادة = السعر ÷ ${MONTH_UNIT_DAYS}`}
+          />
+          {estimatedDays > 0 ? (
+            <p className="muted" style={{ gridColumn: '1 / -1' }}>
+              الشريحة الحالية حسب المدة ({estimatedDays} يوم):{' '}
+              {rentTier === 'daily' ? 'يومي' : rentTier === 'half_monthly' ? 'نص شهري' : 'شهري'}
+            </p>
           ) : null}
           <MoneyField label="التأمين النقدي المتفق" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} />
           <NumberField

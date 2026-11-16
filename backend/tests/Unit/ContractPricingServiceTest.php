@@ -120,24 +120,32 @@ class ContractPricingServiceTest extends TestCase
         $this->assertNull($normalized['delivery_service_notes']);
     }
 
-    public function test_weekly_rent_full_weeks_plus_extra_days_at_week_day_cost(): void
+    public function test_resolve_rent_basis_tiers_by_days(): void
     {
-        // أسبوعي 6000 · ٧ أيام = 6000 · ١٠ أيام = 6000 + round(3*6000/7)=6000+2571
-        $this->assertSame(6000, $this->pricing->periodRent(7, 'weekly', 1000, 6000, null));
-        $this->assertSame(8571, $this->pricing->periodRent(10, 'weekly', 1000, 6000, null));
-        $this->assertSame(12000, $this->pricing->periodRent(14, 'weekly', 1000, 6000, null));
+        $this->assertSame('daily', $this->pricing->resolveRentBasisFromDays(1));
+        $this->assertSame('daily', $this->pricing->resolveRentBasisFromDays(10));
+        $this->assertSame('half_monthly', $this->pricing->resolveRentBasisFromDays(11));
+        $this->assertSame('half_monthly', $this->pricing->resolveRentBasisFromDays(20));
+        $this->assertSame('monthly', $this->pricing->resolveRentBasisFromDays(21));
+        $this->assertSame('monthly', $this->pricing->resolveRentBasisFromDays(60));
     }
 
-    public function test_monthly_rent_full_months_plus_extra_days_at_month_day_cost(): void
+    public function test_period_rent_uses_day_tiers_not_stored_basis(): void
     {
-        // شهري 22000 · ٣٠ يوماً = 22000 · ٣٢ يوماً = 22000 + round(2*22000/30)=22000+1467
-        $this->assertSame(22000, $this->pricing->periodRent(30, 'monthly', 1000, null, 22000));
-        $this->assertSame(23467, $this->pricing->periodRent(32, 'monthly', 1000, null, 22000));
-        $this->assertSame(44000, $this->pricing->periodRent(60, 'monthly', 1000, null, 22000));
+        // ١–١٠ يومي حتى لو طُلب أساس قديم weekly
+        $this->assertSame(10000, $this->pricing->periodRent(10, 'weekly', 1000, 15000, 22000));
+        // ١١–٢٠ نص شهري (وحدة ١٥ يوماً)
+        $this->assertSame(15000, $this->pricing->periodRent(15, 'daily', 1000, 15000, 22000));
+        $this->assertSame(18000, $this->pricing->periodRent(18, null, 1000, 15000, 22000));
+        // ٢١+ شهري (وحدة ٣٠ يوماً)
+        $this->assertSame(22000, $this->pricing->periodRent(30, 'half_monthly', 1000, 15000, 22000));
+        $this->assertSame(23467, $this->pricing->periodRent(32, null, 1000, 15000, 22000));
+        $this->assertSame(44000, $this->pricing->periodRent(60, null, 1000, 15000, 22000));
     }
 
-    public function test_daily_rent_unchanged(): void
+    public function test_normalize_maps_legacy_weekly_to_half_monthly(): void
     {
-        $this->assertSame(5000, $this->pricing->periodRent(5, 'daily', 1000, 6000, 22000));
+        $this->assertSame('half_monthly', $this->pricing->normalizeRentBasis('weekly'));
+        $this->assertSame('half_monthly', $this->pricing->normalizeRentBasis('half_month'));
     }
 }
