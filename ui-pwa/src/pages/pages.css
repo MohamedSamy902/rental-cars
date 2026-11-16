@@ -8,6 +8,19 @@
   overflow-x: clip;
 }
 
+/* Mobile list pages: stretch so DataTable pagination sits at the bottom */
+@media (max-width: 980px) {
+  .rpm-stack {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100dvh - var(--header-height) - var(--bottom-nav-height) - var(--safe-bottom) - 2.75rem);
+  }
+
+  .rpm-stack > .rpm-dt--cards {
+    flex: 1 1 auto;
+  }
+}
+
 .rpm-detail-actions {
   margin-block-start: 0.75rem;
   padding-block-start: 0.75rem;

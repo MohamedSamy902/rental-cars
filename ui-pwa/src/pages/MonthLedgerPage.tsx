@@ -116,6 +116,8 @@ function MoneyRows({ rows, empty, render }: { rows: Row[]; empty: string; render
 export function MonthLedgerPage() {
   const { monthId } = useParams()
   const toast = useToast()
+  /** موقّت: أعد تفعيل أزرار إقفال الشهر بضبط VITE_MONTH_LOCK_UI=1 */
+  const monthLockUi = import.meta.env.VITE_MONTH_LOCK_UI === '1'
   const [data, setData] = useState<Ledger | null>(null)
   const [error, setError] = useState('')
   const [reopen, setReopen] = useState(false)
@@ -199,11 +201,12 @@ export function MonthLedgerPage() {
           <BackNavButton to="/accounts" label="رجوع للحسابات" />
           <div className="ml-hero__actions">
             <Button size="sm" variant="secondary" onClick={exportCsv}>تصدير CSV</Button>
-            {!data.lock.locked ? (
+            {monthLockUi && !data.lock.locked ? (
               <Button size="sm" variant="secondary" onClick={() => void lockMonth()}>إقفال الشهر</Button>
-            ) : (
+            ) : null}
+            {monthLockUi && data.lock.locked ? (
               <Button size="sm" variant="secondary" onClick={() => setReopen(true)}>إعادة فتح</Button>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="ml-identity">
@@ -233,9 +236,6 @@ export function MonthLedgerPage() {
       <section className="rpm-panel">
         <div className="rpm-panel__head">
           <h3>إيرادات الإيجار</h3>
-          <p className="muted" style={{ margin: 0 }}>
-            حصة هذا الشهر فقط من إجمالي الإيجار (مثال: عقد ٥٠٠٠ يُوزَّع ٢٠٠٠ على نوفمبر و٣٠٠٠ على ديسمبر)
-          </p>
         </div>
         <MoneyRows rows={data.rents} empty="لا إيرادات إيجار لهذا الشهر" render={(r) => ({
           title: r.contract ? `${r.contract} · ${r.customer || ''}` : (r.narration || 'قيد إيجار'),

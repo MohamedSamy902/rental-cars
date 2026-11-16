@@ -65,6 +65,8 @@ export function AccountsPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const { can } = useAuth()
+  /** موقّت: أعد تفعيل أزرار إقفال الشهر بضبط VITE_MONTH_LOCK_UI=1 */
+  const monthLockUi = import.meta.env.VITE_MONTH_LOCK_UI === '1'
   const canLock = can('accounting.lock_month')
   const canReopen = can('accounting.reopen_month')
   const [loading, setLoading] = useState(true)
@@ -179,7 +181,7 @@ export function AccountsPage() {
     <div className="rpm-stack">
       <PageHeader
         title="الحسابات"
-        subtitle="حركة الفلوس اليومية · إيرادات الإيجار حسب الشهر · إقفال مع سجل تدقيق"
+        subtitle="حركة الفلوس اليومية · إيرادات الإيجار حسب الشهر"
       />
 
       <MetricCardGrid
@@ -311,10 +313,10 @@ export function AccountsPage() {
                   <Button size="sm" variant="primary" onClick={() => navigate(`/accounts/months/${monthKey(m)}`)}>
                     دفتر الشهر
                   </Button>
-                  {!m.locked && canLock ? (
+                  {monthLockUi && !m.locked && canLock ? (
                     <Button size="sm" variant="danger" onClick={() => void lockMonth(m)}>إقفال</Button>
                   ) : null}
-                  {m.locked && canReopen ? (
+                  {monthLockUi && m.locked && canReopen ? (
                     <Button size="sm" variant="secondary" onClick={() => setReopen(m)}>إعادة فتح</Button>
                   ) : null}
                 </div>
