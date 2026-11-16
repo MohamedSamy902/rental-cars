@@ -155,8 +155,9 @@ class ContractSoftDeleteService
             ->all();
 
         $entryIds = $this->collectJournalEntryIds($contractIds, $depositIds, $paymentIds, $swapWoIds);
-        $counts['journal_lines'] = $this->softDeleteJournalLines($entryIds);
-        $counts['journal_entries'] = $this->softDeleteJournalEntries($entryIds);
+        $journalCounts = $this->softDeleteJournalEntries($entryIds);
+        $counts['journal_entries'] = $journalCounts['entries'];
+        $counts['journal_lines'] = $journalCounts['lines'];
 
         $counts['payments'] = $this->softDeletePayments($paymentIds);
         $counts['credit_movements'] = $this->softDeleteCreditMovements($contractIds);
@@ -237,45 +238,27 @@ class ContractSoftDeleteService
     /**
      * @param  list<int>  $entryIds
      */
-    private function softDeleteJournalLines(array $entryIds): int
-    {
-        if ($entryIds === []) {
-            return 0;
-        }
-        $n = 0;
-        JournalLine::query()->whereIn('journal_entry_id', $entryIds)->orderBy('id')->each(function (JournalLine $line) use (&$n) {
-            if ($line->trashed()) {
-                return;
-            }
-            $line->delete();
-            $n++;
-        });
-
-        return $n;
-    }
-
     /**
      * @param  list<int>  $entryIds
+     * @return array{entries:int,lines:int}
      */
-    private function softDeleteJournalEntries(array $entryIds): int
+    private function softDeleteJournalEntries(array $entryIds): array
     {
         if ($entryIds === []) {
-            return 0;
+            return ['entries' => 0, 'lines' => 0];
         }
-        $n = 0;
-        JournalEntry::query()->whereIn('id', $entryIds)->orderBy('id')->each(function (JournalEntry $entry) use (&$n) {
+        $entries = 0;
+        $lines = 0;
+        JournalEntry::query()->whereIn('id', $entryIds)->orderBy('id')->each(function (JournalEntry $entry) use (&$entries, &$lines) {
             if ($entry->trashed()) {
                 return;
             }
-            // unique(source) — نطبع المصدر قبل الحذف الناعم
-            $entry->forceFill([
-                'source' => mb_substr((string) $entry->source, 0, 180).'__del_'.$entry->id,
-            ])->save();
-            $entry->delete();
-            $n++;
+            $lines += (int) JournalLine::query()->where('journal_entry_id', $entry->id)->count();
+            $entry->softDeleteReleasingSource();
+            $entries++;
         });
 
-        return $n;
+        return ['entries' => $entries, 'lines' => $lines];
     }
 
     /**
@@ -474,7 +457,8 @@ class ContractSoftDeleteService
             );
         }
         $journalIds = array_values(array_unique(array_map('intval', $journalIds)));
-        $journals = $this->softDeleteJournalLines($journalIds) + $this->softDeleteJournalEntries($journalIds);
+        $journalCounts = $this->softDeleteJournalEntries($journalIds);
+        $journals = $journalCounts['entries'] + $journalCounts['lines'];
 
         $expenses = 0;
         Expense::query()->whereIn('work_order_id', $workOrderIds)->orderBy('id')->each(function (Expense $expense) use (&$expenses) {

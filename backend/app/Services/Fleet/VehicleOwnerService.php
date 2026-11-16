@@ -221,8 +221,7 @@ class VehicleOwnerService
             if ($locked->journal_entry_id) {
                 $primary = JournalEntry::query()->whereKey($locked->journal_entry_id)->first();
                 if ($primary) {
-                    JournalLine::query()->where('journal_entry_id', $primary->id)->delete();
-                    $primary->delete();
+                    $primary->softDeleteReleasingSource();
                 }
             }
 

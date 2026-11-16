@@ -198,8 +198,7 @@ class ExpenseService
         ];
         $entries = JournalEntry::query()->whereIn('source', $sources)->lockForUpdate()->get();
         foreach ($entries as $entry) {
-            JournalLine::query()->where('journal_entry_id', $entry->id)->delete();
-            $entry->delete();
+            $entry->softDeleteReleasingSource();
         }
 
         if ($expense->from_petty_cash && $expense->employee_id) {
