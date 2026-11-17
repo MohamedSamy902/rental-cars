@@ -109,7 +109,7 @@ export type PrintPayload = {
 const titles: Record<PrintDocKind, string> = {
   contract: 'عقد تأجير',
   invoice: 'فاتورة',
-  receipt: 'إقرار الاستلام والتسليم',
+  receipt: 'إقرار استلام سيارة',
 }
 
 const snapshotType: Record<PrintDocKind, string> = {
@@ -259,7 +259,7 @@ function receiptBody(tenant: PrintTenant, c: PrintContract) {
   const deposit = c.deposit
   return `
     ${headerBlock(tenant)}
-    <h2>إقرار الاستلام والتسليم</h2>
+    <h2>إقرار استلام سيارة</h2>
     <p class="muted">عقد ${esc(c.number)}</p>
     <h2>بيانات العميل والعربية</h2>
     <table>
@@ -372,13 +372,18 @@ export function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
   }
 
   if (kind === 'contract' && templates?.contract?.rendered_html) {
-    const body = applyRuntimeAssets(templates.contract.rendered_html, tenant)
+    let body = applyRuntimeAssets(templates.contract.rendered_html, tenant)
+    // ظهر العقد — إقرار استلام السيارة في الصفحة ٢ (نفس تصميم الطباعة).
+    if (templates?.handover_receipt?.rendered_html) {
+      const back = applyRuntimeAssets(templates.handover_receipt.rendered_html, tenant)
+      body = `${body}<div class="rpm-print-pagebreak" aria-hidden="true"></div>${back}`
+    }
     return wrapTemplateHtml(title, body, 'contract')
   }
 
   if (kind === 'receipt' && templates?.handover_receipt?.rendered_html) {
     const body = applyRuntimeAssets(templates.handover_receipt.rendered_html, tenant)
-    return wrapTemplateHtml(title, body, 'receipt')
+    return wrapTemplateHtml(title, body, isRentalContractBody(body) ? 'contract' : 'receipt')
   }
 
   if (kind === 'receipt') return shell(title, receiptBody(tenant, contract))

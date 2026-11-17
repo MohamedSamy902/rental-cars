@@ -35,8 +35,8 @@ const TYPE_META: Record<TemplateType, { title: string; hint: string }> = {
     hint: 'عدّل البنود والنصوص كما تظهر في الطباعة. الحقول الجاهزة بالأسفل تُدرج بيانات العقد تلقائياً.',
   },
   handover_receipt: {
-    title: 'قالب إقرار الاستلام والتسليم',
-    hint: 'يُستخدم عند طباعة إقرار الاستلام والتسليم (مع بيانات التأمين والعداد).',
+    title: 'إقرار استلام سيارة (ظهر العقد)',
+    hint: 'يُطبع تلقائياً في الصفحة ٢ مع العقد (ظهر الورقة) بنفس التصميم والألوان.',
   },
   owner_agreement: {
     title: 'عقد إدارة وتشغيل مركبة (مالك ↔ شركة)',
@@ -66,7 +66,7 @@ function shellPreview(type: TemplateType, title: string, body: string) {
   if (type === 'owner_agreement') {
     return shellOwnerAgreementHtml(body, title)
   }
-  if (type === 'contract') {
+  if (type === 'contract' || type === 'handover_receipt') {
     return shellRentalContractHtml(body, title)
   }
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>

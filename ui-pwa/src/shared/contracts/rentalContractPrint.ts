@@ -369,6 +369,66 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
   .rpm-lc-stamp-ring .stamp-stars{ letter-spacing: 0.3mm; font-size: 6px; line-height: 1; color: #111; }
   .foot{ margin-top: 1.2mm; color: #666; font-size: 7.2px; text-align: center; }
 
+  /* Page 2 — إقرار استلام سيارة (ظهر العقد) */
+  .rpm-print-pagebreak{
+    break-before: page;
+    page-break-before: always;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .rpm-ack-v1 .rpm-lc-head{ margin-bottom: 1.8mm; }
+  .rpm-ack-v1 .rpm-lc-badge{ min-height: 12.5mm; padding: 1.4mm 2.6mm; }
+  .rpm-ack-v1 .rpm-lc-title-row{ font-size: 14px; }
+  .rpm-ack-v1 .rpm-lc-block{
+    padding: 1.8mm 2.6mm 3.8mm;
+    margin-bottom: 2mm;
+  }
+  .rpm-ack-v1 .rpm-lc-block p{
+    font-size: 10.2px;
+    line-height: 1.32;
+    margin: .65mm 0;
+  }
+  .rpm-ack-body p{
+    text-align: justify;
+    font-size: 9.8px !important;
+    line-height: 1.32 !important;
+  }
+  .rpm-ack-v1 .rpm-lc-terms{ gap: .55mm; }
+  .rpm-ack-v1 .rpm-lc-terms li{
+    font-size: 9.4px;
+    line-height: 1.3;
+    padding: 1mm 1.8mm;
+  }
+  .rpm-ack-copies{
+    margin: 1.4mm 0 0;
+    text-align: center;
+    font-weight: 800;
+    font-size: 10px;
+  }
+  .rpm-ack-sign{
+    margin-top: 3mm;
+    grid-template-columns: 1fr 26mm 1fr;
+  }
+  .rpm-ack-sign .rpm-lc-sign-col{ min-height: 20mm; padding: 4mm 2.2mm 1.6mm; }
+  .rpm-ack-sign .rpm-lc-stamp-ring{ width: 25mm; height: 25mm; }
+  .rpm-ack-witnesses{ margin-top: 3.2mm; }
+  .rpm-ack-witness-title{
+    text-align: center;
+    font-family: 'Tajawal', sans-serif;
+    font-weight: 800;
+    font-size: 11px;
+    margin-bottom: 2.4mm;
+    color: #111;
+  }
+  .rpm-ack-witness-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3mm;
+  }
+  .rpm-ack-witness-grid .rpm-lc-sign-col{ min-height: 18mm; }
+
   @media print{
     html, body{
       width: 100%;
@@ -387,8 +447,14 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
       padding: .6mm .8mm 1.8mm;
       border-width: 1px;
     }
+    .rpm-print-pagebreak{
+      break-before: page;
+      page-break-before: always;
+    }
     body{ font-size: 11px; }
     .rpm-lc-terms li{ font-size: 10.2px; line-height: 1.33; }
+    .rpm-ack-v1 .rpm-lc-terms li{ font-size: 9.3px; line-height: 1.28; }
+    .rpm-ack-body p{ font-size: 9.5px !important; }
   }
 </style></head><body><div class="rpm-preview-root">${body}</div></body></html>`
 }
@@ -397,11 +463,13 @@ function escapeTitle(title: string) {
   return title.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch))
 }
 
-/** True when the rendered body looks like the paper-form legal contract. */
+/** True when the rendered body looks like the paper-form legal contract / acknowledgment. */
 export function isRentalContractBody(html: string) {
   return html.includes('rpm-legal-contract')
     || html.includes('rpm-paper-v4')
     || html.includes('rpm-paper-v3')
     || html.includes('rpm-paper-v2')
+    || html.includes('rpm-ack-v1')
     || html.includes('شروط التعاقد')
+    || html.includes('إقرار استلام سيارة')
 }

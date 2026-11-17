@@ -48,6 +48,16 @@ class DocumentTemplateService
             ['key' => 'contract_day', 'aliases' => ['يوم_التحرير'], 'label' => 'يوم تحرير العقد', 'sample' => 'السبت', 'group' => 'العقد'],
             ['key' => 'contract_date', 'aliases' => ['تاريخ_التحرير'], 'label' => 'تاريخ تحرير العقد (يوم/شهر/سنة)', 'sample' => '08/11/2026', 'group' => 'العقد'],
             ['key' => 'contract_time', 'aliases' => ['ساعة_التحرير'], 'label' => 'ساعة تحرير العقد', 'sample' => '10:30', 'group' => 'العقد'],
+            ['key' => 'start_day', 'aliases' => ['يوم_البداية'], 'label' => 'يوم بداية الإيجار', 'sample' => 'السبت', 'group' => 'العقد'],
+            ['key' => 'start_date_only', 'aliases' => ['تاريخ_البداية_فقط'], 'label' => 'تاريخ البداية (يوم/شهر/سنة)', 'sample' => '01/11/2026', 'group' => 'العقد'],
+            ['key' => 'start_time', 'aliases' => ['ساعة_البداية'], 'label' => 'ساعة البداية', 'sample' => '10:00', 'group' => 'العقد'],
+            ['key' => 'end_day', 'aliases' => ['يوم_النهاية'], 'label' => 'يوم نهاية الإيجار', 'sample' => 'الأربعاء', 'group' => 'العقد'],
+            ['key' => 'end_date_only', 'aliases' => ['تاريخ_النهاية_فقط'], 'label' => 'تاريخ النهاية (يوم/شهر/سنة)', 'sample' => '05/11/2026', 'group' => 'العقد'],
+            ['key' => 'end_time', 'aliases' => ['ساعة_النهاية'], 'label' => 'ساعة النهاية', 'sample' => '10:00', 'group' => 'العقد'],
+            ['key' => 'annual_km', 'aliases' => ['الكيلومتر_السنوي'], 'label' => 'بدل الكيلومتر السنوي', 'sample' => '73000', 'group' => 'العقد'],
+            ['key' => 'km_extra_after', 'aliases' => ['حد_الكيلومتر_الإضافي'], 'label' => 'حد احتساب الكيلومتر الإضافي', 'sample' => '1000', 'group' => 'العقد'],
+            ['key' => 'rideshare_penalty', 'aliases' => ['غرامة_النقل_التشاركي'], 'label' => 'غرامة التأجير لأوبر ونحوها', 'sample' => '50000', 'group' => 'العقد'],
+            ['key' => 'customer_id_doc', 'aliases' => ['وثيقة_هوية_العميل'], 'label' => 'رقم قومي أو جواز سفر', 'sample' => '29001011234567', 'group' => 'العميل'],
             ['key' => 'print_signer_name', 'aliases' => ['المفوض_بالتوقيع', 'اسم_المفوض'], 'label' => 'المفوض بالتوقيع عن الشركة', 'sample' => 'محمد السيد عبد القادر', 'group' => 'الشركة'],
             ['key' => 'company_tagline', 'aliases' => ['شعار_فرعي'], 'label' => 'الشعار الفرعي تحت اللوجو', 'sample' => 'لخدمات رجال الأعمال', 'group' => 'الشركة'],
             ['key' => 'delivery_address', 'aliases' => ['عنوان_التوصيل'], 'label' => 'عنوان خدمة التوصيل', 'sample' => 'المعادي — القاهرة', 'group' => 'العقد'],
@@ -114,7 +124,7 @@ class DocumentTemplateService
                 'content' => $this->defaultContractHtml(),
             ],
             DocumentTemplate::TYPE_HANDOVER_RECEIPT => [
-                'title' => 'قالب إقرار الاستلام والتسليم',
+                'title' => 'إقرار استلام سيارة (ظهر العقد)',
                 'content' => $this->defaultHandoverHtml(),
             ],
             DocumentTemplate::TYPE_OWNER_AGREEMENT => [
@@ -153,12 +163,50 @@ class DocumentTemplateService
                     ->orWhere('content', 'like', '%محضر التسليم%');
             })
             ->update([
-                'title' => 'قالب إقرار الاستلام والتسليم',
+                'title' => 'إقرار استلام سيارة (ظهر العقد)',
                 'content' => $this->defaultHandoverHtml(),
             ]);
 
         $this->upgradeStockOwnerAgreementTemplate($userId);
         $this->upgradeStockContractTemplate($userId);
+        $this->upgradeStockHandoverTemplate($userId);
+    }
+
+    /**
+     * Replace the legacy table handover receipt with the paper-form acknowledgment
+     * used on the back of the rental contract (same visual language as rpm-paper-v4).
+     */
+    private function upgradeStockHandoverTemplate(?int $userId = null): void
+    {
+        $active = DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->first();
+
+        if (! $active) {
+            return;
+        }
+
+        $content = (string) $active->content;
+        if (str_contains($content, 'rpm-ack-v1')) {
+            return;
+        }
+
+        $looksLikeOurPriorDefault = str_contains($content, 'إقرار الاستلام والتسليم')
+            || (str_contains($content, 'عداد الخروج') && str_contains($content, 'بيانات التأمين'))
+            || (str_contains($content, 'print-head') && str_contains($content, 'عند التسليم'));
+
+        if (! $looksLikeOurPriorDefault) {
+            return;
+        }
+
+        $this->publish([
+            'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
+            'title' => 'إقرار استلام سيارة (ظهر العقد)',
+            'content' => $this->defaultHandoverHtml(),
+            'format' => 'html',
+        ], null, $userId);
     }
 
     /**
@@ -411,9 +459,11 @@ class DocumentTemplateService
         }
 
         $nationalId = (string) ($customer?->national_id ?: '');
+        $passport = (string) ($customer?->passport_number ?: '');
         $nationality = $nationalId !== ''
             ? 'مصري'
-            : ((string) ($customer?->passport_number ?: '') !== '' ? '' : '');
+            : ($passport !== '' ? '' : '');
+        $idDoc = $nationalId !== '' ? $nationalId : $passport;
 
         $signer = trim((string) ($ops['print_signer_name'] ?? ''));
         if ($signer === '') {
@@ -421,6 +471,10 @@ class DocumentTemplateService
         }
         $deliveryOn = (bool) $contract->has_delivery_service;
         $deliveryMark = $deliveryOn ? '☑' : '☐';
+
+        $startsAt = $contract->starts_at;
+        $endsAt = $contract->planned_ends_at;
+        $dailyKm = (int) ($contract->frozen_daily_km_allowance ?? $ops['default_daily_km'] ?? 0);
 
         $map = [
             'company_name' => (string) ($tenant?->center_name ?: 'آر بي إم للتأجير و النقل و السياحة'),
@@ -441,9 +495,19 @@ class DocumentTemplateService
             'contract_day' => $dayNames[(int) $issuedAt->dayOfWeek] ?? '',
             'contract_date' => $issuedAt->format('d/m/Y'),
             'contract_time' => $issuedAt->format('H:i'),
+            'start_day' => $startsAt ? ($dayNames[(int) $startsAt->dayOfWeek] ?? '') : '',
+            'start_date_only' => $startsAt?->format('d/m/Y') ?? '',
+            'start_time' => $startsAt?->format('H:i') ?? '',
+            'end_day' => $endsAt ? ($dayNames[(int) $endsAt->dayOfWeek] ?? '') : '',
+            'end_date_only' => $endsAt?->format('d/m/Y') ?? '',
+            'end_time' => $endsAt?->format('H:i') ?? '',
+            'annual_km' => $dailyKm > 0 ? (string) ($dailyKm * 365) : '',
+            'km_extra_after' => '1000',
+            'rideshare_penalty' => '50000',
             'customer_name' => (string) ($customer?->full_name ?: ''),
             'customer_phone' => (string) ($customer?->phone ?: ''),
             'customer_national_id' => $nationalId,
+            'customer_id_doc' => $idDoc,
             'customer_nationality' => $nationality,
             'customer_address' => (string) ($customer?->address ?: ''),
             'customer_license' => (string) ($customer?->license_number ?: ''),
@@ -465,7 +529,7 @@ class DocumentTemplateService
             'daily_rate' => (string) (int) $contract->frozen_daily_rate,
             // إن وُجد {{vehicle_daily_rate}} في قالب عقد الإيجار نعرض سعر العقد المثبّت لا سعر العربية الافتراضي.
             'vehicle_daily_rate' => (string) (int) $contract->frozen_daily_rate,
-            'daily_km' => (string) (int) ($contract->frozen_daily_km_allowance ?? $ops['default_daily_km'] ?? 0),
+            'daily_km' => (string) $dailyKm,
             'excess_km_rate' => (string) (int) ($contract->frozen_excess_km_rate ?? $ops['excess_km_rate'] ?? 0),
             'deposit' => (string) (int) ($deposit?->original_amount ?? $contract->frozen_agreed_deposit ?? 0),
             'deposit_status' => (string) ($deposit?->status ?? ''),
@@ -653,7 +717,7 @@ class DocumentTemplateService
     {
         return match ($type) {
             DocumentTemplate::TYPE_CONTRACT => 'عقد إيجار سيارة (نموذج الشركة)',
-            DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'قالب إقرار الاستلام والتسليم',
+            DocumentTemplate::TYPE_HANDOVER_RECEIPT => 'إقرار استلام سيارة (ظهر العقد)',
             DocumentTemplate::TYPE_OWNER_AGREEMENT => 'عقد إدارة وتشغيل مركبة (مالك ↔ شركة)',
             DocumentTemplate::TYPE_CUSTODY_AGREEMENT => 'قالب عقد الاعتماد',
             default => 'قالب مستند',
@@ -826,38 +890,169 @@ HTML;
     private function defaultHandoverHtml(): string
     {
         return <<<'HTML'
-<header class="print-head">
-  <img class="print-logo" src="{{logo_src}}" alt="شعار الشركة" />
-  <div>
-    <h1>{{company_name}}</h1>
-    <p class="muted">{{company_phone}} · {{company_address}}</p>
+<article class="rpm-legal-contract rpm-paper-v4 rpm-ack-v1">
+  <header class="rpm-lc-head">
+    <div class="rpm-lc-badge rpm-lc-badge--contact">
+      <div class="rpm-lc-signer-short">أ/ {{print_signer_name}}</div>
+      <div class="rpm-lc-phone-pill">
+        <span class="rpm-lc-phone-dot" aria-hidden="true">
+          <svg class="rpm-lc-ico-phone" viewBox="0 0 24 24"><path fill="#c40000" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg>
+        </span>
+        <span dir="ltr">/ {{company_phone}}</span>
+      </div>
+    </div>
+    <div class="rpm-lc-badge rpm-lc-badge--title">
+      <div class="rpm-lc-title-row">
+        <svg class="rpm-lc-ico-handshake" viewBox="0 0 72 44" aria-hidden="true">
+          <path fill="#fff" d="M10 28c0-4.5 3.5-8 8-8h6.5l8.5-8.5 4.2 4.2-6.8 6.8H38c2.8 0 5 2.2 5 5v4.5H10V28z"/>
+          <path fill="#fff" d="M62 28c0-4.5-3.5-8-8-8h-5l-3.8-3.8-4.2 4.2 5.5 5.5H42c-2.8 0-5 2.2-5 5v4.5h25V28z"/>
+          <rect x="22" y="25" width="28" height="8" rx="2.5" fill="#e10600"/>
+          <rect x="24" y="27.2" width="24" height="3.5" rx="1.2" fill="#fff"/>
+        </svg>
+        <span>إقرار استلام سيارة</span>
+      </div>
+    </div>
+    <div class="rpm-lc-badge rpm-lc-badge--brand">
+      <div class="rpm-lc-brand-mark">RPM<span class="rpm-lc-swoosh-thru" aria-hidden="true"></span></div>
+      <div class="rpm-lc-tagline">{{company_tagline}}</div>
+    </div>
+  </header>
+
+  <p class="rpm-lc-meta">{{contract_number}}</p>
+
+  <section class="rpm-lc-block">
+    <p>
+      أقر أنا الموقع أدناه <span class="fill wide">{{customer_name}}</span>
+      ( الطرف الثاني )
+    </p>
+    <p class="rpm-lc-row">
+      جواز سفر / رقم قومي : <span class="fill mid" dir="ltr">{{customer_id_doc}}</span>
+      صادرة من : <span class="fill"></span>
+      بتاريخ : <span class="fill"></span>
+    </p>
+    <p>عنوانه / <span class="fill wide">{{customer_address}}</span></p>
+    <div class="rpm-lc-party-tag">( الطرف الثاني المستأجر )</div>
+  </section>
+
+  <section class="rpm-lc-block rpm-lc-block--icon">
+    <div class="rpm-lc-float-ico rpm-lc-float-ico--car" aria-hidden="true">
+      <svg viewBox="0 0 64 40" fill="none">
+        <path fill="#fff" d="M10 23l5.5-9h26l8 9H10z"/>
+        <path fill="#fff" d="M8 23h48v5.5H8z"/>
+        <circle cx="18" cy="30" r="4.2" fill="#111" stroke="#fff" stroke-width="2"/>
+        <circle cx="46" cy="30" r="4.2" fill="#111" stroke="#fff" stroke-width="2"/>
+        <path fill="#fff" d="M22 16.5h8.5l-2.2-3.5H24z"/>
+      </svg>
+    </div>
+    <p>
+      أقر أني استلمت السيارة رقم : <span class="fill">{{vehicle_plate}}</span>
+      ماركة / <span class="fill">{{vehicle_brand}}</span>
+      موديل / <span class="fill">{{vehicle_model}}</span>
+    </p>
+    <p>
+      موتور رقم : <span class="fill" dir="ltr">{{vehicle_engine}}</span>
+      شاسية رقم : <span class="fill" dir="ltr">{{vehicle_chassis}}</span>
+    </p>
+    <p>
+      ملك السيد / <span class="fill wide">{{company_name}}</span>
+      ( طرف أول )
+    </p>
+  </section>
+
+  <section class="rpm-lc-block rpm-lc-block--icon">
+    <div class="rpm-lc-float-ico rpm-lc-float-ico--cal" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="5" width="18" height="16" rx="2.2" stroke="#fff" stroke-width="2"/>
+        <path stroke="#fff" stroke-width="2" d="M3 10h18M8 3v4M16 3v4"/>
+        <path fill="#fff" d="M7 13h3.2v3.2H7zm5 0h3.2v3.2H12z"/>
+      </svg>
+    </div>
+    <p>
+      يوم : <span class="fill">{{start_day}}</span>
+      الموافق : <span class="fill mid">{{start_date_only}}</span> م
+      الساعة : <span class="fill">{{start_time}}</span>
+    </p>
+    <p>
+      حتى يوم : <span class="fill">{{end_day}}</span>
+      الموافق : <span class="fill mid">{{end_date_only}}</span> م
+      الساعة : <span class="fill">{{end_time}}</span>
+    </p>
+  </section>
+
+  <section class="rpm-lc-block rpm-ack-body">
+    <p>
+      وأقر الطرف الثاني أن السيارة مستوفاة لجميع شروط العمل وأصبح مسؤولاً عنها مسؤولية كاملة وعن جميع المخالفات والحوادث وكافة الأضرار التي تقع على هذه السيارة بتحميلها أي بضاعة مخالفة للقانون وتنفيذها بدقة، وعليه أصبح الطرف الثاني مسؤولاً مسؤولية كاملة عن السيارة من تاريخ وساعة استلامها وحتى نهاية مدة التعاقد ولحين تسليمها للطرف الأول، ويتعهد الطرف الثاني بدفع قيمة الإيجار طوال فترة الإصلاح وفي حالة حدوث أي ضرر للسيارة مثل الحوادث، ويتعهد الطرف الأول بتسهيل كافة الإجراءات الخاصة بالتأمين الخاص بالسيارة مع تحمل الطرف الثاني المستأجر فروق المصاريف ونسبة تحمل التأمين، وهذا إقرار وتعهد من الطرف الثاني ( المستأجر ) للعمل بموجبه عند اللزوم.
+    </p>
+    <p>تحرر في <span class="fill mid">{{contract_date}}</span> م</p>
+  </section>
+
+  <div class="rpm-lc-terms-wrap">
+    <div class="rpm-lc-terms-banner"><span>بنود إضافية</span></div>
+    <ol class="rpm-lc-terms">
+      <li><span class="rpm-lc-band">العشرون</span> يتحمل الطرف الثاني كافة المخالفات المرورية والغرامات التي تقع على السيارة طول مدة العقد كما يتحمل الأضرار التي تسببها السيارة عن طريق العمد وغير العمد خلال فترة التعاقد واتفق الطرفان أن السيارة تستخدم ( <span class="fill">{{annual_km}}</span> كيلومتر ) في العام الواحد ويتم احتساب كل كيلو متر بعد الـ <span class="fill">{{km_extra_after}}</span> كيلو بـ <span class="fill">{{excess_km_rate}}</span> جنيه بعد التحقق من ذلك.</li>
+      <li><span class="rpm-lc-band">الواحد والعشرون</span> يتعهد الطرف الثاني بأنه لا يستخدم السيارة في أعمال مخالفة للقانون والآداب أو نقل البضائع وأنه على علم تام بقواعد وقرارات المرور وفي حالة مخالفة ذلك يكون مسؤولاً مسؤولية كاملة.</li>
+      <li><span class="rpm-lc-band">الثاني والعشرون</span> في حالة سحب رخصة السيارة المذكورة لأي سبب من الأسباب المخالفة للقانون يلتزم الطرف الثاني المستأجر بإعادة تلك الرخصة كما يلتزم الطرف الأول بتغيير الكاوتش في موعده اللازم للتغيير.</li>
+      <li><span class="rpm-lc-band">الثالث والعشرون</span> يتعهد الطرف الثاني بأن مخالفات السيارة خلال الفترة المذكورة هو المسؤول الوحيد عنها مدنياً وقانونياً وجنائياً وأنه على علم بجميع القوانين الخاصة بالمرور.</li>
+      <li><span class="rpm-lc-band">الرابع والعشرون</span> يلتزم المستأجر بعدم تأجير السيارة للأفراد أو الشركات العاملة على نقل الأفراد مثل أوبر وكريم وديدي ومن على شاكلتها، وفي حالة المخالفة يسدد المستأجر للمؤجر غرامة ( <span class="fill">{{rideshare_penalty}}</span> جنيه فقط لا غير ).</li>
+    </ol>
+    <p class="rpm-ack-copies">تحرر هذا العقد من نسختين بيد كل طرف نسخة للعمل بها عند اللزوم.</p>
   </div>
-</header>
-<h2>إقرار الاستلام والتسليم</h2>
-<p class="muted">عقد {{contract_number}} · إصدار القالب {{template_version}}</p>
-<h2>بيانات العميل والعربية</h2>
-<table>
-  <tr><th>العميل</th><td>{{customer_name}} · <span dir="ltr">{{customer_phone}}</span></td></tr>
-  <tr><th>العربية</th><td>{{vehicle_name}} · {{vehicle_plate}}</td></tr>
-</table>
-<h2>بيانات التأمين</h2>
-<table>
-  <tr><th>مبلغ التأمين</th><td>{{deposit}}</td></tr>
-  <tr><th>حالة التأمين</th><td>{{deposit_status}}</td></tr>
-  <tr><th>الخصومات</th><td>{{deposit_deductions}}</td></tr>
-  <tr><th>المتبقي</th><td>{{deposit_remaining}}</td></tr>
-</table>
-<h2>عند التسليم</h2>
-<table>
-  <tr><th>عداد الخروج</th><td>{{odometer_out}}</td></tr>
-  <tr><th>وقت التسليم</th><td>{{handover_at}}</td></tr>
-</table>
-<h2>عند الاستلام</h2>
-<table>
-  <tr><th>عداد العودة</th><td>{{odometer_in}}</td></tr>
-  <tr><th>وقت الاستلام</th><td>{{return_at}}</td></tr>
-</table>
-<p class="foot">{{print_footer}}</p>
+
+  <footer class="rpm-lc-sign rpm-ack-sign">
+    <div class="rpm-lc-sign-col">
+      <div class="rpm-lc-party-tag">الطرف الثاني ( المستأجر )</div>
+      <p>الإسم / <span class="fill wide">{{customer_name}}</span></p>
+      <p>رقم قومي : <span class="fill mid" dir="ltr">{{customer_national_id}}</span></p>
+      <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
+      <p class="rpm-lc-sign-line">البصمة / ____________________</p>
+    </div>
+    <div class="rpm-lc-stamp">
+      <div class="rpm-lc-stamp-ring">
+        <svg class="rpm-lc-stamp-car" viewBox="0 0 64 28" aria-hidden="true">
+          <path fill="#111" d="M8 18l6-9h28l8 9H8z"/>
+          <path fill="#111" d="M6 18h52v4H6z"/>
+          <circle cx="16" cy="23" r="3.2" fill="#111"/>
+          <circle cx="48" cy="23" r="3.2" fill="#111"/>
+          <path fill="none" stroke="#111" stroke-width="1.4" d="M10 26c8 2 36 2 44 0"/>
+        </svg>
+        <div class="stamp-rpm">RPM</div>
+        <div class="stamp-en">Rent A Car</div>
+        <div class="stamp-ar-box">{{company_tagline}}</div>
+        <div class="stamp-cr">سجل تجاري رقم {{company_cr}}</div>
+        <div class="stamp-stars" aria-hidden="true">★★★★★</div>
+      </div>
+    </div>
+    <div class="rpm-lc-sign-col">
+      <div class="rpm-lc-party-tag">الطرف الأول ( المؤجر )</div>
+      <p>الإسم / {{company_name}}</p>
+      <p>ويمثله / {{print_signer_name}}</p>
+      <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
+      <p class="rpm-lc-sign-line">البصمة / ____________________</p>
+    </div>
+  </footer>
+
+  <section class="rpm-ack-witnesses">
+    <div class="rpm-ack-witness-title">الشهود</div>
+    <div class="rpm-ack-witness-grid">
+      <div class="rpm-lc-sign-col">
+        <div class="rpm-lc-party-tag">شاهد أول</div>
+        <p>الاسم : ____________________</p>
+        <p>البطاقة : ____________________</p>
+        <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
+        <p class="rpm-lc-sign-line">البصمة / ____________________</p>
+      </div>
+      <div class="rpm-lc-sign-col">
+        <div class="rpm-lc-party-tag">شاهد ثاني</div>
+        <p>الاسم : ____________________</p>
+        <p>البطاقة : ____________________</p>
+        <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
+        <p class="rpm-lc-sign-line">البصمة / ____________________</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">{{print_footer}}</p>
+</article>
 HTML;
     }
 

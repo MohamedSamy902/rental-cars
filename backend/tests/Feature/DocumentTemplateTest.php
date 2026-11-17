@@ -236,6 +236,51 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringContainsString('التوقيع :', $rendered);
         $this->assertStringNotContainsString('{{customer_name}}', $rendered);
         $this->assertStringNotContainsString('{{deposit}}', $rendered);
+
+        $ack = (string) $print->json('data.templates.handover_receipt.rendered_html');
+        $this->assertStringContainsString('rpm-ack-v1', $ack);
+        $this->assertStringContainsString('إقرار استلام سيارة', $ack);
+        $this->assertStringContainsString('العشرون', $ack);
+        $this->assertStringContainsString('الرابع والعشرون', $ack);
+        $this->assertStringContainsString('أوبر', $ack);
+        $this->assertStringContainsString('الشهود', $ack);
+        $this->assertStringContainsString('سارة علي حسن', $ack);
+        $this->assertStringContainsString('س ص ع 100', $ack);
+        $this->assertStringNotContainsString('{{customer_name}}', $ack);
+    }
+
+    public function test_stock_handover_stub_upgrades_to_ack_form(): void
+    {
+        $this->actingAdmin();
+        DocumentTemplate::query()->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)->delete();
+        DocumentTemplate::query()->create([
+            'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
+            'title' => 'قالب إقرار الاستلام والتسليم',
+            'content' => <<<'HTML'
+<header class="print-head"><h1>{{company_name}}</h1></header>
+<h2>إقرار الاستلام والتسليم</h2>
+<table><tr><th>عداد الخروج</th><td>{{odometer_out}}</td></tr></table>
+<h2>بيانات التأمين</h2>
+<table><tr><th>التأمين</th><td>{{deposit}}</td></tr></table>
+HTML,
+            'format' => 'html',
+            'version' => 1,
+            'is_active' => true,
+        ]);
+
+        app(DocumentTemplateService::class)->ensureDefaults();
+
+        $active = DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->first();
+
+        $this->assertNotNull($active);
+        $this->assertGreaterThan(1, (int) $active->version);
+        $this->assertStringContainsString('rpm-ack-v1', (string) $active->content);
+        $this->assertStringContainsString('إقرار استلام سيارة', (string) $active->content);
+        $this->assertStringContainsString('العشرون', (string) $active->content);
     }
 
     public function test_stock_contract_stub_upgrades_to_paper_form(): void

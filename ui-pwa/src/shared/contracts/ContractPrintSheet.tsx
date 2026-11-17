@@ -37,7 +37,7 @@ type Props = {
 const kindTitle: Record<PrintDocKind, string> = {
   contract: 'عقد الإيجار',
   invoice: 'الفاتورة',
-  receipt: 'إقرار الاستلام والتسليم',
+  receipt: 'إقرار استلام سيارة',
 }
 
 /**
