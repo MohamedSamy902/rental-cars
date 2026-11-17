@@ -22,7 +22,7 @@ class DocumentTemplateService
     public function placeholderCatalog(): array
     {
         return [
-            ['key' => 'company_name', 'aliases' => ['اسم_الشركة', 'اسم_المركز'], 'label' => 'اسم الشركة', 'sample' => 'آر بي إم للتأجير و النقل و السياحة', 'group' => 'الشركة'],
+            ['key' => 'company_name', 'aliases' => ['اسم_الشركة', 'اسم_المركز'], 'label' => 'اسم الشركة', 'sample' => 'شركة آر بي إم للنقل والسياحة', 'group' => 'الشركة'],
             ['key' => 'company_phone', 'aliases' => ['هاتف_الشركة'], 'label' => 'هاتف الشركة', 'sample' => '01150100104', 'group' => 'الشركة'],
             ['key' => 'company_address', 'aliases' => ['عنوان_الشركة'], 'label' => 'عنوان الشركة', 'sample' => 'القاهرة', 'group' => 'الشركة'],
             ['key' => 'company_cr', 'aliases' => ['السجل_التجاري'], 'label' => 'السجل التجاري', 'sample' => '12345', 'group' => 'الشركة'],
@@ -58,7 +58,7 @@ class DocumentTemplateService
             ['key' => 'km_extra_after', 'aliases' => ['حد_الكيلومتر_الإضافي'], 'label' => 'حد احتساب الكيلومتر الإضافي', 'sample' => '1000', 'group' => 'العقد'],
             ['key' => 'rideshare_penalty', 'aliases' => ['غرامة_النقل_التشاركي'], 'label' => 'غرامة التأجير لأوبر ونحوها', 'sample' => '50000', 'group' => 'العقد'],
             ['key' => 'customer_id_doc', 'aliases' => ['وثيقة_هوية_العميل'], 'label' => 'رقم قومي أو جواز سفر', 'sample' => '29001011234567', 'group' => 'العميل'],
-            ['key' => 'print_signer_name', 'aliases' => ['المفوض_بالتوقيع', 'اسم_المفوض'], 'label' => 'المفوض بالتوقيع عن الشركة', 'sample' => 'محمد السيد عبد القادر', 'group' => 'الشركة'],
+            ['key' => 'print_signer_name', 'aliases' => ['المفوض_بالتوقيع', 'اسم_المفوض'], 'label' => 'المفوض بالتوقيع عن الشركة', 'sample' => 'محمد عبد القادر محمد', 'group' => 'الشركة'],
             ['key' => 'company_tagline', 'aliases' => ['شعار_فرعي'], 'label' => 'الشعار الفرعي تحت اللوجو', 'sample' => 'لخدمات رجال الأعمال', 'group' => 'الشركة'],
             ['key' => 'delivery_address', 'aliases' => ['عنوان_التوصيل'], 'label' => 'عنوان خدمة التوصيل', 'sample' => 'المعادي — القاهرة', 'group' => 'العقد'],
             ['key' => 'delivery_pickup_mark', 'aliases' => ['علامة_الاستلام'], 'label' => 'علامة استلام التوصيل', 'sample' => '☐', 'group' => 'العقد'],
@@ -227,12 +227,17 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
 
-        if (str_contains($content, 'rpm-paper-v4')) {
+        // Refresh stock v4 copy when the lessor line still uses the old parentheses form.
+        $needsV4CopyRefresh = str_contains($content, 'rpm-paper-v4')
+            && str_contains($content, 'أجر السيد/ (');
+
+        if (str_contains($content, 'rpm-paper-v4') && ! $needsV4CopyRefresh) {
             return;
         }
 
         // Upgrade only templates we previously shipped — never overwrite a custom published body.
-        $looksLikeOurPriorDefault = str_contains($content, 'rpm-paper-v3')
+        $looksLikeOurPriorDefault = $needsV4CopyRefresh
+            || str_contains($content, 'rpm-paper-v3')
             || str_contains($content, 'rpm-paper-v2')
             || str_contains($content, 'rpm-legal-contract')
             || (str_contains($content, 'بنود وشروط العقد') && str_contains($content, 'عقد تأجير'))
@@ -465,10 +470,7 @@ class DocumentTemplateService
             : ($passport !== '' ? '' : '');
         $idDoc = $nationalId !== '' ? $nationalId : $passport;
 
-        $signer = trim((string) ($ops['print_signer_name'] ?? ''));
-        if ($signer === '') {
-            $signer = 'محمد السيد عبد القادر';
-        }
+        $signer = $this->resolvePrintSignerName($ops);
         $deliveryOn = (bool) $contract->has_delivery_service;
         $deliveryMark = $deliveryOn ? '☑' : '☐';
 
@@ -477,7 +479,7 @@ class DocumentTemplateService
         $dailyKm = (int) ($contract->frozen_daily_km_allowance ?? $ops['default_daily_km'] ?? 0);
 
         $map = [
-            'company_name' => (string) ($tenant?->center_name ?: 'آر بي إم للتأجير و النقل و السياحة'),
+            'company_name' => $this->resolveCompanyName($tenant?->center_name),
             'company_phone' => (string) ($ops['print_phone'] ?? ''),
             'company_address' => (string) ($ops['print_address'] ?? ''),
             'company_cr' => (string) ($ops['print_commercial_register'] ?? ''),
@@ -724,6 +726,43 @@ class DocumentTemplateService
         };
     }
 
+    /** @param  array<string, mixed>|null  $ops */
+    private function resolvePrintSignerName(?array $ops): string
+    {
+        $signer = trim((string) ($ops['print_signer_name'] ?? ''));
+        $legacyWrong = [
+            'محمد السيد عبد القادر',
+            'أ/ محمد السيد عبد القادر',
+            'أ/ محمد عبدالقادر',
+            'أ/ محمد عبد القادر',
+            'محمد عبدالقادر',
+        ];
+
+        if ($signer === '' || in_array($signer, $legacyWrong, true)) {
+            return 'محمد عبد القادر محمد';
+        }
+
+        return $signer;
+    }
+
+    private function resolveCompanyName(?string $centerName): string
+    {
+        $name = trim((string) $centerName);
+        $legacyDefaults = [
+            'شركة آر بي إم للتأجير',
+            'آر بي إم للتأجير و النقل و السياحة',
+            'آر بي إم للتأجير والنقل والسياحة',
+            'مركز آر بي إم للتأجير',
+            'آر - بي - إم للنقل والسياحة',
+        ];
+
+        if ($name === '' || in_array($name, $legacyDefaults, true)) {
+            return 'شركة آر بي إم للنقل والسياحة';
+        }
+
+        return $name;
+    }
+
     private function defaultContractHtml(): string
     {
         return <<<'HTML'
@@ -764,7 +803,7 @@ class DocumentTemplateService
       الساعة : <span class="fill">{{contract_time}}</span> .
     </p>
     <p>
-      أجر السيد/ ( <strong>{{company_name}}</strong> ) ،
+      أجر السيد / <strong>{{company_name}}</strong> ،
       ويمثله في التوقيع - <strong>{{print_signer_name}}</strong>
       - سجل تجاري / <span class="fill" dir="ltr">{{company_cr}}</span> .
     </p>

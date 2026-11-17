@@ -22,10 +22,10 @@ class DepartmentNoticeStatementTest extends TestCase
         parent::setUp();
         PermissionCatalog::ensureSeeded();
         TenantSetting::query()->create([
-            'center_name' => 'شركة آر بي إم للتأجير',
+            'center_name' => 'شركة آر بي إم للنقل والسياحة',
             'operational' => [
                 'print_phone' => '01125253888',
-                'print_signer_name' => 'أ/ محمد عبدالقادر',
+                'print_signer_name' => 'محمد عبد القادر محمد',
                 'company_tagline' => 'لتجارة وإيجار أحدث أنواع السيارات',
             ],
             'feature_flags' => ['department_notice' => true],
@@ -74,7 +74,7 @@ class DepartmentNoticeStatementTest extends TestCase
         ]);
 
         $res = $this->getJson('/api/department-notice?filter=all')->assertOk();
-        $res->assertJsonPath('data.signer_name', 'أ/ محمد عبدالقادر')
+        $res->assertJsonPath('data.signer_name', 'محمد عبد القادر محمد')
             ->assertJsonPath('data.phones.0', '01125253888')
             ->assertJsonPath('data.statements.0.renter_name', 'عميل البيان')
             ->assertJsonPath('data.statements.0.national_id', '29001011234567')

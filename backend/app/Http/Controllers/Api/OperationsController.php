@@ -145,9 +145,17 @@ class OperationsController extends Controller
         $phone2 = is_string($ops['print_phone_alt'] ?? null) && trim((string) $ops['print_phone_alt']) !== ''
             ? trim((string) $ops['print_phone_alt'])
             : '01150666901';
-        $signer = is_string($ops['print_signer_name'] ?? null) && trim((string) $ops['print_signer_name']) !== ''
-            ? trim((string) $ops['print_signer_name'])
-            : 'محمد السيد عبد القادر';
+        $signerRaw = is_string($ops['print_signer_name'] ?? null) ? trim((string) $ops['print_signer_name']) : '';
+        $legacyWrongSigners = [
+            'محمد السيد عبد القادر',
+            'أ/ محمد السيد عبد القادر',
+            'أ/ محمد عبدالقادر',
+            'أ/ محمد عبد القادر',
+            'محمد عبدالقادر',
+        ];
+        $signer = ($signerRaw === '' || in_array($signerRaw, $legacyWrongSigners, true))
+            ? 'محمد عبد القادر محمد'
+            : $signerRaw;
         $tagline = is_string($ops['company_tagline'] ?? null) && trim((string) $ops['company_tagline']) !== ''
             ? trim((string) $ops['company_tagline'])
             : 'لتأجير وإيجار أحدث أنواع السيارات';
@@ -207,7 +215,7 @@ class OperationsController extends Controller
 
         return response()->json([
             'data' => [
-                'center_name' => $settings?->center_name ?: 'شركة آر بي إم للتأجير',
+                'center_name' => $settings?->center_name ?: 'شركة آر بي إم للنقل والسياحة',
                 'signer_name' => $signer,
                 'tagline' => $tagline,
                 'logo_path' => $settings?->logo_path,
