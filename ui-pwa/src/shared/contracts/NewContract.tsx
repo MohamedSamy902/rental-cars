@@ -469,48 +469,50 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             }}
           />
 
-          <MoneyField
-            label="السعر اليومي"
-            required
-            value={form.daily_rate}
-            error={errors.daily_rate}
-            onChange={(e) => {
-              const daily = Number(e.target.value || 0)
-              setForm({
-                ...form,
-                daily_rate: e.target.value,
-                half_monthly_rate: Number.isFinite(daily) && daily > 0
-                  ? String(Math.round(daily * HALF_MONTHLY_FACTOR))
-                  : form.half_monthly_rate,
-                monthly_rate: Number.isFinite(daily) && daily > 0
-                  ? String(Math.round(daily * MONTHLY_FACTOR))
-                  : form.monthly_rate,
-              })
-            }}
-            hint="يُستخدم لمدة ١–١٠ أيام"
-          />
-          <MoneyField
-            label="سعر نص الشهر (١٥ يوماً)"
-            required
-            value={form.half_monthly_rate}
-            error={errors.half_monthly_rate}
-            onChange={(e) => setForm({ ...form, half_monthly_rate: e.target.value })}
-            hint={`لمدة ١١–٢٠ يوماً · يوم الزيادة = السعر ÷ ${HALF_MONTH_UNIT_DAYS}`}
-          />
-          <MoneyField
-            label="السعر الشهري (٣٠ يوماً)"
-            required
-            value={form.monthly_rate}
-            error={errors.monthly_rate}
-            onChange={(e) => setForm({ ...form, monthly_rate: e.target.value })}
-            hint={`لمدة ٢١ يوماً فأكثر · يوم الزيادة = السعر ÷ ${MONTH_UNIT_DAYS}`}
-          />
-          {estimatedDays > 0 ? (
+          {estimatedDays < 1 ? (
             <p className="muted" style={{ gridColumn: '1 / -1' }}>
-              الشريحة الحالية حسب المدة ({estimatedDays} يوم):{' '}
-              {rentTier === 'daily' ? 'يومي' : rentTier === 'half_monthly' ? 'نص شهري' : 'شهري'}
+              حدد بداية ونهاية الحجز أولاً لعرض سعر الشريحة المناسبة للمدة.
             </p>
-          ) : null}
+          ) : rentTier === 'daily' ? (
+            <MoneyField
+              label="السعر اليومي"
+              required
+              value={form.daily_rate}
+              error={errors.daily_rate}
+              onChange={(e) => {
+                const daily = Number(e.target.value || 0)
+                setForm({
+                  ...form,
+                  daily_rate: e.target.value,
+                  half_monthly_rate: Number.isFinite(daily) && daily > 0
+                    ? String(Math.round(daily * HALF_MONTHLY_FACTOR))
+                    : form.half_monthly_rate,
+                  monthly_rate: Number.isFinite(daily) && daily > 0
+                    ? String(Math.round(daily * MONTHLY_FACTOR))
+                    : form.monthly_rate,
+                })
+              }}
+              hint={`لمدة ${estimatedDays} يوم (شريحة يومي ١–١٠ أيام)`}
+            />
+          ) : rentTier === 'half_monthly' ? (
+            <MoneyField
+              label="سعر نص الشهر (١٥ يوماً)"
+              required
+              value={form.half_monthly_rate}
+              error={errors.half_monthly_rate}
+              onChange={(e) => setForm({ ...form, half_monthly_rate: e.target.value })}
+              hint={`لمدة ${estimatedDays} يوم (شريحة نص شهري ١١–٢٠) · يوم الزيادة = السعر ÷ ${HALF_MONTH_UNIT_DAYS}`}
+            />
+          ) : (
+            <MoneyField
+              label="السعر الشهري (٣٠ يوماً)"
+              required
+              value={form.monthly_rate}
+              error={errors.monthly_rate}
+              onChange={(e) => setForm({ ...form, monthly_rate: e.target.value })}
+              hint={`لمدة ${estimatedDays} يوم (شريحة شهري ٢١ فأكثر) · يوم الزيادة = السعر ÷ ${MONTH_UNIT_DAYS}`}
+            />
+          )}
           <MoneyField label="التأمين النقدي المتفق" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} />
           <NumberField
             label="بدل الكيلومتر اليومي"
