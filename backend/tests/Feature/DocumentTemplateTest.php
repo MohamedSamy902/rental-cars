@@ -158,7 +158,7 @@ class DocumentTemplateTest extends TestCase
                 'print_phone' => '01125253888',
                 'print_address' => '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة',
                 'print_commercial_register' => '18766',
-                'print_signer_name' => 'محمد عبد القادر محمد عطية',
+                'print_signer_name' => 'محمد السيد عبد القادر',
                 'company_tagline' => 'لخدمات رجال الأعمال',
                 'default_daily_km' => 200,
                 'excess_km_rate' => 5,
@@ -212,10 +212,17 @@ class DocumentTemplateTest extends TestCase
         $print = $this->getJson("/api/contracts/{$contract->id}/print")->assertOk();
         $rendered = (string) $print->json('data.templates.contract.rendered_html');
 
-        $this->assertStringContainsString('rpm-paper-v3', $rendered);
+        $this->assertStringContainsString('rpm-paper-v4', $rendered);
         $this->assertStringContainsString('شروط التعاقد', $rendered);
         $this->assertStringContainsString('البند الأول', $rendered);
-        $this->assertStringContainsString('البند الحادي عشر', $rendered);
+        $this->assertStringContainsString('البند التاسع', $rendered);
+        $this->assertStringContainsString('قبل انتهاء الإيجار', $rendered);
+        $this->assertStringContainsString('إذا حدث لقدر الله', $rendered);
+        $this->assertStringContainsString('400 للسرعة', $rendered);
+        $this->assertStringContainsString('خدمة توصيل', $rendered);
+        $this->assertStringContainsString('بطاقة الرقم القومي', $rendered);
+        $this->assertStringNotContainsString('البند الحادي عشر', $rendered);
+        $this->assertStringNotContainsString('rpm-lc-ribbon', $rendered);
         $this->assertStringContainsString('سارة علي حسن', $rendered);
         $this->assertStringContainsString('29001011234567', $rendered);
         $this->assertStringContainsString('مصري', $rendered);
@@ -225,10 +232,55 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringContainsString('5000', $rendered);
         $this->assertStringContainsString('250', $rendered);
         $this->assertStringContainsString('450000', $rendered);
-        $this->assertStringContainsString('محمد عبد القادر محمد عطية', $rendered);
+        $this->assertStringContainsString('محمد السيد عبد القادر', $rendered);
         $this->assertStringContainsString('التوقيع :', $rendered);
         $this->assertStringNotContainsString('{{customer_name}}', $rendered);
         $this->assertStringNotContainsString('{{deposit}}', $rendered);
+
+        $ack = (string) $print->json('data.templates.handover_receipt.rendered_html');
+        $this->assertStringContainsString('rpm-ack-v1', $ack);
+        $this->assertStringContainsString('إقرار استلام سيارة', $ack);
+        $this->assertStringContainsString('العشرون', $ack);
+        $this->assertStringContainsString('الرابع والعشرون', $ack);
+        $this->assertStringContainsString('أوبر', $ack);
+        $this->assertStringContainsString('الشهود', $ack);
+        $this->assertStringContainsString('سارة علي حسن', $ack);
+        $this->assertStringContainsString('س ص ع 100', $ack);
+        $this->assertStringNotContainsString('{{customer_name}}', $ack);
+    }
+
+    public function test_stock_handover_stub_upgrades_to_ack_form(): void
+    {
+        $this->actingAdmin();
+        DocumentTemplate::query()->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)->delete();
+        DocumentTemplate::query()->create([
+            'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
+            'title' => 'قالب إقرار الاستلام والتسليم',
+            'content' => <<<'HTML'
+<header class="print-head"><h1>{{company_name}}</h1></header>
+<h2>إقرار الاستلام والتسليم</h2>
+<table><tr><th>عداد الخروج</th><td>{{odometer_out}}</td></tr></table>
+<h2>بيانات التأمين</h2>
+<table><tr><th>التأمين</th><td>{{deposit}}</td></tr></table>
+HTML,
+            'format' => 'html',
+            'version' => 1,
+            'is_active' => true,
+        ]);
+
+        app(DocumentTemplateService::class)->ensureDefaults();
+
+        $active = DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->first();
+
+        $this->assertNotNull($active);
+        $this->assertGreaterThan(1, (int) $active->version);
+        $this->assertStringContainsString('rpm-ack-v1', (string) $active->content);
+        $this->assertStringContainsString('إقرار استلام سيارة', (string) $active->content);
+        $this->assertStringContainsString('العشرون', (string) $active->content);
     }
 
     public function test_stock_contract_stub_upgrades_to_paper_form(): void
@@ -260,9 +312,10 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(1, (int) $active->version);
-        $this->assertStringContainsString('rpm-paper-v3', (string) $active->content);
+        $this->assertStringContainsString('rpm-paper-v4', (string) $active->content);
         $this->assertStringContainsString('شروط التعاقد', (string) $active->content);
         $this->assertStringContainsString('البند السادس', (string) $active->content);
+        $this->assertStringContainsString('خدمة توصيل', (string) $active->content);
     }
 
     public function test_viewer_cannot_mutate_templates_but_service_still_renders(): void
