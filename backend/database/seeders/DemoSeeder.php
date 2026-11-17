@@ -146,7 +146,7 @@ class DemoSeeder extends Seeder
 
         $tenant = TenantSetting::query()->firstOrCreate([]);
         $tenant->fill([
-            'center_name' => 'شركة آر بي إم للتأجير',
+            'center_name' => 'شركة آر بي إم للنقل والسياحة',
             'multi_branch' => false,
             'inventory_mode' => 'unified',
             'colors' => [
@@ -162,7 +162,7 @@ class DemoSeeder extends Seeder
                 'chat' => true,
                 'hr' => true,
             ],
-            'print_footer' => 'شركة آر بي إم للتأجير — نسخة داخلية',
+            'print_footer' => 'شركة آر بي إم للنقل والسياحة — نسخة داخلية',
             'operational' => [
                 'default_daily_km' => 200,
                 'excess_km_rate' => 5,
@@ -173,6 +173,7 @@ class DemoSeeder extends Seeder
                 'require_return_signature_always' => false,
                 'print_phone' => '01125253888',
                 'print_address' => '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة',
+                'print_signer_name' => 'محمد عبد القادر محمد',
                 'company_tagline' => 'لخدمات رجال الأعمال',
             ],
         ])->save();

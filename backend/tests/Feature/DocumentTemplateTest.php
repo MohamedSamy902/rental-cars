@@ -153,12 +153,12 @@ class DocumentTemplateTest extends TestCase
     {
         $this->actingAdmin();
         TenantSetting::query()->first()?->update([
-            'center_name' => 'آر - بي - إم للنقل والسياحة',
+            'center_name' => 'شركة آر بي إم للنقل والسياحة',
             'operational' => [
                 'print_phone' => '01125253888',
                 'print_address' => '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة',
                 'print_commercial_register' => '18766',
-                'print_signer_name' => 'محمد السيد عبد القادر',
+                'print_signer_name' => 'محمد عبد القادر محمد',
                 'company_tagline' => 'لخدمات رجال الأعمال',
                 'default_daily_km' => 200,
                 'excess_km_rate' => 5,
@@ -232,7 +232,10 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringContainsString('5000', $rendered);
         $this->assertStringContainsString('250', $rendered);
         $this->assertStringContainsString('450000', $rendered);
-        $this->assertStringContainsString('محمد السيد عبد القادر', $rendered);
+        $this->assertStringContainsString('محمد عبد القادر محمد', $rendered);
+        $this->assertStringContainsString('أجر السيد /', $rendered);
+        $this->assertStringContainsString('شركة آر بي إم للنقل والسياحة', $rendered);
+        $this->assertStringNotContainsString('محمد السيد عبد القادر', $rendered);
         $this->assertStringContainsString('التوقيع :', $rendered);
         $this->assertStringNotContainsString('{{customer_name}}', $rendered);
         $this->assertStringNotContainsString('{{deposit}}', $rendered);
@@ -281,6 +284,63 @@ HTML,
         $this->assertStringContainsString('rpm-ack-v1', (string) $active->content);
         $this->assertStringContainsString('إقرار استلام سيارة', (string) $active->content);
         $this->assertStringContainsString('العشرون', (string) $active->content);
+    }
+
+    public function test_legacy_wrong_signer_and_company_defaults_are_normalized_on_print(): void
+    {
+        $this->actingAdmin();
+        TenantSetting::query()->first()?->update([
+            'center_name' => 'شركة آر بي إم للتأجير',
+            'operational' => [
+                'print_phone' => '01125253888',
+                'print_address' => 'القاهرة',
+                'print_signer_name' => 'محمد السيد عبد القادر',
+                'company_tagline' => 'لخدمات رجال الأعمال',
+            ],
+        ]);
+
+        app(DocumentTemplateService::class)->ensureDefaults();
+
+        $customer = Customer::query()->create([
+            'full_name' => 'عميل تصحيح الاسم',
+            'phone' => '01055554444',
+            'birth_date' => '1990-01-01',
+            'license_number' => 'LIC-FIX',
+            'license_expires_on' => now()->addYears(2)->toDateString(),
+            'status' => 'active',
+        ]);
+        $vehicle = Vehicle::query()->create([
+            'code' => 'FIX-1',
+            'plate' => 'أ ب ج 1',
+            'brand' => 'نيسان',
+            'model' => 'صني',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 700,
+            'default_deposit' => 2000,
+            'is_active' => true,
+        ]);
+        $contract = Contract::query()->create([
+            'number' => 'C-FIX-1',
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'active',
+            'starts_at' => now()->startOfDay(),
+            'planned_ends_at' => now()->startOfDay()->addDays(2),
+            'frozen_daily_rate' => 700,
+            'frozen_agreed_deposit' => 2000,
+            'frozen_daily_km_allowance' => 200,
+            'frozen_excess_km_rate' => 5,
+            'frozen_min_days' => 1,
+        ]);
+
+        $print = $this->getJson("/api/contracts/{$contract->id}/print")->assertOk();
+        $rendered = (string) $print->json('data.templates.contract.rendered_html');
+        $this->assertStringContainsString('محمد عبد القادر محمد', $rendered);
+        $this->assertStringContainsString('شركة آر بي إم للنقل والسياحة', $rendered);
+        $this->assertStringNotContainsString('محمد السيد عبد القادر', $rendered);
     }
 
     public function test_stock_contract_stub_upgrades_to_paper_form(): void
