@@ -147,7 +147,7 @@ class OperationsController extends Controller
             : '01150666901';
         $signer = is_string($ops['print_signer_name'] ?? null) && trim((string) $ops['print_signer_name']) !== ''
             ? trim((string) $ops['print_signer_name'])
-            : 'أ/ محمد عبدالقادر';
+            : 'محمد السيد عبد القادر';
         $tagline = is_string($ops['company_tagline'] ?? null) && trim((string) $ops['company_tagline']) !== ''
             ? trim((string) $ops['company_tagline'])
             : 'لتأجير وإيجار أحدث أنواع السيارات';

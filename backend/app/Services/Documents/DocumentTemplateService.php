@@ -22,7 +22,7 @@ class DocumentTemplateService
     public function placeholderCatalog(): array
     {
         return [
-            ['key' => 'company_name', 'aliases' => ['اسم_الشركة', 'اسم_المركز'], 'label' => 'اسم الشركة', 'sample' => 'شركة آر بي إم للتأجير', 'group' => 'الشركة'],
+            ['key' => 'company_name', 'aliases' => ['اسم_الشركة', 'اسم_المركز'], 'label' => 'اسم الشركة', 'sample' => 'آر بي إم للتأجير و النقل و السياحة', 'group' => 'الشركة'],
             ['key' => 'company_phone', 'aliases' => ['هاتف_الشركة'], 'label' => 'هاتف الشركة', 'sample' => '01150100104', 'group' => 'الشركة'],
             ['key' => 'company_address', 'aliases' => ['عنوان_الشركة'], 'label' => 'عنوان الشركة', 'sample' => 'القاهرة', 'group' => 'الشركة'],
             ['key' => 'company_cr', 'aliases' => ['السجل_التجاري'], 'label' => 'السجل التجاري', 'sample' => '12345', 'group' => 'الشركة'],
@@ -48,8 +48,11 @@ class DocumentTemplateService
             ['key' => 'contract_day', 'aliases' => ['يوم_التحرير'], 'label' => 'يوم تحرير العقد', 'sample' => 'السبت', 'group' => 'العقد'],
             ['key' => 'contract_date', 'aliases' => ['تاريخ_التحرير'], 'label' => 'تاريخ تحرير العقد (يوم/شهر/سنة)', 'sample' => '08/11/2026', 'group' => 'العقد'],
             ['key' => 'contract_time', 'aliases' => ['ساعة_التحرير'], 'label' => 'ساعة تحرير العقد', 'sample' => '10:30', 'group' => 'العقد'],
-            ['key' => 'print_signer_name', 'aliases' => ['المفوض_بالتوقيع', 'اسم_المفوض'], 'label' => 'المفوض بالتوقيع عن الشركة', 'sample' => 'محمد عبد القادر محمد عطية', 'group' => 'الشركة'],
+            ['key' => 'print_signer_name', 'aliases' => ['المفوض_بالتوقيع', 'اسم_المفوض'], 'label' => 'المفوض بالتوقيع عن الشركة', 'sample' => 'محمد السيد عبد القادر', 'group' => 'الشركة'],
             ['key' => 'company_tagline', 'aliases' => ['شعار_فرعي'], 'label' => 'الشعار الفرعي تحت اللوجو', 'sample' => 'لخدمات رجال الأعمال', 'group' => 'الشركة'],
+            ['key' => 'delivery_address', 'aliases' => ['عنوان_التوصيل'], 'label' => 'عنوان خدمة التوصيل', 'sample' => 'المعادي — القاهرة', 'group' => 'العقد'],
+            ['key' => 'delivery_pickup_mark', 'aliases' => ['علامة_الاستلام'], 'label' => 'علامة استلام التوصيل', 'sample' => '☐', 'group' => 'العقد'],
+            ['key' => 'delivery_dropoff_mark', 'aliases' => ['علامة_التسليم'], 'label' => 'علامة تسليم التوصيل', 'sample' => '☐', 'group' => 'العقد'],
             ['key' => 'vehicle_value', 'aliases' => ['قيمة_السيارة', 'ثمن_السيارة'], 'label' => 'قيمة العربية التقديرية (من بيانات العربية)', 'sample' => '450000', 'group' => 'العربية'],
             ['key' => 'start_date', 'aliases' => ['تاريخ_البداية'], 'label' => 'تاريخ البداية', 'sample' => '01/11/2026 10:00', 'group' => 'العقد'],
             ['key' => 'end_date', 'aliases' => ['تاريخ_النهاية', 'النهاية_المخططة'], 'label' => 'تاريخ النهاية المخططة', 'sample' => '05/11/2026 10:00', 'group' => 'العقد'],
@@ -175,21 +178,19 @@ class DocumentTemplateService
         }
 
         $content = (string) $active->content;
-        $title = (string) $active->title;
 
-        if (str_contains($content, 'rpm-paper-v3')) {
+        if (str_contains($content, 'rpm-paper-v4')) {
             return;
         }
 
         // Upgrade only templates we previously shipped — never overwrite a custom published body.
-        $isLegacyShortTitle = in_array($title, ['قالب العقد الأساسي', 'قالب العقد'], true);
-        $looksLikeOurPriorDefault = str_contains($content, 'rpm-paper-v2')
+        $looksLikeOurPriorDefault = str_contains($content, 'rpm-paper-v3')
+            || str_contains($content, 'rpm-paper-v2')
             || str_contains($content, 'rpm-legal-contract')
             || (str_contains($content, 'بنود وشروط العقد') && str_contains($content, 'عقد تأجير'))
             || (str_contains($content, 'شروط التعاقد') && str_contains($content, 'rpm-lc-'));
-        $isTinyLegacyStub = $isLegacyShortTitle && mb_strlen(strip_tags($content)) < 900;
 
-        if (! $looksLikeOurPriorDefault && ! $isTinyLegacyStub) {
+        if (! $looksLikeOurPriorDefault) {
             return;
         }
 
@@ -414,17 +415,27 @@ class DocumentTemplateService
             ? 'مصري'
             : ((string) ($customer?->passport_number ?: '') !== '' ? '' : '');
 
+        $signer = trim((string) ($ops['print_signer_name'] ?? ''));
+        if ($signer === '') {
+            $signer = 'محمد السيد عبد القادر';
+        }
+        $deliveryOn = (bool) $contract->has_delivery_service;
+        $deliveryMark = $deliveryOn ? '☑' : '☐';
+
         $map = [
-            'company_name' => (string) ($tenant?->center_name ?: 'شركة التأجير'),
+            'company_name' => (string) ($tenant?->center_name ?: 'آر بي إم للتأجير و النقل و السياحة'),
             'company_phone' => (string) ($ops['print_phone'] ?? ''),
             'company_address' => (string) ($ops['print_address'] ?? ''),
             'company_cr' => (string) ($ops['print_commercial_register'] ?? ''),
             'company_tax' => (string) ($ops['print_tax_info'] ?? ''),
             'logo_src' => (string) ($tenant?->logo_path ?: '/brand/rpm-logo.webp'),
             'print_footer' => (string) ($tenant?->print_footer ?: ''),
-            'print_signer_name' => (string) ($ops['print_signer_name'] ?? ''),
+            'print_signer_name' => $signer,
             'company_tagline' => (string) ($ops['company_tagline'] ?? 'لخدمات رجال الأعمال'),
             'contract_terms' => (string) ($ops['contract_terms'] ?? ''),
+            'delivery_address' => (string) ($contract->delivery_service_notes ?: ''),
+            'delivery_pickup_mark' => $deliveryMark,
+            'delivery_dropoff_mark' => $deliveryMark,
             'contract_number' => (string) ($contract->number ?: ('C-'.$contract->id)),
             'contract_status' => (string) $contract->status,
             'contract_day' => $dayNames[(int) $issuedAt->dayOfWeek] ?? '',
@@ -652,8 +663,7 @@ class DocumentTemplateService
     private function defaultContractHtml(): string
     {
         return <<<'HTML'
-<article class="rpm-legal-contract rpm-paper-v3">
-  <div class="rpm-lc-ribbon" aria-hidden="true"></div>
+<article class="rpm-legal-contract rpm-paper-v4">
   <header class="rpm-lc-head">
     <div class="rpm-lc-badge rpm-lc-badge--contact">
       <div class="rpm-lc-signer-short">أ/ {{print_signer_name}}</div>
@@ -699,20 +709,19 @@ class DocumentTemplateService
   </section>
 
   <section class="rpm-lc-block">
-    <p>
+    <p class="rpm-lc-row">
       إلى السيد/ <span class="fill wide">{{customer_name}}</span>
-      بطاقة رقم : <span class="fill mid" dir="ltr">{{customer_national_id}}</span>
-    </p>
-    <p>
-      الجنسية : <span class="fill">{{customer_nationality}}</span>
-      . صادر من : <span class="fill mid"></span>
+      بطاقة الرقم القومي : <span class="fill mid" dir="ltr">{{customer_national_id}}</span>
+      صادرة من : <span class="fill"></span>
       تاريخ الصدور : <span class="fill"></span>
+      الجنسية : <span class="fill">{{customer_nationality}}</span>
     </p>
-    <p>
+    <p class="rpm-lc-row">
       رخصة رقم : <span class="fill mid" dir="ltr">{{customer_license}}</span>
-      . صادر من : <span class="fill mid"></span>
+      صادرة من : <span class="fill"></span>
+      محل الإقامة : <span class="fill wide">{{customer_address}}</span>
+      موبايل : <span class="fill mid" dir="ltr">{{customer_phone}}</span>
     </p>
-    <p>محل إقامة المستأجر : <span class="fill wide">{{customer_address}}</span></p>
     <div class="rpm-lc-party-tag">( الطرف الثاني المستأجر )</div>
   </section>
 
@@ -734,9 +743,8 @@ class DocumentTemplateService
     <p>
       رقم الموتور : <span class="fill" dir="ltr">{{vehicle_engine}}</span> ،
       رقم الشاسية : <span class="fill" dir="ltr">{{vehicle_chassis}}</span> ،
-      عداد الكيلو متر : <span class="fill">{{vehicle_odometer}}</span> ،
+      عداد الكيلو متر : <span class="fill">{{vehicle_odometer}}</span> .
     </p>
-    <p>موبيل : <span class="fill" dir="ltr">{{customer_phone}}</span></p>
   </section>
 
   <section class="rpm-lc-block rpm-lc-block--icon">
@@ -753,22 +761,25 @@ class DocumentTemplateService
       إلى : <span class="fill mid">{{end_date}}</span>
     </p>
     <p style="text-align:center">. قابلة للتجديد بموافقة الطرفين .</p>
+    <p class="rpm-lc-delivery">
+      خدمة توصيل — العنوان : <span class="fill wide">{{delivery_address}}</span>
+      <span class="rpm-lc-check">{{delivery_pickup_mark}} استلام</span>
+      <span class="rpm-lc-check">{{delivery_dropoff_mark}} تسليم</span>
+    </p>
   </section>
 
   <div class="rpm-lc-terms-wrap">
     <div class="rpm-lc-terms-banner"><span>شروط التعاقد</span></div>
     <ol class="rpm-lc-terms">
       <li><span class="rpm-lc-band">البند الأول</span> تم دفع تأمين للسيارة مبلغ وقدره ( <span class="fill">{{deposit}}</span> ) يسترد للمستأجر عند إستلام السيارة بدون أي تلفيات أو مخالفات .</li>
-      <li><span class="rpm-lc-band">البند الثاني</span> في حالة رغبة الطرف الثاني تجديد مدة الإيجار عليه أن يخطر الطرف الأول بانتهاء الإيجار بيوم واحد ، وإذا تأخر المستأجر عن التسليم كحد أقصى ، ساعتين ، تحسب يوم جديد ، ويتم سحب السيارة دون تنبيه على المستأجر إذا تغيب الطرف الثاني لمدة 24 ساعة .</li>
+      <li><span class="rpm-lc-band">البند الثاني</span> في حالة رغبة الطرف الثاني تجديد مدة الإيجار عليه أن يخطر الطرف الأول قبل انتهاء الإيجار بيوم واحد ، وإذا تأخر المستأجر عن التسليم كحد أقصى ، ساعتين ، تحسب يوم جديد ، ويتم سحب السيارة دون تنبيه على المستأجر إذا تغيب الطرف الثاني لمدة 24 ساعة .</li>
       <li><span class="rpm-lc-band">البند الثالث</span> معدل أستخدام السيارة لا يتعدي ( <span class="fill">{{daily_km}}</span> ) كيلو متر في اليوم الواحد ، ما يزيد عن ذلك يحسب بعد كل كيلو متر مبلغ ( <span class="fill">{{excess_km_rate}}</span> ) .</li>
       <li><span class="rpm-lc-band">البند الرابع</span> من حق الطرف الأول سحب السيارة من الطرف الثاني إذا وجدت بقيادة شخص آخر أو تم أستخدام السيارة إستخدام غير شرعي أو بطريقة غير قانونية ولا يحق للطرف الثاني إسترداد باقي مبلغ الإيجار .</li>
-      <li><span class="rpm-lc-band">البند الخامس</span> إذا حصل لا قدر الله أي حادث للسيارة فعلى الطرف الثاني أن يرجع للطرف الأول قبل أن يقوم بأي تصليح للسيارة .</li>
+      <li><span class="rpm-lc-band">البند الخامس</span> إذا حدث لقدر الله أي حادث للسيارة فعلى الطرف الثاني أن يرجع للطرف الأول قبل أن يقوم بأي تصليح للسيارة ، مع العلم أن فترة توقف السيارة وقت الإصلاح على عاتق الطرف الثاني المستأجر وبنفس قيمة الإيجار اليومي المتفق عليها .</li>
       <li><span class="rpm-lc-band">البند السادس</span> في حالة عدم إعادة السيارة أو حدوث حادث جسيم للسيارة ولا يمكن إصلاحها بأي حال من الأحوال ، فالطرف الثاني يكون ملزم بدفع ثمن السيارة والذي يقدر بـ ( <span class="fill">{{vehicle_value}}</span> ) جنيه مصري لا غير .</li>
       <li><span class="rpm-lc-band">البند السابع</span> يقر الطرف الثاني بأنه إستلم السيارة بصفة أمانة وهي في حالة جيدة وأصبح مسؤولا عنها جنائيا ومدنيا وعن كل الأضرار التي تسببها هذه السيارة للغير وأيضا عن جميع المخالفات ، وكذلك يقر أنه على علم تام نافية للجهالة بجميع شروط وقوانين وتعليمات المرور والأمن العام ، كما يلتزم المستأجر في حالة حدوث سرقات أو أي جريمة جنائية تقع بسبب الطرف الثاني ( المستأجر ) أن يتحمل عقوبتها وحده دون أدنى مسؤولية على الطرف الأول المؤجر .</li>
-      <li><span class="rpm-lc-band">البند الثامن</span> يلتزم الطرف الثاني بأنه ينفذ تعليمات المرور من حيث السرعة داخل الجمهورية والطرق الصحراوية والزراعية .</li>
+      <li><span class="rpm-lc-band">البند الثامن</span> يلتزم الطرف الثاني بأنه ينفذ تعليمات المرور من حيث السرعة داخل الجمهورية والطرق الصحراوية والزراعية ، كما يلتزم بدفع قيمة المخالفات المرورية خلال فترة الإيجار وحتى تسليم السيارة وهي 400 للسرعة و 200 حزام أمان واستخدام الهاتف .</li>
       <li><span class="rpm-lc-band">البند التاسع</span> يلتزم المستأجر بدفع قيمة أربعة أيام إيجار في حالة سحب رخصة السيارة أو فقدها حتى يتم إسترداد الرخصة .</li>
-      <li><span class="rpm-lc-band">البند العاشر</span> في حالة وقوع حادث تكون تكلفة الإصلاح على عاتق المستأجر وبنفس قيمة الإيجار اليومي المتفق عليها .</li>
-      <li><span class="rpm-lc-band">البند الحادي عشر</span> يلتزم الطرف الثاني بدفع قيمة المخالفات المرورية خلال فترة الإيجار وحتى بعد تسليم السيارة .</li>
     </ol>
   </div>
 
