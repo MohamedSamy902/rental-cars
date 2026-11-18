@@ -57,6 +57,8 @@ const DECOR_SELECTORS = [
   '.rpm-lc-ribbon',
   '.rpm-lc-stamp',
   '.rpm-lc-float-ico',
+  '.rpm-ack2-seal-top-wrap',
+  '.rpm-ack2-finger-block',
   '.page-break',
   'svg',
   'img',
@@ -211,6 +213,8 @@ function assetLabel(node: HTMLElement): string {
   if (node.matches('.rpm-lc-ribbon')) return 'شريط علوي (محمي)'
   if (node.matches('.rpm-lc-stamp')) return 'ختم الشركة (محمي)'
   if (node.matches('.rpm-lc-float-ico')) return 'أيقونة تصميم (محمية)'
+  if (node.matches('.rpm-ack2-seal-top-wrap')) return 'ختم إقرار الاستلام (محمي)'
+  if (node.matches('.rpm-ack2-finger-block')) return 'موضع البصمة (محمي)'
   if (node.matches('.page-break')) return 'فاصل صفحة (محمي)'
   if (node.matches('img')) return 'صورة / شعار (محمي)'
   if (node.matches('svg')) return 'رسم تصميم (محمي)'
