@@ -378,56 +378,56 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     padding: 0;
     border: 0;
   }
-  .rpm-ack-v1 .rpm-lc-head{ margin-bottom: 1.8mm; }
-  .rpm-ack-v1 .rpm-lc-badge{ min-height: 12.5mm; padding: 1.4mm 2.6mm; }
-  .rpm-ack-v1 .rpm-lc-title-row{ font-size: 14px; }
+  .rpm-ack-v1 .rpm-lc-head{ margin-bottom: 2mm; }
+  .rpm-ack-v1 .rpm-lc-badge{ min-height: 13mm; padding: 1.5mm 2.8mm; }
+  .rpm-ack-v1 .rpm-lc-title-row{ font-size: 16px; }
+  .rpm-ack-v1 .rpm-lc-signer-short{ font-size: 12.5px; }
   .rpm-ack-v1 .rpm-lc-block{
-    padding: 1.8mm 2.6mm 3.8mm;
-    margin-bottom: 2mm;
+    padding: 2mm 2.8mm 4mm;
+    margin-bottom: 2.2mm;
   }
   .rpm-ack-v1 .rpm-lc-block p{
-    font-size: 10.2px;
-    line-height: 1.32;
-    margin: .65mm 0;
+    font-size: 11.4px;
+    line-height: 1.38;
+    margin: .75mm 0;
   }
+  /* Key filled values stand out from boilerplate labels/body. */
+  .rpm-ack-v1 .fill{
+    font-size: 13.5px;
+    font-weight: 800;
+    line-height: 1.25;
+    border-bottom-width: 1.35px;
+    padding-inline: 1.2mm;
+  }
+  .rpm-ack-v1 .fill.wide{ min-width: 12em; }
+  .rpm-ack-v1 .fill.mid{ min-width: 7.2em; }
   .rpm-ack-body p{
     text-align: justify;
-    font-size: 9.8px !important;
-    line-height: 1.32 !important;
+    font-size: 11px !important;
+    line-height: 1.38 !important;
+    font-weight: 600;
   }
-  .rpm-ack-v1 .rpm-lc-terms{ gap: .55mm; }
+  .rpm-ack-v1 .rpm-lc-terms{ gap: .65mm; }
   .rpm-ack-v1 .rpm-lc-terms li{
-    font-size: 9.4px;
-    line-height: 1.3;
-    padding: 1mm 1.8mm;
+    font-size: 10.6px;
+    line-height: 1.36;
+    padding: 1.15mm 2mm;
   }
+  .rpm-ack-v1 .rpm-lc-band{ font-size: 9.4px; }
   .rpm-ack-copies{
-    margin: 1.4mm 0 0;
+    margin: 1.6mm 0 0;
     text-align: center;
     font-weight: 800;
-    font-size: 10px;
+    font-size: 11.2px;
   }
   .rpm-ack-sign{
-    margin-top: 3mm;
+    margin-top: 3.4mm;
     grid-template-columns: 1fr 26mm 1fr;
   }
-  .rpm-ack-sign .rpm-lc-sign-col{ min-height: 20mm; padding: 4mm 2.2mm 1.6mm; }
+  .rpm-ack-sign .rpm-lc-sign-col{ min-height: 22mm; padding: 4.4mm 2.4mm 2mm; }
+  .rpm-ack-sign .rpm-lc-sign-col p{ font-size: 11.2px; }
+  .rpm-ack-sign .rpm-lc-sign-col .fill{ font-size: 13px; }
   .rpm-ack-sign .rpm-lc-stamp-ring{ width: 25mm; height: 25mm; }
-  .rpm-ack-witnesses{ margin-top: 3.2mm; }
-  .rpm-ack-witness-title{
-    text-align: center;
-    font-family: 'Tajawal', sans-serif;
-    font-weight: 800;
-    font-size: 11px;
-    margin-bottom: 2.4mm;
-    color: #111;
-  }
-  .rpm-ack-witness-grid{
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3mm;
-  }
-  .rpm-ack-witness-grid .rpm-lc-sign-col{ min-height: 18mm; }
 
   @media print{
     html, body{
@@ -451,10 +451,12 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
       break-before: page;
       page-break-before: always;
     }
-    body{ font-size: 11px; }
+    body{ font-size: 11.5px; }
     .rpm-lc-terms li{ font-size: 10.2px; line-height: 1.33; }
-    .rpm-ack-v1 .rpm-lc-terms li{ font-size: 9.3px; line-height: 1.28; }
-    .rpm-ack-body p{ font-size: 9.5px !important; }
+    .rpm-ack-v1 .rpm-lc-block p{ font-size: 11.2px; line-height: 1.36; }
+    .rpm-ack-v1 .fill{ font-size: 13.2px; }
+    .rpm-ack-v1 .rpm-lc-terms li{ font-size: 10.4px; line-height: 1.34; }
+    .rpm-ack-body p{ font-size: 10.8px !important; line-height: 1.36 !important; }
   }
 </style></head><body><div class="rpm-preview-root">${body}</div></body></html>`
 }

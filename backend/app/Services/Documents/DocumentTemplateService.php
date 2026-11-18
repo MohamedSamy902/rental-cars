@@ -189,6 +189,19 @@ class DocumentTemplateService
         }
 
         $content = (string) $active->content;
+
+        // Refresh shipped ack form when it still includes the witnesses block.
+        if (str_contains($content, 'rpm-ack-v1') && str_contains($content, 'rpm-ack-witnesses')) {
+            $this->publish([
+                'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
+                'title' => 'إقرار استلام سيارة (ظهر العقد)',
+                'content' => $this->defaultHandoverHtml(),
+                'format' => 'html',
+            ], null, $userId);
+
+            return;
+        }
+
         if (str_contains($content, 'rpm-ack-v1')) {
             return;
         }
@@ -1069,26 +1082,6 @@ HTML;
       <p class="rpm-lc-sign-line">البصمة / ____________________</p>
     </div>
   </footer>
-
-  <section class="rpm-ack-witnesses">
-    <div class="rpm-ack-witness-title">الشهود</div>
-    <div class="rpm-ack-witness-grid">
-      <div class="rpm-lc-sign-col">
-        <div class="rpm-lc-party-tag">شاهد أول</div>
-        <p>الاسم : ____________________</p>
-        <p>البطاقة : ____________________</p>
-        <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
-        <p class="rpm-lc-sign-line">البصمة / ____________________</p>
-      </div>
-      <div class="rpm-lc-sign-col">
-        <div class="rpm-lc-party-tag">شاهد ثاني</div>
-        <p>الاسم : ____________________</p>
-        <p>البطاقة : ____________________</p>
-        <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
-        <p class="rpm-lc-sign-line">البصمة / ____________________</p>
-      </div>
-    </div>
-  </section>
 
   <p class="foot">{{print_footer}}</p>
 </article>
