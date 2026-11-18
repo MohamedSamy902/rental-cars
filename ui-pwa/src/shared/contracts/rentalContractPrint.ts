@@ -369,7 +369,7 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
   .rpm-lc-stamp-ring .stamp-stars{ letter-spacing: 0.3mm; font-size: 6px; line-height: 1; color: #111; }
   .foot{ margin-top: 1.2mm; color: #666; font-size: 7.2px; text-align: center; }
 
-  /* Page 2 — إقرار استلام سيارة (ظهر العقد) — Word-form rpm-ack-v5 */
+  /* Page 2 — إقرار استلام سيارة (ظهر العقد) — Word-form rpm-ack-v6 */
   .rpm-print-pagebreak{
     break-before: page;
     page-break-before: always;
@@ -378,7 +378,7 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     padding: 0;
     border: 0;
   }
-  .rpm-ack-v2, .rpm-ack-v3, .rpm-ack-v4, .rpm-ack-v5, .rpm-ack-form{
+  .rpm-ack-v2, .rpm-ack-v3, .rpm-ack-v4, .rpm-ack-v5, .rpm-ack-v6, .rpm-ack-form{
     --rpm-red: #b00000;
     width: 100%;
     max-width: 202mm;
@@ -469,7 +469,7 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     line-height: 1.78;
     font-weight: 500;
   }
-  .rpm-ack-v2 .fill, .rpm-ack-v3 .fill, .rpm-ack-v4 .fill, .rpm-ack-v5 .fill, .rpm-ack-form .fill{
+  .rpm-ack-v2 .fill, .rpm-ack-v3 .fill, .rpm-ack-v4 .fill, .rpm-ack-v5 .fill, .rpm-ack-v6 .fill, .rpm-ack-form .fill{
     display: inline;
     border-bottom: 1.4px solid #111;
     padding-inline: 1.5mm;
@@ -479,8 +479,8 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     line-height: 1.35;
     color: #000;
   }
-  .rpm-ack-v2 .fill.wide, .rpm-ack-v3 .fill.wide, .rpm-ack-v4 .fill.wide, .rpm-ack-v5 .fill.wide, .rpm-ack-form .fill.wide{ min-width: 11em; }
-  .rpm-ack-v2 .fill.mid, .rpm-ack-v3 .fill.mid, .rpm-ack-v4 .fill.mid, .rpm-ack-v5 .fill.mid, .rpm-ack-form .fill.mid{ min-width: 7em; }
+  .rpm-ack-v2 .fill.wide, .rpm-ack-v3 .fill.wide, .rpm-ack-v4 .fill.wide, .rpm-ack-v5 .fill.wide, .rpm-ack-v6 .fill.wide, .rpm-ack-form .fill.wide{ min-width: 11em; }
+  .rpm-ack-v2 .fill.mid, .rpm-ack-v3 .fill.mid, .rpm-ack-v4 .fill.mid, .rpm-ack-v5 .fill.mid, .rpm-ack-v6 .fill.mid, .rpm-ack-form .fill.mid{ min-width: 7em; }
 
   /* يمين: بيضاوي البصمة · يسار: وهذا إقرار · ثم الإسم/التوقيع بمحاذاة اليسار */
   .rpm-ack2-close{
@@ -565,8 +565,8 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     }
     body{ font-size: 11.5px; }
     .rpm-lc-terms li{ font-size: 10.2px; line-height: 1.33; }
-    .rpm-ack-v2, .rpm-ack-v3, .rpm-ack-v4, .rpm-ack-v5, .rpm-ack-form{ font-size: 15.5px; }
-    .rpm-ack-v2 .fill, .rpm-ack-v3 .fill, .rpm-ack-v4 .fill, .rpm-ack-v5 .fill, .rpm-ack-form .fill{ font-size: 16.5px; }
+    .rpm-ack-v2, .rpm-ack-v3, .rpm-ack-v4, .rpm-ack-v5, .rpm-ack-v6, .rpm-ack-form{ font-size: 15.5px; }
+    .rpm-ack-v2 .fill, .rpm-ack-v3 .fill, .rpm-ack-v4 .fill, .rpm-ack-v5 .fill, .rpm-ack-v6 .fill, .rpm-ack-form .fill{ font-size: 16.5px; }
     .rpm-ack2-body{ font-size: 14.6px; line-height: 1.72; }
     .rpm-ack2-seal,
     .rpm-ack2-seal-top-wrap img,
@@ -595,6 +595,7 @@ export function isRentalContractBody(html: string) {
     || html.includes('rpm-ack-v3')
     || html.includes('rpm-ack-v4')
     || html.includes('rpm-ack-v5')
+    || html.includes('rpm-ack-v6')
     || html.includes('rpm-ack-form')
     || html.includes('rpm-ack2-')
     || html.includes('rpm-ack-seal')
