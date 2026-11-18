@@ -241,9 +241,9 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringNotContainsString('{{deposit}}', $rendered);
 
         $ack = (string) $print->json('data.templates.handover_receipt.rendered_html');
-        $this->assertStringContainsString('rpm-ack-v5', $ack);
+        $this->assertStringContainsString('rpm-ack-v6', $ack);
         $this->assertStringContainsString('إقرار استلام سيارة', $ack);
-        $this->assertStringNotContainsString('محضر إثبات تسلّم المركبة وحالتها الظاهرة', $ack);
+        $this->assertStringNotContainsString('محضر إثبات', $ack);
         $this->assertStringContainsString('خائنا للأمانة', $ack);
         $this->assertStringContainsString('وهذا إقرار مني بذلك', $ack);
         $this->assertStringContainsString('البصمة', $ack);
@@ -288,13 +288,13 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(1, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v5', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v6', (string) $active->content);
         $this->assertStringContainsString('إقرار استلام سيارة', (string) $active->content);
-        $this->assertStringNotContainsString('محضر إثبات تسلّم المركبة وحالتها الظاهرة', (string) $active->content);
+        $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
         $this->assertStringNotContainsString('rpm-ack-witnesses', (string) $active->content);
     }
 
-    public function test_ack_with_witnesses_upgrades_to_word_form_v5(): void
+    public function test_ack_with_witnesses_upgrades_to_word_form_v6(): void
     {
         $this->actingAdmin();
         DocumentTemplate::query()->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)->delete();
@@ -323,13 +323,46 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(2, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v5', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v6', (string) $active->content);
         $this->assertStringNotContainsString('rpm-ack-witnesses', (string) $active->content);
         $this->assertStringNotContainsString('الشهود', (string) $active->content);
-        $this->assertStringNotContainsString('محضر إثبات تسلّم المركبة وحالتها الظاهرة', (string) $active->content);
+        $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
         $this->assertStringContainsString('خائنا للأمانة', (string) $active->content);
         $this->assertStringContainsString('وهذا إقرار مني بذلك', (string) $active->content);
         $this->assertStringContainsString('rpm-ack2-finger-oval', (string) $active->content);
+    }
+
+    public function test_ack_with_subtitle_line_force_upgrades_even_on_v5(): void
+    {
+        $this->actingAdmin();
+        DocumentTemplate::query()->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)->delete();
+        DocumentTemplate::query()->create([
+            'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
+            'title' => 'إقرار استلام سيارة (ظهر العقد)',
+            'content' => <<<'HTML'
+<article class="rpm-ack-form rpm-ack-v5" dir="rtl">
+  <h1 class="rpm-ack2-title">إقرار استلام سيارة</h1>
+  <h2 class="rpm-ack2-sub">محضر إثبات تسلّم المركبة وحالتها الظاهرة</h2>
+  <p>خائنا للأمانة</p>
+</article>
+HTML,
+            'format' => 'html',
+            'version' => 5,
+            'is_active' => true,
+        ]);
+
+        app(DocumentTemplateService::class)->ensureDefaults();
+
+        $active = DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->first();
+
+        $this->assertNotNull($active);
+        $this->assertGreaterThan(5, (int) $active->version);
+        $this->assertStringContainsString('rpm-ack-v6', (string) $active->content);
+        $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
     }
 
     public function test_legacy_wrong_signer_and_company_defaults_are_normalized_on_print(): void

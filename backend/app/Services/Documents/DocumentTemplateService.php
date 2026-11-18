@@ -190,12 +190,17 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
 
-        if (str_contains($content, 'rpm-ack-v5')) {
+        if (str_contains($content, 'rpm-ack-v6')) {
             return;
         }
 
-        // Upgrade prior shipped ack (v1–v4 / witnesses) and legacy table stubs to the Word-form text.
-        $looksLikeShippedAck = str_contains($content, 'rpm-ack-v4')
+        // Any active ack that still shows «محضر إثبات» must be replaced (even if tagged v5).
+        $hasSubtitleLine = str_contains($content, 'محضر إثبات');
+
+        // Upgrade prior shipped ack (v1–v5 / witnesses) and legacy table stubs to the Word-form text.
+        $looksLikeShippedAck = $hasSubtitleLine
+            || str_contains($content, 'rpm-ack-v5')
+            || str_contains($content, 'rpm-ack-v4')
             || str_contains($content, 'rpm-ack-v3')
             || str_contains($content, 'rpm-ack-v2')
             || str_contains($content, 'rpm-ack-v1')
@@ -203,8 +208,7 @@ class DocumentTemplateService
             || str_contains($content, 'إقرار الاستلام والتسليم')
             || (str_contains($content, 'عداد الخروج') && str_contains($content, 'بيانات التأمين'))
             || (str_contains($content, 'print-head') && str_contains($content, 'عند التسليم'))
-            || (str_contains($content, 'إقرار استلام سيارة') && str_contains($content, 'العشرون'))
-            || (str_contains($content, 'إقرار استلام سيارة') && str_contains($content, 'محضر إثبات'));
+            || (str_contains($content, 'إقرار استلام سيارة') && str_contains($content, 'العشرون'));
 
         if (! $looksLikeShippedAck) {
             return;
@@ -939,7 +943,7 @@ HTML;
     {
         // Texts match the customer Word form (إقرار استلام سيارة) exactly — including typos; blanks are placeholders.
         return <<<'HTML'
-<article class="rpm-ack-form rpm-ack-v5" dir="rtl">
+<article class="rpm-ack-form rpm-ack-v6" dir="rtl">
   <p class="rpm-ack2-brandhead">RPM &nbsp;•&nbsp; RENT A CAR &nbsp;|&nbsp; شركة RBM للنقل والسياحة</p>
   <div class="rpm-ack2-seal-top-wrap" data-rpm-lock="1">
     <img class="rpm-ack2-seal rpm-ack2-seal--top" src="/brand/rpm-ack-seal-gold.png" width="120" height="120" alt="" />
