@@ -190,27 +190,19 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
 
-        // Refresh shipped ack form when it still includes the witnesses block.
-        if (str_contains($content, 'rpm-ack-v1') && str_contains($content, 'rpm-ack-witnesses')) {
-            $this->publish([
-                'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
-                'title' => 'إقرار استلام سيارة (ظهر العقد)',
-                'content' => $this->defaultHandoverHtml(),
-                'format' => 'html',
-            ], null, $userId);
-
+        if (str_contains($content, 'rpm-ack-v2')) {
             return;
         }
 
-        if (str_contains($content, 'rpm-ack-v1')) {
-            return;
-        }
-
-        $looksLikeOurPriorDefault = str_contains($content, 'إقرار الاستلام والتسليم')
+        // Upgrade prior shipped ack (v1 / witnesses) and legacy table stubs to the Word-form text.
+        $looksLikeShippedAck = str_contains($content, 'rpm-ack-v1')
+            || str_contains($content, 'rpm-ack-witnesses')
+            || str_contains($content, 'إقرار الاستلام والتسليم')
             || (str_contains($content, 'عداد الخروج') && str_contains($content, 'بيانات التأمين'))
-            || (str_contains($content, 'print-head') && str_contains($content, 'عند التسليم'));
+            || (str_contains($content, 'print-head') && str_contains($content, 'عند التسليم'))
+            || (str_contains($content, 'إقرار استلام سيارة') && str_contains($content, 'العشرون'));
 
-        if (! $looksLikeOurPriorDefault) {
+        if (! $looksLikeShippedAck) {
             return;
         }
 
@@ -941,149 +933,69 @@ HTML;
 
     private function defaultHandoverHtml(): string
     {
+        // Texts match the customer Word form (إقرار استلام سيارة) exactly — including typos; blanks are placeholders.
         return <<<'HTML'
-<article class="rpm-legal-contract rpm-paper-v4 rpm-ack-v1">
-  <header class="rpm-lc-head">
-    <div class="rpm-lc-badge rpm-lc-badge--contact">
-      <div class="rpm-lc-signer-short">أ/ {{print_signer_name}}</div>
-      <div class="rpm-lc-phone-pill">
-        <span class="rpm-lc-phone-dot" aria-hidden="true">
-          <svg class="rpm-lc-ico-phone" viewBox="0 0 24 24"><path fill="#c40000" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg>
-        </span>
-        <span dir="ltr">/ {{company_phone}}</span>
-      </div>
-    </div>
-    <div class="rpm-lc-badge rpm-lc-badge--title">
-      <div class="rpm-lc-title-row">
-        <svg class="rpm-lc-ico-handshake" viewBox="0 0 72 44" aria-hidden="true">
-          <path fill="#fff" d="M10 28c0-4.5 3.5-8 8-8h6.5l8.5-8.5 4.2 4.2-6.8 6.8H38c2.8 0 5 2.2 5 5v4.5H10V28z"/>
-          <path fill="#fff" d="M62 28c0-4.5-3.5-8-8-8h-5l-3.8-3.8-4.2 4.2 5.5 5.5H42c-2.8 0-5 2.2-5 5v4.5h25V28z"/>
-          <rect x="22" y="25" width="28" height="8" rx="2.5" fill="#e10600"/>
-          <rect x="24" y="27.2" width="24" height="3.5" rx="1.2" fill="#fff"/>
-        </svg>
-        <span>إقرار استلام سيارة</span>
-      </div>
-    </div>
-    <div class="rpm-lc-badge rpm-lc-badge--brand">
-      <div class="rpm-lc-brand-mark">RPM<span class="rpm-lc-swoosh-thru" aria-hidden="true"></span></div>
-      <div class="rpm-lc-tagline">{{company_tagline}}</div>
-    </div>
-  </header>
-
-  <p class="rpm-lc-meta">{{contract_number}}</p>
-
-  <section class="rpm-lc-block">
-    <p>
-      أقر أنا الموقع أدناه <span class="fill wide">{{customer_name}}</span>
-      ( الطرف الثاني )
-    </p>
-    <p class="rpm-lc-row">
-      جواز سفر / رقم قومي : <span class="fill mid" dir="ltr">{{customer_id_doc}}</span>
-      صادرة من : <span class="fill"></span>
-      بتاريخ : <span class="fill"></span>
-    </p>
-    <p>عنوانه / <span class="fill wide">{{customer_address}}</span></p>
-    <div class="rpm-lc-party-tag">( الطرف الثاني المستأجر )</div>
-  </section>
-
-  <section class="rpm-lc-block rpm-lc-block--icon">
-    <div class="rpm-lc-float-ico rpm-lc-float-ico--car" aria-hidden="true">
-      <svg viewBox="0 0 64 40" fill="none">
-        <path fill="#fff" d="M10 23l5.5-9h26l8 9H10z"/>
-        <path fill="#fff" d="M8 23h48v5.5H8z"/>
-        <circle cx="18" cy="30" r="4.2" fill="#111" stroke="#fff" stroke-width="2"/>
-        <circle cx="46" cy="30" r="4.2" fill="#111" stroke="#fff" stroke-width="2"/>
-        <path fill="#fff" d="M22 16.5h8.5l-2.2-3.5H24z"/>
-      </svg>
-    </div>
-    <p>
-      أقر أني استلمت السيارة رقم : <span class="fill">{{vehicle_plate}}</span>
-      ماركة / <span class="fill">{{vehicle_brand}}</span>
-      موديل / <span class="fill">{{vehicle_model}}</span>
-    </p>
-    <p>
-      موتور رقم : <span class="fill" dir="ltr">{{vehicle_engine}}</span>
-      شاسية رقم : <span class="fill" dir="ltr">{{vehicle_chassis}}</span>
-    </p>
-    <p>
-      ملك السيد / <span class="fill wide">{{company_name}}</span>
-      ( طرف أول )
-    </p>
-  </section>
-
-  <section class="rpm-lc-block rpm-lc-block--icon">
-    <div class="rpm-lc-float-ico rpm-lc-float-ico--cal" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none">
-        <rect x="3" y="5" width="18" height="16" rx="2.2" stroke="#fff" stroke-width="2"/>
-        <path stroke="#fff" stroke-width="2" d="M3 10h18M8 3v4M16 3v4"/>
-        <path fill="#fff" d="M7 13h3.2v3.2H7zm5 0h3.2v3.2H12z"/>
-      </svg>
-    </div>
-    <p>
-      يوم : <span class="fill">{{start_day}}</span>
-      الموافق : <span class="fill mid">{{start_date_only}}</span> م
-      الساعة : <span class="fill">{{start_time}}</span>
-    </p>
-    <p>
-      حتى يوم : <span class="fill">{{end_day}}</span>
-      الموافق : <span class="fill mid">{{end_date_only}}</span> م
-      الساعة : <span class="fill">{{end_time}}</span>
-    </p>
-  </section>
-
-  <section class="rpm-lc-block rpm-ack-body">
-    <p>
-      وأقر الطرف الثاني أن السيارة مستوفاة لجميع شروط العمل وأصبح مسؤولاً عنها مسؤولية كاملة وعن جميع المخالفات والحوادث وكافة الأضرار التي تقع على هذه السيارة بتحميلها أي بضاعة مخالفة للقانون وتنفيذها بدقة، وعليه أصبح الطرف الثاني مسؤولاً مسؤولية كاملة عن السيارة من تاريخ وساعة استلامها وحتى نهاية مدة التعاقد ولحين تسليمها للطرف الأول، ويتعهد الطرف الثاني بدفع قيمة الإيجار طوال فترة الإصلاح وفي حالة حدوث أي ضرر للسيارة مثل الحوادث، ويتعهد الطرف الأول بتسهيل كافة الإجراءات الخاصة بالتأمين الخاص بالسيارة مع تحمل الطرف الثاني المستأجر فروق المصاريف ونسبة تحمل التأمين، وهذا إقرار وتعهد من الطرف الثاني ( المستأجر ) للعمل بموجبه عند اللزوم.
-    </p>
-    <p>تحرر في <span class="fill mid">{{contract_date}}</span> م</p>
-  </section>
-
-  <div class="rpm-lc-terms-wrap">
-    <div class="rpm-lc-terms-banner"><span>بنود إضافية</span></div>
-    <ol class="rpm-lc-terms">
-      <li><span class="rpm-lc-band">العشرون</span> يتحمل الطرف الثاني كافة المخالفات المرورية والغرامات التي تقع على السيارة طول مدة العقد كما يتحمل الأضرار التي تسببها السيارة عن طريق العمد وغير العمد خلال فترة التعاقد واتفق الطرفان أن السيارة تستخدم ( <span class="fill">{{annual_km}}</span> كيلومتر ) في العام الواحد ويتم احتساب كل كيلو متر بعد الـ <span class="fill">{{km_extra_after}}</span> كيلو بـ <span class="fill">{{excess_km_rate}}</span> جنيه بعد التحقق من ذلك.</li>
-      <li><span class="rpm-lc-band">الواحد والعشرون</span> يتعهد الطرف الثاني بأنه لا يستخدم السيارة في أعمال مخالفة للقانون والآداب أو نقل البضائع وأنه على علم تام بقواعد وقرارات المرور وفي حالة مخالفة ذلك يكون مسؤولاً مسؤولية كاملة.</li>
-      <li><span class="rpm-lc-band">الثاني والعشرون</span> في حالة سحب رخصة السيارة المذكورة لأي سبب من الأسباب المخالفة للقانون يلتزم الطرف الثاني المستأجر بإعادة تلك الرخصة كما يلتزم الطرف الأول بتغيير الكاوتش في موعده اللازم للتغيير.</li>
-      <li><span class="rpm-lc-band">الثالث والعشرون</span> يتعهد الطرف الثاني بأن مخالفات السيارة خلال الفترة المذكورة هو المسؤول الوحيد عنها مدنياً وقانونياً وجنائياً وأنه على علم بجميع القوانين الخاصة بالمرور.</li>
-      <li><span class="rpm-lc-band">الرابع والعشرون</span> يلتزم المستأجر بعدم تأجير السيارة للأفراد أو الشركات العاملة على نقل الأفراد مثل أوبر وكريم وديدي ومن على شاكلتها، وفي حالة المخالفة يسدد المستأجر للمؤجر غرامة ( <span class="fill">{{rideshare_penalty}}</span> جنيه فقط لا غير ).</li>
-    </ol>
-    <p class="rpm-ack-copies">تحرر هذا العقد من نسختين بيد كل طرف نسخة للعمل بها عند اللزوم.</p>
+<article class="rpm-ack-form rpm-ack-v2" dir="rtl">
+  <div class="rpm-ack2-seal-top-wrap">
+    <img class="rpm-ack2-seal rpm-ack2-seal--top" src="/brand/rpm-ack-seal-gold.png" alt="" />
   </div>
 
-  <footer class="rpm-lc-sign rpm-ack-sign">
-    <div class="rpm-lc-sign-col">
-      <div class="rpm-lc-party-tag">الطرف الثاني ( المستأجر )</div>
-      <p>الإسم / <span class="fill wide">{{customer_name}}</span></p>
-      <p>رقم قومي : <span class="fill mid" dir="ltr">{{customer_national_id}}</span></p>
-      <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
-      <p class="rpm-lc-sign-line">البصمة / ____________________</p>
-    </div>
-    <div class="rpm-lc-stamp">
-      <div class="rpm-lc-stamp-ring">
-        <svg class="rpm-lc-stamp-car" viewBox="0 0 64 28" aria-hidden="true">
-          <path fill="#111" d="M8 18l6-9h28l8 9H8z"/>
-          <path fill="#111" d="M6 18h52v4H6z"/>
-          <circle cx="16" cy="23" r="3.2" fill="#111"/>
-          <circle cx="48" cy="23" r="3.2" fill="#111"/>
-          <path fill="none" stroke="#111" stroke-width="1.4" d="M10 26c8 2 36 2 44 0"/>
-        </svg>
-        <div class="stamp-rpm">RPM</div>
-        <div class="stamp-en">Rent A Car</div>
-        <div class="stamp-ar-box">{{company_tagline}}</div>
-        <div class="stamp-cr">سجل تجاري رقم {{company_cr}}</div>
-        <div class="stamp-stars" aria-hidden="true">★★★★★</div>
-      </div>
-    </div>
-    <div class="rpm-lc-sign-col">
-      <div class="rpm-lc-party-tag">الطرف الأول ( المؤجر )</div>
-      <p>الإسم / {{company_name}}</p>
-      <p>ويمثله / {{print_signer_name}}</p>
-      <p class="rpm-lc-sign-line">التوقيع : ____________________</p>
-      <p class="rpm-lc-sign-line">البصمة / ____________________</p>
-    </div>
-  </footer>
+  <h1 class="rpm-ack2-title">إقرار استلام سيارة</h1>
+  <h2 class="rpm-ack2-sub">محضر إثبات تسلّم المركبة وحالتها الظاهرة</h2>
 
-  <p class="foot">{{print_footer}}</p>
+  <table class="rpm-ack2-date">
+    <tr>
+      <th>تحريرا في يوم</th>
+      <td>
+        <span class="fill mid" dir="ltr">{{contract_date}}</span>
+        &nbsp; الموافق :
+        <span class="fill">{{contract_day}}</span>
+        ، الساعة :
+        <span class="fill">{{contract_time}}</span>
+      </td>
+    </tr>
+  </table>
+
+  <p class="rpm-ack2-line rpm-ack2-line--strong">
+    أقر أنا الموقع أدناه /
+    <span class="fill wide">{{customer_name}}</span>
+    ، بطاقة رقم قومي / جواز السفر /
+    <span class="fill mid" dir="ltr">{{customer_id_doc}}</span>
+    . الجنسية /
+    <span class="fill">{{customer_nationality}}</span>
+    محل إقامة المستأجر /
+    <span class="fill wide">{{customer_address}}</span>
+  </p>
+
+  <p class="rpm-ack2-line rpm-ack2-line--strong">
+    بأنني تسلمت من السيد / RPM للنقل والسياحة &nbsp;- ويمثلها السيد /
+    <span class="fill wide">{{print_signer_name}}</span>
+    .
+  </p>
+
+  <p class="rpm-ack2-line rpm-ack2-line--strong">
+    سيارة ماركة /
+    <span class="fill">{{vehicle_brand}}</span>
+    ، موديل/
+    <span class="fill">{{vehicle_model}}</span>
+    ، رقم الشاسيه /
+    <span class="fill mid" dir="ltr">{{vehicle_chassis}}</span>
+    رقم الموتور /
+    <span class="fill mid" dir="ltr">{{vehicle_engine}}</span>
+    ، لوحات معدنية /
+    <span class="fill">{{vehicle_plate}}</span>
+  </p>
+
+  <p class="rpm-ack2-body">
+    أقرّ أنا الموقّع أدناه بأنني إستلمت السيارة الموضحة بياناتها أعلاه من شركة RPM للنقل والسياحة ، وعاينت حالتها الظاهرة وإطلعت على قراءة العداد ومستوى الوقود/الشحن وما سُلّم معها من مفاتيح ووثائق وملحقات ، وأكون مسئولا مسئولية كاملة مدنيا وجنائيا عن السيارة موضوع الإقرار وعن كافة ما يلحق بالسيارة من تلف أو هلاك أو سرقة أو إصابتها بأي أضرار يقلل من قيمتها السعرية أو أي مخالفة لقواعد وقوانين المرور كما أتعهد أيضا بتسليمها بنفس الحالة الجيدة الخالية من أي أعطال أو عيوب أو نقص في الإجراء كما أستلمتها بناءا علي تصوير فيديو تم بوجود الطرفين وذلك في مدة تبدأ بتاريخ { <span class="fill mid">{{start_date_only}}</span> } ، وتنتهي في { <span class="fill mid">{{end_date_only}}</span> } عند تسليم السيارة أو عند الطلب قبل المؤجر وفي حالة أمتناعي عن ذلك أكون خائنا للأمانة وملزم بسداد ثمن السيارة المذكور ،وهومبلغ( <span class="fill">{{vehicle_value}}</span> ج) ( <span class="fill wide">{{vehicle_value}}</span> جنيه لا غير ) ويكون هذا المقدار حسب أسعار مثلها في المعارض وأسواق السيارات وذلك دون الحاجة إلي تنبيه أو إنذار وعدم الإخلال بحق التعويضات فضلا عن حق المالك أو المؤجر في مقاضاتي قانونيا وبوصفه مرتكبا جريمة خيانة الأمانة المعاقب عليها قانونيا ، ويكون ذلك من إختصاص المحاكم المختصة كما أتعه بأنه لا يحق بيع السيارة أو تغيير أي شيء من معالمها الأساسية .
+  </p>
+
+  <div class="rpm-ack2-close">
+    <img class="rpm-ack2-seal rpm-ack2-seal--close" src="/brand/rpm-ack-seal.png" alt="" />
+    <p class="rpm-ack2-finger"><span class="rpm-ack2-finger-label">البصمة</span><span class="rpm-ack2-finger-gap"></span><span>وهذا إقرار مني بذلك</span></p>
+  </div>
+  <p class="rpm-ack2-sign-line">الإسم : <span class="fill wide">{{customer_name}}</span></p>
+  <p class="rpm-ack2-sign-line">التوقيع : ____________________</p>
 </article>
 HTML;
     }
