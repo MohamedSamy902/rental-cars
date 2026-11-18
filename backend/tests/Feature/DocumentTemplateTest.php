@@ -241,13 +241,15 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringNotContainsString('{{deposit}}', $rendered);
 
         $ack = (string) $print->json('data.templates.handover_receipt.rendered_html');
-        $this->assertStringContainsString('rpm-ack-v2', $ack);
+        $this->assertStringContainsString('rpm-ack-v4', $ack);
         $this->assertStringContainsString('إقرار استلام سيارة', $ack);
         $this->assertStringContainsString('محضر إثبات تسلّم المركبة وحالتها الظاهرة', $ack);
         $this->assertStringContainsString('خائنا للأمانة', $ack);
         $this->assertStringContainsString('وهذا إقرار مني بذلك', $ack);
+        $this->assertStringContainsString('البصمة', $ack);
         $this->assertStringContainsString('الإسم :', $ack);
         $this->assertStringContainsString('التوقيع :', $ack);
+        $this->assertStringContainsString('rpm-ack2-finger-oval', $ack);
         $this->assertStringNotContainsString('الشهود', $ack);
         $this->assertStringNotContainsString('rpm-ack-witnesses', $ack);
         $this->assertStringNotContainsString('العشرون', $ack);
@@ -286,13 +288,13 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(1, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v2', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v4', (string) $active->content);
         $this->assertStringContainsString('إقرار استلام سيارة', (string) $active->content);
         $this->assertStringContainsString('محضر إثبات تسلّم المركبة وحالتها الظاهرة', (string) $active->content);
         $this->assertStringNotContainsString('rpm-ack-witnesses', (string) $active->content);
     }
 
-    public function test_ack_with_witnesses_upgrades_to_word_form_v2(): void
+    public function test_ack_with_witnesses_upgrades_to_word_form_v4(): void
     {
         $this->actingAdmin();
         DocumentTemplate::query()->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)->delete();
@@ -321,11 +323,12 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(2, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v2', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v4', (string) $active->content);
         $this->assertStringNotContainsString('rpm-ack-witnesses', (string) $active->content);
         $this->assertStringNotContainsString('الشهود', (string) $active->content);
         $this->assertStringContainsString('خائنا للأمانة', (string) $active->content);
         $this->assertStringContainsString('وهذا إقرار مني بذلك', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack2-finger-oval', (string) $active->content);
     }
 
     public function test_legacy_wrong_signer_and_company_defaults_are_normalized_on_print(): void

@@ -369,7 +369,7 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
   .rpm-lc-stamp-ring .stamp-stars{ letter-spacing: 0.3mm; font-size: 6px; line-height: 1; color: #111; }
   .foot{ margin-top: 1.2mm; color: #666; font-size: 7.2px; text-align: center; }
 
-  /* Page 2 — إقرار استلام سيارة (ظهر العقد) — Word-form rpm-ack-v2 */
+  /* Page 2 — إقرار استلام سيارة (ظهر العقد) — Word-form rpm-ack-v4 */
   .rpm-print-pagebreak{
     break-before: page;
     page-break-before: always;
@@ -378,21 +378,29 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     padding: 0;
     border: 0;
   }
-  .rpm-ack-v2{
-    --rpm-red: #d40000;
+  .rpm-ack-v2, .rpm-ack-v3, .rpm-ack-v4{
+    --rpm-red: #b00000;
     width: 100%;
     max-width: 202mm;
     margin: 0 auto;
-    padding: 2mm 4mm 4mm;
+    padding: 1.5mm 4mm 3mm;
     color: #111;
     font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Segoe UI', Tahoma, sans-serif;
-    font-size: 14.5px;
+    font-size: 16px;
     line-height: 1.55;
+  }
+  .rpm-ack2-brandhead{
+    margin: 0 0 1mm;
+    text-align: center;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: #1a1a1a;
   }
   .rpm-ack2-seal-top-wrap{
     display: flex;
     justify-content: center;
-    margin: 0 0 1.5mm;
+    margin: 0 0 1.2mm;
   }
   .rpm-ack2-seal{
     display: block;
@@ -401,105 +409,131 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     print-color-adjust: exact;
   }
   .rpm-ack2-seal--top{
-    width: 28mm;
-    height: 28mm;
-  }
-  .rpm-ack2-seal--close{
     width: 30mm;
-    height: 36mm;
-    flex: 0 0 auto;
+    height: 30mm;
   }
+  .rpm-ack2-seal--close{ display: none; }
   .rpm-ack2-title{
     margin: 0;
     text-align: center;
     font-family: 'Tajawal', 'IBM Plex Sans Arabic', sans-serif;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 800;
-    line-height: 1.25;
+    line-height: 1.2;
   }
   .rpm-ack2-sub{
-    margin: 1mm 0 3.5mm;
+    margin: 1.2mm 0 3.2mm;
     text-align: center;
     font-family: 'Tajawal', 'IBM Plex Sans Arabic', sans-serif;
-    font-size: 16px;
+    font-size: 17.5px;
     font-weight: 800;
     line-height: 1.3;
+    color: #7a5a18;
   }
   .rpm-ack2-date{
     width: 100%;
     border-collapse: collapse;
-    margin: 0 0 3.5mm;
+    margin: 0 0 3.2mm;
     table-layout: fixed;
   }
   .rpm-ack2-date th,
   .rpm-ack2-date td{
     border: 1.2px solid #111;
-    padding: 2.2mm 3mm;
-    font-size: 14px;
+    padding: 2.4mm 3mm;
+    font-size: 15.5px;
     font-weight: 700;
     vertical-align: middle;
   }
   .rpm-ack2-date th{
-    width: 28mm;
+    width: 30mm;
     text-align: center;
     white-space: nowrap;
     background: #f7f7f7;
   }
   .rpm-ack2-date td{ text-align: start; }
   .rpm-ack2-line{
-    margin: 0 0 2.8mm;
-    font-size: 14.2px;
-    line-height: 1.7;
+    margin: 0 0 3mm;
+    font-size: 15.8px;
+    line-height: 1.72;
   }
   .rpm-ack2-line--strong{ font-weight: 700; }
   .rpm-ack2-body{
-    margin: 1mm 0 5mm;
+    margin: 1mm 0 6mm;
     text-align: justify;
-    font-size: 13.6px;
-    line-height: 1.72;
+    font-size: 15px;
+    line-height: 1.78;
     font-weight: 500;
   }
-  .rpm-ack-v2 .fill{
+  .rpm-ack-v2 .fill, .rpm-ack-v3 .fill, .rpm-ack-v4 .fill{
     display: inline;
-    border-bottom: 1.35px solid #111;
-    padding-inline: 1.4mm;
+    border-bottom: 1.4px solid #111;
+    padding-inline: 1.5mm;
     min-width: 4.5em;
-    font-size: 15.5px;
+    font-size: 17px;
     font-weight: 800;
     line-height: 1.35;
     color: #000;
   }
-  .rpm-ack-v2 .fill.wide{ min-width: 11em; }
-  .rpm-ack-v2 .fill.mid{ min-width: 7em; }
+  .rpm-ack-v2 .fill.wide, .rpm-ack-v3 .fill.wide, .rpm-ack-v4 .fill.wide{ min-width: 11em; }
+  .rpm-ack-v2 .fill.mid, .rpm-ack-v3 .fill.mid, .rpm-ack-v4 .fill.mid{ min-width: 7em; }
+
+  /* يمين: بيضاوي البصمة · يسار: وهذا إقرار · ثم الإسم/التوقيع بمحاذاة اليسار */
   .rpm-ack2-close{
-    display: flex;
-    align-items: center;
-    gap: 4mm;
-    margin: 2mm 0 4mm;
+    margin: 2mm 0 1mm;
   }
-  .rpm-ack2-finger{
-    flex: 1;
+  .rpm-ack2-finger-row{
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6mm;
-    margin: 0;
-    font-size: 15px;
-    font-weight: 700;
+    gap: 8mm;
+    margin: 0 0 3mm;
   }
-  .rpm-ack2-finger-label{ white-space: nowrap; }
-  .rpm-ack2-finger-gap{
-    flex: 1;
-    border-bottom: 1.2px solid #111;
-    min-width: 18mm;
-    align-self: flex-end;
-    margin-bottom: 1.5mm;
+  .rpm-ack2-finger-block{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.8mm;
+    flex: 0 0 auto;
+  }
+  .rpm-ack2-finger-oval{
+    width: 32mm;
+    height: 38mm;
+    border: 1.7px solid #111;
+    border-radius: 50%;
+    background: #fff;
+  }
+  .rpm-ack2-finger-label{
+    margin: 0;
+    font-size: 17.5px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .rpm-ack2-finger-end{
+    margin: 0;
+    font-size: 17.5px;
+    font-weight: 800;
+    white-space: nowrap;
+    align-self: flex-start;
+    padding-top: 2mm;
+  }
+  .rpm-ack2-signs{
+    width: min(58%, 110mm);
+    margin-inline-start: auto; /* يدفع الإسم/التوقيع لجهة وهذا إقرار (يسار في RTL) */
   }
   .rpm-ack2-sign-line{
-    margin: 2.5mm 0 0;
-    font-size: 15px;
+    margin: 0 0 4.5mm;
+    font-size: 17px;
     font-weight: 700;
-    padding-inline-start: 34mm;
+  }
+  .rpm-ack2-sign-line .fill{
+    min-width: 12em;
+  }
+  .rpm-ack2-foot{
+    margin: 3mm 0 0;
+    text-align: center;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #333;
   }
 
   @media print{
@@ -526,9 +560,9 @@ export function shellRentalContractHtml(body: string, title = 'عقد إيجار
     }
     body{ font-size: 11.5px; }
     .rpm-lc-terms li{ font-size: 10.2px; line-height: 1.33; }
-    .rpm-ack-v2{ font-size: 14px; }
-    .rpm-ack-v2 .fill{ font-size: 15px; }
-    .rpm-ack2-body{ font-size: 13.2px; line-height: 1.68; }
+    .rpm-ack-v2, .rpm-ack-v3, .rpm-ack-v4{ font-size: 15.5px; }
+    .rpm-ack-v2 .fill, .rpm-ack-v3 .fill, .rpm-ack-v4 .fill{ font-size: 16.5px; }
+    .rpm-ack2-body{ font-size: 14.6px; line-height: 1.72; }
   }
 </style></head><body><div class="rpm-preview-root">${body}</div></body></html>`
 }
@@ -545,6 +579,8 @@ export function isRentalContractBody(html: string) {
     || html.includes('rpm-paper-v2')
     || html.includes('rpm-ack-v1')
     || html.includes('rpm-ack-v2')
+    || html.includes('rpm-ack-v3')
+    || html.includes('rpm-ack-v4')
     || html.includes('شروط التعاقد')
     || html.includes('إقرار استلام سيارة')
 }

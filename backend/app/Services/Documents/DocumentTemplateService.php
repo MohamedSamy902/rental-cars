@@ -190,12 +190,14 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
 
-        if (str_contains($content, 'rpm-ack-v2')) {
+        if (str_contains($content, 'rpm-ack-v4')) {
             return;
         }
 
-        // Upgrade prior shipped ack (v1 / witnesses) and legacy table stubs to the Word-form text.
-        $looksLikeShippedAck = str_contains($content, 'rpm-ack-v1')
+        // Upgrade prior shipped ack (v1–v3 / witnesses) and legacy table stubs to the Word-form text.
+        $looksLikeShippedAck = str_contains($content, 'rpm-ack-v3')
+            || str_contains($content, 'rpm-ack-v2')
+            || str_contains($content, 'rpm-ack-v1')
             || str_contains($content, 'rpm-ack-witnesses')
             || str_contains($content, 'إقرار الاستلام والتسليم')
             || (str_contains($content, 'عداد الخروج') && str_contains($content, 'بيانات التأمين'))
@@ -935,7 +937,8 @@ HTML;
     {
         // Texts match the customer Word form (إقرار استلام سيارة) exactly — including typos; blanks are placeholders.
         return <<<'HTML'
-<article class="rpm-ack-form rpm-ack-v2" dir="rtl">
+<article class="rpm-ack-form rpm-ack-v4" dir="rtl">
+  <p class="rpm-ack2-brandhead">RPM &nbsp;•&nbsp; RENT A CAR &nbsp;|&nbsp; شركة RBM للنقل والسياحة</p>
   <div class="rpm-ack2-seal-top-wrap">
     <img class="rpm-ack2-seal rpm-ack2-seal--top" src="/brand/rpm-ack-seal-gold.png" alt="" />
   </div>
@@ -991,11 +994,20 @@ HTML;
   </p>
 
   <div class="rpm-ack2-close">
-    <img class="rpm-ack2-seal rpm-ack2-seal--close" src="/brand/rpm-ack-seal.png" alt="" />
-    <p class="rpm-ack2-finger"><span class="rpm-ack2-finger-label">البصمة</span><span class="rpm-ack2-finger-gap"></span><span>وهذا إقرار مني بذلك</span></p>
+    <div class="rpm-ack2-finger-row">
+      <div class="rpm-ack2-finger-block">
+        <div class="rpm-ack2-finger-oval" aria-hidden="true"></div>
+        <p class="rpm-ack2-finger-label">البصمة</p>
+      </div>
+      <p class="rpm-ack2-finger-end">وهذا إقرار مني بذلك</p>
+    </div>
+    <div class="rpm-ack2-signs">
+      <p class="rpm-ack2-sign-line">الإسم : <span class="fill wide">{{customer_name}}</span></p>
+      <p class="rpm-ack2-sign-line">التوقيع : ____________________</p>
+    </div>
   </div>
-  <p class="rpm-ack2-sign-line">الإسم : <span class="fill wide">{{customer_name}}</span></p>
-  <p class="rpm-ack2-sign-line">التوقيع : ____________________</p>
+
+  <p class="rpm-ack2-foot">RPM &nbsp;•&nbsp; إقرار استلام سيارة &nbsp;•</p>
 </article>
 HTML;
     }
