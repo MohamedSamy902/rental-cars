@@ -2,7 +2,7 @@ import {
   Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, MediaUpload, DateField,
 } from '@/shared/ui'
 import { civilDateOnly } from '@/shared/lib/dates'
-import { formatDate, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatDepositAmount, formatMoney } from '@/shared/lib/format'
 import { actionTitle, type ActionKind, type Contract, type VehicleOption } from './contractModel'
 
 type Form = {
@@ -237,7 +237,11 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
               onChange={(e) => patch({ method: e.target.value })}
             />
             <TextField label="رقم الإيصال" required value={form.receipt_number} onChange={(e) => patch({ receipt_number: e.target.value })} />
-            {action === 'deposit' ? <p className="muted">المبلغ: {formatMoney(selected?.frozen_agreed_deposit || 0)} (خارج إجمالي العقد)</p> : null}
+            {action === 'deposit' ? (
+              <p className="muted">
+                المبلغ: {formatDepositAmount(selected?.frozen_agreed_deposit || 0, selected?.frozen_deposit_currency)} (خارج إجمالي العقد)
+              </p>
+            ) : null}
           </>
         ) : null}
         {action === 'deduct' ? (

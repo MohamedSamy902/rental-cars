@@ -354,6 +354,7 @@ Query شائع: `?per_page=50&page=1&search=...`
   "daily_km_allowance": 200,
   "excess_km_rate": 5,
   "deposit": 3000,
+  "deposit_currency": "دولار",
   "min_days": 2,
   "discount": 0,
   "other_fees": 0,

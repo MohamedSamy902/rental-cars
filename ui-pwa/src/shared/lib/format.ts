@@ -21,6 +21,17 @@ export function formatMoney(value: number): string {
   return egp.format(value)
 }
 
+/** Default label for agreed cash deposit currency (writable free text). */
+export const DEFAULT_DEPOSIT_CURRENCY = 'جنيه مصري'
+
+/** Format deposit amount with its written currency (not forced EGP). */
+export function formatDepositAmount(value: number, currency?: string | null): string {
+  const n = Number.isFinite(value) ? Math.round(value) : 0
+  const cur = String(currency || '').trim() || DEFAULT_DEPOSIT_CURRENCY
+  const num = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)
+  return `${num} ${cur}`
+}
+
 /** Plain money for WhatsApp/share (Western digits, no RTL isolates). */
 export function formatMoneyPlain(value: number): string {
   const n = Number.isFinite(value) ? Math.round(value) : 0

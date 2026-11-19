@@ -1,3 +1,4 @@
+import { formatDepositAmount } from '@/shared/lib/format'
 import { StatusPill, type MenuItem } from '@/shared/ui'
 import {
   IconEye, IconCheck, IconKey, IconReturn, IconCash, IconCalendar, IconCar, IconBan, IconPrinter, IconWallet, IconTrash,
@@ -63,6 +64,7 @@ export type Contract = {
   prepaid_excess_km?: number | null
   prepaid_excess_km_amount?: number | null
   frozen_agreed_deposit?: number
+  frozen_deposit_currency?: string | null
   excess_km?: number | null
   approved_days?: number
   odometer_out?: number
@@ -163,10 +165,12 @@ export const timelineLabel: Record<string, string> = {
 export function DepositBadge({
   deposit,
   agreedAmount,
+  currency,
 }: {
   deposit?: Deposit | null
   /** Fallback when deposit row not yet received (frozen/agreed on contract). */
   agreedAmount?: number | null
+  currency?: string | null
 }) {
   const amount = deposit?.original_amount ?? agreedAmount ?? null
   const meta = deposit
@@ -179,19 +183,10 @@ export function DepositBadge({
 
   return (
     <span className="rpm-deposit-amount">
-      <strong className="rpm-table__primary tabular-nums">{formatMoneyLocal(amount)}</strong>
+      <strong className="rpm-table__primary tabular-nums">{formatDepositAmount(amount, currency)}</strong>
       <span className="rpm-table__sub">{meta.label}</span>
     </span>
   )
-}
-
-function formatMoneyLocal(value: number): string {
-  return new Intl.NumberFormat('ar-EG', {
-    style: 'currency',
-    currency: 'EGP',
-    maximumFractionDigits: 0,
-    numberingSystem: 'latn',
-  }).format(value)
 }
 
 export function contractMenu(

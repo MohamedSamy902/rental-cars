@@ -3,7 +3,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import {
   Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, DateField, MediaUpload, NumberField, SwitchField, useToast,
 } from '@/shared/ui'
-import { toApiDateTime, formatMoney } from '@/shared/lib/format'
+import { toApiDateTime, formatMoney, formatDepositAmount, DEFAULT_DEPOSIT_CURRENCY } from '@/shared/lib/format'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
@@ -58,7 +58,7 @@ function estimatePeriodRent(days: number, daily: number, halfMonthly: number, mo
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
   daily_rate: '', half_monthly_rate: '', monthly_rate: '',
-  deposit: '', odometer: '', notes: '',
+  deposit: '', deposit_currency: DEFAULT_DEPOSIT_CURRENCY, odometer: '', notes: '',
   daily_km_allowance: String(DEFAULT_DAILY_KM),
   excess_km_rate: String(DEFAULT_EXCESS_KM_RATE),
   prepaid_excess_km: '',
@@ -189,7 +189,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     const handle = window.setTimeout(() => {
       void loadVehicles(form.starts_at, form.planned_ends_at, lockedVehicleId).then((list) => {
         if (form.vehicle_id && !list.some((v) => String(v.id) === form.vehicle_id) && Number(form.vehicle_id) !== lockedVehicleId) {
-          setForm((f) => ({ ...f, vehicle_id: '', daily_rate: '', deposit: '', odometer: '' }))
+          setForm((f) => ({ ...f, vehicle_id: '', daily_rate: '', deposit: '', deposit_currency: DEFAULT_DEPOSIT_CURRENCY, odometer: '' }))
           setAccessoryIds([])
           toast.info('العربية المختارة غير متاحة في هذه الفترة — اختر عربية أخرى.')
         }
@@ -287,6 +287,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           half_monthly_rate: form.half_monthly_rate ? Number(form.half_monthly_rate) : undefined,
           monthly_rate: form.monthly_rate ? Number(form.monthly_rate) : undefined,
           deposit: form.deposit ? Number(form.deposit) : undefined,
+          deposit_currency: form.deposit_currency?.trim() || DEFAULT_DEPOSIT_CURRENCY,
           daily_km_allowance: form.daily_km_allowance !== '' ? Number(form.daily_km_allowance) : undefined,
           excess_km_rate: form.excess_km_rate !== '' ? Number(form.excess_km_rate) : undefined,
           prepaid_excess_km: form.prepaid_excess_km !== '' ? Number(form.prepaid_excess_km) : 0,
@@ -513,7 +514,19 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               hint={`لمدة ${estimatedDays} يوم (شريحة شهري ٢١ فأكثر) · يوم الزيادة = السعر ÷ ${MONTH_UNIT_DAYS}`}
             />
           )}
-          <MoneyField label="التأمين النقدي المتفق" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} />
+          <MoneyField
+            label="التأمين النقدي المتفق"
+            value={form.deposit}
+            unit={form.deposit_currency?.trim() || DEFAULT_DEPOSIT_CURRENCY}
+            onChange={(e) => setForm({ ...form, deposit: e.target.value })}
+          />
+          <TextField
+            label="عملة التأمين"
+            required
+            value={form.deposit_currency}
+            onChange={(e) => setForm({ ...form, deposit_currency: e.target.value })}
+            hint="اكتب العملة كما هي — جنيه مصري · دولار · ريال · يورو …"
+          />
           <NumberField
             label="بدل الكيلومتر اليومي"
             required
@@ -589,7 +602,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
                 قيمة الإيجار {formatMoney(rentEstimate)}
                 {prepaidAmountEstimate > 0 ? ` + كم مدفوع مقدماً ${formatMoney(prepaidAmountEstimate)}` : ''}
                 {deliveryFee > 0 ? ` + خدمة تسليم واستلام ${formatMoney(deliveryFee)}` : ''}
-                {depositEstimate > 0 ? ` + التأمين ${formatMoney(depositEstimate)}` : ''}
+                {depositEstimate > 0 ? ` + التأمين ${formatDepositAmount(depositEstimate, form.deposit_currency)}` : ''}
                 {' = '}
                 <strong>{formatMoney(dueWithDepositLabel)}</strong>
               </p>

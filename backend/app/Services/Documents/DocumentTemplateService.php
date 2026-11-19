@@ -69,6 +69,7 @@ class DocumentTemplateService
             ['key' => 'actual_end_date', 'aliases' => ['تاريخ_الاستلام_الفعلي'], 'label' => 'تاريخ الاستلام الفعلي', 'sample' => '05/11/2026 18:00', 'group' => 'العقد'],
             ['key' => 'daily_rate', 'aliases' => ['السعر_اليومي'], 'label' => 'السعر اليومي', 'sample' => '800', 'group' => 'العقد'],
             ['key' => 'deposit', 'aliases' => ['التأمين', 'التأمين_النقدي'], 'label' => 'مبلغ التأمين النقدي', 'sample' => '5000', 'group' => 'التأمين'],
+            ['key' => 'deposit_currency', 'aliases' => ['عملة_التأمين'], 'label' => 'عملة التأمين النقدي', 'sample' => 'جنيه مصري', 'group' => 'التأمين'],
             ['key' => 'deposit_status', 'aliases' => ['حالة_التأمين'], 'label' => 'حالة التأمين', 'sample' => 'مقبوض', 'group' => 'التأمين'],
             ['key' => 'deposit_remaining', 'aliases' => ['متبقي_التأمين'], 'label' => 'متبقي التأمين', 'sample' => '5000', 'group' => 'التأمين'],
             ['key' => 'deposit_deductions', 'aliases' => ['خصومات_التأمين'], 'label' => 'خصومات التأمين', 'sample' => '0', 'group' => 'التأمين'],
@@ -547,6 +548,7 @@ class DocumentTemplateService
             'daily_km' => (string) $dailyKm,
             'excess_km_rate' => (string) (int) ($contract->frozen_excess_km_rate ?? $ops['excess_km_rate'] ?? 0),
             'deposit' => (string) (int) ($deposit?->original_amount ?? $contract->frozen_agreed_deposit ?? 0),
+            'deposit_currency' => \App\Support\DepositCurrency::normalize($contract->frozen_deposit_currency ?? null),
             'deposit_status' => (string) ($deposit?->status ?? ''),
             'deposit_remaining' => (string) (int) ($deposit ? $deposit->remaining() : ($contract->frozen_agreed_deposit ?? 0)),
             'deposit_deductions' => (string) (int) ($deposit?->deductions_total ?? 0),
@@ -887,7 +889,7 @@ class DocumentTemplateService
   <div class="rpm-lc-terms-wrap">
     <div class="rpm-lc-terms-banner"><span>شروط التعاقد</span></div>
     <ol class="rpm-lc-terms">
-      <li><span class="rpm-lc-band">البند الأول</span> تم دفع تأمين للسيارة مبلغ وقدره ( <span class="fill">{{deposit}}</span> ) يسترد للمستأجر عند إستلام السيارة بدون أي تلفيات أو مخالفات .</li>
+      <li><span class="rpm-lc-band">البند الأول</span> تم دفع تأمين للسيارة مبلغ وقدره ( <span class="fill">{{deposit}}</span> ) <span class="fill">{{deposit_currency}}</span> يسترد للمستأجر عند إستلام السيارة بدون أي تلفيات أو مخالفات .</li>
       <li><span class="rpm-lc-band">البند الثاني</span> في حالة رغبة الطرف الثاني تجديد مدة الإيجار عليه أن يخطر الطرف الأول قبل انتهاء الإيجار بيوم واحد ، وإذا تأخر المستأجر عن التسليم كحد أقصى ، ساعتين ، تحسب يوم جديد ، ويتم سحب السيارة دون تنبيه على المستأجر إذا تغيب الطرف الثاني لمدة 24 ساعة .</li>
       <li><span class="rpm-lc-band">البند الثالث</span> معدل أستخدام السيارة لا يتعدي ( <span class="fill">{{daily_km}}</span> ) كيلو متر في اليوم الواحد ، ما يزيد عن ذلك يحسب بعد كل كيلو متر مبلغ ( <span class="fill">{{excess_km_rate}}</span> ) .</li>
       <li><span class="rpm-lc-band">البند الرابع</span> من حق الطرف الأول سحب السيارة من الطرف الثاني إذا وجدت بقيادة شخص آخر أو تم أستخدام السيارة إستخدام غير شرعي أو بطريقة غير قانونية ولا يحق للطرف الثاني إسترداد باقي مبلغ الإيجار .</li>

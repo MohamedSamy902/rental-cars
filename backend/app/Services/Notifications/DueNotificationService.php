@@ -20,6 +20,7 @@ use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Services\Contracts\ContractPricingService;
 use App\Support\CivilDate;
+use App\Support\DepositCurrency;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -478,7 +479,7 @@ class DueNotificationService
                 subjectType: 'contract',
                 subjectId: (int) $contract->id,
                 title: "تأمين غير مقبوض على العقد {$contract->number}",
-                body: "المبلغ المتفق {$this->money((int) $contract->frozen_agreed_deposit)} ولم يُقبض بعد.",
+                body: 'المبلغ المتفق '.$this->depositMoney((int) $contract->frozen_agreed_deposit, $contract->frozen_deposit_currency ?? null).' ولم يُقبض بعد.',
                 linkType: 'contract',
                 linkId: (int) $contract->id,
                 permissions: ['deposits.view'],
@@ -1119,5 +1120,10 @@ class DueNotificationService
     private function money(int $amount): string
     {
         return number_format($amount, 0, '.', ',').' ج.م';
+    }
+
+    private function depositMoney(int $amount, ?string $currency): string
+    {
+        return number_format($amount, 0, '.', ',').' '.DepositCurrency::normalize($currency);
     }
 }
