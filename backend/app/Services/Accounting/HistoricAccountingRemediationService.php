@@ -72,7 +72,7 @@ class HistoricAccountingRemediationService
     /**
      * B04/B05: contract cash receipts/refunds get payment:{id} cash↔AR journal.
      * Mirrors live recordPayment: skip credit/deposit methods and non-contract links
-     * (deposit cash is already posted via deposit_hold / deposit_return).
+     * (التأمين النقدي خارج الحسابات — لا يُرحَّل من المسار الحي).
      */
     public function backfillPaymentJournals(?int $userId = null): int
     {

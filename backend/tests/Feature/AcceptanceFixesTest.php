@@ -122,7 +122,7 @@ class AcceptanceFixesTest extends TestCase
         }
     }
 
-    public function test_transfer_deposit_posts_to_the_bank_account(): void
+    public function test_transfer_deposit_stays_outside_accounting_journals(): void
     {
         [$customer, $vehicle] = $this->seedParty('01090000007');
         $active = $this->activate($customer, $vehicle, now()->subHour(), now()->addDays(2));
@@ -132,16 +132,13 @@ class AcceptanceFixesTest extends TestCase
             'amount' => (int) $active->frozen_agreed_deposit,
         ], $this->admin->id);
 
-        $codes = DB::table('journal_lines')
-            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
-            ->join('accounts', 'accounts.id', '=', 'journal_lines.account_id')
-            ->where('journal_entries.source', 'deposit_hold:'.$deposit->id)
-            ->pluck('accounts.code')
-            ->all();
-
-        $this->assertContains('1100', $codes);
-        $this->assertContains('1300', $codes);
-        $this->assertNotContains('1000', $codes);
+        $this->assertDatabaseMissing('payments', [
+            'link_type' => 'deposit',
+            'link_id' => $deposit->id,
+        ]);
+        $this->assertFalse(
+            DB::table('journal_entries')->where('source', 'deposit_hold:'.$deposit->id)->exists()
+        );
     }
 
     public function test_discount_above_the_total_is_rejected_in_arabic(): void

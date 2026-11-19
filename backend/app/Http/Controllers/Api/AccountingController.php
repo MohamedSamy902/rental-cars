@@ -129,7 +129,7 @@ class AccountingController extends Controller
             'direction' => ['required', 'in:in,out'],
             'paid_at' => ['nullable', 'date'],
             'reference' => ['nullable', 'string'],
-            'link_type' => ['required', 'string', 'in:contract,customer,deposit,vehicle'],
+            'link_type' => ['required', 'string', 'in:contract,customer,vehicle'],
             'link_id' => ['required', 'integer'],
             'notes' => ['nullable', 'string'],
             'balance_due_on' => ['nullable', 'date', 'after_or_equal:today'],

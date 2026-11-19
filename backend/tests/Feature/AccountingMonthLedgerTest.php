@@ -71,8 +71,8 @@ class AccountingMonthLedgerTest extends TestCase
         $this->assertGreaterThan(0, $ledger['summary']['rent_revenue']);
         $this->assertSame(300, $ledger['summary']['fees_revenue']);
         $this->assertSame(250, $ledger['summary']['expenses']);
-        $this->assertSame(2000, $ledger['summary']['deposits_received']);
-        $this->assertSame(300, $ledger['summary']['deposit_deductions']);
+        $this->assertArrayNotHasKey('deposits_received', $ledger['summary']);
+        $this->assertArrayNotHasKey('deposits', $ledger);
         $this->assertSame(
             $ledger['summary']['rent_revenue'] + 300 - 250,
             $ledger['summary']['net_operating'],
@@ -109,7 +109,12 @@ class AccountingMonthLedgerTest extends TestCase
             ->assertJsonPath('data.number', fn ($n) => is_string($n) && $n !== '')
             ->assertJsonPath('data.ledger.deposit_held', 1700)
             ->assertJsonCount(2, 'data.inspections')
-            ->assertJsonPath('data.payments', fn ($rows) => collect($rows)->contains(fn ($p) => ($p['link_type'] ?? '') === 'deposit'));
+            ->assertJsonPath('data.payments', fn ($rows) => collect($rows)->contains(
+                fn ($p) => ($p['method'] ?? '') === 'deposit' && ($p['link_type'] ?? '') === 'contract'
+            ))
+            ->assertJsonPath('data.payments', fn ($rows) => collect($rows)->every(
+                fn ($p) => ($p['link_type'] ?? '') !== 'deposit'
+            ));
     }
 
     public function test_invalid_month_is_rejected(): void

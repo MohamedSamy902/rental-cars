@@ -2,24 +2,26 @@
 
 namespace App\Services\Dashboard;
 
-use App\Models\Deposit;
 use App\Models\Expense;
 use App\Models\OwnerPayout;
 use App\Models\Payment;
 use App\Models\PayrollPayout;
 use App\Models\User;
+use App\Services\Accounting\PaymentMethodNormalizer;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 
 /**
  * سجل حركة الفلوس ليوم واحد — مقبوضات/مدفوعات + مصروفات (+ رواتب/ملاك عند الصلاحية).
  * مفلتر بصلاحيات المستخدم (payments/accounting · expenses · hr · owners).
+ * التأمين النقدي خارج الحركة (قبض/رد/تسوية method=deposit).
  */
 class HomeDailyCashService
 {
     public const LIMIT = 40;
 
     public const ACCOUNTS_LIMIT = 120;
+
+    public function __construct(private readonly PaymentMethodNormalizer $methods) {}
 
     /**
      * @return array{
@@ -51,19 +53,21 @@ class HomeDailyCashService
         if ($canPayments) {
             $payments = Payment::query()
                 ->whereDate('paid_at', $dateKey)
+                ->where('link_type', '!=', 'deposit')
                 ->orderByDesc('paid_at')
                 ->orderByDesc('id')
                 ->limit($fetchLimit)
-                ->get();
-
-            $depositIds = $payments->where('link_type', 'deposit')->pluck('link_id')->filter()->map(fn ($id) => (int) $id)->all();
-            $contractByDeposit = $depositIds === []
-                ? collect()
-                : Deposit::query()->whereIn('id', $depositIds)->pluck('contract_id', 'id');
+                ->get()
+                // تأمين/رصيد دائن = مذكرة تسوية بلا نقد حقيقي — لا يدخل حركة الفلوس.
+                ->reject(fn (Payment $p) => in_array(
+                    $this->methods->canonical((string) $p->method),
+                    ['deposit', 'credit'],
+                    true
+                ));
 
             foreach ($payments as $p) {
                 $direction = $p->direction === 'in' ? 'in' : 'out';
-                $contractId = $this->contractId($p, $contractByDeposit);
+                $contractId = $this->contractId($p);
                 $entries[] = [
                     'id' => 'payment:'.$p->id,
                     'source' => 'payment',
@@ -220,18 +224,10 @@ class HomeDailyCashService
         return $parts !== [] ? implode(' · ', $parts) : '—';
     }
 
-    /**
-     * @param  Collection<int, int|string|null>  $contractByDeposit
-     */
-    private function contractId(Payment $p, $contractByDeposit): ?int
+    private function contractId(Payment $p): ?int
     {
         if ($p->link_type === 'contract' && $p->link_id) {
             return (int) $p->link_id;
-        }
-        if ($p->link_type === 'deposit' && $p->link_id) {
-            $id = $contractByDeposit[(int) $p->link_id] ?? null;
-
-            return $id ? (int) $id : null;
         }
 
         return null;
@@ -239,7 +235,7 @@ class HomeDailyCashService
 
     private function paymentHref(Payment $p, bool $canContracts, ?int $contractId): ?string
     {
-        if (in_array($p->link_type, ['contract', 'deposit'], true)) {
+        if ($p->link_type === 'contract') {
             if (! $canContracts || ! $contractId) {
                 return null;
             }
