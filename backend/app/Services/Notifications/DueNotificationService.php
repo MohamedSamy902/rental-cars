@@ -19,6 +19,7 @@ use App\Models\VehicleTire;
 use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Services\Contracts\ContractPricingService;
+use App\Support\CivilDate;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -425,7 +426,7 @@ class DueNotificationService
 
             $who = $contract->customer?->full_name ?: 'العميل';
             $dueLabel = $contract->balance_due_on
-                ? ' · استحقاق '.$contract->balance_due_on->toDateString()
+                ? ' · استحقاق '.CivilDate::formatDisplay($contract->balance_due_on)
                 : '';
             $alerts[] = new DueAlert(
                 ruleKey: 'contract_balance',
@@ -683,8 +684,10 @@ class DueNotificationService
         foreach ($vehicles as $vehicle) {
             $plate = $vehicle->plate ?: ($vehicle->code ?: 'عربية');
             $sim = $vehicle->tracker_sim_number ? " · شريحة {$vehicle->tracker_sim_number}" : '';
-            $next = $vehicle->tracker_sim_next_recharge_on?->toDateString();
-            $last = $vehicle->tracker_sim_last_recharged_on?->toDateString();
+            $next = CivilDate::formatDisplay($vehicle->tracker_sim_next_recharge_on);
+            $last = $vehicle->tracker_sim_last_recharged_on
+                ? CivilDate::formatDisplay($vehicle->tracker_sim_last_recharged_on)
+                : null;
             $body = $last
                 ? "ميعاد الشحن القادم {$next}. آخر شحن كان {$last}{$sim}."
                 : "ميعاد الشحن القادم {$next}{$sim}.";
@@ -734,8 +737,10 @@ class DueNotificationService
         foreach ($vehicles as $vehicle) {
             $plate = $vehicle->plate ?: ($vehicle->code ?: 'عربية');
             $ownerName = $vehicle->owner?->full_name ?: 'مالك';
-            $ends = $vehicle->owner_agreement_ends_on?->toDateString();
-            $starts = $vehicle->owner_agreement_starts_on?->toDateString();
+            $ends = CivilDate::formatDisplay($vehicle->owner_agreement_ends_on);
+            $starts = $vehicle->owner_agreement_starts_on
+                ? CivilDate::formatDisplay($vehicle->owner_agreement_starts_on)
+                : null;
             $range = $starts ? "من {$starts} إلى {$ends}" : "ينتهي {$ends}";
 
             $alerts[] = new DueAlert(
@@ -776,7 +781,7 @@ class DueNotificationService
                     subjectType: 'vehicle_document',
                     subjectId: (int) $document->id,
                     title: "مستند عربية يقترب انتهاؤه: {$plate}",
-                    body: "{$document->type} ينتهي في {$document->expires_on?->toDateString()}.",
+                    body: "{$document->type} ينتهي في ".CivilDate::formatDisplay($document->expires_on).'.',
                     linkType: 'vehicle',
                     linkId: (int) $document->vehicle_id,
                     permissions: ['vehicles.view'],
@@ -823,7 +828,7 @@ class DueNotificationService
                 subjectType: 'customer',
                 subjectId: (int) $customer->id,
                 title: "{$label} تقترب من الانتهاء: {$customer->full_name}",
-                body: "تاريخ الانتهاء {$expires->toDateString()}.",
+                body: 'تاريخ الانتهاء '.CivilDate::formatDisplay($expires).'.',
                 linkType: 'customer',
                 linkId: (int) $customer->id,
                 permissions: ['customers.view'],
@@ -864,7 +869,7 @@ class DueNotificationService
                     subjectType: 'work_order',
                     subjectId: (int) $order->id,
                     title: "صيانة بالتاريخ: {$plate}",
-                    body: "موعد الصيانة التالية {$order->next_service_on->toDateString()}.",
+                    body: 'موعد الصيانة التالية '.CivilDate::formatDisplay($order->next_service_on).'.',
                     linkType: 'maintenance',
                     linkId: (int) $order->id,
                     permissions: ['maintenance.view', 'vehicles.view'],
@@ -919,7 +924,7 @@ class DueNotificationService
                     subjectType: 'vehicle_consumable',
                     subjectId: (int) $state->id,
                     title: "قطعة استهلاكية بالتاريخ: {$name}",
-                    body: "{$plate} · الاستحقاق {$state->due_on->toDateString()}.",
+                    body: "{$plate} · الاستحقاق ".CivilDate::formatDisplay($state->due_on).'.',
                     linkType: 'vehicle',
                     linkId: (int) $state->vehicle_id,
                     permissions: ['maintenance.view', 'vehicles.view'],

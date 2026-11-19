@@ -40,6 +40,26 @@ final class CivilDate
         return [(int) $dt->format('Y'), (int) $dt->format('n')];
     }
 
+    /** User-facing day/month/year (Western digits). Storage stays YYYY-MM-DD. */
+    public static function formatDisplay(mixed $value, string $empty = '—'): string
+    {
+        if ($value === null || $value === '') {
+            return $empty;
+        }
+
+        $day = self::toDateString($value, '');
+        if ($day === '') {
+            return $empty;
+        }
+
+        $dt = \DateTimeImmutable::createFromFormat('!Y-m-d', $day);
+        if (! $dt) {
+            return $empty;
+        }
+
+        return $dt->format('d/m/Y');
+    }
+
     private static function zone(): string
     {
         return (string) config('app.timezone', 'Africa/Cairo');

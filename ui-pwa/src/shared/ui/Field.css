@@ -70,6 +70,59 @@
   min-width: 0;
 }
 
+.rpm-date {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.rpm-date__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-inline-end: 2.75rem;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rpm-date__cal {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.rpm-date__icon {
+  pointer-events: none;
+}
+
+.rpm-date__native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  color: transparent;
+}
+
+.rpm-date__native:disabled {
+  cursor: not-allowed;
+}
+
 .rpm-input--date,
 .rpm-input--time,
 input.rpm-input[type='date'],
