@@ -88,6 +88,10 @@ class QaV10FixTicketsTest extends TestCase
         ])->assertCreated();
         $depositId = (int) Deposit::query()->where('contract_id', $contractId)->value('id');
         $this->assertNotSame($contractId, $depositId);
+        $this->assertDatabaseMissing('payments', [
+            'link_type' => 'deposit',
+            'link_id' => $depositId,
+        ]);
 
         $this->postJson('/api/accounting/payments', [
             'amount' => 100,
@@ -106,13 +110,7 @@ class QaV10FixTicketsTest extends TestCase
             'link_type' => 'deposit',
             'link_id' => $depositId,
             'notes' => 'رد متبقي التأمين النقدي',
-        ])->assertCreated();
-
-        $storedDepositNote = (string) Payment::query()
-            ->where('link_type', 'deposit')
-            ->where('direction', 'in')
-            ->value('notes');
-        $this->assertStringContainsString($number, $storedDepositNote);
+        ])->assertStatus(422);
 
         $accountant = $this->userWith(['vehicles.view', 'accounting.view']);
         Sanctum::actingAs($accountant);
@@ -122,9 +120,9 @@ class QaV10FixTicketsTest extends TestCase
         $this->assertNotNull($hidden);
         $this->assertStringNotContainsString('CNT-', (string) json_encode($hidden, JSON_UNESCAPED_UNICODE));
         $this->assertStringNotContainsString('عقد #'.$contractId, (string) json_encode($hidden, JSON_UNESCAPED_UNICODE));
-        $this->assertStringContainsString('قبض تأمين نقدي', (string) json_encode($hidden['entries'], JSON_UNESCAPED_UNICODE));
-        $this->assertSame(1102, $hidden['totals']['in']);
-        $this->assertSame(200, $hidden['totals']['out']);
+        $this->assertStringNotContainsString('تأمين', (string) json_encode($hidden['entries'], JSON_UNESCAPED_UNICODE));
+        $this->assertSame(102, $hidden['totals']['in']);
+        $this->assertSame(0, $hidden['totals']['out']);
         foreach ($hidden['entries'] as $entry) {
             if (($entry['source'] ?? '') === 'payment') {
                 $this->assertNull($entry['href']);
@@ -144,27 +142,16 @@ class QaV10FixTicketsTest extends TestCase
         $this->assertSame('cash', $restrictedRent['method']);
         $this->assertSame($hidden['totals']['count'], count($hidden['entries']));
 
-        $this->assertStringContainsString($number, (string) Payment::query()
-            ->where('link_type', 'deposit')
-            ->where('direction', 'in')
-            ->value('notes'));
-
         foreach ([$this->userWith(['vehicles.view', 'accounting.view', 'contracts.view']), $this->admin()] as $user) {
             Sanctum::actingAs($user);
             $shown = $this->getJson('/api/dashboard')->assertOk()->json('daily_cash');
             $this->assertStringContainsString($number, (string) json_encode($shown, JSON_UNESCAPED_UNICODE));
             $byNotes = collect($shown['entries'])->keyBy(fn ($row) => $row['subtitle']);
-            $deposit = $byNotes->first(fn ($row) => str_contains((string) $row['subtitle'], 'قبض تأمين نقدي')
-                && str_contains((string) $row['subtitle'], 'للعقد '.$number));
+            $deposit = $byNotes->first(fn ($row) => str_contains((string) $row['subtitle'], 'قبض تأمين'));
             $rent = $byNotes->first(fn ($row) => str_contains((string) $row['subtitle'], 'دفعة إيجار للعقد '.$number));
-            $refund = $byNotes->first(fn ($row) => str_contains((string) $row['subtitle'], 'رد متبقي التأمين النقدي'));
-            $this->assertNotNull($deposit);
+            $this->assertNull($deposit);
             $this->assertNotNull($rent);
-            $this->assertNotNull($refund);
-            $this->assertSame('/contracts/'.$contractId, $deposit['href']);
             $this->assertSame('/contracts/'.$contractId, $rent['href']);
-            $this->assertSame('/contracts/'.$contractId, $refund['href']);
-            $this->assertNotSame('/contracts/'.$depositId, $deposit['href']);
             $this->assertStringContainsString('عقد #'.$contractId, (string) $rent['subtitle']);
         }
     }

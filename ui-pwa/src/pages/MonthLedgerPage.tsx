@@ -4,7 +4,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, BackNavButton, MetricCardGrid, StatusPill, SkeletonBlock, ErrorState, Sheet, TextField, useToast,
-  IconCash, IconReceipt, IconWallet, IconTrend, IconBriefcase, IconAlert, IconKey,
+  IconCash, IconReceipt, IconWallet, IconTrend, IconBriefcase, IconAlert,
 } from '@/shared/ui'
 import './pages.css'
 import './MonthLedgerPage.css'
@@ -42,9 +42,6 @@ type Ledger = {
     expenses: number
     payroll_paid: number
     net_operating: number
-    deposits_received: number
-    deposits_returned: number
-    deposit_deductions: number
     payments_in: number
     client_payouts: number
     violations_tracked: number
@@ -53,7 +50,6 @@ type Ledger = {
   rents: Row[]
   fees: Row[]
   expenses: Row[]
-  deposits: { received: Row[]; returned: Row[]; deductions: Row[] }
   payments_in: Row[]
   client_payouts: Row[]
   payroll: Row[]
@@ -180,9 +176,6 @@ export function MonthLedgerPage() {
     data.rents.forEach((r) => push('إيجار', r))
     data.fees.forEach((r) => push(r.kind || 'رسوم', r))
     data.expenses.forEach((r) => push(`مصروف/${r.category || ''}`, r, r.title || ''))
-    data.deposits.received.forEach((r) => push('تأمين مقبوض', r))
-    data.deposits.returned.forEach((r) => push('تأمين مردود', r))
-    data.deposits.deductions.forEach((r) => push('خصم تأمين', r))
     data.payroll.forEach((r) => push('راتب', r))
     data.violations.forEach((r) => push('مخالفة (متابعة)', r))
     downloadCsv(`rpm-${data.year}-${String(data.month).padStart(2, '0')}.csv`, ['النوع', 'التاريخ', 'العقد', 'الطرف', 'المبلغ', 'مرجع'], rows)
@@ -228,7 +221,6 @@ export function MonthLedgerPage() {
           { id: 'exp', label: 'المصروفات', value: s.expenses, format: 'money', tone: 'warning', icon: <IconReceipt size={16} /> },
           { id: 'pay', label: 'رواتب مصروفة', value: s.payroll_paid, format: 'money', icon: <IconBriefcase size={16} /> },
           { id: 'net', label: 'صافي الربح', value: s.net_operating, format: 'money', tone: s.net_operating >= 0 ? 'success' : 'danger', icon: <IconWallet size={16} /> },
-          { id: 'dep', label: 'تأمينات مقبوضة', value: s.deposits_received, format: 'money', icon: <IconKey size={16} /> },
           { id: 'viol', label: 'مخالفات متابعة', value: s.violations_tracked ?? 0, format: 'money', tone: 'warning', icon: <IconAlert size={16} /> },
         ]}
       />
@@ -256,25 +248,6 @@ export function MonthLedgerPage() {
         <MoneyRows rows={data.expenses} empty="لا مصروفات" render={(r) => ({
           title: r.title || 'مصروف',
           sub: `${when(r.date)} · ${r.category || ''} · ${r.vehicle || r.method || ''}`,
-        })} />
-      </section>
-
-      <section className="rpm-panel">
-        <div className="rpm-panel__head"><h3>التأمينات النقدية</h3></div>
-        <h4 className="ml-sub">مقبوض</h4>
-        <MoneyRows rows={data.deposits.received} empty="لا قبض تأمين" render={(r) => ({
-          title: `${r.contract || ''} · ${r.customer || ''}`,
-          sub: `${when(r.date)} · ${r.receipt || r.method || ''}`,
-        })} />
-        <h4 className="ml-sub">خصومات</h4>
-        <MoneyRows rows={data.deposits.deductions} empty="لا خصومات" render={(r) => ({
-          title: r.reason || 'خصم',
-          sub: `${when(r.date)} · ${r.contract || ''} · ${r.customer || ''}`,
-        })} />
-        <h4 className="ml-sub">مردود للعملاء</h4>
-        <MoneyRows rows={data.deposits.returned} empty="لا رد تأمين" render={(r) => ({
-          title: `${r.contract || ''} · ${r.customer || ''}`,
-          sub: `${when(r.date)} · ${r.receipt || r.method || ''}`,
         })} />
       </section>
 

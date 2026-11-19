@@ -4,8 +4,6 @@ namespace App\Services\Accounting;
 
 use App\Models\AuditLog;
 use App\Models\Contract;
-use App\Models\Deposit;
-use App\Models\DepositDeduction;
 use App\Models\Expense;
 use App\Models\JournalLine;
 use App\Models\MonthLock;
@@ -68,62 +66,13 @@ class MonthLedgerService
                 'amount' => (int) $e->amount,
             ])->values();
 
-        $depositsReceived = Deposit::query()
-            ->with('contract:id,number,customer_id', 'contract.customer:id,full_name')
-            ->whereBetween('received_at', $range)
-            ->orderBy('received_at')
-            ->get()
-            ->map(fn (Deposit $d) => [
-                'id' => $d->id,
-                'date' => $d->received_at?->toIso8601String(),
-                'contract_id' => $d->contract_id,
-                'contract' => $d->contract?->number,
-                'customer' => $d->contract?->customer?->full_name,
-                'receipt' => $d->receipt_number,
-                'method' => $d->collection_method,
-                'amount' => (int) $d->original_amount,
-            ])->values();
-
-        $depositsReturned = Deposit::query()
-            ->with('contract:id,number,customer_id', 'contract.customer:id,full_name')
-            ->whereBetween('returned_at', $range)
-            ->orderBy('returned_at')
-            ->get()
-            ->map(fn (Deposit $d) => [
-                'id' => $d->id,
-                'date' => $d->returned_at?->toIso8601String(),
-                'contract_id' => $d->contract_id,
-                'contract' => $d->contract?->number,
-                'customer' => $d->contract?->customer?->full_name,
-                'receipt' => $d->return_receipt_number,
-                'method' => $d->return_method,
-                'amount' => $d->remaining(),
-            ])->values();
-
-        $deductions = DepositDeduction::query()
-            ->whereBetween('deducted_at', $range)
-            ->orderBy('deducted_at')
+        // التأمين النقدي خارج دفتر الحسابات — يُتابع من شاشة العقد فقط.
+        $payments = Payment::query()
+            ->whereBetween('paid_at', $range)
+            ->where('link_type', '!=', 'deposit')
+            ->whereNotIn('method', ['deposit', 'credit', 'تأمين', 'رصيد', 'رصيد دائن'])
+            ->orderBy('paid_at')
             ->get();
-        $deductionDeposits = Deposit::query()
-            ->with('contract:id,number,customer_id', 'contract.customer:id,full_name')
-            ->whereKey($deductions->pluck('deposit_id')->unique()->all())
-            ->get()
-            ->keyBy('id');
-        $depositDeductions = $deductions->map(function (DepositDeduction $x) use ($deductionDeposits) {
-            $deposit = $deductionDeposits->get($x->deposit_id);
-
-            return [
-                'id' => $x->id,
-                'date' => $x->deducted_at?->toIso8601String(),
-                'contract_id' => $deposit?->contract_id,
-                'contract' => $deposit?->contract?->number,
-                'customer' => $deposit?->contract?->customer?->full_name,
-                'reason' => $x->reason,
-                'amount' => (int) $x->amount,
-            ];
-        })->values();
-
-        $payments = Payment::query()->whereBetween('paid_at', $range)->orderBy('paid_at')->get();
         $mapPayment = fn (Payment $p) => [
             'id' => $p->id,
             'date' => $p->paid_at?->toIso8601String(),
@@ -188,9 +137,6 @@ class MonthLedgerService
                 'expenses' => $expensesTotal,
                 'payroll_paid' => $payrollTotal,
                 'net_operating' => $rentTotal + $feesTotal - $expensesTotal - $payrollTotal,
-                'deposits_received' => (int) $depositsReceived->sum('amount'),
-                'deposits_returned' => (int) $depositsReturned->sum('amount'),
-                'deposit_deductions' => (int) $depositDeductions->sum('amount'),
                 'payments_in' => (int) $paymentsIn->sum('amount'),
                 'client_payouts' => (int) $clientPayouts->sum('amount'),
                 'violations_tracked' => (int) $violations->sum('amount'),
@@ -202,11 +148,6 @@ class MonthLedgerService
             'rents' => $rents,
             'fees' => $fees,
             'expenses' => $expenses,
-            'deposits' => [
-                'received' => $depositsReceived,
-                'returned' => $depositsReturned,
-                'deductions' => $depositDeductions,
-            ],
             'payments_in' => $paymentsIn,
             'client_payouts' => $clientPayouts,
             'payroll' => $payroll,

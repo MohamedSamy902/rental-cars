@@ -735,10 +735,12 @@ class AccountingService
             if (! $linkId) {
                 throw new DomainException('معرّف الربط مطلوب.');
             }
+            if ($linkType === 'deposit') {
+                throw new DomainException('التأمين النقدي خارج الحسابات — يُسجَّل من مسار العقد فقط بلا دفعة محاسبية.');
+            }
             $linked = match ($linkType) {
                 'contract' => Contract::query()->whereKey($linkId)->exists(),
                 'customer' => Customer::query()->whereKey($linkId)->exists(),
-                'deposit' => Deposit::query()->whereKey($linkId)->exists(),
                 'vehicle' => Vehicle::query()->whereKey($linkId)->exists(),
                 default => false,
             };
@@ -802,6 +804,10 @@ class AccountingService
         });
     }
 
+    /**
+     * @deprecated التأمين النقدي خارج الحسابات — لا يُستدعى من مسار العقد الحي.
+     * يبقى للتوافق مع قيود تاريخية / أدوات إصلاح فقط.
+     */
     public function postDepositHold(Deposit $deposit, Contract $contract, ?int $userId = null, ?string $method = null): JournalEntry
     {
         $cash = $this->methods->cashAccountCode($method ?? (string) ($deposit->collection_method ?? 'cash'));
@@ -820,6 +826,9 @@ class AccountingService
         );
     }
 
+    /**
+     * @deprecated التأمين النقدي خارج الحسابات — لا يُستدعى من مسار العقد الحي.
+     */
     public function postDepositReturn(Deposit $deposit, int $amount, ?int $userId = null, ?string $method = null): ?JournalEntry
     {
         if ($amount < 1) {
@@ -905,6 +914,9 @@ class AccountingService
         );
     }
 
+    /**
+     * @deprecated التأمين النقدي خارج الحسابات — خصم التأمين يسجّل مذكرة method=deposit بلا قيد.
+     */
     public function postDepositApply(Deposit $deposit, Contract $contract, int $amount, int $deductionId, ?int $userId = null): JournalEntry
     {
         return $this->postTransfer(

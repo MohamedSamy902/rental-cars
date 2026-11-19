@@ -364,7 +364,7 @@ export function AccountsPage() {
             <div className="rpm-dense-row">
               <div>
                 <strong>لا مقبوضات بعد</strong>
-                <p className="muted">تظهر هنا قبض التأمين ومدفوعات العقود</p>
+                <p className="muted">تظهر هنا مدفوعات العقود والمصروفات — التأمين النقدي خارج الحسابات</p>
               </div>
               <strong className="tabular-nums">{formatMoney(0)}</strong>
             </div>

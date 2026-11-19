@@ -1159,8 +1159,8 @@ class ContractLifecycleService
                 throw new DomainException('مبلغ التأمين يجب أن يساوي التأمين المتفق ('.$agreed.').');
             }
 
-            $currency = \App\Support\DepositCurrency::normalize($contract->frozen_deposit_currency ?? null);
-            $deposit = Deposit::query()->create([
+            // التأمين النقدي متابعة تشغيلية فقط — بلا دفعة محاسبية وبلا قيد يومية (يُرد لاحقاً فيلغبط الدفتر).
+            return Deposit::query()->create([
                 'contract_id' => $contract->id,
                 'original_amount' => $amount,
                 'status' => 'received',
@@ -1170,19 +1170,6 @@ class ContractLifecycleService
                 'collection_ref' => $data['collection_ref'] ?? null,
                 'deductions_total' => 0,
             ]);
-
-            $this->accounting->recordPayment([
-                'amount' => $amount,
-                'method' => $data['method'],
-                'direction' => 'in',
-                'reference' => $data['receipt_number'],
-                'link_type' => 'deposit',
-                'link_id' => $deposit->id,
-                'notes' => 'قبض تأمين نقدي ('.$currency.') للعقد '.$contract->number,
-            ], $userId);
-            $this->accounting->postDepositHold($deposit->fresh(), $contract, $userId, (string) $data['method']);
-
-            return $deposit;
         });
     }
 
@@ -1235,6 +1222,7 @@ class ContractLifecycleService
         $deposit->save();
 
         if ($contract) {
+            // مذكرة تسوية على العقد فقط (method=deposit بلا قيد payment:*) — التأمين نفسه خارج الحسابات.
             Payment::query()->create([
                 'amount' => $amount,
                 'paid_at' => now(),
@@ -1246,7 +1234,6 @@ class ContractLifecycleService
                 'user_id' => $userId,
                 'notes' => 'تسوية تأمين على العقد '.$contract->number,
             ]);
-            $this->accounting->postDepositApply($deposit, $contract, $amount, (int) $deduction->id, $userId);
         }
 
         return $deposit->fresh('deductions');
@@ -1280,7 +1267,6 @@ class ContractLifecycleService
             }
         }
 
-        $remaining = $deposit->remaining();
         $deposit->fill([
             'status' => 'returned',
             'returned_at' => now(),
@@ -1288,18 +1274,7 @@ class ContractLifecycleService
             'return_receipt_number' => $receiptNumber,
         ])->save();
 
-        if ($remaining > 0) {
-            $this->accounting->recordPayment([
-                'amount' => $remaining,
-                'method' => $method,
-                'direction' => 'out',
-                'reference' => $receiptNumber,
-                'link_type' => 'deposit',
-                'link_id' => $deposit->id,
-                'notes' => 'رد متبقي التأمين النقدي',
-            ], $userId);
-            $this->accounting->postDepositReturn($deposit, $remaining, $userId, $method);
-        }
+        // رد التأمين خارج الحسابات — بلا دفعة وبلا قيد (المبلغ كان محتجزاً تشغيلياً فقط).
 
         return $deposit->fresh('deductions');
     }
