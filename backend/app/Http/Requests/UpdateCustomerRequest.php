@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
-use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
 use App\Rules\MediaReference;
 use App\Support\DigitNormalizer;
@@ -56,26 +55,19 @@ class UpdateCustomerRequest extends FormRequest
      */
     public function rules(): array
     {
-        $nationality = $this->input('nationality');
-        if ($nationality === null || $nationality === '') {
-            $customer = $this->route('customer');
-            $nationality = is_object($customer) ? ($customer->nationality ?? Nationalities::EGYPTIAN) : Nationalities::EGYPTIAN;
-        }
-        $egyptian = Nationalities::isEgyptian($nationality);
-
         return [
             'full_name' => ['sometimes', 'string', 'max:200'],
             'phone' => ['sometimes', 'string', 'max:30', new EgyptianPhone, Rule::unique('customers', 'phone')->ignore($this->customerId())->whereNull('deleted_at')],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'email' => ['nullable', 'email', 'max:200'],
             'nationality' => ['sometimes', 'required', 'string', 'max:80', Rule::in(Nationalities::all())],
-            'national_id' => array_values(array_filter([
+            // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
+            'national_id' => [
                 'nullable',
                 'string',
-                'max:30',
-                $egyptian ? new EgyptianNationalId : null,
+                'max:80',
                 Rule::unique('customers', 'national_id')->ignore($this->customerId())->whereNull('deleted_at'),
-            ])),
+            ],
             'national_id_expires_on' => ['nullable', 'date'],
             'passport_number' => ['nullable', 'string', 'max:50'],
             'passport_expires_on' => ['nullable', 'date'],

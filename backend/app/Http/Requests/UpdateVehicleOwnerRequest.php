@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
-use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
 use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
@@ -31,25 +30,13 @@ class UpdateVehicleOwnerRequest extends FormRequest
      */
     public function rules(): array
     {
-        $nationality = $this->input('nationality');
-        if ($nationality === null || $nationality === '') {
-            $owner = $this->route('owner');
-            $nationality = is_object($owner) ? ($owner->nationality ?? null) : null;
-        }
-        $egyptian = Nationalities::isEgyptian($nationality);
-
         return [
             'full_name' => ['sometimes', 'required', 'string', 'max:200'],
             'phone' => ['sometimes', 'required', 'string', 'max:30', new EgyptianPhone],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'nationality' => ['sometimes', 'required', 'string', 'max:80', Rule::in(Nationalities::all())],
-            'national_id' => array_values(array_filter([
-                'sometimes',
-                'required',
-                'string',
-                'max:30',
-                $egyptian ? new EgyptianNationalId : null,
-            ])),
+            // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
+            'national_id' => ['sometimes', 'required', 'string', 'max:80'],
             'id_front_path' => ['sometimes', 'required', 'string', 'max:500'],
             'id_back_path' => ['sometimes', 'required', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],

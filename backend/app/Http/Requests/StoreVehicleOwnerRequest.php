@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
-use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
 use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
@@ -31,19 +30,13 @@ class StoreVehicleOwnerRequest extends FormRequest
      */
     public function rules(): array
     {
-        $egyptian = Nationalities::isEgyptian($this->input('nationality'));
-
         return [
             'full_name' => ['required', 'string', 'max:200'],
             'phone' => ['required', 'string', 'max:30', new EgyptianPhone],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'nationality' => ['required', 'string', 'max:80', Rule::in(Nationalities::all())],
-            'national_id' => array_values(array_filter([
-                'required',
-                'string',
-                'max:30',
-                $egyptian ? new EgyptianNationalId : null,
-            ])),
+            // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
+            'national_id' => ['required', 'string', 'max:80'],
             'id_front_path' => ['required', 'string', 'max:500'],
             'id_back_path' => ['required', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
