@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api, type ApiError } from '@/shared/api/client'
 import { todayCivilIso } from '@/shared/lib/dates'
-import { formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   Button, Sheet, Fab, TextField, SelectField, MoneyField, SwitchField,
@@ -653,7 +653,7 @@ export function StaffPage() {
                 >
                   <div>
                     <strong>{emp.name}</strong>
-                    <p>{emp.job_title || 'بدون مسمى'} · تعيين {emp.hired_on || '—'}</p>
+                    <p>{emp.job_title || 'بدون مسمى'} · تعيين {emp.hired_on ? formatDate(emp.hired_on) : '—'}</p>
                   </div>
                   <div className="st-hr__end">
                     <span className="tabular-nums">{formatMoney(emp.base_salary)}</span>

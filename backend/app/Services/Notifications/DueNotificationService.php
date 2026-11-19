@@ -1113,11 +1113,7 @@ class DueNotificationService
 
     private function when(mixed $at): string
     {
-        if ($at === null) {
-            return '—';
-        }
-
-        return Carbon::parse($at)->timezone(config('app.timezone'))->format('Y-m-d H:i');
+        return CivilDate::formatDateTime($at);
     }
 
     private function money(int $amount): string

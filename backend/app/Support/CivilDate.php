@@ -60,6 +60,16 @@ final class CivilDate
         return $dt->format('d/m/Y');
     }
 
+    /** User-facing day/month/year + time (Western digits). */
+    public static function formatDateTime(mixed $value, string $empty = '—'): string
+    {
+        if ($value === null || $value === '') {
+            return $empty;
+        }
+
+        return CarbonImmutable::parse($value)->timezone(self::zone())->format('d/m/Y H:i');
+    }
+
     private static function zone(): string
     {
         return (string) config('app.timezone', 'Africa/Cairo');

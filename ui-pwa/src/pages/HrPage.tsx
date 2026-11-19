@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { todayCivilIso } from '@/shared/lib/dates'
-import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatMoney } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, FilterBar, Button, Sheet, TextAreaField, SelectField, MoneyField, TextField,
@@ -392,7 +392,7 @@ export function HrPage() {
                 <strong>{a.employee?.name || 'موظف'}</strong>
                 <strong className="tabular-nums">{formatMoney(a.amount)}</strong>
               </div>
-              <p className="muted">{a.advanced_on} · {a.method === 'transfer' ? 'تحويل' : a.method === 'card' ? 'بطاقة' : 'نقدي'}{a.notes ? ` · ${a.notes}` : ''}</p>
+              <p className="muted">{formatDate(a.advanced_on)} · {a.method === 'transfer' ? 'تحويل' : a.method === 'card' ? 'بطاقة' : 'نقدي'}{a.notes ? ` · ${a.notes}` : ''}</p>
               <div className="rpm-card__actions">
                 {a.employee?.id ? (
                   <Button size="sm" variant="secondary" onClick={() => navigate(`/employees/${a.employee!.id}`)}>عرض الملف الكامل</Button>

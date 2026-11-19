@@ -24,5 +24,6 @@ class CivilDateTest extends TestCase
         $this->assertSame('01/11/2026', CivilDate::formatDisplay('2026-10-31T22:00:00.000000Z'));
         $this->assertSame('—', CivilDate::formatDisplay(null));
         $this->assertSame('', CivilDate::formatDisplay(null, ''));
+        $this->assertSame('01/11/2026 00:00', CivilDate::formatDateTime('2026-11-01T00:00:00+02:00'));
     }
 }

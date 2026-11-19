@@ -1044,7 +1044,7 @@ export function VehicleDetailPage() {
               <div className="rpm-card__row">
                 <div>
                   <strong>أمر #{w.id}</strong>
-                  <p className="muted">{w.workshop || '—'} · فتح {w.opened_on || '—'} · عداد {w.odometer != null ? formatNumber(w.odometer) : '—'}</p>
+                  <p className="muted">{w.workshop || '—'} · فتح {shortDate(w.opened_on)} · عداد {w.odometer != null ? formatNumber(w.odometer) : '—'}</p>
                 </div>
                 <StatusPill status={w.status} label={statusLabel[w.status] || w.status} />
               </div>
@@ -1115,7 +1115,7 @@ export function VehicleDetailPage() {
                 <tr key={e.id}>
                   <td data-label="العنوان"><strong className="rpm-table__primary">{e.title}</strong></td>
                   <td data-label="التصنيف">{e.category || '—'}</td>
-                  <td data-label="التاريخ">{e.spent_on || '—'}</td>
+                  <td data-label="التاريخ">{shortDate(e.spent_on)}</td>
                   <td data-label="المبلغ">{formatMoney(e.amount)}</td>
                   <td data-label="الطريقة">{e.payment_method || '—'}</td>
                 </tr>
@@ -1461,7 +1461,7 @@ export function VehicleDetailPage() {
                   <tbody>
                     {dossier.owner_payouts.map((p) => (
                       <tr key={p.id}>
-                        <td data-label="التاريخ">{p.paid_on || '—'}</td>
+                        <td data-label="التاريخ">{shortDate(p.paid_on)}</td>
                         <td data-label="المبلغ">{formatMoney(p.amount)}</td>
                         <td data-label="الطريقة">{p.payment_method || '—'}</td>
                       </tr>

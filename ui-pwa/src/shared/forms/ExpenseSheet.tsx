@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
+import { formatDate } from '@/shared/lib/format'
 import {
   Button, Sheet, TextField, MoneyField, SelectField, TextAreaField, DateField, SwitchField, useToast,
 } from '@/shared/ui'
@@ -250,7 +251,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
               { value: '', label: '— بدون أمر صيانة —' },
               ...workOrders.map((w) => ({
                 value: String(w.id),
-                label: `#${w.id} · ${w.status}${w.opened_on ? ` · ${w.opened_on}` : ''}${w.workshop ? ` · ${w.workshop}` : ''}`,
+                label: `#${w.id} · ${w.status}${w.opened_on ? ` · ${formatDate(w.opened_on)}` : ''}${w.workshop ? ` · ${w.workshop}` : ''}`,
               })),
             ]}
             onChange={(e) => setForm({ ...form, work_order_id: e.target.value })}
