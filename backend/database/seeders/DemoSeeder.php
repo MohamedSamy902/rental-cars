@@ -203,9 +203,9 @@ class DemoSeeder extends Seeder
         }
 
         $customers = [
-            ['full_name' => 'أحمد محمود', 'phone' => '01011112222', 'birth_date' => '1990-05-12', 'license_number' => 'L-1001', 'license_expires_on' => '2028-01-01', 'national_id' => '29005121234567'],
-            ['full_name' => 'منى حسين', 'phone' => '01022223333', 'birth_date' => '1993-08-20', 'license_number' => 'L-1002', 'license_expires_on' => '2027-06-01', 'national_id' => '29308201234567'],
-            ['full_name' => 'يوسف علي', 'phone' => '01033334444', 'birth_date' => '1988-01-03', 'license_number' => 'L-1003', 'license_expires_on' => '2029-03-15', 'national_id' => '28801031234567'],
+            ['full_name' => 'أحمد محمود', 'phone' => '01011112222', 'birth_date' => '1990-05-12', 'license_number' => 'L-1001', 'license_expires_on' => '2028-01-01', 'nationality' => 'مصري', 'national_id' => '29005121234567'],
+            ['full_name' => 'منى حسين', 'phone' => '01022223333', 'birth_date' => '1993-08-20', 'license_number' => 'L-1002', 'license_expires_on' => '2027-06-01', 'nationality' => 'سعودي', 'national_id' => 'A1234567890'],
+            ['full_name' => 'يوسف علي', 'phone' => '01033334444', 'birth_date' => '1988-01-03', 'license_number' => 'L-1003', 'license_expires_on' => '2029-03-15', 'nationality' => 'مصري', 'national_id' => '28801031234567'],
         ];
         foreach ($customers as $c) {
             Customer::query()->updateOrCreate(
@@ -358,6 +358,7 @@ class DemoSeeder extends Seeder
             [
                 'full_name' => 'خالد عبد الله',
                 'phone_alt' => '01155556666',
+                'nationality' => 'مصري',
                 'national_id' => '28001011234567',
                 'notes' => 'مالك معاينة — عربيتين للسيناريو الشامل',
                 'is_active' => true,

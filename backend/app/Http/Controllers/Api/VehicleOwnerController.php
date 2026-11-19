@@ -195,6 +195,7 @@ class VehicleOwnerController extends Controller
             'phone' => $o->phone,
             'phone_alt' => $o->phone_alt,
             'national_id' => $nid,
+            'nationality' => $o->nationality,
             'id_front_path' => $o->id_front_path,
             'id_back_path' => $o->id_back_path,
             'notes' => $o->notes,

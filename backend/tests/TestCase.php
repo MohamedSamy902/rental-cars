@@ -27,6 +27,7 @@ abstract class TestCase extends BaseTestCase
 
             if ($path === '/api/vehicles' && isset($data['owner_inline']) && is_array($data['owner_inline'])) {
                 $data['owner_inline']['phone'] ??= '01012345678';
+                $data['owner_inline']['nationality'] ??= 'مصري';
                 $data['owner_inline']['national_id'] ??= '29001011234567';
                 $data['owner_inline']['id_front_path'] ??= 'tests/owners/id-front.jpg';
                 $data['owner_inline']['id_back_path'] ??= 'tests/owners/id-back.jpg';
@@ -44,9 +45,14 @@ abstract class TestCase extends BaseTestCase
 
             if ($path === '/api/owners' && $data !== []) {
                 $data['phone'] ??= '01012345678';
+                $data['nationality'] ??= 'مصري';
                 $data['national_id'] ??= '29001011234567';
                 $data['id_front_path'] ??= 'tests/owners/id-front.jpg';
                 $data['id_back_path'] ??= 'tests/owners/id-back.jpg';
+            }
+
+            if ($path === '/api/customers' && $data !== []) {
+                $data['nationality'] ??= 'مصري';
             }
         }
 

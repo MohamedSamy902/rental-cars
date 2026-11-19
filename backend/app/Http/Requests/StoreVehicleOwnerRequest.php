@@ -5,7 +5,9 @@ namespace App\Http\Requests;
 use App\Http\Requests\Concerns\NormalizesDigits;
 use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
+use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreVehicleOwnerRequest extends FormRequest
 {
@@ -29,11 +31,19 @@ class StoreVehicleOwnerRequest extends FormRequest
      */
     public function rules(): array
     {
+        $egyptian = Nationalities::isEgyptian($this->input('nationality'));
+
         return [
             'full_name' => ['required', 'string', 'max:200'],
             'phone' => ['required', 'string', 'max:30', new EgyptianPhone],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
-            'national_id' => ['required', 'string', 'max:30', new EgyptianNationalId],
+            'nationality' => ['required', 'string', 'max:80', Rule::in(Nationalities::all())],
+            'national_id' => array_values(array_filter([
+                'required',
+                'string',
+                'max:30',
+                $egyptian ? new EgyptianNationalId : null,
+            ])),
             'id_front_path' => ['required', 'string', 'max:500'],
             'id_back_path' => ['required', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
@@ -50,7 +60,8 @@ class StoreVehicleOwnerRequest extends FormRequest
             'full_name' => 'اسم المالك',
             'phone' => 'الهاتف',
             'phone_alt' => 'هاتف بديل',
-            'national_id' => 'الرقم القومي',
+            'nationality' => 'الجنسية',
+            'national_id' => 'الرقم القومي / رقم الهوية',
             'id_front_path' => 'وجه البطاقة',
             'id_back_path' => 'ظهر البطاقة',
             'notes' => 'الملاحظات',
