@@ -4,9 +4,14 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import { civilDateOnly, nowLocalDateTimeValue } from '@/shared/lib/dates'
 import { formatMoney } from '@/shared/lib/format'
 import {
+  MAINTENANCE_ITEM_PRESETS,
+  normalizeMaintenanceItemLabel,
+} from '@/shared/maintenance/maintenanceItems'
+import {
   Button, Sheet, SelectField, NumberField, MoneyField, TextField, SwitchField,
-  DateField, DateTimeField, useToast,
+  DateField, DateTimeField, useToast, FieldShell,
 } from '@/shared/ui'
+import './WorkOrderSheet.css'
 
 type Props = {
   open: boolean
@@ -22,11 +27,21 @@ type VehicleOption = { id: number; brand: string; model: string; plate: string; 
 type Item = { id: number; name: string; code: string; remaining?: number; unit_cost?: number | null }
 type EmployeeOption = { id: number; name: string }
 
+type LinePayload = {
+  description: string
+  part_source: 'stock' | 'purchase'
+  inventory_item_id?: number
+  quantity: number
+  unit_price?: number
+  from_petty_cash?: boolean
+  petty_cash_employee_id?: number
+  petty_cash_amount?: number
+}
+
 const emptyForm = {
   vehicle_id: '',
   odometer: '',
   workshop: '',
-  description: 'صيانة',
   inventory_item_id: '',
   quantity: '1',
   unit_price: '0',
@@ -35,6 +50,7 @@ const emptyForm = {
   employee_id: '',
   next_service_on: '',
   next_service_odometer: '',
+  customItem: '',
 }
 
 export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmployee }: Props) {
@@ -46,13 +62,19 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
   const [items, setItems] = useState<Item[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
   const [saving, setSaving] = useState(false)
-  const [putsInMaintenance, setPutsInMaintenance] = useState(true)
+  const [firstUpcoming, setFirstUpcoming] = useState(true)
+  const [withSpend, setWithSpend] = useState(false)
+  const [putsInMaintenance, setPutsInMaintenance] = useState(false)
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
+  const [extraItems, setExtraItems] = useState<string[]>([])
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const lockedId = vehicle?.id
   const lockedOdometer = vehicle?.odometer
   const lockCustody = Boolean(custodyEmployee?.id)
+  const baselineMode = firstUpcoming && !lockCustody
+  const spendMode = lockCustody || (!baselineMode && withSpend)
 
   const stockItems = useMemo(
     () => items.filter((i) => Number(i.remaining ?? 0) > 0),
@@ -62,6 +84,11 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
   const selectedItem = useMemo(
     () => stockItems.find((i) => String(i.id) === form.inventory_item_id) || null,
     [stockItems, form.inventory_item_id],
+  )
+
+  const chosenLabels = useMemo(
+    () => [...selectedItems, ...extraItems],
+    [selectedItems, extraItems],
   )
 
   useEffect(() => {
@@ -78,7 +105,11 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
       employee_id: defaultEmployeeId,
     })
     setFieldErrors({})
-    setPutsInMaintenance(true)
+    setSelectedItems([])
+    setExtraItems([])
+    setFirstUpcoming(!lockCustody)
+    setWithSpend(lockCustody)
+    setPutsInMaintenance(false)
     const requests: Promise<unknown>[] = [
       api<{ data: Item[] }>('/inventory?per_page=200')
         .then((r) => setItems(Array.isArray(r.data) ? r.data : []))
@@ -102,23 +133,58 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     Promise.all(requests).catch((e) => toast.error((e as ApiError).message))
   }, [open, lockedId, lockedOdometer, lockCustody, custodyEmployee?.id, toast, canManagePetty, ownEmployeeId])
 
+  function togglePreset(label: string) {
+    setSelectedItems((prev) => (
+      prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label]
+    ))
+    setFieldErrors((prev) => ({ ...prev, items: '' }))
+  }
+
+  function addCustomItem() {
+    const label = normalizeMaintenanceItemLabel(form.customItem)
+    if (!label) {
+      setFieldErrors((prev) => ({ ...prev, customItem: 'اكتب اسم البند أولاً.' }))
+      return
+    }
+    const exists = [...MAINTENANCE_ITEM_PRESETS, ...extraItems, ...selectedItems]
+      .some((x) => x === label)
+    if (exists) {
+      if (!selectedItems.includes(label) && (MAINTENANCE_ITEM_PRESETS as readonly string[]).includes(label)) {
+        setSelectedItems((prev) => [...prev, label])
+      }
+      setForm((prev) => ({ ...prev, customItem: '' }))
+      setFieldErrors((prev) => ({ ...prev, customItem: '', items: '' }))
+      return
+    }
+    setExtraItems((prev) => [...prev, label])
+    setForm((prev) => ({ ...prev, customItem: '' }))
+    setFieldErrors((prev) => ({ ...prev, customItem: '', items: '' }))
+  }
+
+  function removeExtra(label: string) {
+    setExtraItems((prev) => prev.filter((x) => x !== label))
+  }
+
   function validate(): boolean {
     const next: Record<string, string> = {}
     if (!form.vehicle_id) next.vehicle_id = 'اختر العربية.'
     if (!form.odometer) next.odometer = 'أدخل قراءة العداد.'
     if (!form.opened_at) next.opened_at = 'أدخل تاريخ ووقت الصيانة.'
-    if (form.funding === 'stock') {
-      if (!form.inventory_item_id) next.inventory_item_id = 'اختر صنف المخزون.'
-      else if (!selectedItem) next.inventory_item_id = 'الصنف غير متاح أو نفد رصيده.'
-    } else {
-      if (!canManagePetty && !ownEmployeeId) {
-        next.employee_id = 'حسابك غير مرتبط بموظف — إدارة العهدة فقط تخصم عهدة الغير.'
-      } else if (!form.employee_id) {
-        next.employee_id = canManagePetty ? 'اختر موظف العهدة.' : 'تعذّر تحديد عهدتك.'
+    if (chosenLabels.length < 1) next.items = 'اختر بند صيانة واحداً على الأقل، أو أضف بنداً.'
+    if (spendMode) {
+      if (form.funding === 'stock') {
+        if (!form.inventory_item_id) next.inventory_item_id = 'اختر صنف المخزون.'
+        else if (!selectedItem) next.inventory_item_id = 'الصنف غير متاح أو نفد رصيده.'
+      } else {
+        if (!canManagePetty && !ownEmployeeId) {
+          next.employee_id = 'حسابك غير مرتبط بموظف — إدارة العهدة فقط تخصم عهدة الغير.'
+        } else if (!form.employee_id) {
+          next.employee_id = canManagePetty ? 'اختر موظف العهدة.' : 'تعذّر تحديد عهدتك.'
+        }
+        if (!form.unit_price || Number(form.unit_price) < 0) next.unit_price = 'أدخل سعر الشراء.'
       }
-      if (!form.unit_price || Number(form.unit_price) < 0) next.unit_price = 'أدخل سعر الشراء.'
+      if (!form.quantity || Number(form.quantity) < 1) next.quantity = 'الكمية يجب أن تكون ١ فأكثر.'
     }
-    if (!form.quantity || Number(form.quantity) < 1) next.quantity = 'الكمية يجب أن تكون ١ فأكثر.'
     const hasDate = Boolean(form.next_service_on)
     const hasOdo = form.next_service_odometer !== ''
     if (!hasDate && !hasOdo) {
@@ -132,6 +198,38 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     return Object.keys(next).length === 0
   }
 
+  function buildLines(): LinePayload[] {
+    if (!spendMode) {
+      return chosenLabels.map((description) => ({
+        description,
+        part_source: 'purchase',
+        quantity: 1,
+        unit_price: 0,
+        from_petty_cash: false,
+      }))
+    }
+
+    const fromStock = form.funding === 'stock'
+    const inventoryItemId = Number(form.inventory_item_id)
+    const joined = chosenLabels.join(' · ')
+    return [{
+      description: joined,
+      part_source: fromStock ? 'stock' : 'purchase',
+      ...(fromStock && Number.isFinite(inventoryItemId) && inventoryItemId > 0
+        ? { inventory_item_id: inventoryItemId }
+        : {}),
+      quantity: Number(form.quantity || 1),
+      unit_price: fromStock ? undefined : Number(form.unit_price || 0),
+      from_petty_cash: !fromStock,
+      petty_cash_employee_id: !fromStock
+        ? Number(canManagePetty ? form.employee_id : ownEmployeeId)
+        : undefined,
+      petty_cash_amount: !fromStock
+        ? Number(form.unit_price || 0) * Number(form.quantity || 1)
+        : undefined,
+    }]
+  }
+
   async function save() {
     if (!validate()) {
       toast.error('راجع الحقول المطلوبة قبل الحفظ.')
@@ -139,8 +237,9 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     }
     setSaving(true)
     try {
-      const fromStock = form.funding === 'stock'
-      const inventoryItemId = Number(form.inventory_item_id)
+      const notes = baselineMode
+        ? 'تسجيل أساس — أول صيانة قادمة'
+        : undefined
       await api('/work-orders', {
         method: 'POST',
         json: {
@@ -148,33 +247,17 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           odometer: Number(form.odometer),
           workshop: form.workshop || undefined,
           labor_cost: 0,
-          puts_in_maintenance: putsInMaintenance,
+          puts_in_maintenance: baselineMode ? false : putsInMaintenance,
           force_after_resolution: true,
           opened_at: form.opened_at || undefined,
           opened_on: form.opened_at ? civilDateOnly(form.opened_at) : undefined,
           next_service_on: form.next_service_on || undefined,
           next_service_odometer: form.next_service_odometer !== '' ? Number(form.next_service_odometer) : undefined,
-          lines: [
-            {
-              description: form.description,
-              part_source: fromStock ? 'stock' : 'purchase',
-              ...(fromStock && Number.isFinite(inventoryItemId) && inventoryItemId > 0
-                ? { inventory_item_id: inventoryItemId }
-                : {}),
-              quantity: Number(form.quantity || 1),
-              unit_price: fromStock ? undefined : Number(form.unit_price || 0),
-              from_petty_cash: !fromStock,
-              petty_cash_employee_id: !fromStock
-                ? Number(canManagePetty ? form.employee_id : ownEmployeeId)
-                : undefined,
-              petty_cash_amount: !fromStock
-                ? Number(form.unit_price || 0) * Number(form.quantity || 1)
-                : undefined,
-            },
-          ],
+          notes,
+          lines: buildLines(),
         },
       })
-      toast.success('تم فتح أمر الصيانة.')
+      toast.success(baselineMode ? 'تم تسجيل أول صيانة قادمة.' : 'تم فتح أمر الصيانة.')
       onClose()
       onSaved?.()
     } catch (e) {
@@ -192,16 +275,34 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
   return (
     <Sheet
       open={open}
-      title={vehicle ? `صيانة · ${vehicle.label}` : 'صيانة جديدة'}
+      title={vehicle
+        ? (baselineMode ? `أول صيانة قادمة · ${vehicle.label}` : `صيانة · ${vehicle.label}`)
+        : (baselineMode ? 'تسجيل أول صيانة قادمة' : 'صيانة جديدة')}
       onClose={onClose}
       footer={
         <>
-          <Button loading={saving} onClick={() => void save()}>فتح أمر الصيانة</Button>
+          <Button loading={saving} onClick={() => void save()}>
+            {baselineMode ? 'حفظ الموعد' : 'فتح أمر الصيانة'}
+          </Button>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
         </>
       }
     >
       <div className="rpm-form-grid">
+        {!lockCustody ? (
+          <SwitchField
+            label="تسجيل أول صيانة قادمة (بدون مبلغ / عهدة)"
+            checked={firstUpcoming}
+            onChange={(v) => {
+              setFirstUpcoming(v)
+              if (v) {
+                setWithSpend(false)
+                setPutsInMaintenance(false)
+              }
+            }}
+          />
+        ) : null}
+
         {!vehicle ? (
           <SelectField
             label="العربية"
@@ -217,7 +318,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           />
         ) : null}
         <DateTimeField
-          label="تاريخ ووقت الصيانة"
+          label={baselineMode ? 'تاريخ آخر صيانة (نقطة الأساس)' : 'تاريخ ووقت الصيانة'}
           required
           error={fieldErrors.opened_at}
           value={form.opened_at}
@@ -237,111 +338,177 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
             setFieldErrors((prev) => ({ ...prev, odometer: '' }))
           }}
         />
-        <TextField label="وصف البند" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        <SwitchField label="يضع العربية في صيانة" checked={putsInMaintenance} onChange={setPutsInMaintenance} />
 
-        <SelectField
-          label="مصدر التمويل / القطع"
-          required
-          value={form.funding}
-          onChange={(e) => {
-            const funding = e.target.value as 'stock' | 'custody'
-            if (funding === 'custody' && !canManagePetty && !ownEmployeeId) {
-              toast.error('حسابك غير مرتبط بموظف — إدارة العهدة فقط تخصم عهدة الغير.')
-              return
-            }
-            setForm({
-              ...form,
-              funding,
-              inventory_item_id: '',
-              employee_id: funding === 'custody'
-                ? (canManagePetty
-                  ? (custodyEmployee?.id ? String(custodyEmployee.id) : '')
-                  : String(ownEmployeeId))
-                : '',
-              unit_price: '0',
-            })
-            setFieldErrors((prev) => ({ ...prev, inventory_item_id: '', employee_id: '', unit_price: '' }))
-          }}
-          options={[
-            { value: 'stock', label: 'من المخزون (سعر مسجّل تلقائياً)' },
-            { value: 'custody', label: 'شراء من عهدة موظف' },
-          ]}
-        />
+        <FieldShell label="بنود الصيانة" required error={fieldErrors.items} hint="اختر من القائمة أو أضف بنداً غير موجود">
+          <div className="rpm-maint-items" role="group" aria-label="بنود الصيانة">
+            {MAINTENANCE_ITEM_PRESETS.map((label) => {
+              const active = selectedItems.includes(label)
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  className={`rpm-maint-item${active ? ' is-active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => togglePreset(label)}
+                >
+                  {label}
+                </button>
+              )
+            })}
+            {extraItems.map((label) => (
+              <button
+                key={`extra-${label}`}
+                type="button"
+                className="rpm-maint-item is-active is-custom"
+                aria-pressed
+                onClick={() => removeExtra(label)}
+                title="اضغط للإزالة"
+              >
+                {label} ×
+              </button>
+            ))}
+          </div>
+        </FieldShell>
 
-        {form.funding === 'stock' ? (
-          <SelectField
-            label="صنف المخزون"
-            required
-            error={fieldErrors.inventory_item_id}
-            hint={
-              stockItems.length === 0
-                ? 'لا أصناف متاحة برصيد — أضف دفعة مخزون أولاً'
-                : selectedItem?.unit_cost != null
-                  ? `السعر من المخزون (FIFO): ${formatMoney(selectedItem.unit_cost)} — بلا إدخال يدوي`
-                  : 'يُسحب السعر تلقائياً من أقدم دفعة عند الحفظ'
-            }
-            options={stockItems.map((i) => ({
-              value: String(i.id),
-              label: `${i.code} · ${i.name} · متبقي ${i.remaining ?? 0}${i.unit_cost != null ? ` · ${formatMoney(i.unit_cost)}` : ''}`,
-            }))}
-            value={form.inventory_item_id}
+        <div className="rpm-maint-custom-row">
+          <TextField
+            label="بند إضافي غير موجود"
+            value={form.customItem}
+            error={fieldErrors.customItem}
             onChange={(e) => {
-              setForm({ ...form, inventory_item_id: e.target.value })
-              setFieldErrors((prev) => ({ ...prev, inventory_item_id: '' }))
+              setForm({ ...form, customItem: e.target.value })
+              setFieldErrors((prev) => ({ ...prev, customItem: '' }))
             }}
+            hint="مثال: بطانة فرامل"
           />
-        ) : (
+          <Button type="button" variant="secondary" onClick={addCustomItem}>إضافة</Button>
+        </div>
+
+        {!baselineMode ? (
+          <SwitchField
+            label="يضع العربية في صيانة"
+            checked={putsInMaintenance}
+            onChange={setPutsInMaintenance}
+          />
+        ) : null}
+
+        {!baselineMode && !lockCustody ? (
+          <SwitchField
+            label="صرف من مخزون أو عهدة (اختياري)"
+            checked={withSpend}
+            onChange={setWithSpend}
+          />
+        ) : null}
+
+        {spendMode ? (
           <>
-            {canManagePetty ? (
+            <SelectField
+              label="مصدر التمويل / القطع"
+              required
+              value={form.funding}
+              onChange={(e) => {
+                const funding = e.target.value as 'stock' | 'custody'
+                if (funding === 'custody' && !canManagePetty && !ownEmployeeId) {
+                  toast.error('حسابك غير مرتبط بموظف — إدارة العهدة فقط تخصم عهدة الغير.')
+                  return
+                }
+                setForm({
+                  ...form,
+                  funding,
+                  inventory_item_id: '',
+                  employee_id: funding === 'custody'
+                    ? (canManagePetty
+                      ? (custodyEmployee?.id ? String(custodyEmployee.id) : '')
+                      : String(ownEmployeeId))
+                    : '',
+                  unit_price: '0',
+                })
+                setFieldErrors((prev) => ({ ...prev, inventory_item_id: '', employee_id: '', unit_price: '' }))
+              }}
+              options={[
+                { value: 'stock', label: 'من المخزون (سعر مسجّل تلقائياً)' },
+                { value: 'custody', label: 'شراء من عهدة موظف' },
+              ]}
+            />
+
+            {form.funding === 'stock' ? (
               <SelectField
-                label="موظف العهدة"
+                label="صنف المخزون"
                 required
-                error={fieldErrors.employee_id}
-                hint="الإدارة فقط تختار عهدة موظف آخر"
-                options={[
-                  { value: '', label: 'اختر…' },
-                  ...employees.map((e) => ({ value: String(e.id), label: e.name })),
-                ]}
-                value={form.employee_id}
+                error={fieldErrors.inventory_item_id}
+                hint={
+                  stockItems.length === 0
+                    ? 'لا أصناف متاحة برصيد — أضف دفعة مخزون أولاً'
+                    : selectedItem?.unit_cost != null
+                      ? `السعر من المخزون (FIFO): ${formatMoney(selectedItem.unit_cost)} — بلا إدخال يدوي`
+                      : 'يُسحب السعر تلقائياً من أقدم دفعة عند الحفظ'
+                }
+                options={stockItems.map((i) => ({
+                  value: String(i.id),
+                  label: `${i.code} · ${i.name} · متبقي ${i.remaining ?? 0}${i.unit_cost != null ? ` · ${formatMoney(i.unit_cost)}` : ''}`,
+                }))}
+                value={form.inventory_item_id}
                 onChange={(e) => {
-                  setForm({ ...form, employee_id: e.target.value })
-                  setFieldErrors((prev) => ({ ...prev, employee_id: '' }))
+                  setForm({ ...form, inventory_item_id: e.target.value })
+                  setFieldErrors((prev) => ({ ...prev, inventory_item_id: '' }))
                 }}
               />
             ) : (
-              <TextField
-                label="موظف العهدة"
-                value={custodyEmployee?.name || user?.name || `موظف #${ownEmployeeId}`}
-                disabled
-                onChange={() => undefined}
-                hint="يُخصم من عهدتك فقط — لا يمكن اختيار موظف آخر"
-                error={fieldErrors.employee_id}
-              />
+              <>
+                {canManagePetty ? (
+                  <SelectField
+                    label="موظف العهدة"
+                    required
+                    error={fieldErrors.employee_id}
+                    hint="الإدارة فقط تختار عهدة موظف آخر"
+                    options={[
+                      { value: '', label: 'اختر…' },
+                      ...employees.map((e) => ({ value: String(e.id), label: e.name })),
+                    ]}
+                    value={form.employee_id}
+                    onChange={(e) => {
+                      setForm({ ...form, employee_id: e.target.value })
+                      setFieldErrors((prev) => ({ ...prev, employee_id: '' }))
+                    }}
+                  />
+                ) : (
+                  <TextField
+                    label="موظف العهدة"
+                    value={custodyEmployee?.name || user?.name || `موظف #${ownEmployeeId}`}
+                    disabled
+                    onChange={() => undefined}
+                    hint="يُخصم من عهدتك فقط — لا يمكن اختيار موظف آخر"
+                    error={fieldErrors.employee_id}
+                  />
+                )}
+                <MoneyField
+                  label="سعر شراء الوحدة"
+                  required
+                  error={fieldErrors.unit_price}
+                  value={form.unit_price}
+                  onChange={(e) => {
+                    setForm({ ...form, unit_price: e.target.value })
+                    setFieldErrors((prev) => ({ ...prev, unit_price: '' }))
+                  }}
+                />
+              </>
             )}
-            <MoneyField
-              label="سعر شراء الوحدة"
+
+            <NumberField
+              label="الكمية"
               required
-              error={fieldErrors.unit_price}
-              value={form.unit_price}
+              error={fieldErrors.quantity}
+              value={form.quantity}
               onChange={(e) => {
-                setForm({ ...form, unit_price: e.target.value })
-                setFieldErrors((prev) => ({ ...prev, unit_price: '' }))
+                setForm({ ...form, quantity: e.target.value })
+                setFieldErrors((prev) => ({ ...prev, quantity: '' }))
               }}
             />
           </>
+        ) : (
+          <p className="rpm-maint-free-hint">بدون مبلغ ولا عهدة — البنود تُسجَّل توثيقاً فقط مع موعد/عداد الصيانة التالية.</p>
         )}
 
-        <NumberField
-          label="الكمية"
-          required
-          error={fieldErrors.quantity}
-          value={form.quantity}
-          onChange={(e) => {
-            setForm({ ...form, quantity: e.target.value })
-            setFieldErrors((prev) => ({ ...prev, quantity: '' }))
-          }}
-        />
         <DateField
           label="موعد الصيانة التالية"
           required={!form.next_service_odometer}

@@ -557,7 +557,8 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/work-orders` | فتح |
 | POST | `/work-orders/{id}/close` | إغلاق + FIFO |
 
-**POST work-order**
+**POST work-order** — بنود جاهزة في الواجهة (زيت موتور · فلتر زيت موتور · زيت فتيس · فلتر زيت فتيس · فلتر هوا · فلتر تكيف · فلتر بنزين · بيوجوهات · سير مجموعه · إطارات أو كاوتش) مع بند حر. تسجيل أول صيانة قادمة = `puts_in_maintenance: false` + `notes` أساس + أسطر `purchase` بـ`unit_price: 0` بلا عهدة.
+
 ```json
 {
   "vehicle_id": 1,
@@ -573,7 +574,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
   "notes": null,
   "lines": [
     {
-      "description": "زيت",
+      "description": "زيت موتور",
       "part_source": "stock",
       "inventory_item_id": 1,
       "quantity": 4,

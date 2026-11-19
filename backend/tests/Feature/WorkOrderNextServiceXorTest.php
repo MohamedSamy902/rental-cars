@@ -104,4 +104,45 @@ class WorkOrderNextServiceXorTest extends TestCase
             ]],
         ])->assertCreated();
     }
+
+    public function test_accepts_first_upcoming_baseline_without_money_or_petty(): void
+    {
+        $res = $this->postJson('/api/work-orders', [
+            'vehicle_id' => $this->vehicle->id,
+            'odometer' => 10200,
+            'puts_in_maintenance' => false,
+            'labor_cost' => 0,
+            'notes' => 'تسجيل أساس — أول صيانة قادمة',
+            'next_service_on' => now()->addMonths(2)->toDateString(),
+            'lines' => [
+                [
+                    'description' => 'زيت موتور',
+                    'part_source' => 'purchase',
+                    'quantity' => 1,
+                    'unit_price' => 0,
+                    'from_petty_cash' => false,
+                ],
+                [
+                    'description' => 'فلتر هوا',
+                    'part_source' => 'purchase',
+                    'quantity' => 1,
+                    'unit_price' => 0,
+                    'from_petty_cash' => false,
+                ],
+                [
+                    'description' => 'بطانة فرامل',
+                    'part_source' => 'purchase',
+                    'quantity' => 1,
+                    'unit_price' => 0,
+                    'from_petty_cash' => false,
+                ],
+            ],
+        ])->assertCreated();
+
+        $this->assertSame(0, (int) $res->json('data.parts_cost'));
+        $this->assertFalse((bool) $res->json('data.puts_in_maintenance'));
+        $this->assertCount(3, $res->json('data.lines') ?? []);
+        $this->vehicle->refresh();
+        $this->assertNull($this->vehicle->manual_status);
+    }
 }
