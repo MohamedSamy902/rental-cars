@@ -30,7 +30,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.55rem;
-  align-items: end;
+  align-items: start;
+}
+
+/* Align «إضافة» with the input control (below the field label), not the hint. */
+.rpm-maint-custom-row > button {
+  margin-block-start: calc(0.9rem * 1.35 + 0.35rem);
+  min-height: 44px;
 }
 
 .rpm-maint-free-hint {

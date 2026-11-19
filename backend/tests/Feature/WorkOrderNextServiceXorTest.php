@@ -45,13 +45,14 @@ class WorkOrderNextServiceXorTest extends TestCase
         $this->postJson('/api/work-orders', [
             'vehicle_id' => $this->vehicle->id,
             'odometer' => 10050,
+            'baseline' => true,
             'puts_in_maintenance' => false,
             'labor_cost' => 0,
             'lines' => [[
                 'description' => 'فحص',
                 'part_source' => 'purchase',
                 'quantity' => 1,
-                'unit_price' => 100,
+                'unit_price' => 0,
             ]],
         ])->assertStatus(422);
     }
@@ -61,6 +62,7 @@ class WorkOrderNextServiceXorTest extends TestCase
         $this->postJson('/api/work-orders', [
             'vehicle_id' => $this->vehicle->id,
             'odometer' => 10050,
+            'baseline' => true,
             'puts_in_maintenance' => false,
             'labor_cost' => 0,
             'next_service_on' => now()->addMonths(3)->toDateString(),
@@ -69,7 +71,7 @@ class WorkOrderNextServiceXorTest extends TestCase
                 'description' => 'فحص',
                 'part_source' => 'purchase',
                 'quantity' => 1,
-                'unit_price' => 100,
+                'unit_price' => 0,
             ]],
         ])->assertStatus(422);
     }
@@ -79,6 +81,7 @@ class WorkOrderNextServiceXorTest extends TestCase
         $this->postJson('/api/work-orders', [
             'vehicle_id' => $this->vehicle->id,
             'odometer' => 10050,
+            'baseline' => true,
             'puts_in_maintenance' => false,
             'labor_cost' => 0,
             'next_service_on' => now()->addMonths(3)->toDateString(),
@@ -86,13 +89,14 @@ class WorkOrderNextServiceXorTest extends TestCase
                 'description' => 'توقيت',
                 'part_source' => 'purchase',
                 'quantity' => 1,
-                'unit_price' => 100,
+                'unit_price' => 0,
             ]],
         ])->assertCreated();
 
         $this->postJson('/api/work-orders', [
             'vehicle_id' => $this->vehicle->id,
             'odometer' => 10100,
+            'baseline' => true,
             'puts_in_maintenance' => false,
             'labor_cost' => 0,
             'next_service_odometer' => 25000,
@@ -100,7 +104,7 @@ class WorkOrderNextServiceXorTest extends TestCase
                 'description' => 'كيلومتر',
                 'part_source' => 'purchase',
                 'quantity' => 1,
-                'unit_price' => 100,
+                'unit_price' => 0,
             ]],
         ])->assertCreated();
     }
@@ -110,6 +114,7 @@ class WorkOrderNextServiceXorTest extends TestCase
         $res = $this->postJson('/api/work-orders', [
             'vehicle_id' => $this->vehicle->id,
             'odometer' => 10200,
+            'baseline' => true,
             'puts_in_maintenance' => false,
             'labor_cost' => 0,
             'notes' => 'تسجيل أساس — أول صيانة قادمة',
@@ -144,5 +149,38 @@ class WorkOrderNextServiceXorTest extends TestCase
         $this->assertCount(3, $res->json('data.lines') ?? []);
         $this->vehicle->refresh();
         $this->assertNull($this->vehicle->manual_status);
+    }
+
+    public function test_rejects_regular_work_order_without_funding_source_or_zero_amount(): void
+    {
+        $this->postJson('/api/work-orders', [
+            'vehicle_id' => $this->vehicle->id,
+            'odometer' => 10300,
+            'puts_in_maintenance' => true,
+            'next_service_on' => now()->addMonths(1)->toDateString(),
+            'lines' => [[
+                'description' => 'زيت موتور',
+                'part_source' => 'purchase',
+                'quantity' => 1,
+                'unit_price' => 0,
+                'from_petty_cash' => false,
+            ]],
+        ])->assertStatus(422);
+
+        $this->postJson('/api/work-orders', [
+            'vehicle_id' => $this->vehicle->id,
+            'odometer' => 10310,
+            'puts_in_maintenance' => true,
+            'next_service_on' => now()->addMonths(1)->toDateString(),
+            'lines' => [[
+                'description' => 'زيت موتور',
+                'part_source' => 'purchase',
+                'quantity' => 1,
+                'unit_price' => 0,
+                'from_petty_cash' => true,
+                'petty_cash_employee_id' => 1,
+                'petty_cash_amount' => 0,
+            ]],
+        ])->assertStatus(422);
     }
 }

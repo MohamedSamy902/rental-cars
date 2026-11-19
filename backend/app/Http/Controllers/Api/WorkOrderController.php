@@ -51,6 +51,7 @@ class WorkOrderController extends Controller
             'puts_in_maintenance' => ['nullable', 'boolean'],
             'labor_cost' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
+            'baseline' => ['nullable', 'boolean'],
             'next_service_on' => ['nullable', 'date', 'required_without:next_service_odometer', 'prohibits:next_service_odometer'],
             'next_service_odometer' => ['nullable', 'integer', 'min:0', 'required_without:next_service_on', 'prohibits:next_service_on'],
             'lines' => ['nullable', 'array'],
@@ -96,6 +97,19 @@ class WorkOrderController extends Controller
             return response()->json(['message' => 'صرف العهدة يتطلب صلاحية إدارة العهدة.'], 403);
         }
 
+        $isBaseline = (bool) ($data['baseline'] ?? false)
+            || (
+                ($data['puts_in_maintenance'] ?? true) === false
+                && str_contains((string) ($data['notes'] ?? ''), 'تسجيل أساس')
+            );
+
+        if (! $isBaseline) {
+            $fundingError = $this->assertFundedLines($data['lines'] ?? []);
+            if ($fundingError !== null) {
+                return response()->json(['message' => $fundingError], 422);
+            }
+        }
+
         try {
             $order = $this->service->open($data, $data['lines'] ?? [], $request->user()?->id);
         } catch (\DomainException $e) {
@@ -113,6 +127,50 @@ class WorkOrderController extends Controller
         $order = $this->service->close($workOrder->load('lines'));
 
         return response()->json(['data' => $this->present($order, request()), 'message' => 'تم إغلاق أمر الشغل.']);
+    }
+
+    /**
+     * Regular work orders must fund from stock or petty cash with a non-zero amount.
+     * Baseline (first upcoming) is exempt and may use zero-price documentation lines.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     */
+    private function assertFundedLines(array $lines): ?string
+    {
+        if ($lines === []) {
+            return 'أمر الصيانة العادي يتطلب بند تمويل من المخزون أو العهدة.';
+        }
+
+        foreach ($lines as $line) {
+            $source = (string) ($line['part_source'] ?? '');
+            if ($source === 'stock') {
+                if (empty($line['inventory_item_id'])) {
+                    return 'اختر صنف المخزون عند التمويل من المخزون.';
+                }
+
+                continue;
+            }
+
+            if ($source === 'purchase') {
+                $fromPetty = ! empty($line['from_petty_cash']);
+                $qty = max(1, (int) ($line['quantity'] ?? 1));
+                $unit = (int) ($line['unit_price'] ?? 0);
+                $pettyAmount = (int) ($line['petty_cash_amount'] ?? 0);
+                $total = $pettyAmount > 0 ? $pettyAmount : ($unit * $qty);
+                if (! $fromPetty) {
+                    return 'أمر الصيانة العادي يتطلب مصدر فلوس: مخزون أو عهدة.';
+                }
+                if ($total < 1) {
+                    return 'مبلغ الصيانة من العهدة لازم يكون أكبر من صفر.';
+                }
+
+                continue;
+            }
+
+            return 'أمر الصيانة العادي يتطلب مصدر فلوس: مخزون أو عهدة.';
+        }
+
+        return null;
     }
 
     /**
