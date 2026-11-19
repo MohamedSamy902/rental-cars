@@ -154,7 +154,8 @@ class QaV10FixTicketsTest extends TestCase
             $shown = $this->getJson('/api/dashboard')->assertOk()->json('daily_cash');
             $this->assertStringContainsString($number, (string) json_encode($shown, JSON_UNESCAPED_UNICODE));
             $byNotes = collect($shown['entries'])->keyBy(fn ($row) => $row['subtitle']);
-            $deposit = $byNotes->first(fn ($row) => str_contains((string) $row['subtitle'], 'قبض تأمين نقدي للعقد '.$number));
+            $deposit = $byNotes->first(fn ($row) => str_contains((string) $row['subtitle'], 'قبض تأمين نقدي')
+                && str_contains((string) $row['subtitle'], 'للعقد '.$number));
             $rent = $byNotes->first(fn ($row) => str_contains((string) $row['subtitle'], 'دفعة إيجار للعقد '.$number));
             $refund = $byNotes->first(fn ($row) => str_contains((string) $row['subtitle'], 'رد متبقي التأمين النقدي'));
             $this->assertNotNull($deposit);
