@@ -105,6 +105,9 @@ class ContractLifecycleService
             $deposit = array_key_exists('deposit', $data) && $data['deposit'] !== null
                 ? (int) $data['deposit']
                 : (int) $vehicle->default_deposit;
+            $depositCurrency = \App\Support\DepositCurrency::normalize(
+                array_key_exists('deposit_currency', $data) ? ($data['deposit_currency'] ?? null) : null
+            );
             $ops = TenantSetting::query()->first()?->operational ?? [];
             $halfFactor = is_numeric($ops['showroom_half_monthly_factor'] ?? null)
                 ? (float) $ops['showroom_half_monthly_factor']
@@ -180,6 +183,7 @@ class ContractLifecycleService
                 'prepaid_excess_km' => $prepaidExcessKm,
                 'prepaid_excess_km_amount' => $prepaidExcessAmount,
                 'frozen_agreed_deposit' => $deposit,
+                'frozen_deposit_currency' => $depositCurrency,
                 'frozen_operating_insurance_fee' => $data['operating_insurance_fee'] ?? null,
                 'discount' => $data['discount'] ?? 0,
                 'other_fees' => $data['other_fees'] ?? 0,
@@ -436,6 +440,9 @@ class ContractLifecycleService
             $deposit = array_key_exists('deposit', $data) && $data['deposit'] !== null
                 ? (int) $data['deposit']
                 : (int) $locked->frozen_agreed_deposit;
+            $depositCurrency = array_key_exists('deposit_currency', $data)
+                ? \App\Support\DepositCurrency::normalize($data['deposit_currency'] ?? null)
+                : \App\Support\DepositCurrency::normalize($locked->frozen_deposit_currency ?? null);
             $kmAllowance = array_key_exists('daily_km_allowance', $data) && $data['daily_km_allowance'] !== null
                 ? (int) $data['daily_km_allowance']
                 : (int) ($locked->frozen_daily_km_allowance ?? 200);
@@ -491,6 +498,7 @@ class ContractLifecycleService
                 'prepaid_excess_km' => $prepaidExcessKm,
                 'prepaid_excess_km_amount' => $prepaidExcessAmount,
                 'frozen_agreed_deposit' => $deposit,
+                'frozen_deposit_currency' => $depositCurrency,
                 'discount' => array_key_exists('discount', $data) ? (int) $data['discount'] : $locked->discount,
                 'other_fees' => array_key_exists('other_fees', $data) ? (int) $data['other_fees'] : $locked->other_fees,
                 'other_fees_description' => array_key_exists('other_fees_description', $data)
@@ -936,6 +944,7 @@ class ContractLifecycleService
             'daily_km_allowance' => $source->frozen_daily_km_allowance,
             'excess_km_rate' => $source->frozen_excess_km_rate,
             'deposit' => $source->frozen_agreed_deposit,
+            'deposit_currency' => $source->frozen_deposit_currency,
             'operating_insurance_fee' => $source->frozen_operating_insurance_fee,
             'min_days' => $source->frozen_min_days ?? $source->min_days,
             'has_delivery_service' => (bool) $source->has_delivery_service,
@@ -1150,6 +1159,7 @@ class ContractLifecycleService
                 throw new DomainException('مبلغ التأمين يجب أن يساوي التأمين المتفق ('.$agreed.').');
             }
 
+            $currency = \App\Support\DepositCurrency::normalize($contract->frozen_deposit_currency ?? null);
             $deposit = Deposit::query()->create([
                 'contract_id' => $contract->id,
                 'original_amount' => $amount,
@@ -1168,7 +1178,7 @@ class ContractLifecycleService
                 'reference' => $data['receipt_number'],
                 'link_type' => 'deposit',
                 'link_id' => $deposit->id,
-                'notes' => 'قبض تأمين نقدي للعقد '.$contract->number,
+                'notes' => 'قبض تأمين نقدي ('.$currency.') للعقد '.$contract->number,
             ], $userId);
             $this->accounting->postDepositHold($deposit->fresh(), $contract, $userId, (string) $data['method']);
 

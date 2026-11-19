@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatDepositAmount, formatMoney, formatNumber } from '@/shared/lib/format'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
   Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState,
@@ -91,7 +91,11 @@ export function ContractDetailPage() {
         <div className="cd-identity">
           <div className="cd-identity__pills">
             <StatusPill status={row.status} label={statusLabel[row.status] || row.status} />
-            <DepositBadge deposit={row.deposit} agreedAmount={row.frozen_agreed_deposit} />
+            <DepositBadge
+              deposit={row.deposit}
+              agreedAmount={row.frozen_agreed_deposit}
+              currency={row.frozen_deposit_currency}
+            />
             <span className="cd-code">{row.number}</span>
           </div>
           <div className="cd-identity__who">
@@ -185,7 +189,7 @@ export function ContractDetailPage() {
             { label: 'البداية', value: formatDate(row.starts_at) },
             { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },
             { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },
-            { label: 'التأمين المتفق', value: formatMoney(row.frozen_agreed_deposit || 0) },
+            { label: 'التأمين المتفق', value: formatDepositAmount(row.frozen_agreed_deposit || 0, row.frozen_deposit_currency) },
             {
               label: 'بدل الكيلومتر اليومي',
               value: row.frozen_daily_km_allowance != null

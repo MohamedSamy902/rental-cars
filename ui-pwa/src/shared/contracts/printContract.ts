@@ -1,5 +1,5 @@
 import { api, getToken, type ApiError } from '@/shared/api/client'
-import { formatDate, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatDepositAmount, formatMoney } from '@/shared/lib/format'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { statusLabel } from './contractModel'
 import { isRentalContractBody, shellRentalContractHtml } from './rentalContractPrint'
@@ -34,6 +34,7 @@ type PrintContract = Record<string, unknown> & {
   actual_ends_at?: string | null
   frozen_daily_rate: number
   frozen_agreed_deposit?: number
+  frozen_deposit_currency?: string | null
   approved_days?: number | null
   period_rent?: number | null
   excess_km?: number | null
@@ -219,7 +220,7 @@ function contractBody(tenant: PrintTenant, c: PrintContract) {
       <tr><th>البداية</th><td>${formatDate(c.starts_at)}</td></tr>
       <tr><th>النهاية المخططة</th><td>${formatDate(c.planned_ends_at)}</td></tr>
       <tr><th>السعر اليومي</th><td>${formatMoney(c.frozen_daily_rate)}</td></tr>
-      <tr><th>التأمين النقدي</th><td>${formatMoney(c.frozen_agreed_deposit || 0)}</td></tr>
+      <tr><th>التأمين النقدي</th><td>${formatDepositAmount(c.frozen_agreed_deposit || 0, c.frozen_deposit_currency)}</td></tr>
       <tr><th>خدمة تسليم واستلام السيارة</th><td>${
         (c.has_delivery_service || (c.delivery_service_fee ?? 0) > 0)
           ? `${formatMoney(c.delivery_service_fee || 0)}${c.delivery_service_notes ? ` · ${esc(c.delivery_service_notes)}` : ''}`
@@ -269,7 +270,7 @@ function receiptBody(tenant: PrintTenant, c: PrintContract) {
     ${idCardsBlock(c)}
     <h2>بيانات التأمين</h2>
     <table>
-      <tr><th>مبلغ التأمين</th><td>${formatMoney(deposit?.original_amount ?? c.frozen_agreed_deposit ?? 0)}</td></tr>
+      <tr><th>مبلغ التأمين</th><td>${formatDepositAmount(deposit?.original_amount ?? c.frozen_agreed_deposit ?? 0, c.frozen_deposit_currency)}</td></tr>
       <tr><th>حالة التأمين</th><td>${esc(deposit?.status || 'لم يُقبض بعد')}</td></tr>
       <tr><th>الخصومات</th><td>${formatMoney(deposit?.deductions_total ?? 0)}</td></tr>
       <tr><th>المتبقي</th><td>${formatMoney(deposit?.remaining ?? deposit?.original_amount ?? 0)}</td></tr>

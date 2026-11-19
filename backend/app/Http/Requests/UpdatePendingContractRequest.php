@@ -72,6 +72,7 @@ class UpdatePendingContractRequest extends FormRequest
             'excess_km_rate' => ['nullable', 'integer', 'min:0'],
             'prepaid_excess_km' => ['nullable', 'integer', 'min:0'],
             'deposit' => ['nullable', 'integer', 'min:0'],
+            'deposit_currency' => ['nullable', 'string', 'max:40'],
             'min_days' => ['nullable', 'integer', 'min:0'],
             'discount' => ['nullable', 'integer', 'min:0'],
             'other_fees' => ['nullable', 'integer', 'min:0'],

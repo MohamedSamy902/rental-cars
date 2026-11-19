@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatDepositAmount, formatMoney, formatNumber } from '@/shared/lib/format'
 
 type InvoiceCustomer = {
   full_name?: string
@@ -27,6 +27,7 @@ type InvoiceContract = {
   actual_ends_at?: string | null
   frozen_daily_rate: number
   frozen_agreed_deposit?: number
+  frozen_deposit_currency?: string | null
   approved_days?: number | null
   period_rent?: number | null
   prepaid_excess_km?: number | null
@@ -264,7 +265,7 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
           <td class="desc">تأمين مؤقت (Insurance Deposit)</td>
           <td class="num">${deposit ? '1' : ''}</td>
           <td class="num">—</td>
-          <td class="num">${deposit ? moneyOrBlank(deposit) : ''}</td>
+          <td class="num">${deposit ? formatDepositAmount(deposit, c.frozen_deposit_currency) : ''}</td>
         </tr>
         <tr>
           <td class="desc">كم زيادة مدفوعة مقدماً (Prepaid Extra KM)</td>

@@ -201,7 +201,13 @@ export function BookingsPage() {
     {
       id: 'deposit',
       header: 'التأمين',
-      cell: (b) => <DepositBadge deposit={b.deposit} agreedAmount={b.frozen_agreed_deposit} />,
+      cell: (b) => (
+        <DepositBadge
+          deposit={b.deposit}
+          agreedAmount={b.frozen_agreed_deposit}
+          currency={b.frozen_deposit_currency}
+        />
+      ),
       sortValue: (b) => b.deposit?.original_amount ?? b.frozen_agreed_deposit ?? 0,
     },
     {

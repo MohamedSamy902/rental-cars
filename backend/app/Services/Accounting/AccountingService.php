@@ -805,11 +805,12 @@ class AccountingService
     public function postDepositHold(Deposit $deposit, Contract $contract, ?int $userId = null, ?string $method = null): JournalEntry
     {
         $cash = $this->methods->cashAccountCode($method ?? (string) ($deposit->collection_method ?? 'cash'));
+        $currency = \App\Support\DepositCurrency::normalize($contract->frozen_deposit_currency ?? null);
 
         return $this->postTransfer(
             'deposit_hold:'.$deposit->id,
             now()->toDateString(),
-            'قبض تأمين نقدي للعقد '.$contract->number,
+            'قبض تأمين نقدي ('.$currency.') للعقد '.$contract->number,
             $cash,
             '1300',
             (int) $deposit->original_amount,
