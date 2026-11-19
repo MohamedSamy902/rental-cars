@@ -1,5 +1,8 @@
-/** Canonical Arabic nationality labels — keep in sync with backend Nationalities. */
-export const NATIONALITIES = [
+/**
+ * Nationality is free text. Suggestions are optional UX helpers only.
+ * Keep suggestion labels loosely aligned with backend Nationalities::suggestions().
+ */
+export const NATIONALITY_SUGGESTIONS = [
   'مصري',
   'سعودي',
   'إماراتي',
@@ -18,69 +21,31 @@ export const NATIONALITIES = [
   'تونسي',
   'جزائري',
   'مغربي',
-  'موريتاني',
-  'صومالي',
-  'جيبوتي',
-  'إريتري',
-  'إثيوبي',
-  'كيني',
-  'نيجيري',
-  'جنوب أفريقي',
   'تركي',
-  'إيراني',
-  'أفغاني',
-  'باكستاني',
-  'هندي',
-  'بنغلاديشي',
-  'سريلانكي',
-  'نيبالي',
-  'فلبيني',
-  'إندونيسي',
-  'ماليزي',
-  'صيني',
-  'كوري',
-  'ياباني',
-  'روسي',
-  'أوكراني',
   'بريطاني',
-  'أيرلندي',
-  'فرنسي',
-  'ألماني',
-  'إيطالي',
-  'إسباني',
-  'برتغالي',
-  'هولندي',
-  'بلجيكي',
-  'سويسري',
-  'نمساوي',
-  'سويدي',
-  'نرويجي',
-  'دنماركي',
-  'بولندي',
-  'روماني',
-  'يوناني',
   'أمريكي',
-  'كندي',
-  'مكسيكي',
-  'برازيلي',
-  'أرجنتيني',
-  'أسترالي',
-  'نيوزيلندي',
   'أخرى',
 ] as const
 
-export type Nationality = (typeof NATIONALITIES)[number]
+/** @deprecated Prefer NATIONALITY_SUGGESTIONS — list is not closed. */
+export const NATIONALITIES = NATIONALITY_SUGGESTIONS
 
-/** Default stored/display value — typed as string so form state stays assignable from inputs/API. */
+export type Nationality = string
+
+/** Default when the form opens empty. */
 export const DEFAULT_NATIONALITY = 'مصري'
 
-export const NATIONALITY_OPTIONS = NATIONALITIES.map((n) => ({ value: n, label: n }))
+/** @deprecated Select options — prefer NationalityField free text. */
+export const NATIONALITY_OPTIONS = NATIONALITY_SUGGESTIONS.map((n) => ({ value: n, label: n }))
+
+export const NATIONALITY_DATALIST_ID = 'rpm-nationality-suggestions'
 
 export function isEgyptianNationality(value?: string | null): boolean {
   return String(value || '').trim() === DEFAULT_NATIONALITY
 }
 
+/** Keep any non-empty written nationality; empty → default for form UX. */
 export function normalizeNationality(value?: string | null): string {
   const trimmed = String(value || '').trim()
-  return (NATIONALITIES as readonly string[]).includes(trimmed) ? trimmed : DEFAULT_NATIONALITY
+  return trimmed || DEFAULT_NATIONALITY
 }

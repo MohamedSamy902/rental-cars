@@ -6,7 +6,6 @@ use App\Http\Requests\Concerns\NormalizesDigits;
 use App\Models\TenantSetting;
 use App\Rules\EgyptianPhone;
 use App\Rules\MediaReference;
-use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -47,7 +46,7 @@ class StoreCustomerRequest extends FormRequest
             'phone' => ['required', 'string', 'max:30', new EgyptianPhone, Rule::unique('customers', 'phone')->whereNull('deleted_at')],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'email' => ['nullable', 'email', 'max:200'],
-            'nationality' => ['required', 'string', 'max:80', Rule::in(Nationalities::all())],
+            'nationality' => ['required', 'string', 'max:80'],
             // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
             'national_id' => [
                 'nullable',

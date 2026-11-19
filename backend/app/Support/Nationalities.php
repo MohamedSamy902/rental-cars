@@ -3,15 +3,16 @@
 namespace App\Support;
 
 /**
- * Canonical nationality labels (Arabic) for customers and vehicle owners.
- * Storage is the Arabic label string itself.
+ * Nationality is free text (any written label).
+ * Suggestions are UX helpers only — not a closed allow-list.
  */
 final class Nationalities
 {
     public const EGYPTIAN = 'مصري';
 
+    /** Common suggestions for forms (not exhaustive). */
     /** @return list<string> */
-    public static function all(): array
+    public static function suggestions(): array
     {
         return [
             self::EGYPTIAN,
@@ -32,56 +33,18 @@ final class Nationalities
             'تونسي',
             'جزائري',
             'مغربي',
-            'موريتاني',
-            'صومالي',
-            'جيبوتي',
-            'إريتري',
-            'إثيوبي',
-            'كيني',
-            'نيجيري',
-            'جنوب أفريقي',
             'تركي',
-            'إيراني',
-            'أفغاني',
-            'باكستاني',
-            'هندي',
-            'بنغلاديشي',
-            'سريلانكي',
-            'نيبالي',
-            'فلبيني',
-            'إندونيسي',
-            'ماليزي',
-            'صيني',
-            'كوري',
-            'ياباني',
-            'روسي',
-            'أوكراني',
             'بريطاني',
-            'أيرلندي',
-            'فرنسي',
-            'ألماني',
-            'إيطالي',
-            'إسباني',
-            'برتغالي',
-            'هولندي',
-            'بلجيكي',
-            'سويسري',
-            'نمساوي',
-            'سويدي',
-            'نرويجي',
-            'دنماركي',
-            'بولندي',
-            'روماني',
-            'يوناني',
             'أمريكي',
-            'كندي',
-            'مكسيكي',
-            'برازيلي',
-            'أرجنتيني',
-            'أسترالي',
-            'نيوزيلندي',
             'أخرى',
         ];
+    }
+
+    /** @deprecated Use suggestions(); kept for older call sites. */
+    /** @return list<string> */
+    public static function all(): array
+    {
+        return self::suggestions();
     }
 
     public static function isEgyptian(?string $nationality): bool
@@ -89,6 +52,9 @@ final class Nationalities
         return trim((string) $nationality) === self::EGYPTIAN;
     }
 
+    /**
+     * Trim free-text nationality. Empty → null. Any non-empty label is kept.
+     */
     public static function normalize(?string $nationality): ?string
     {
         $value = trim((string) $nationality);
@@ -96,6 +62,6 @@ final class Nationalities
             return null;
         }
 
-        return in_array($value, self::all(), true) ? $value : null;
+        return mb_substr($value, 0, 80);
     }
 }

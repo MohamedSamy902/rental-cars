@@ -3,7 +3,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
-import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
+import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
+import { NationalityField } from '@/shared/forms/NationalityField'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
   SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconCash, IconKey, IconTrend,
@@ -314,12 +315,9 @@ export function OwnerDetailPage() {
           <TextField label="الاسم" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
           <TextField label="الهاتف" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
-          <SelectField
-            label="الجنسية"
-            required
-            options={NATIONALITY_OPTIONS}
+          <NationalityField
             value={form.nationality}
-            onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+            onChange={(nationality) => setForm({ ...form, nationality })}
           />
           <TextField label="الرقم القومي / رقم الهوية" required value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

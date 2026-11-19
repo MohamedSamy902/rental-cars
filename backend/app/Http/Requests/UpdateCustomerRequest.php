@@ -6,7 +6,6 @@ use App\Http\Requests\Concerns\NormalizesDigits;
 use App\Rules\EgyptianPhone;
 use App\Rules\MediaReference;
 use App\Support\DigitNormalizer;
-use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -61,7 +60,7 @@ class UpdateCustomerRequest extends FormRequest
             'phone' => ['sometimes', 'string', 'max:30', new EgyptianPhone, Rule::unique('customers', 'phone')->ignore($this->customerId())->whereNull('deleted_at')],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'email' => ['nullable', 'email', 'max:200'],
-            'nationality' => ['sometimes', 'required', 'string', 'max:80', Rule::in(Nationalities::all())],
+            'nationality' => ['sometimes', 'required', 'string', 'max:80'],
             // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
             'national_id' => [
                 'nullable',
