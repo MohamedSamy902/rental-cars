@@ -171,6 +171,7 @@ class DocumentTemplateTest extends TestCase
         $customer = Customer::query()->create([
             'full_name' => 'سارة علي حسن',
             'phone' => '01012345678',
+            'nationality' => 'مصري',
             'national_id' => '29001011234567',
             'address' => 'المعادي — القاهرة',
             'birth_date' => '1990-01-01',
@@ -257,6 +258,57 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringContainsString('س ص ع 100', $ack);
         $this->assertStringContainsString('450000', $ack);
         $this->assertStringNotContainsString('{{customer_name}}', $ack);
+    }
+
+    public function test_contract_print_uses_stored_non_egyptian_nationality(): void
+    {
+        $this->actingAdmin();
+        app(DocumentTemplateService::class)->ensureDefaults();
+
+        $customer = Customer::query()->create([
+            'full_name' => 'فهد العتيبي',
+            'phone' => '01099990001',
+            'nationality' => 'سعودي',
+            'national_id' => 'SA-998877',
+            'birth_date' => '1985-06-15',
+            'license_number' => 'DRV-SA-1',
+            'license_expires_on' => now()->addYears(2)->toDateString(),
+            'status' => 'active',
+        ]);
+        $vehicle = Vehicle::query()->create([
+            'code' => 'SA-1',
+            'plate' => 'س ع د 200',
+            'brand' => 'تويوتا',
+            'model' => 'كامري',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'chassis_number' => 'CHS-SA-1',
+            'odometer' => 10000,
+            'daily_rate' => 800,
+            'default_deposit' => 4000,
+            'is_active' => true,
+        ]);
+        $contract = Contract::query()->create([
+            'number' => 'C-SA-1',
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'active',
+            'starts_at' => now()->startOfDay(),
+            'planned_ends_at' => now()->startOfDay()->addDays(2),
+            'frozen_daily_rate' => 800,
+            'frozen_agreed_deposit' => 4000,
+            'frozen_daily_km_allowance' => 200,
+            'frozen_excess_km_rate' => 5,
+            'frozen_min_days' => 1,
+            'odometer_out' => 10000,
+        ]);
+
+        $print = $this->getJson("/api/contracts/{$contract->id}/print")->assertOk();
+        $rendered = (string) $print->json('data.templates.contract.rendered_html');
+        $this->assertStringContainsString('سعودي', $rendered);
+        $this->assertStringContainsString('فهد العتيبي', $rendered);
+        $this->assertStringContainsString('SA-998877', $rendered);
     }
 
     public function test_stock_handover_stub_upgrades_to_ack_form(): void

@@ -3,9 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
-use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
 use App\Support\DigitNormalizer;
+use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -105,7 +105,9 @@ class StoreVehicleRequest extends FormRequest
             'owner_inline.full_name' => ['required_with:owner_inline', 'string', 'max:150'],
             'owner_inline.phone' => ['required_with:owner_inline', 'string', 'max:30', new EgyptianPhone],
             'owner_inline.phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
-            'owner_inline.national_id' => ['required_with:owner_inline', 'string', 'max:30', new EgyptianNationalId],
+            'owner_inline.nationality' => ['required_with:owner_inline', 'string', 'max:80', Rule::in(Nationalities::all())],
+            // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
+            'owner_inline.national_id' => ['required_with:owner_inline', 'string', 'max:80'],
             'owner_inline.id_front_path' => ['required_with:owner_inline', 'string', 'max:500'],
             'owner_inline.id_back_path' => ['required_with:owner_inline', 'string', 'max:500'],
             'owner_inline.notes' => ['nullable', 'string'],
@@ -147,7 +149,8 @@ class StoreVehicleRequest extends FormRequest
             'owner_agreement_starts_on' => 'بداية عقد المالك',
             'owner_agreement_ends_on' => 'نهاية عقد المالك',
             'owner_inline.phone' => 'هاتف المالك',
-            'owner_inline.national_id' => 'الرقم القومي للمالك',
+            'owner_inline.nationality' => 'جنسية المالك',
+            'owner_inline.national_id' => 'الرقم القومي / رقم الهوية للمالك',
             'owner_inline.id_front_path' => 'وجه بطاقة المالك',
             'owner_inline.id_back_path' => 'ظهر بطاقة المالك',
             'notes' => 'الملاحظات',

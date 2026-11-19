@@ -58,24 +58,42 @@ class ValidationArabicTest extends TestCase
         ]);
     }
 
-    public function test_invalid_national_id_returns_arabic_message(): void
+    public function test_national_id_accepts_passport_and_alphanumeric_for_any_nationality(): void
     {
-        $response = $this->postJson('/api/customers', [
-            'full_name' => 'عميل هوية خاطئة',
+        $egyptianPassport = $this->postJson('/api/customers', [
+            'full_name' => 'عميل جواز مصري',
             'phone' => '01001112233',
-            'national_id' => '123',
+            'nationality' => 'مصري',
+            'national_id' => 'A12345678',
             'birth_date' => '1990-01-01',
             'license_number' => 'LIC-NID-1',
             'license_expires_on' => now()->addYears(2)->toDateString(),
-        ]);
+        ])->assertCreated();
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['national_id']);
+        $this->assertSame('A12345678', $egyptianPassport->json('data.national_id'));
 
-        $messages = $response->json('errors.national_id');
-        $this->assertIsArray($messages);
-        $this->assertNotEmpty($messages);
-        $this->assertStringContainsString('الرقم القومي', $messages[0]);
+        $foreignId = $this->postJson('/api/customers', [
+            'full_name' => 'عميل هوية خليجية',
+            'phone' => '01001112234',
+            'nationality' => 'سعودي',
+            'national_id' => 'ID-SA-77X9',
+            'birth_date' => '1991-02-02',
+            'license_number' => 'LIC-NID-2',
+            'license_expires_on' => now()->addYears(2)->toDateString(),
+        ])->assertCreated();
+
+        $this->assertSame('ID-SA-77X9', $foreignId->json('data.national_id'));
+
+        $owner = $this->postJson('/api/owners', [
+            'full_name' => 'مالك بجواز',
+            'phone' => '01001112235',
+            'nationality' => 'إماراتي',
+            'national_id' => 'P-AE-9988',
+            'id_front_path' => 'tests/owners/front.jpg',
+            'id_back_path' => 'tests/owners/back.jpg',
+        ])->assertCreated();
+
+        $this->assertSame('P-AE-9988', $owner->json('data.national_id'));
     }
 
     public function test_contract_end_before_start_returns_arabic_message(): void

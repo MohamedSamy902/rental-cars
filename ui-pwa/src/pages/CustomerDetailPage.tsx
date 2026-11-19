@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney, toDateOnly } from '@/shared/lib/format'
+import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { statusLabel } from '@/shared/contracts/contractModel'
 import {
-  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
+  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, SelectField, MediaUpload,
   useToast, SkeletonBlock, ErrorState, StatusPill, PhoneActions,
 } from '@/shared/ui'
 import './pages.css'
@@ -40,6 +41,7 @@ type Customer = {
   license_number: string
   license_expires_on: string
   birth_date?: string
+  nationality?: string | null
   national_id?: string | null
   national_id_image_path?: string | null
   national_id_back_path?: string | null
@@ -54,7 +56,7 @@ type Customer = {
 
 const emptyForm = {
   full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01',
-  national_id: '', notes: '',
+  nationality: DEFAULT_NATIONALITY, national_id: '', notes: '',
   national_id_image_path: '', national_id_back_path: '', license_image_path: '', license_back_path: '',
 }
 
@@ -86,6 +88,7 @@ export function CustomerDetailPage() {
         birth_date: toDateOnly(res.data.birth_date) || '1990-01-01',
         license_number: res.data.license_number,
         license_expires_on: toDateOnly(res.data.license_expires_on) || '2030-01-01',
+        nationality: res.data.nationality || DEFAULT_NATIONALITY,
         national_id: res.data.national_id || '',
         notes: res.data.notes || '',
         national_id_image_path: res.data.national_id_image_path || '',
@@ -187,7 +190,8 @@ export function CustomerDetailPage() {
           { label: 'الهاتف', value: <PhoneActions phone={customer.phone} name={customer.full_name} compact /> },
           { label: 'هاتف بديل', value: customer.phone_alt ? <PhoneActions phone={customer.phone_alt} name={customer.full_name} compact /> : '—' },
           { label: 'البريد', value: customer.email || '—' },
-          { label: 'الرقم القومي', value: customer.national_id || '—' },
+          { label: 'الجنسية', value: customer.nationality || '—' },
+          { label: 'الرقم القومي / رقم الهوية', value: customer.national_id || '—' },
           { label: 'تاريخ الميلاد', value: formatDate(customer.birth_date) },
           { label: 'رقم الرخصة', value: customer.license_number },
           { label: 'انتهاء الرخصة', value: formatDate(customer.license_expires_on) },
@@ -282,7 +286,15 @@ export function CustomerDetailPage() {
           <TextField label="الاسم الكامل" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
           <TextField label="الهاتف" required error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
-          <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+          <SelectField
+            label="الجنسية"
+            required
+            error={fieldErrors.nationality}
+            options={NATIONALITY_OPTIONS}
+            value={form.nationality}
+            onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+          />
+          <TextField label="الرقم القومي / رقم الهوية" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
           <TextField label="تاريخ الميلاد" required type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
           <TextField label="رقم الرخصة" required value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
           <TextField label="انتهاء الرخصة" required type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />

@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
+import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
   SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconCash, IconKey, IconTrend,
@@ -49,6 +50,7 @@ type Owner = {
   full_name: string
   phone?: string | null
   phone_alt?: string | null
+  nationality?: string | null
   national_id?: string | null
   id_front_path?: string | null
   id_back_path?: string | null
@@ -60,7 +62,7 @@ type Owner = {
 }
 
 const emptyForm = {
-  full_name: '', phone: '', phone_alt: '', national_id: '', notes: '', is_active: true,
+  full_name: '', phone: '', phone_alt: '', nationality: DEFAULT_NATIONALITY, national_id: '', notes: '', is_active: true,
   id_front_path: '', id_back_path: '',
 }
 
@@ -92,6 +94,7 @@ export function OwnerDetailPage() {
         full_name: res.data.full_name,
         phone: res.data.phone || '',
         phone_alt: res.data.phone_alt || '',
+        nationality: res.data.nationality || DEFAULT_NATIONALITY,
         national_id: res.data.national_id || '',
         notes: res.data.notes || '',
         is_active: res.data.is_active !== false,
@@ -118,8 +121,8 @@ export function OwnerDetailPage() {
 
   async function onUpdate() {
     if (!owner) return
-    if (!form.phone.trim() || !form.national_id.trim() || !form.id_front_path.trim() || !form.id_back_path.trim()) {
-      toast.error('الموبايل والرقم القومي وصور البطاقة (وش وضهر) مطلوبة')
+    if (!form.phone.trim() || !form.nationality.trim() || !form.national_id.trim() || !form.id_front_path.trim() || !form.id_back_path.trim()) {
+      toast.error('الموبايل والجنسية ورقم الهوية وصور البطاقة (وش وضهر) مطلوبة')
       return
     }
     setSaving(true)
@@ -233,7 +236,8 @@ export function OwnerDetailPage() {
         rows={[
           { label: 'الهاتف', value: owner.phone ? <PhoneActions phone={owner.phone} name={owner.full_name} compact /> : '—' },
           { label: 'هاتف بديل', value: owner.phone_alt ? <PhoneActions phone={owner.phone_alt} name={owner.full_name} compact /> : '—' },
-          { label: 'الرقم القومي', value: owner.national_id || '—' },
+          { label: 'الجنسية', value: owner.nationality || '—' },
+          { label: 'الرقم القومي / رقم الهوية', value: owner.national_id || '—' },
           { label: 'الحالة', value: <StatusPill status={owner.is_active ? 'active' : 'cancelled'} label={owner.is_active ? 'نشط' : 'موقوف'} /> },
           { label: 'ملاحظات', value: owner.notes || '—', wide: true },
         ]}
@@ -310,7 +314,14 @@ export function OwnerDetailPage() {
           <TextField label="الاسم" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
           <TextField label="الهاتف" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
-          <TextField label="الرقم القومي" required value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+          <SelectField
+            label="الجنسية"
+            required
+            options={NATIONALITY_OPTIONS}
+            value={form.nationality}
+            onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+          />
+          <TextField label="الرقم القومي / رقم الهوية" required value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <SwitchField label="نشط" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
           <MediaUpload label="بطاقة — وش" required value={form.id_front_path || null} collection="owners_id" purpose="id_front" accept="image" onChange={(path) => setForm({ ...form, id_front_path: path || '' })} />

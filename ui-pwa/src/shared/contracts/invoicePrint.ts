@@ -4,6 +4,7 @@ type InvoiceCustomer = {
   full_name?: string
   phone?: string
   address?: string | null
+  nationality?: string | null
   national_id?: string | null
   passport_number?: string | null
   license_number?: string
@@ -92,8 +93,11 @@ function rentalDays(c: InvoiceContract): number {
 }
 
 function nationalityOf(customer?: InvoiceCustomer): string {
+  if (customer?.nationality && String(customer.nationality).trim()) {
+    return String(customer.nationality).trim()
+  }
+  // Legacy rows before nationality column: Egyptian national ID implied مصري.
   if (customer?.national_id) return 'مصري'
-  if (customer?.passport_number) return ''
   return ''
 }
 

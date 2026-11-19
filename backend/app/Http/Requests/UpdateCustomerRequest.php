@@ -3,10 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
-use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
 use App\Rules\MediaReference;
 use App\Support\DigitNormalizer;
+use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -60,7 +60,14 @@ class UpdateCustomerRequest extends FormRequest
             'phone' => ['sometimes', 'string', 'max:30', new EgyptianPhone, Rule::unique('customers', 'phone')->ignore($this->customerId())->whereNull('deleted_at')],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
             'email' => ['nullable', 'email', 'max:200'],
-            'national_id' => ['nullable', 'string', 'max:30', new EgyptianNationalId, Rule::unique('customers', 'national_id')->ignore($this->customerId())->whereNull('deleted_at')],
+            'nationality' => ['sometimes', 'required', 'string', 'max:80', Rule::in(Nationalities::all())],
+            // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
+            'national_id' => [
+                'nullable',
+                'string',
+                'max:80',
+                Rule::unique('customers', 'national_id')->ignore($this->customerId())->whereNull('deleted_at'),
+            ],
             'national_id_expires_on' => ['nullable', 'date'],
             'passport_number' => ['nullable', 'string', 'max:50'],
             'passport_expires_on' => ['nullable', 'date'],
@@ -109,7 +116,8 @@ class UpdateCustomerRequest extends FormRequest
             'phone' => 'الهاتف',
             'phone_alt' => 'هاتف بديل',
             'email' => 'البريد الإلكتروني',
-            'national_id' => 'الرقم القومي',
+            'nationality' => 'الجنسية',
+            'national_id' => 'الرقم القومي / رقم الهوية',
             'national_id_expires_on' => 'تاريخ انتهاء الرقم القومي',
             'passport_number' => 'رقم جواز السفر',
             'passport_expires_on' => 'تاريخ انتهاء جواز السفر',

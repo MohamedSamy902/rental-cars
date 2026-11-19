@@ -37,6 +37,7 @@ class VehicleService
                     'phone' => $ownerInline['phone'] ?? null,
                     'phone_alt' => $ownerInline['phone_alt'] ?? null,
                     'national_id' => $ownerInline['national_id'] ?? null,
+                    'nationality' => $ownerInline['nationality'] ?? null,
                     'id_front_path' => $ownerInline['id_front_path'] ?? null,
                     'id_back_path' => $ownerInline['id_back_path'] ?? null,
                     'notes' => $ownerInline['notes'] ?? null,

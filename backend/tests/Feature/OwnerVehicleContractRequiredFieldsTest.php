@@ -60,12 +60,13 @@ class OwnerVehicleContractRequiredFieldsTest extends TestCase
         $this->postJson('/api/owners', [
             'full_name' => 'مالك ناقص',
         ])->assertStatus(422)
-            ->assertJsonValidationErrors(['phone', 'national_id', 'id_front_path', 'id_back_path']);
+            ->assertJsonValidationErrors(['phone', 'nationality', 'national_id', 'id_front_path', 'id_back_path']);
 
         $this->injectRequiredCreateFields = true;
         $this->postJson('/api/owners', [
             'full_name' => 'مالك مكتمل',
             'phone' => '01011112222',
+            'nationality' => 'مصري',
             'national_id' => '29001011234567',
             'id_front_path' => 'tests/owners/front.jpg',
             'id_back_path' => 'tests/owners/back.jpg',

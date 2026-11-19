@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
+import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, DataTable, TextField, TextAreaField, SwitchField,
+  PageHeader, FilterBar, Button, Sheet, Fab, DataTable, TextField, TextAreaField, SelectField, SwitchField,
   StatusPill, useToast, IconEye, MediaUpload, PhoneActions, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -27,6 +28,7 @@ type Owner = {
   full_name: string
   phone?: string | null
   phone_alt?: string | null
+  nationality?: string | null
   national_id?: string | null
   id_front_path?: string | null
   id_back_path?: string | null
@@ -37,8 +39,8 @@ type Owner = {
 }
 
 const emptyForm = {
-  full_name: '', phone: '', phone_alt: '', national_id: '', id_front_path: '', id_back_path: '',
-  notes: '', is_active: true,
+  full_name: '', phone: '', phone_alt: '', nationality: DEFAULT_NATIONALITY, national_id: '',
+  id_front_path: '', id_back_path: '', notes: '', is_active: true,
 }
 
 const OwnersPageTabs = ['all', 'overdue'] as const
@@ -125,7 +127,8 @@ export function OwnersPage() {
     const local: Record<string, string> = {}
     if (!form.full_name.trim()) local.full_name = 'اسم المالك مطلوب'
     if (!form.phone.trim()) local.phone = 'رقم الموبايل مطلوب'
-    if (!form.national_id.trim()) local.national_id = 'الرقم القومي مطلوب'
+    if (!form.nationality.trim()) local.nationality = 'الجنسية مطلوبة'
+    if (!form.national_id.trim()) local.national_id = 'الرقم القومي / رقم الهوية مطلوب'
     if (!form.id_front_path.trim()) local.id_front_path = 'صورة البطاقة (وش) مطلوبة'
     if (!form.id_back_path.trim()) local.id_back_path = 'صورة البطاقة (ضهر) مطلوبة'
     if (Object.keys(local).length) {
@@ -152,9 +155,17 @@ export function OwnersPage() {
       <TextField label="اسم المالك" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
       <TextField label="الهاتف" required error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
-      <TextField label="الرقم القومي" required error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <SelectField
+        label="الجنسية"
+        required
+        error={fieldErrors.nationality}
+        options={NATIONALITY_OPTIONS}
+        value={form.nationality}
+        onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+      />
+      <TextField label="الرقم القومي / رقم الهوية" required error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
       <MediaUpload
-        label="بطاقة الرقم القومي — الوجه (وش)"
+        label="بطاقة الهوية — الوجه (وش)"
         required
         error={fieldErrors.id_front_path}
         value={form.id_front_path || null}
@@ -164,7 +175,7 @@ export function OwnersPage() {
         onChange={(path) => setForm({ ...form, id_front_path: path || '' })}
       />
       <MediaUpload
-        label="بطاقة الرقم القومي — الظهر (ضهر)"
+        label="بطاقة الهوية — الظهر (ضهر)"
         required
         error={fieldErrors.id_back_path}
         value={form.id_back_path || null}
