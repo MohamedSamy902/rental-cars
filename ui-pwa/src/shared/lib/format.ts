@@ -1,4 +1,4 @@
-import { civilDateOnly, isoToDisplayDate } from '@/shared/lib/dates'
+import { civilDateOnly, isoToDisplayDate, nowLocalDateTimeValue } from '@/shared/lib/dates'
 
 /** Western digits (0-9) required — numberingSystem: latn */
 const latn = { numberingSystem: 'latn' as const }
@@ -72,10 +72,25 @@ export function formatDate(iso: string | null | undefined): string {
   return isoToDisplayDate(iso) || '—'
 }
 
-/** Append midnight for APIs that still expect datetime. */
-export function toApiDateTime(dateOnly: string): string {
-  const d = toDateOnly(dateOnly)
-  return d ? `${d}T00:00:00` : ''
+/**
+ * API datetime in Africa/Cairo wall clock.
+ * Keeps an explicit time when present; date-only values get the current Cairo HH:mm
+ * (never forced midnight — contract print shows الساعة from this instant).
+ */
+export function toApiDateTime(dateOrDateTime: string): string {
+  const raw = String(dateOrDateTime || '').trim()
+  if (!raw) return ''
+
+  const withTime = raw.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/)
+  if (withTime) {
+    return `${withTime[1]}T${withTime[2]}:${withTime[3]}:00`
+  }
+
+  const d = toDateOnly(raw)
+  if (!d) return ''
+  const now = nowLocalDateTimeValue()
+  const hm = now.slice(11, 16) || '12:00'
+  return `${d}T${hm}:00`
 }
 
 export function formatTime(iso: string): string {

@@ -351,6 +351,9 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       half_monthly_rate: Number(form.half_monthly_rate),
       monthly_rate: Number(form.monthly_rate),
       default_deposit: Number(form.default_deposit),
+      purchase_value_estimate: form.purchase_value_estimate !== ''
+        ? Number(form.purchase_value_estimate)
+        : null,
       chassis_number: form.chassis_number.trim() || null,
       engine_number: form.engine_number || null,
       engine_capacity: form.engine_capacity || null,
@@ -538,6 +541,13 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
         />
         <TextField label="الموديل" required value={form.model} error={errors.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
         <NumberField label="سنة الصنع" required value={form.year} error={errors.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
+        <MoneyField
+          label="ثمن العربية التقديري"
+          value={form.purchase_value_estimate}
+          error={errors.purchase_value_estimate}
+          hint="يُطبع تلقائياً في البند السادس وإقرار الاستلام"
+          onChange={(e) => setForm({ ...form, purchase_value_estimate: e.target.value })}
+        />
         <SelectField
           label="الفئة"
           required

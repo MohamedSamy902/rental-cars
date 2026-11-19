@@ -132,7 +132,12 @@ export function SettingsPage() {
           <TextField label="المفوض بالتوقيع" value={printSigner} onChange={(e) => setPrintSigner(e.target.value)} hint="يظهر في رأس العقد وتوقيع الطرف الأول" />
           <TextField label="هاتف الشركة" value={printPhone} onChange={(e) => setPrintPhone(e.target.value)} />
           <TextField label="عنوان الشركة" value={printAddress} onChange={(e) => setPrintAddress(e.target.value)} />
-          <TextField label="السجل التجاري" value={printCr} onChange={(e) => setPrintCr(e.target.value)} />
+          <TextField
+            label="السجل التجاري"
+            value={printCr}
+            onChange={(e) => setPrintCr(e.target.value)}
+            hint="يظهر تلقائياً في رأس عقد الإيجار والختم على كل العقود"
+          />
           <TextField label="البطاقة الضريبية / الرقم الضريبي" value={printTax} onChange={(e) => setPrintTax(e.target.value)} />
           <MediaUpload
             label="شعار الشركة على المطبوعات"

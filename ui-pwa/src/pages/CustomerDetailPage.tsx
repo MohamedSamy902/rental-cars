@@ -39,10 +39,14 @@ type Customer = {
   phone_alt?: string | null
   email?: string | null
   license_number: string
+  license_issued_from?: string | null
   license_expires_on: string
   birth_date?: string
   nationality?: string | null
   national_id?: string | null
+  national_id_issued_from?: string | null
+  national_id_issued_on?: string | null
+  address?: string | null
   national_id_image_path?: string | null
   national_id_back_path?: string | null
   license_image_path?: string | null
@@ -55,8 +59,10 @@ type Customer = {
 }
 
 const emptyForm = {
-  full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01',
-  nationality: DEFAULT_NATIONALITY, national_id: '', notes: '',
+  full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_issued_from: '',
+  license_expires_on: '2030-01-01',
+  nationality: DEFAULT_NATIONALITY, national_id: '', national_id_issued_from: '', national_id_issued_on: '',
+  address: '', notes: '',
   national_id_image_path: '', national_id_back_path: '', license_image_path: '', license_back_path: '',
 }
 
@@ -87,9 +93,13 @@ export function CustomerDetailPage() {
         phone_alt: res.data.phone_alt || '',
         birth_date: toDateOnly(res.data.birth_date) || '1990-01-01',
         license_number: res.data.license_number,
+        license_issued_from: res.data.license_issued_from || '',
         license_expires_on: toDateOnly(res.data.license_expires_on) || '2030-01-01',
         nationality: res.data.nationality || DEFAULT_NATIONALITY,
         national_id: res.data.national_id || '',
+        national_id_issued_from: res.data.national_id_issued_from || '',
+        national_id_issued_on: toDateOnly(res.data.national_id_issued_on) || '',
+        address: res.data.address || '',
         notes: res.data.notes || '',
         national_id_image_path: res.data.national_id_image_path || '',
         national_id_back_path: res.data.national_id_back_path || '',
@@ -192,8 +202,12 @@ export function CustomerDetailPage() {
           { label: 'البريد', value: customer.email || '—' },
           { label: 'الجنسية', value: customer.nationality || '—' },
           { label: 'الرقم القومي / رقم الهوية', value: customer.national_id || '—' },
+          { label: 'صادرة من (البطاقة)', value: customer.national_id_issued_from || '—' },
+          { label: 'تاريخ صدور البطاقة', value: formatDate(customer.national_id_issued_on) },
+          { label: 'محل الإقامة', value: customer.address || '—', wide: true },
           { label: 'تاريخ الميلاد', value: formatDate(customer.birth_date) },
           { label: 'رقم الرخصة', value: customer.license_number },
+          { label: 'صادرة من (الرخصة)', value: customer.license_issued_from || '—' },
           { label: 'انتهاء الرخصة', value: formatDate(customer.license_expires_on) },
           { label: 'سبب القائمة السوداء', value: customer.blacklist_reason || '—', wide: true },
           { label: 'ملاحظات', value: customer.notes || '—', wide: true },
@@ -295,8 +309,12 @@ export function CustomerDetailPage() {
             onChange={(e) => setForm({ ...form, nationality: e.target.value })}
           />
           <TextField label="الرقم القومي / رقم الهوية" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+          <TextField label="صادرة من (البطاقة)" error={fieldErrors.national_id_issued_from} value={form.national_id_issued_from} onChange={(e) => setForm({ ...form, national_id_issued_from: e.target.value })} />
+          <TextField label="تاريخ صدور البطاقة" error={fieldErrors.national_id_issued_on} type="date" value={form.national_id_issued_on} onChange={(e) => setForm({ ...form, national_id_issued_on: e.target.value })} />
+          <TextField label="محل الإقامة" error={fieldErrors.address} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <TextField label="تاريخ الميلاد" required type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
           <TextField label="رقم الرخصة" required value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
+          <TextField label="صادرة من (الرخصة)" error={fieldErrors.license_issued_from} value={form.license_issued_from} onChange={(e) => setForm({ ...form, license_issued_from: e.target.value })} />
           <TextField label="انتهاء الرخصة" required type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
           <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <MediaUpload label="بطاقة — وش" value={form.national_id_image_path || null} collection="customers_id" purpose="national_id" accept="image" attachableType="customer" attachableId={customer.id} onChange={(path) => setForm({ ...form, national_id_image_path: path || '' })} />

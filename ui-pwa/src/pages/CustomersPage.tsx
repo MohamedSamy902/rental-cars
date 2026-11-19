@@ -23,10 +23,14 @@ type Customer = {
   phone_alt?: string | null
   email?: string | null
   license_number: string
+  license_issued_from?: string | null
   license_expires_on: string
   birth_date?: string
   nationality?: string | null
   national_id?: string | null
+  national_id_issued_from?: string | null
+  national_id_issued_on?: string | null
+  address?: string | null
   national_id_image_path?: string | null
   national_id_back_path?: string | null
   license_image_path?: string | null
@@ -37,8 +41,10 @@ type Customer = {
 }
 
 const emptyForm = {
-  full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01',
-  nationality: DEFAULT_NATIONALITY, national_id: '', notes: '',
+  full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_issued_from: '',
+  license_expires_on: '2030-01-01',
+  nationality: DEFAULT_NATIONALITY, national_id: '', national_id_issued_from: '', national_id_issued_on: '',
+  address: '', notes: '',
   national_id_image_path: '', national_id_back_path: '', license_image_path: '', license_back_path: '',
 }
 
@@ -246,8 +252,12 @@ export function CustomersPage() {
         onChange={(e) => setForm({ ...form, nationality: e.target.value })}
       />
       <TextField label="الرقم القومي / رقم الهوية" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <TextField label="صادرة من (البطاقة)" error={fieldErrors.national_id_issued_from} value={form.national_id_issued_from} onChange={(e) => setForm({ ...form, national_id_issued_from: e.target.value })} />
+      <TextField label="تاريخ صدور البطاقة" error={fieldErrors.national_id_issued_on} type="date" value={form.national_id_issued_on} onChange={(e) => setForm({ ...form, national_id_issued_on: e.target.value })} />
       <TextField label="تاريخ الميلاد" required error={fieldErrors.birth_date} type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
+      <TextField label="محل الإقامة" error={fieldErrors.address} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
       <TextField label="رقم الرخصة" required error={fieldErrors.license_number} value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
+      <TextField label="صادرة من (الرخصة)" error={fieldErrors.license_issued_from} value={form.license_issued_from} onChange={(e) => setForm({ ...form, license_issued_from: e.target.value })} />
       <TextField label="انتهاء الرخصة" required error={fieldErrors.license_expires_on} type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
       <TextAreaField label="ملاحظات" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
@@ -373,8 +383,12 @@ export function CustomersPage() {
                 { label: 'البريد', value: detail.email || '—' },
                 { label: 'الجنسية', value: detail.nationality || '—' },
                 { label: 'الرقم القومي / رقم الهوية', value: detail.national_id || '—' },
+                { label: 'صادرة من (البطاقة)', value: detail.national_id_issued_from || '—' },
+                { label: 'تاريخ صدور البطاقة', value: formatDate(detail.national_id_issued_on) },
+                { label: 'محل الإقامة', value: detail.address || '—', wide: true },
                 { label: 'تاريخ الميلاد', value: formatDate(detail.birth_date) },
                 { label: 'رقم الرخصة', value: detail.license_number },
+                { label: 'صادرة من (الرخصة)', value: detail.license_issued_from || '—' },
                 { label: 'انتهاء الرخصة', value: formatDate(detail.license_expires_on) },
                 { label: 'صورة البطاقة', value: detail.national_id_image_path ? 'مرفوعة' : '—' },
                 { label: 'صورة الرخصة', value: detail.license_image_path ? 'مرفوعة' : '—' },

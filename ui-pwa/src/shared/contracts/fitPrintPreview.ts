@@ -22,7 +22,7 @@ export function fitPrintPreviewIframe(
   try {
     const root = (doc.querySelector('.rpm-preview-root') as HTMLElement | null) || doc.body
     const paper = (doc.querySelector(
-      '.rpm-paper-v4, .rpm-paper-v3, .rpm-paper-v2, .rpm-invoice-v1, .rpm-legal-contract',
+      '.rpm-paper-v5, .rpm-paper-v4, .rpm-paper-v3, .rpm-paper-v2, .rpm-invoice-v1, .rpm-legal-contract',
     ) as HTMLElement | null) || root
 
     root.style.transform = ''

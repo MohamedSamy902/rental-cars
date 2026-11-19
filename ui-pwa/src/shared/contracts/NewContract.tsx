@@ -75,8 +75,12 @@ const emptyCustomer = {
   phone_alt: '',
   nationality: DEFAULT_NATIONALITY,
   national_id: '',
+  national_id_issued_from: '',
+  national_id_issued_on: '',
+  address: '',
   birth_date: '1990-01-01',
   license_number: '',
+  license_issued_from: '',
   license_expires_on: '2030-01-01',
   notes: '',
   national_id_image_path: '',
@@ -404,8 +408,12 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
                 onChange={(e) => setNewCustomer({ ...newCustomer, nationality: e.target.value })}
               />
               <TextField label="الرقم القومي / رقم الهوية" value={newCustomer.national_id} onChange={(e) => setNewCustomer({ ...newCustomer, national_id: e.target.value })} />
+              <TextField label="صادرة من (البطاقة)" value={newCustomer.national_id_issued_from} onChange={(e) => setNewCustomer({ ...newCustomer, national_id_issued_from: e.target.value })} />
+              <TextField label="تاريخ صدور البطاقة" type="date" value={newCustomer.national_id_issued_on} onChange={(e) => setNewCustomer({ ...newCustomer, national_id_issued_on: e.target.value })} />
+              <TextField label="محل الإقامة" value={newCustomer.address} onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })} />
               <TextField label="تاريخ الميلاد" required type="date" value={newCustomer.birth_date} onChange={(e) => setNewCustomer({ ...newCustomer, birth_date: e.target.value })} />
               <TextField label="رقم الرخصة" required value={newCustomer.license_number} onChange={(e) => setNewCustomer({ ...newCustomer, license_number: e.target.value })} />
+              <TextField label="صادرة من (الرخصة)" value={newCustomer.license_issued_from} onChange={(e) => setNewCustomer({ ...newCustomer, license_issued_from: e.target.value })} />
               <TextField label="انتهاء الرخصة" required type="date" value={newCustomer.license_expires_on} onChange={(e) => setNewCustomer({ ...newCustomer, license_expires_on: e.target.value })} />
               <TextAreaField label="ملاحظات" value={newCustomer.notes} onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })} />
               <MediaUpload
