@@ -173,9 +173,12 @@ class DocumentTemplateTest extends TestCase
             'phone' => '01012345678',
             'nationality' => 'مصري',
             'national_id' => '29001011234567',
+            'national_id_issued_from' => 'مصر الجديدة',
+            'national_id_issued_on' => '2018-05-12',
             'address' => 'المعادي — القاهرة',
             'birth_date' => '1990-01-01',
             'license_number' => 'DRV-9090',
+            'license_issued_from' => 'مرور القاهرة',
             'license_expires_on' => now()->addYears(2)->toDateString(),
             'status' => 'active',
         ]);
@@ -213,7 +216,7 @@ class DocumentTemplateTest extends TestCase
         $print = $this->getJson("/api/contracts/{$contract->id}/print")->assertOk();
         $rendered = (string) $print->json('data.templates.contract.rendered_html');
 
-        $this->assertStringContainsString('rpm-paper-v4', $rendered);
+        $this->assertStringContainsString('rpm-paper-v5', $rendered);
         $this->assertStringContainsString('شروط التعاقد', $rendered);
         $this->assertStringContainsString('البند الأول', $rendered);
         $this->assertStringContainsString('البند التاسع', $rendered);
@@ -227,12 +230,18 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringContainsString('سارة علي حسن', $rendered);
         $this->assertStringContainsString('29001011234567', $rendered);
         $this->assertStringContainsString('مصري', $rendered);
+        $this->assertStringContainsString('مصر الجديدة', $rendered);
+        $this->assertStringContainsString('12/05/2018', $rendered);
+        $this->assertStringContainsString('مرور القاهرة', $rendered);
+        $this->assertStringContainsString('المعادي — القاهرة', $rendered);
         $this->assertStringContainsString('س ص ع 100', $rendered);
         $this->assertStringContainsString('هيونداي', $rendered);
+        $this->assertStringContainsString('2023', $rendered);
         $this->assertStringContainsString('CHS-999', $rendered);
         $this->assertStringContainsString('5000', $rendered);
         $this->assertStringContainsString('250', $rendered);
         $this->assertStringContainsString('450000', $rendered);
+        $this->assertStringContainsString('18766', $rendered);
         $this->assertStringContainsString('محمد عبد القادر محمد', $rendered);
         $this->assertStringContainsString('أجر السيد /', $rendered);
         $this->assertStringContainsString('شركة آر بي إم للنقل والسياحة', $rendered);
@@ -240,9 +249,10 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringContainsString('التوقيع :', $rendered);
         $this->assertStringNotContainsString('{{customer_name}}', $rendered);
         $this->assertStringNotContainsString('{{deposit}}', $rendered);
+        $this->assertStringNotContainsString('صادرة من : <span class="fill"></span>', $rendered);
 
         $ack = (string) $print->json('data.templates.handover_receipt.rendered_html');
-        $this->assertStringContainsString('rpm-ack-v6', $ack);
+        $this->assertStringContainsString('rpm-ack-v7', $ack);
         $this->assertStringContainsString('إقرار استلام سيارة', $ack);
         $this->assertStringNotContainsString('محضر إثبات', $ack);
         $this->assertStringContainsString('خائنا للأمانة', $ack);
@@ -254,10 +264,14 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringNotContainsString('الشهود', $ack);
         $this->assertStringNotContainsString('rpm-ack-witnesses', $ack);
         $this->assertStringNotContainsString('العشرون', $ack);
+        $this->assertStringNotContainsString('أتعه ', $ack);
+        $this->assertStringContainsString('أتعهد بأنه', $ack);
         $this->assertStringContainsString('سارة علي حسن', $ack);
         $this->assertStringContainsString('س ص ع 100', $ack);
+        $this->assertStringContainsString('2023', $ack);
         $this->assertStringContainsString('450000', $ack);
         $this->assertStringNotContainsString('{{customer_name}}', $ack);
+        $this->assertDoesNotMatchRegularExpression('/الساعة\s*:\s*<span[^>]*>00:00<\/span>/u', $rendered.$ack);
     }
 
     public function test_contract_print_uses_stored_non_egyptian_nationality(): void
@@ -340,7 +354,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(1, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v6', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v7', (string) $active->content);
         $this->assertStringContainsString('إقرار استلام سيارة', (string) $active->content);
         $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
         $this->assertStringNotContainsString('rpm-ack-witnesses', (string) $active->content);
@@ -375,7 +389,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(2, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v6', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v7', (string) $active->content);
         $this->assertStringNotContainsString('rpm-ack-witnesses', (string) $active->content);
         $this->assertStringNotContainsString('الشهود', (string) $active->content);
         $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
@@ -413,7 +427,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(5, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v6', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v7', (string) $active->content);
         $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
     }
 
@@ -503,7 +517,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(1, (int) $active->version);
-        $this->assertStringContainsString('rpm-paper-v4', (string) $active->content);
+        $this->assertStringContainsString('rpm-paper-v5', (string) $active->content);
         $this->assertStringContainsString('شروط التعاقد', (string) $active->content);
         $this->assertStringContainsString('البند السادس', (string) $active->content);
         $this->assertStringContainsString('خدمة توصيل', (string) $active->content);

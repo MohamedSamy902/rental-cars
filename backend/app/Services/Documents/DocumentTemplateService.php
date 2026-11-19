@@ -35,9 +35,12 @@ class DocumentTemplateService
             ['key' => 'customer_name', 'aliases' => ['اسم_العميل'], 'label' => 'اسم العميل', 'sample' => 'محمد أحمد', 'group' => 'العميل'],
             ['key' => 'customer_phone', 'aliases' => ['هاتف_العميل', 'رقم_الهاتف'], 'label' => 'هاتف العميل', 'sample' => '01000000000', 'group' => 'العميل'],
             ['key' => 'customer_national_id', 'aliases' => ['الرقم_القومي', 'قومي_العميل'], 'label' => 'الرقم القومي للعميل', 'sample' => '29001011234567', 'group' => 'العميل'],
+            ['key' => 'customer_id_issued_from', 'aliases' => ['جهة_صدور_البطاقة', 'صادرة_من_البطاقة'], 'label' => 'جهة صدور بطاقة العميل', 'sample' => 'مصر الجديدة', 'group' => 'العميل'],
+            ['key' => 'customer_id_issued_on', 'aliases' => ['تاريخ_صدور_البطاقة'], 'label' => 'تاريخ صدور بطاقة العميل', 'sample' => '01/01/2020', 'group' => 'العميل'],
             ['key' => 'customer_nationality', 'aliases' => ['جنسية_العميل'], 'label' => 'جنسية العميل', 'sample' => 'مصري', 'group' => 'العميل'],
             ['key' => 'customer_address', 'aliases' => ['عنوان_العميل', 'محل_الإقامة'], 'label' => 'محل إقامة المستأجر', 'sample' => 'القاهرة — المعادي', 'group' => 'العميل'],
             ['key' => 'customer_license', 'aliases' => ['رخصة_العميل', 'رقم_الرخصة'], 'label' => 'رقم رخصة القيادة', 'sample' => 'LIC-12345', 'group' => 'العميل'],
+            ['key' => 'customer_license_issued_from', 'aliases' => ['جهة_صدور_الرخصة', 'صادرة_من_الرخصة'], 'label' => 'جهة صدور رخصة العميل', 'sample' => 'المرور', 'group' => 'العميل'],
             ['key' => 'vehicle_plate', 'aliases' => ['رقم_اللوحة'], 'label' => 'رقم اللوحة', 'sample' => 'أ ب ج 1234', 'group' => 'العربية'],
             ['key' => 'vehicle_name', 'aliases' => ['اسم_العربية', 'العربية'], 'label' => 'الماركة والموديل', 'sample' => 'هيونداي إلنترا', 'group' => 'العربية'],
             ['key' => 'vehicle_brand', 'aliases' => ['ماركة_العربية'], 'label' => 'ماركة العربية', 'sample' => 'هيونداي', 'group' => 'العربية'],
@@ -192,15 +195,19 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
 
-        if (str_contains($content, 'rpm-ack-v6')) {
+        if (str_contains($content, 'rpm-ack-v7')) {
             return;
         }
 
         // Any active ack that still shows «محضر إثبات» must be replaced (even if tagged v5).
         $hasSubtitleLine = str_contains($content, 'محضر إثبات');
+        $needsV7Refresh = str_contains($content, 'أتعه ')
+            || (str_contains($content, 'rpm-ack-v6') && ! str_contains($content, '{{vehicle_year}}'));
 
-        // Upgrade prior shipped ack (v1–v5 / witnesses) and legacy table stubs to the Word-form text.
-        $looksLikeShippedAck = $hasSubtitleLine
+        // Upgrade prior shipped ack (v1–v6 / witnesses) and legacy table stubs to the Word-form text.
+        $looksLikeShippedAck = $needsV7Refresh
+            || $hasSubtitleLine
+            || str_contains($content, 'rpm-ack-v6')
             || str_contains($content, 'rpm-ack-v5')
             || str_contains($content, 'rpm-ack-v4')
             || str_contains($content, 'rpm-ack-v3')
@@ -242,16 +249,22 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
 
-        // Refresh stock v4 copy when the lessor line still uses the old parentheses form.
-        $needsV4CopyRefresh = str_contains($content, 'rpm-paper-v4')
-            && str_contains($content, 'أجر السيد/ (');
-
-        if (str_contains($content, 'rpm-paper-v4') && ! $needsV4CopyRefresh) {
+        if (str_contains($content, 'rpm-paper-v5')) {
             return;
         }
 
+        // Refresh stock v4/v3 when placeholders or copy still lag the current paper form.
+        $needsV5Refresh = (str_contains($content, 'rpm-paper-v4') || str_contains($content, 'rpm-lc-'))
+            && (
+                str_contains($content, 'أجر السيد/ (')
+                || str_contains($content, 'صادرة من : <span class="fill"></span>')
+                || ! str_contains($content, '{{customer_id_issued_from}}')
+                || ! str_contains($content, '{{vehicle_year}}')
+            );
+
         // Upgrade only templates we previously shipped — never overwrite a custom published body.
-        $looksLikeOurPriorDefault = $needsV4CopyRefresh
+        $looksLikeOurPriorDefault = $needsV5Refresh
+            || str_contains($content, 'rpm-paper-v4')
             || str_contains($content, 'rpm-paper-v3')
             || str_contains($content, 'rpm-paper-v2')
             || str_contains($content, 'rpm-legal-contract')
@@ -470,29 +483,49 @@ class DocumentTemplateService
         $customer = $contract->customer;
         $deposit = $contract->deposit;
 
-        $issuedAt = $contract->starts_at ?? $contract->created_at ?? now();
+        $tz = (string) config('app.timezone', 'Africa/Cairo');
         $dayNames = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        $inTz = static function ($value) use ($tz) {
+            if ($value === null) {
+                return null;
+            }
+
+            return $value->copy()->timezone($tz);
+        };
+
+        // «إنه في يوم … الساعة» = الوقت الحالي بتوقيت مصر عند الطباعة/العرض.
+        $issuedAt = now($tz);
+
         $durationDays = null;
         if ($contract->starts_at && $contract->planned_ends_at) {
-            $durationDays = max(1, (int) $contract->starts_at->copy()->startOfDay()
-                ->diffInDays($contract->planned_ends_at->copy()->startOfDay()) ?: 1);
+            $durationDays = max(1, (int) $contract->starts_at->copy()->timezone($tz)->startOfDay()
+                ->diffInDays($contract->planned_ends_at->copy()->timezone($tz)->startOfDay()) ?: 1);
         }
 
         $nationalId = (string) ($customer?->national_id ?: '');
         $passport = (string) ($customer?->passport_number ?: '');
         $nationality = trim((string) ($customer?->nationality ?: ''));
-        if ($nationality === '' && $nationalId !== '') {
+        // لا نفرض «مصري» إلا عند غياب الجنسية مع رقم قومي مصري من 14 رقمًا.
+        if ($nationality === '' && preg_match('/^\d{14}$/', $nationalId) === 1) {
             $nationality = 'مصري';
         }
         $idDoc = $nationalId !== '' ? $nationalId : $passport;
+        $idIssuedOn = $customer?->national_id_issued_on;
 
         $signer = $this->resolvePrintSignerName($ops);
         $deliveryOn = (bool) $contract->has_delivery_service;
         $deliveryMark = $deliveryOn ? '☑' : '☐';
 
-        $startsAt = $contract->starts_at;
-        $endsAt = $contract->planned_ends_at;
+        $startsAt = $inTz($contract->starts_at);
+        $endsAt = $inTz($contract->planned_ends_at);
+        $actualEndsAt = $inTz($contract->actual_ends_at);
+        $handoverAt = $inTz($handover?->inspected_at);
+        $returnAt = $inTz($ret?->inspected_at) ?? $actualEndsAt;
         $dailyKm = (int) ($contract->frozen_daily_km_allowance ?? $ops['default_daily_km'] ?? 0);
+        $vehicleValue = $vehicle?->purchase_value_estimate;
+        $vehicleValueStr = $vehicleValue !== null && $vehicleValue !== ''
+            ? (string) (int) $vehicleValue
+            : '';
 
         $map = [
             'company_name' => $this->resolveCompanyName($tenant?->center_name),
@@ -526,9 +559,12 @@ class DocumentTemplateService
             'customer_phone' => (string) ($customer?->phone ?: ''),
             'customer_national_id' => $nationalId,
             'customer_id_doc' => $idDoc,
+            'customer_id_issued_from' => (string) ($customer?->national_id_issued_from ?: ''),
+            'customer_id_issued_on' => $idIssuedOn ? $idIssuedOn->format('d/m/Y') : '',
             'customer_nationality' => $nationality,
             'customer_address' => (string) ($customer?->address ?: ''),
             'customer_license' => (string) ($customer?->license_number ?: ''),
+            'customer_license_issued_from' => (string) ($customer?->license_issued_from ?: ''),
             'national_id_front' => (string) ($customer?->national_id_image_path ?: ''),
             'national_id_back' => (string) ($customer?->national_id_back_path ?: ''),
             'vehicle_plate' => (string) ($vehicle?->plate ?: ''),
@@ -539,10 +575,10 @@ class DocumentTemplateService
             'vehicle_chassis' => (string) ($vehicle?->chassis_number ?: ''),
             'vehicle_engine' => (string) ($vehicle?->engine_number ?: ''),
             'vehicle_odometer' => (string) ($handover?->odometer ?? $contract->odometer_out ?? $vehicle?->odometer ?? ''),
-            'vehicle_value' => (string) ($vehicle?->purchase_value_estimate ?? ''),
-            'start_date' => $contract->starts_at?->format('d/m/Y H:i') ?? '',
-            'end_date' => $contract->planned_ends_at?->format('d/m/Y H:i') ?? '',
-            'actual_end_date' => $contract->actual_ends_at?->format('d/m/Y H:i') ?? '',
+            'vehicle_value' => $vehicleValueStr,
+            'start_date' => $startsAt?->format('d/m/Y H:i') ?? '',
+            'end_date' => $endsAt?->format('d/m/Y H:i') ?? '',
+            'actual_end_date' => $actualEndsAt?->format('d/m/Y H:i') ?? '',
             'rental_duration' => $durationDays === null ? '' : ($durationDays === 1 ? 'يوم واحد' : $durationDays.' أيام'),
             'daily_rate' => (string) (int) $contract->frozen_daily_rate,
             // إن وُجد {{vehicle_daily_rate}} في قالب عقد الإيجار نعرض سعر العقد المثبّت لا سعر العربية الافتراضي.
@@ -557,9 +593,8 @@ class DocumentTemplateService
             'final_total' => $contract->final_total !== null ? (string) (int) $contract->final_total : '',
             'odometer_out' => (string) ($handover?->odometer ?? $contract->odometer_out ?? ''),
             'odometer_in' => (string) ($ret?->odometer ?? $contract->odometer_in ?? ''),
-            'handover_at' => $handover?->inspected_at?->format('d/m/Y H:i') ?? '',
-            'return_at' => $ret?->inspected_at?->format('d/m/Y H:i')
-                ?? ($contract->actual_ends_at?->format('d/m/Y H:i') ?? ''),
+            'handover_at' => $handoverAt?->format('d/m/Y H:i') ?? '',
+            'return_at' => $returnAt?->format('d/m/Y H:i') ?? '',
             'template_version' => (string) ($template?->version ?? ''),
         ];
 
@@ -786,7 +821,7 @@ class DocumentTemplateService
     private function defaultContractHtml(): string
     {
         return <<<'HTML'
-<article class="rpm-legal-contract rpm-paper-v4">
+<article class="rpm-legal-contract rpm-paper-v5">
   <header class="rpm-lc-head">
     <div class="rpm-lc-badge rpm-lc-badge--contact">
       <div class="rpm-lc-signer-short">أ/ {{print_signer_name}}</div>
@@ -835,13 +870,13 @@ class DocumentTemplateService
     <p class="rpm-lc-row">
       إلى السيد/ <span class="fill wide">{{customer_name}}</span>
       بطاقة الرقم القومي : <span class="fill mid" dir="ltr">{{customer_national_id}}</span>
-      صادرة من : <span class="fill"></span>
-      تاريخ الصدور : <span class="fill"></span>
+      صادرة من : <span class="fill">{{customer_id_issued_from}}</span>
+      تاريخ الصدور : <span class="fill">{{customer_id_issued_on}}</span>
       الجنسية : <span class="fill">{{customer_nationality}}</span>
     </p>
     <p class="rpm-lc-row">
       رخصة رقم : <span class="fill mid" dir="ltr">{{customer_license}}</span>
-      صادرة من : <span class="fill"></span>
+      صادرة من : <span class="fill">{{customer_license_issued_from}}</span>
       محل الإقامة : <span class="fill wide">{{customer_address}}</span>
       موبايل : <span class="fill mid" dir="ltr">{{customer_phone}}</span>
     </p>
@@ -862,6 +897,7 @@ class DocumentTemplateService
       أجر الطرف الأول إلى الطرف الثاني السيارة رقم : <span class="fill">{{vehicle_plate}}</span> ،
       ماركة : <span class="fill">{{vehicle_brand}}</span> ،
       موديل : <span class="fill">{{vehicle_model}}</span> ،
+      سنة الصنع : <span class="fill">{{vehicle_year}}</span> ،
     </p>
     <p>
       رقم الموتور : <span class="fill" dir="ltr">{{vehicle_engine}}</span> ،
@@ -950,7 +986,7 @@ HTML;
     {
         // Texts match the customer Word form (إقرار استلام سيارة) exactly — including typos; blanks are placeholders.
         return <<<'HTML'
-<article class="rpm-ack-form rpm-ack-v6" dir="rtl">
+<article class="rpm-ack-form rpm-ack-v7" dir="rtl">
   <p class="rpm-ack2-brandhead">RPM &nbsp;•&nbsp; RENT A CAR &nbsp;|&nbsp; شركة RBM للنقل والسياحة</p>
   <div class="rpm-ack2-seal-top-wrap" data-rpm-lock="1">
     <img class="rpm-ack2-seal rpm-ack2-seal--top" src="/brand/rpm-ack-seal-gold.png" width="120" height="120" alt="" />
@@ -993,6 +1029,8 @@ HTML;
     <span class="fill">{{vehicle_brand}}</span>
     ، موديل/
     <span class="fill">{{vehicle_model}}</span>
+    ، سنة الصنع /
+    <span class="fill">{{vehicle_year}}</span>
     ، رقم الشاسيه /
     <span class="fill mid" dir="ltr">{{vehicle_chassis}}</span>
     رقم الموتور /
@@ -1002,7 +1040,7 @@ HTML;
   </p>
 
   <p class="rpm-ack2-body">
-    أقرّ أنا الموقّع أدناه بأنني إستلمت السيارة الموضحة بياناتها أعلاه من شركة RPM للنقل والسياحة ، وعاينت حالتها الظاهرة وإطلعت على قراءة العداد ومستوى الوقود/الشحن وما سُلّم معها من مفاتيح ووثائق وملحقات ، وأكون مسئولا مسئولية كاملة مدنيا وجنائيا عن السيارة موضوع الإقرار وعن كافة ما يلحق بالسيارة من تلف أو هلاك أو سرقة أو إصابتها بأي أضرار يقلل من قيمتها السعرية أو أي مخالفة لقواعد وقوانين المرور كما أتعهد أيضا بتسليمها بنفس الحالة الجيدة الخالية من أي أعطال أو عيوب أو نقص في الإجراء كما أستلمتها بناءا علي تصوير فيديو تم بوجود الطرفين وذلك في مدة تبدأ بتاريخ { <span class="fill mid">{{start_date_only}}</span> } ، وتنتهي في { <span class="fill mid">{{end_date_only}}</span> } عند تسليم السيارة أو عند الطلب قبل المؤجر وفي حالة أمتناعي عن ذلك أكون خائنا للأمانة وملزم بسداد ثمن السيارة المذكور ،وهومبلغ( <span class="fill">{{vehicle_value}}</span> ج) ( <span class="fill wide">{{vehicle_value}}</span> جنيه لا غير ) ويكون هذا المقدار حسب أسعار مثلها في المعارض وأسواق السيارات وذلك دون الحاجة إلي تنبيه أو إنذار وعدم الإخلال بحق التعويضات فضلا عن حق المالك أو المؤجر في مقاضاتي قانونيا وبوصفه مرتكبا جريمة خيانة الأمانة المعاقب عليها قانونيا ، ويكون ذلك من إختصاص المحاكم المختصة كما أتعه بأنه لا يحق بيع السيارة أو تغيير أي شيء من معالمها الأساسية .
+    أقرّ أنا الموقّع أدناه بأنني إستلمت السيارة الموضحة بياناتها أعلاه من شركة RPM للنقل والسياحة ، وعاينت حالتها الظاهرة وإطلعت على قراءة العداد ومستوى الوقود/الشحن وما سُلّم معها من مفاتيح ووثائق وملحقات ، وأكون مسئولا مسئولية كاملة مدنيا وجنائيا عن السيارة موضوع الإقرار وعن كافة ما يلحق بالسيارة من تلف أو هلاك أو سرقة أو إصابتها بأي أضرار يقلل من قيمتها السعرية أو أي مخالفة لقواعد وقوانين المرور كما أتعهد أيضا بتسليمها بنفس الحالة الجيدة الخالية من أي أعطال أو عيوب أو نقص في الإجراء كما أستلمتها بناءا علي تصوير فيديو تم بوجود الطرفين وذلك في مدة تبدأ بتاريخ { <span class="fill mid">{{start_date_only}}</span> } ، وتنتهي في { <span class="fill mid">{{end_date_only}}</span> } عند تسليم السيارة أو عند الطلب قبل المؤجر وفي حالة أمتناعي عن ذلك أكون خائنا للأمانة وملزم بسداد ثمن السيارة المذكور ،وهومبلغ( <span class="fill">{{vehicle_value}}</span> ج) ( <span class="fill wide">{{vehicle_value}}</span> جنيه لا غير ) ويكون هذا المقدار حسب أسعار مثلها في المعارض وأسواق السيارات وذلك دون الحاجة إلي تنبيه أو إنذار وعدم الإخلال بحق التعويضات فضلا عن حق المالك أو المؤجر في مقاضاتي قانونيا وبوصفه مرتكبا جريمة خيانة الأمانة المعاقب عليها قانونيا ، ويكون ذلك من إختصاص المحاكم المختصة كما أتعهد بأنه لا يحق بيع السيارة أو تغيير أي شيء من معالمها الأساسية .
   </p>
 
   <div class="rpm-ack2-close">

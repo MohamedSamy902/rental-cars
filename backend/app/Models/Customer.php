@@ -12,9 +12,10 @@ class Customer extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'full_name', 'phone', 'phone_alt', 'email', 'national_id', 'nationality', 'national_id_expires_on',
+        'full_name', 'phone', 'phone_alt', 'email', 'national_id', 'national_id_issued_from', 'national_id_issued_on',
+        'nationality', 'national_id_expires_on',
         'national_id_image_path', 'national_id_back_path', 'passport_number', 'passport_expires_on', 'birth_date', 'address',
-        'license_number', 'license_expires_on', 'license_image_path', 'license_back_path',
+        'license_number', 'license_issued_from', 'license_expires_on', 'license_image_path', 'license_back_path',
         'status', 'blacklist_reason', 'blacklisted_by', 'blacklisted_at', 'notes', 'credit_balance',
     ];
 
@@ -23,6 +24,7 @@ class Customer extends Model
         return [
             'birth_date' => 'date:Y-m-d',
             'national_id_expires_on' => 'date:Y-m-d',
+            'national_id_issued_on' => 'date:Y-m-d',
             'passport_expires_on' => 'date:Y-m-d',
             'license_expires_on' => 'date:Y-m-d',
             'blacklisted_at' => 'datetime',
@@ -47,7 +49,7 @@ class Customer extends Model
      */
     public static function normalizeDateOnlyFields(array $payload): array
     {
-        foreach (['birth_date', 'license_expires_on', 'national_id_expires_on', 'passport_expires_on'] as $dateKey) {
+        foreach (['birth_date', 'license_expires_on', 'national_id_expires_on', 'national_id_issued_on', 'passport_expires_on'] as $dateKey) {
             if (! array_key_exists($dateKey, $payload) || $payload[$dateKey] === null || $payload[$dateKey] === '') {
                 continue;
             }

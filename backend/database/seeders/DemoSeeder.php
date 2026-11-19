@@ -173,6 +173,8 @@ class DemoSeeder extends Seeder
                 'require_return_signature_always' => false,
                 'print_phone' => '01125253888',
                 'print_address' => '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة',
+                'print_commercial_register' => '18766',
+                'print_tax_info' => '',
                 'print_signer_name' => 'محمد عبد القادر محمد',
                 'company_tagline' => 'لخدمات رجال الأعمال',
             ],
