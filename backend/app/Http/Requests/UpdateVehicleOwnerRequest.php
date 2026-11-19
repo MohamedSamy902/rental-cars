@@ -3,9 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
-use App\Rules\EgyptianNationalId;
 use App\Rules\EgyptianPhone;
+use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateVehicleOwnerRequest extends FormRequest
 {
@@ -33,7 +34,9 @@ class UpdateVehicleOwnerRequest extends FormRequest
             'full_name' => ['sometimes', 'required', 'string', 'max:200'],
             'phone' => ['sometimes', 'required', 'string', 'max:30', new EgyptianPhone],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
-            'national_id' => ['sometimes', 'required', 'string', 'max:30', new EgyptianNationalId],
+            'nationality' => ['sometimes', 'required', 'string', 'max:80', Rule::in(Nationalities::all())],
+            // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
+            'national_id' => ['sometimes', 'required', 'string', 'max:80'],
             'id_front_path' => ['sometimes', 'required', 'string', 'max:500'],
             'id_back_path' => ['sometimes', 'required', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
@@ -50,7 +53,8 @@ class UpdateVehicleOwnerRequest extends FormRequest
             'full_name' => 'اسم المالك',
             'phone' => 'الهاتف',
             'phone_alt' => 'هاتف بديل',
-            'national_id' => 'الرقم القومي',
+            'nationality' => 'الجنسية',
+            'national_id' => 'الرقم القومي / رقم الهوية',
             'id_front_path' => 'وجه البطاقة',
             'id_back_path' => 'ظهر البطاقة',
             'notes' => 'الملاحظات',

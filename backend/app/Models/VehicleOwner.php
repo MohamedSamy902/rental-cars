@@ -11,7 +11,7 @@ class VehicleOwner extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'full_name', 'phone', 'phone_alt', 'national_id', 'id_front_path', 'id_back_path',
+        'full_name', 'phone', 'phone_alt', 'national_id', 'nationality', 'id_front_path', 'id_back_path',
         'notes', 'is_active',
     ];
 

@@ -188,6 +188,9 @@ class VehicleCustodyAgreementService
             'owner_name' => (string) ($owner?->full_name ?: ''),
             'owner_phone' => (string) ($owner?->phone ?: ''),
             'owner_national_id' => (string) ($owner?->national_id ?: ''),
+            'owner_nationality' => trim((string) ($owner?->nationality ?: '')) !== ''
+                ? (string) $owner->nationality
+                : ((string) ($owner?->national_id ?: '') !== '' ? 'مصري' : ''),
             'owner_notes' => (string) ($owner?->notes ?: ''),
             'vehicle_plate' => (string) ($vehicle->plate ?: ''),
             'vehicle_name' => trim(($vehicle->brand ?? '').' '.($vehicle->model ?? '')),
@@ -209,7 +212,7 @@ class VehicleCustodyAgreementService
      */
     public function present(VehicleCustodyAgreement $row): array
     {
-        $row->loadMissing(['owner:id,full_name,phone,national_id', 'issuer:id,name']);
+        $row->loadMissing(['owner:id,full_name,phone,national_id,nationality', 'issuer:id,name']);
 
         return [
             'id' => $row->id,
@@ -220,6 +223,7 @@ class VehicleCustodyAgreementService
                 'full_name' => $row->owner->full_name,
                 'phone' => $row->owner->phone,
                 'national_id' => $row->owner->national_id,
+                'nationality' => $row->owner->nationality,
             ] : null,
             'number' => $row->number,
             'starts_on' => $row->starts_on?->toDateString(),

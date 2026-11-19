@@ -83,6 +83,7 @@ class DocumentTemplateService
             ['key' => 'owner_phone', 'aliases' => ['هاتف_المالك'], 'label' => 'هاتف المالك', 'sample' => '01011112222', 'group' => 'المالك'],
             ['key' => 'owner_phone_alt', 'aliases' => ['هاتف_المالك_البديل'], 'label' => 'هاتف المالك البديل', 'sample' => '01122223333', 'group' => 'المالك'],
             ['key' => 'owner_national_id', 'aliases' => ['قومي_المالك'], 'label' => 'الرقم القومي للمالك', 'sample' => '29001011234567', 'group' => 'المالك'],
+            ['key' => 'owner_nationality', 'aliases' => ['جنسية_المالك'], 'label' => 'جنسية المالك', 'sample' => 'مصري', 'group' => 'المالك'],
             ['key' => 'owner_monthly_amount', 'aliases' => ['المبلغ_الشهري_للمالك'], 'label' => 'المبلغ الشهري للمالك', 'sample' => '8000', 'group' => 'المالك'],
             ['key' => 'owner_agreement_number', 'aliases' => ['رقم_عقد_المالك'], 'label' => 'رقم عقد المالك (تلقائي)', 'sample' => 'OWN-VEH-0001', 'group' => 'المالك'],
             ['key' => 'owner_agreement_starts_on', 'aliases' => ['بداية_عقد_المالك'], 'label' => 'بداية عقد المالك', 'sample' => '01/01/2026', 'group' => 'المالك'],
@@ -479,9 +480,10 @@ class DocumentTemplateService
 
         $nationalId = (string) ($customer?->national_id ?: '');
         $passport = (string) ($customer?->passport_number ?: '');
-        $nationality = $nationalId !== ''
-            ? 'مصري'
-            : ($passport !== '' ? '' : '');
+        $nationality = trim((string) ($customer?->nationality ?: ''));
+        if ($nationality === '' && $nationalId !== '') {
+            $nationality = 'مصري';
+        }
         $idDoc = $nationalId !== '' ? $nationalId : $passport;
 
         $signer = $this->resolvePrintSignerName($ops);
@@ -704,6 +706,9 @@ class DocumentTemplateService
             'owner_phone' => (string) ($owner?->phone ?: ''),
             'owner_phone_alt' => (string) ($owner?->phone_alt ?: ''),
             'owner_national_id' => (string) ($owner?->national_id ?: ''),
+            'owner_nationality' => trim((string) ($owner?->nationality ?: '')) !== ''
+                ? (string) $owner->nationality
+                : ((string) ($owner?->national_id ?: '') !== '' ? 'مصري' : ''),
             'owner_monthly_amount' => (string) (int) ($vehicle->owner_monthly_amount ?? 0),
             'owner_agreement_number' => $number,
             'owner_agreement_starts_on' => ($vehicle->owner_agreement_starts_on ?? $vehicle->owner_since)
@@ -1040,6 +1045,7 @@ HTML;
 <table>
   <tr><th>الطرف الأول (المالك)</th><td>
     السيد/ة: {{owner_name}}<br>
+    الجنسية: {{owner_nationality}}<br>
     الرقم القومي: <span dir="ltr">{{owner_national_id}}</span><br>
     هاتف: <span dir="ltr">{{owner_phone}}</span>
     <span class="muted"> · بديل: <span dir="ltr">{{owner_phone_alt}}</span></span>
@@ -1192,7 +1198,7 @@ HTML;
   <div class="sign-box">
     <h4>الطرف الأول — المالك</h4>
     <p>{{owner_name}}</p>
-    <p class="muted">قومي: <span dir="ltr">{{owner_national_id}}</span></p>
+    <p class="muted">الجنسية: {{owner_nationality}} · قومي: <span dir="ltr">{{owner_national_id}}</span></p>
     <div class="sign-line">التوقيع · بصمة · التاريخ</div>
   </div>
   <div class="sign-box">
@@ -1224,6 +1230,7 @@ HTML;
 <h2>أولاً: الطرف الأول (المؤجر / مالك العربية)</h2>
 <table>
   <tr><th>الاسم</th><td>{{owner_name}}</td></tr>
+  <tr><th>الجنسية</th><td>{{owner_nationality}}</td></tr>
   <tr><th>الهاتف</th><td dir="ltr">{{owner_phone}}</td></tr>
   <tr><th>الرقم القومي</th><td dir="ltr">{{owner_national_id}}</td></tr>
 </table>

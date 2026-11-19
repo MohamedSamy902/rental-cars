@@ -44,7 +44,7 @@ const emptyForm = {
   workshop: '',
   inventory_item_id: '',
   quantity: '1',
-  unit_price: '0',
+  unit_price: '',
   opened_at: nowLocalDateTimeValue(),
   funding: 'stock' as 'stock' | 'custody',
   employee_id: '',
@@ -63,7 +63,6 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
   const [saving, setSaving] = useState(false)
   const [firstUpcoming, setFirstUpcoming] = useState(true)
-  const [withSpend, setWithSpend] = useState(false)
   const [putsInMaintenance, setPutsInMaintenance] = useState(false)
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [extraItems, setExtraItems] = useState<string[]>([])
@@ -74,7 +73,8 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
   const lockedOdometer = vehicle?.odometer
   const lockCustody = Boolean(custodyEmployee?.id)
   const baselineMode = firstUpcoming && !lockCustody
-  const spendMode = lockCustody || (!baselineMode && withSpend)
+  /** Normal WO (and custody quick-action) must fund from stock or petty cash — baseline stays free. */
+  const spendMode = !baselineMode
 
   const stockItems = useMemo(
     () => items.filter((i) => Number(i.remaining ?? 0) > 0),
@@ -108,7 +108,6 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     setSelectedItems([])
     setExtraItems([])
     setFirstUpcoming(!lockCustody)
-    setWithSpend(lockCustody)
     setPutsInMaintenance(false)
     const requests: Promise<unknown>[] = [
       api<{ data: Item[] }>('/inventory?per_page=200')
@@ -172,16 +171,17 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     if (!form.opened_at) next.opened_at = 'أدخل تاريخ ووقت الصيانة.'
     if (chosenLabels.length < 1) next.items = 'اختر بند صيانة واحداً على الأقل، أو أضف بنداً.'
     if (spendMode) {
+      if (!form.funding) next.funding = 'حدّد مصدر الفلوس: مخزون أو عهدة.'
       if (form.funding === 'stock') {
         if (!form.inventory_item_id) next.inventory_item_id = 'اختر صنف المخزون.'
         else if (!selectedItem) next.inventory_item_id = 'الصنف غير متاح أو نفد رصيده.'
-      } else {
+      } else if (form.funding === 'custody') {
         if (!canManagePetty && !ownEmployeeId) {
           next.employee_id = 'حسابك غير مرتبط بموظف — إدارة العهدة فقط تخصم عهدة الغير.'
         } else if (!form.employee_id) {
           next.employee_id = canManagePetty ? 'اختر موظف العهدة.' : 'تعذّر تحديد عهدتك.'
         }
-        if (!form.unit_price || Number(form.unit_price) < 0) next.unit_price = 'أدخل سعر الشراء.'
+        if (!form.unit_price || Number(form.unit_price) < 1) next.unit_price = 'المبلغ لازم يكون أكبر من صفر.'
       }
       if (!form.quantity || Number(form.quantity) < 1) next.quantity = 'الكمية يجب أن تكون ١ فأكثر.'
     }
@@ -253,6 +253,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           opened_on: form.opened_at ? civilDateOnly(form.opened_at) : undefined,
           next_service_on: form.next_service_on || undefined,
           next_service_odometer: form.next_service_odometer !== '' ? Number(form.next_service_odometer) : undefined,
+          baseline: baselineMode,
           notes,
           lines: buildLines(),
         },
@@ -296,8 +297,14 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
             onChange={(v) => {
               setFirstUpcoming(v)
               if (v) {
-                setWithSpend(false)
                 setPutsInMaintenance(false)
+                setForm((prev) => ({ ...prev, unit_price: '', inventory_item_id: '' }))
+              } else {
+                setForm((prev) => ({
+                  ...prev,
+                  funding: prev.funding || 'stock',
+                  unit_price: prev.unit_price === '0' ? '' : prev.unit_price,
+                }))
               }
             }}
           />
@@ -392,19 +399,13 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
           />
         ) : null}
 
-        {!baselineMode && !lockCustody ? (
-          <SwitchField
-            label="صرف من مخزون أو عهدة (اختياري)"
-            checked={withSpend}
-            onChange={setWithSpend}
-          />
-        ) : null}
-
         {spendMode ? (
           <>
             <SelectField
               label="مصدر التمويل / القطع"
               required
+              error={fieldErrors.funding}
+              hint="إلزامي في أمر الصيانة العادي — مخزون أو عهدة (مش بدون فلوس)"
               value={form.funding}
               onChange={(e) => {
                 const funding = e.target.value as 'stock' | 'custody'
@@ -421,9 +422,9 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
                       ? (custodyEmployee?.id ? String(custodyEmployee.id) : '')
                       : String(ownEmployeeId))
                     : '',
-                  unit_price: '0',
+                  unit_price: '',
                 })
-                setFieldErrors((prev) => ({ ...prev, inventory_item_id: '', employee_id: '', unit_price: '' }))
+                setFieldErrors((prev) => ({ ...prev, funding: '', inventory_item_id: '', employee_id: '', unit_price: '' }))
               }}
               options={[
                 { value: 'stock', label: 'من المخزون (سعر مسجّل تلقائياً)' },
@@ -505,9 +506,9 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
               }}
             />
           </>
-        ) : (
+        ) : baselineMode ? (
           <p className="rpm-maint-free-hint">بدون مبلغ ولا عهدة — البنود تُسجَّل توثيقاً فقط مع موعد/عداد الصيانة التالية.</p>
-        )}
+        ) : null}
 
         <DateField
           label="موعد الصيانة التالية"

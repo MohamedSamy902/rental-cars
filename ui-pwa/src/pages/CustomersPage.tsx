@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate } from '@/shared/lib/format'
+import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useLatestRequest } from '@/shared/lib/useLatestRequest'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
-  MediaUpload, useToast, SkeletonBlock, ErrorState, IconEye, IconEdit, IconClipboard, PhoneActions,
+  SelectField, MediaUpload, useToast, SkeletonBlock, ErrorState, IconEye, IconEdit, IconClipboard, PhoneActions,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import './pages.css'
@@ -24,6 +25,7 @@ type Customer = {
   license_number: string
   license_expires_on: string
   birth_date?: string
+  nationality?: string | null
   national_id?: string | null
   national_id_image_path?: string | null
   national_id_back_path?: string | null
@@ -35,7 +37,8 @@ type Customer = {
 }
 
 const emptyForm = {
-  full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01', national_id: '', notes: '',
+  full_name: '', phone: '', phone_alt: '', birth_date: '1990-01-01', license_number: '', license_expires_on: '2030-01-01',
+  nationality: DEFAULT_NATIONALITY, national_id: '', notes: '',
   national_id_image_path: '', national_id_back_path: '', license_image_path: '', license_back_path: '',
 }
 
@@ -234,7 +237,15 @@ export function CustomersPage() {
     <div className="rpm-form-grid">
       <TextField label="الاسم الكامل" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
       <TextField label="الهاتف" required error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-      <TextField label="الرقم القومي" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
+      <SelectField
+        label="الجنسية"
+        required
+        error={fieldErrors.nationality}
+        options={NATIONALITY_OPTIONS}
+        value={form.nationality}
+        onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+      />
+      <TextField label="الرقم القومي / رقم الهوية" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
       <TextField label="تاريخ الميلاد" required error={fieldErrors.birth_date} type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
       <TextField label="رقم الرخصة" required error={fieldErrors.license_number} value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
       <TextField label="انتهاء الرخصة" required error={fieldErrors.license_expires_on} type="date" value={form.license_expires_on} onChange={(e) => setForm({ ...form, license_expires_on: e.target.value })} />
@@ -360,7 +371,8 @@ export function CustomersPage() {
                 { label: 'الهاتف', value: <PhoneActions phone={detail.phone} name={detail.full_name} /> },
                 { label: 'هاتف بديل', value: detail.phone_alt ? <PhoneActions phone={detail.phone_alt} name={detail.full_name} /> : '—' },
                 { label: 'البريد', value: detail.email || '—' },
-                { label: 'الرقم القومي', value: detail.national_id || '—' },
+                { label: 'الجنسية', value: detail.nationality || '—' },
+                { label: 'الرقم القومي / رقم الهوية', value: detail.national_id || '—' },
                 { label: 'تاريخ الميلاد', value: formatDate(detail.birth_date) },
                 { label: 'رقم الرخصة', value: detail.license_number },
                 { label: 'انتهاء الرخصة', value: formatDate(detail.license_expires_on) },

@@ -6,8 +6,9 @@ use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 
 /**
- * الرقم القومي المصري اختياري؛ إن وُجد يجب أن يكون 14 رقماً ويبدأ بـ 2 أو 3.
- * يفترض أرقاماً غربية مسبقاً.
+ * Legacy optional Egyptian national-ID shape check (14 digits, starts with 2/3).
+ * Not applied on customer/owner APIs anymore — national_id accepts free-form
+ * Egyptian ID, foreign ID, or passport (letters + digits). Kept for optional reuse.
  */
 class EgyptianNationalId implements ValidationRule
 {

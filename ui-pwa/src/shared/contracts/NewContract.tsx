@@ -4,6 +4,7 @@ import {
   Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, DateField, MediaUpload, NumberField, SwitchField, useToast,
 } from '@/shared/ui'
 import { toApiDateTime, formatMoney, formatDepositAmount, DEFAULT_DEPOSIT_CURRENCY } from '@/shared/lib/format'
+import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
@@ -72,6 +73,7 @@ const emptyCustomer = {
   full_name: '',
   phone: '',
   phone_alt: '',
+  nationality: DEFAULT_NATIONALITY,
   national_id: '',
   birth_date: '1990-01-01',
   license_number: '',
@@ -210,6 +212,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           full_name: newCustomer.full_name,
           phone: newCustomer.phone,
           phone_alt: newCustomer.phone_alt || null,
+          nationality: newCustomer.nationality || DEFAULT_NATIONALITY,
           national_id: newCustomer.national_id || null,
           birth_date: newCustomer.birth_date,
           license_number: newCustomer.license_number,
@@ -393,7 +396,14 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               <TextField label="الاسم الكامل" required value={newCustomer.full_name} onChange={(e) => setNewCustomer({ ...newCustomer, full_name: e.target.value })} />
               <TextField label="الهاتف" required value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
               <TextField label="هاتف بديل" value={newCustomer.phone_alt} onChange={(e) => setNewCustomer({ ...newCustomer, phone_alt: e.target.value })} />
-              <TextField label="الرقم القومي" value={newCustomer.national_id} onChange={(e) => setNewCustomer({ ...newCustomer, national_id: e.target.value })} />
+              <SelectField
+                label="الجنسية"
+                required
+                options={NATIONALITY_OPTIONS}
+                value={newCustomer.nationality}
+                onChange={(e) => setNewCustomer({ ...newCustomer, nationality: e.target.value })}
+              />
+              <TextField label="الرقم القومي / رقم الهوية" value={newCustomer.national_id} onChange={(e) => setNewCustomer({ ...newCustomer, national_id: e.target.value })} />
               <TextField label="تاريخ الميلاد" required type="date" value={newCustomer.birth_date} onChange={(e) => setNewCustomer({ ...newCustomer, birth_date: e.target.value })} />
               <TextField label="رقم الرخصة" required value={newCustomer.license_number} onChange={(e) => setNewCustomer({ ...newCustomer, license_number: e.target.value })} />
               <TextField label="انتهاء الرخصة" required type="date" value={newCustomer.license_expires_on} onChange={(e) => setNewCustomer({ ...newCustomer, license_expires_on: e.target.value })} />

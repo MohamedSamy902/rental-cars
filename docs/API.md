@@ -262,7 +262,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 **POST /vehicles — حقول أساسية**
 `plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit` · **`chassis_number` (مطلوب)**  
 الكود: يُولَّد تلقائياً إن لم يُرسل.  
-اختياري: `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_inline{full_name,phone,national_id,id_front_path,id_back_path,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}` — عند ربط مالك تُرجع الاستجابة أيضاً `owner_agreement` (عقد إدارة وتشغيل متعدد الصفحات مملوء ببيانات الشركة/المالك/العربية) للطباعة. `GET /vehicles/{id}/owner-agreement/print`  
+اختياري: `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_inline{full_name,phone,nationality,national_id,id_front_path,id_back_path,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}` — عند ربط مالك تُرجع الاستجابة أيضاً `owner_agreement` (عقد إدارة وتشغيل متعدد الصفحات مملوء ببيانات الشركة/المالك/العربية) للطباعة. `GET /vehicles/{id}/owner-agreement/print`  
 `owner_inline`: عند الإنشاء المضمّن يلزم الهاتف + الرقم القومي + وش/ضهر البطاقة.  
 **ملغى:** `rental_priority` · قائمة الانتظار · `fuel_level` في الفحص.
 
@@ -306,8 +306,10 @@ Query شائع: `?per_page=50&page=1&search=...`
 | DELETE | `/customers/{customer}` | أرشفة ناعمة |
 
 **POST Body**
-`full_name`, `phone`, `birth_date`, `license_number`, `license_expires_on`  
+`full_name`, `phone`, `nationality`, `birth_date`, `license_number`, `license_expires_on`  
 اختياري: `phone_alt`, `email`, `national_id`, `national_id_expires_on`, `passport_number`, `passport_expires_on`, `address`, `notes`, `national_id_image_path`, `license_image_path`
+
+> `nationality` من قائمة عربية موحّدة (`App\Support\Nationalities`). `national_id` يقبل أي نص حر (رقم قومي مصري أو هوية أجنبية أو جواز) بحروف وأرقام بلا صيغة إلزامية.
 
 > مسارات الصور تُملأ عادةً من `POST /media` (مثل `/media/{id}/file`) — التخزين محلي خاص بلا CDN خارجي.
 
@@ -558,7 +560,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 | POST | `/work-orders` | فتح |
 | POST | `/work-orders/{id}/close` | إغلاق + FIFO |
 
-**POST work-order** — بنود جاهزة في الواجهة (زيت موتور · فلتر زيت موتور · زيت فتيس · فلتر زيت فتيس · فلتر هوا · فلتر تكيف · فلتر بنزين · بيوجوهات · سير مجموعه · إطارات أو كاوتش) مع بند حر. تسجيل أول صيانة قادمة = `puts_in_maintenance: false` + `notes` أساس + أسطر `purchase` بـ`unit_price: 0` بلا عهدة.
+**POST work-order** — بنود جاهزة في الواجهة (زيت موتور · فلتر زيت موتور · زيت فتيس · فلتر زيت فتيس · فلتر هوا · فلتر تكيف · فلتر بنزين · بيوجوهات · سير مجموعه · إطارات أو كاوتش) مع بند حر. تسجيل أول صيانة قادمة = `baseline: true` (أو `puts_in_maintenance: false` + `notes` أساس) + أسطر `purchase` بـ`unit_price: 0` بلا عهدة. أمر عادي: مصدر تمويل إلزامي (`stock` مع صنف، أو `purchase` من عهدة بمبلغ > ٠).
 
 ```json
 {
@@ -775,7 +777,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 `POST` يقبل اختيارياً `number` · `starts_on` · `ends_on` · `monthly_amount`؛ إن غابت تُؤخذ من حقول `owner_agreement_*` / `owner_monthly_amount` على العربية. تعديل قالب الإعدادات لاحقاً لا يغيّر النسخ الصادرة.
 
-**حقول المالك (عند الإنشاء):** اسم (مطلوب) · هاتف (مطلوب) · هاتف بديل · رقم قومي (مطلوب) · بطاقة وش (مطلوب) · بطاقة ضهر (مطلوب) · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
+**حقول المالك (عند الإنشاء):** اسم (مطلوب) · هاتف (مطلوب) · هاتف بديل · جنسية (مطلوب، قائمة موحّدة) · رقم قومي/هوية (مطلوب) · بطاقة وش (مطلوب) · بطاقة ضهر (مطلوب) · ملاحظات. **بلا رخصة على المالك** — رخصة التسيير على العربية (`vehicle_documents.document_number` + وش/ضهر + انتهاء).
 
 **ترحيل محاسبي**
 - استحقاق شهري: مدين `5200` مصروف إيجار ملاك · دائن `2100` مستحقات ملاك
