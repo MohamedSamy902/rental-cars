@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney, toDateOnly } from '@/shared/lib/format'
-import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
+import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
+import { NationalityField } from '@/shared/forms/NationalityField'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { statusLabel } from '@/shared/contracts/contractModel'
 import {
-  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, SelectField, MediaUpload,
+  PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
   useToast, SkeletonBlock, ErrorState, StatusPill, PhoneActions,
 } from '@/shared/ui'
 import './pages.css'
@@ -300,13 +301,10 @@ export function CustomerDetailPage() {
           <TextField label="الاسم الكامل" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
           <TextField label="الهاتف" required error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
-          <SelectField
-            label="الجنسية"
-            required
+          <NationalityField
             error={fieldErrors.nationality}
-            options={NATIONALITY_OPTIONS}
             value={form.nationality}
-            onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+            onChange={(nationality) => setForm({ ...form, nationality })}
           />
           <TextField label="الرقم القومي / رقم الهوية" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
           <TextField label="صادرة من (البطاقة)" error={fieldErrors.national_id_issued_from} value={form.national_id_issued_from} onChange={(e) => setForm({ ...form, national_id_issued_from: e.target.value })} />

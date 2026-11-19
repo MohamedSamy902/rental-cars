@@ -309,7 +309,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 `full_name`, `phone`, `nationality`, `birth_date`, `license_number`, `license_expires_on`  
 اختياري: `phone_alt`, `email`, `national_id`, `national_id_expires_on`, `passport_number`, `passport_expires_on`, `address`, `notes`, `national_id_image_path`, `license_image_path`
 
-> `nationality` من قائمة عربية موحّدة (`App\Support\Nationalities`). `national_id` يقبل أي نص حر (رقم قومي مصري أو هوية أجنبية أو جواز) بحروف وأرقام بلا صيغة إلزامية.
+> `nationality` نص حر (أي جنسية مكتوبة، حد أقصى 80 حرفاً؛ الاقتراحات في الواجهة اختيارية فقط). `national_id` يقبل أي نص حر (رقم قومي مصري أو هوية أجنبية أو جواز) بحروف وأرقام بلا صيغة إلزامية.
 
 > مسارات الصور تُملأ عادةً من `POST /media` (مثل `/media/{id}/file`) — التخزين محلي خاص بلا CDN خارجي.
 

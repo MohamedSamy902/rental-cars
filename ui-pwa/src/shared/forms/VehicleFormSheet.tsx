@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { addCivilDays, civilDateOnly, todayCivilIso } from '@/shared/lib/dates'
 import { vehicleCategorySelectOptions } from '@/shared/lib/vehicleCategories'
-import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
+import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
+import { NationalityField } from '@/shared/forms/NationalityField'
 import { BrandSelectField } from '@/shared/forms/BrandSelectField'
 import {
   Button, Sheet, TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
@@ -658,13 +659,11 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
               <>
                 <TextField label="اسم المالك" required value={form.owner_full_name} error={errors['owner_inline.full_name']} onChange={(e) => setForm({ ...form, owner_full_name: e.target.value })} />
                 <TextField label="هاتف المالك" required value={form.owner_phone} error={errors['owner_inline.phone']} onChange={(e) => setForm({ ...form, owner_phone: e.target.value })} />
-                <SelectField
+                <NationalityField
                   label="جنسية المالك"
-                  required
                   error={errors['owner_inline.nationality']}
-                  options={NATIONALITY_OPTIONS}
                   value={form.owner_nationality}
-                  onChange={(e) => setForm({ ...form, owner_nationality: e.target.value })}
+                  onChange={(owner_nationality) => setForm({ ...form, owner_nationality })}
                 />
                 <TextField label="الرقم القومي / رقم الهوية" required value={form.owner_national_id} error={errors['owner_inline.national_id']} onChange={(e) => setForm({ ...form, owner_national_id: e.target.value })} />
                 <MediaUpload

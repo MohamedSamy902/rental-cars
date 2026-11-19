@@ -4,7 +4,8 @@ import {
   Button, Sheet, TextField, SelectField, MoneyField, TextAreaField, DateTimeField, DateField, MediaUpload, NumberField, SwitchField, useToast,
 } from '@/shared/ui'
 import { toApiDateTime, formatMoney, formatDepositAmount, DEFAULT_DEPOSIT_CURRENCY } from '@/shared/lib/format'
-import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
+import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
+import { NationalityField } from '@/shared/forms/NationalityField'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
@@ -400,12 +401,9 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               <TextField label="الاسم الكامل" required value={newCustomer.full_name} onChange={(e) => setNewCustomer({ ...newCustomer, full_name: e.target.value })} />
               <TextField label="الهاتف" required value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
               <TextField label="هاتف بديل" value={newCustomer.phone_alt} onChange={(e) => setNewCustomer({ ...newCustomer, phone_alt: e.target.value })} />
-              <SelectField
-                label="الجنسية"
-                required
-                options={NATIONALITY_OPTIONS}
+              <NationalityField
                 value={newCustomer.nationality}
-                onChange={(e) => setNewCustomer({ ...newCustomer, nationality: e.target.value })}
+                onChange={(nationality) => setNewCustomer({ ...newCustomer, nationality })}
               />
               <TextField label="الرقم القومي / رقم الهوية" value={newCustomer.national_id} onChange={(e) => setNewCustomer({ ...newCustomer, national_id: e.target.value })} />
               <TextField label="صادرة من (البطاقة)" value={newCustomer.national_id_issued_from} onChange={(e) => setNewCustomer({ ...newCustomer, national_id_issued_from: e.target.value })} />

@@ -96,6 +96,32 @@ class ValidationArabicTest extends TestCase
         $this->assertSame('P-AE-9988', $owner->json('data.national_id'));
     }
 
+    public function test_nationality_accepts_any_written_label_not_only_suggestions(): void
+    {
+        $customer = $this->postJson('/api/customers', [
+            'full_name' => 'عميل جنسية حرة',
+            'phone' => '01001112236',
+            'nationality' => 'ألباني',
+            'national_id' => 'AL-4411',
+            'birth_date' => '1988-03-03',
+            'license_number' => 'LIC-NID-3',
+            'license_expires_on' => now()->addYears(2)->toDateString(),
+        ])->assertCreated();
+
+        $this->assertSame('ألباني', $customer->json('data.nationality'));
+
+        $owner = $this->postJson('/api/owners', [
+            'full_name' => 'مالك جنسية حرة',
+            'phone' => '01001112237',
+            'nationality' => 'كازاخستاني',
+            'national_id' => 'KZ-7788',
+            'id_front_path' => 'tests/owners/front2.jpg',
+            'id_back_path' => 'tests/owners/back2.jpg',
+        ])->assertCreated();
+
+        $this->assertSame('كازاخستاني', $owner->json('data.nationality'));
+    }
+
     public function test_contract_end_before_start_returns_arabic_message(): void
     {
         $customer = Customer::query()->create([

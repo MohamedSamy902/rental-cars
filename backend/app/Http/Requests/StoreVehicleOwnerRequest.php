@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
 use App\Rules\EgyptianPhone;
-use App\Support\Nationalities;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -34,7 +33,7 @@ class StoreVehicleOwnerRequest extends FormRequest
             'full_name' => ['required', 'string', 'max:200'],
             'phone' => ['required', 'string', 'max:30', new EgyptianPhone],
             'phone_alt' => ['nullable', 'string', 'max:30', new EgyptianPhone],
-            'nationality' => ['required', 'string', 'max:80', Rule::in(Nationalities::all())],
+            'nationality' => ['required', 'string', 'max:80'],
             // رقم قومي مصري أو هوية أجنبية أو جواز — حروف وأرقام بلا صيغة إلزامية
             'national_id' => ['required', 'string', 'max:80'],
             'id_front_path' => ['required', 'string', 'max:500'],

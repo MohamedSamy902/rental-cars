@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
-import { DEFAULT_NATIONALITY, NATIONALITY_OPTIONS } from '@/shared/lib/nationalities'
+import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
+import { NationalityField } from '@/shared/forms/NationalityField'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
-  PageHeader, FilterBar, Button, Sheet, Fab, DataTable, TextField, TextAreaField, SelectField, SwitchField,
+  PageHeader, FilterBar, Button, Sheet, Fab, DataTable, TextField, TextAreaField, SwitchField,
   StatusPill, useToast, IconEye, MediaUpload, PhoneActions, type DataColumn,
 } from '@/shared/ui'
 import './pages.css'
@@ -155,13 +156,10 @@ export function OwnersPage() {
       <TextField label="اسم المالك" required error={fieldErrors.full_name} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
       <TextField label="الهاتف" required error={fieldErrors.phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       <TextField label="هاتف بديل" value={form.phone_alt} onChange={(e) => setForm({ ...form, phone_alt: e.target.value })} />
-      <SelectField
-        label="الجنسية"
-        required
+      <NationalityField
         error={fieldErrors.nationality}
-        options={NATIONALITY_OPTIONS}
         value={form.nationality}
-        onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+        onChange={(nationality) => setForm({ ...form, nationality })}
       />
       <TextField label="الرقم القومي / رقم الهوية" required error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
       <MediaUpload
