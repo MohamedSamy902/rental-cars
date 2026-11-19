@@ -2,7 +2,7 @@ import {
   Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, MediaUpload, DateField,
 } from '@/shared/ui'
 import { civilDateOnly } from '@/shared/lib/dates'
-import { formatMoney } from '@/shared/lib/format'
+import { formatDate, formatMoney } from '@/shared/lib/format'
 import { actionTitle, type ActionKind, type Contract, type VehicleOption } from './contractModel'
 
 type Form = {
@@ -98,7 +98,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
                 {(selected?.open_violations || []).map((v) => (
                   <li key={v.id}>
                     {formatMoney(v.amount)}
-                    {v.occurred_at ? ` · ${v.occurred_at}` : ''}
+                    {v.occurred_at ? ` · ${formatDate(v.occurred_at)}` : ''}
                     {v.created_by_name ? ` · رفعها ${v.created_by_name}` : ''}
                   </li>
                 ))}
@@ -164,7 +164,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
           <>
             <p className="muted">
               المتبقي الحالي: {formatMoney(selected?.ledger?.balance || 0)}
-              {selected?.balance_due_on ? ` · استحقاق ${selected.balance_due_on}` : ''}
+              {selected?.balance_due_on ? ` · استحقاق ${formatDate(selected.balance_due_on)}` : ''}
             </p>
             <MoneyField
               label="المبلغ المحصّل الآن"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/shared/lib/format'
 import {
   Button, BackNavButton, MetricCardGrid, StatusPill, SkeletonBlock, ErrorState, Sheet, TextField, useToast,
   IconCash, IconReceipt, IconWallet, IconTrend, IconBriefcase, IconAlert, IconKey,
@@ -78,7 +78,7 @@ function downloadCsv(filename: string, header: string[], rows: unknown[][]) {
 
 function when(value?: string | null) {
   if (!value) return '—'
-  return value.length > 10 ? formatDateTime(value) : value
+  return value.length > 10 ? formatDateTime(value) : formatDate(value)
 }
 
 function MoneyRows({ rows, empty, render }: { rows: Row[]; empty: string; render: (r: Row) => { title: string; sub: string } }) {

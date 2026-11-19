@@ -7,6 +7,7 @@ use App\Models\MediaFile;
 use App\Models\TenantSetting;
 use App\Models\Violation;
 use App\Services\Media\PublicMediaLinkService;
+use App\Support\CivilDate;
 use App\Support\PublicAppUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -64,7 +65,9 @@ class ViolationShareController extends Controller
         foreach ($rows->values() as $i => $v) {
             $total += (int) $v->amount;
             $n = $i + 1;
-            $date = $v->occurred_at?->timezone(config('app.timezone'))->format('Y-m-d') ?: '—';
+            $date = $v->occurred_at
+                ? CivilDate::formatDisplay($v->occurred_at->timezone(config('app.timezone')))
+                : '—';
             $amount = number_format((int) $v->amount, 0, '.', ',');
             $lines[] = "{$n}) تاريخ {$date} · المبلغ {$amount} ج.م.";
             if ($v->vehicle) {

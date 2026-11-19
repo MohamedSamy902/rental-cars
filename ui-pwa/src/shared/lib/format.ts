@@ -1,4 +1,4 @@
-import { civilDateOnly } from '@/shared/lib/dates'
+import { civilDateOnly, isoToDisplayDate } from '@/shared/lib/dates'
 
 /** Western digits (0-9) required — numberingSystem: latn */
 const latn = { numberingSystem: 'latn' as const }
@@ -55,14 +55,10 @@ export function toDateOnly(iso: string | null | undefined): string {
 
 /**
  * Date display as DD/MM/YYYY (Western digits).
- * Storage/API and `<input type="date">` stay YYYY-MM-DD via `toDateOnly`.
+ * Storage/API stay YYYY-MM-DD via `toDateOnly`. UI inputs use DateField (same display).
  */
 export function formatDate(iso: string | null | undefined): string {
-  const only = toDateOnly(iso)
-  if (!only) return '—'
-  const [y, m, d] = only.split('-')
-  if (!y || !m || !d) return '—'
-  return `${d}/${m}/${y}`
+  return isoToDisplayDate(iso) || '—'
 }
 
 /** Append midnight for APIs that still expect datetime. */

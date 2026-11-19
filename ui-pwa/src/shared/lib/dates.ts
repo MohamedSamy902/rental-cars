@@ -85,3 +85,45 @@ export function civilDateOnly(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return ''
   return todayCivilIso(d)
 }
+
+/** YYYY-MM-DD → DD/MM/YYYY (Western digits). Empty → ''. */
+export function isoToDisplayDate(iso: string | null | undefined): string {
+  const only = civilDateOnly(iso)
+  if (!only) return ''
+  const [y, m, d] = only.split('-')
+  if (!y || !m || !d) return ''
+  return `${d}/${m}/${y}`
+}
+
+/**
+ * Parse user-facing day/month/year into YYYY-MM-DD.
+ * Accepts DD/MM/YYYY, D/M/YYYY, DD-MM-YYYY, DD.MM.YYYY, or bare YYYY-MM-DD.
+ */
+export function parseDisplayDate(raw: string | null | undefined): string | null {
+  if (raw == null) return null
+  const s = String(raw).trim()
+  if (!s) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+
+  const match = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/)
+  if (!match) return null
+  const day = Number(match[1])
+  const month = Number(match[2])
+  const year = Number(match[3])
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) return null
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1000) return null
+
+  const iso = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const probe = new Date(`${iso}T12:00:00`)
+  if (Number.isNaN(probe.getTime())) return null
+  if (probe.getFullYear() !== year || probe.getMonth() + 1 !== month || probe.getDate() !== day) return null
+  return iso
+}
+
+/** Auto-insert slashes while typing digits for DD/MM/YYYY. */
+export function maskDisplayDateInput(raw: string): string {
+  const digits = String(raw).replace(/\D/g, '').slice(0, 8)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+}

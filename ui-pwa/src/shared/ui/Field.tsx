@@ -1,5 +1,5 @@
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
-import { civilDateOnly } from '@/shared/lib/dates'
+import { useId, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
+import { civilDateOnly, isoToDisplayDate, maskDisplayDateInput, parseDisplayDate } from '@/shared/lib/dates'
 import './Field.css'
 
 export { SelectField } from './SelectField'
@@ -33,11 +33,25 @@ type TextProps = InputHTMLAttributes<HTMLInputElement> & {
   hint?: string
 }
 
-export function TextField({ label, error, hint, required, id, className = '', ...rest }: TextProps) {
+export function TextField({ label, error, hint, required, id, className = '', type, ...rest }: TextProps) {
+  if (type === 'date') {
+    return (
+      <DateField
+        label={label}
+        error={error}
+        hint={hint}
+        required={required}
+        id={id}
+        className={className}
+        {...rest}
+      />
+    )
+  }
+
   const fieldId = id ?? rest.name
   return (
     <FieldShell label={label} required={required} error={error} hint={hint} htmlFor={fieldId}>
-      <input id={fieldId} className={`rpm-input ${className}`.trim()} required={required} {...rest} />
+      <input id={fieldId} type={type} className={`rpm-input ${className}`.trim()} required={required} {...rest} />
     </FieldShell>
   )
 }
@@ -48,13 +62,103 @@ export function NumberField(props: NumberProps) {
   return <TextField inputMode="decimal" {...props} type="number" />
 }
 
-/** Native date input styled like other dashboard fields. */
-export function DateField(props: TextProps) {
-  return <TextField {...props} type="date" className={`rpm-input--date ${props.className || ''}`.trim()} />
+/**
+ * Date field: visible DD/MM/YYYY (day/month/year), storage/API YYYY-MM-DD.
+ * Native calendar is a picker affordance only — never the visible format.
+ */
+export function DateField({
+  label,
+  error,
+  hint,
+  required,
+  id,
+  className = '',
+  value,
+  onChange,
+  disabled,
+  name,
+  min,
+  max,
+}: TextProps) {
+  const autoId = useId()
+  const fieldId = id ?? name ?? autoId
+  const iso = civilDateOnly(typeof value === 'string' ? value : '')
+  const [draft, setDraft] = useState<string | null>(null)
+  const text = draft !== null ? draft : isoToDisplayDate(iso)
+
+  function emitIso(nextIso: string) {
+    if (!onChange) return
+    onChange({ target: { value: nextIso, name: name || '' } } as never)
+  }
+
+  function commitText(raw: string) {
+    const trimmed = raw.trim()
+    if (!trimmed) {
+      setDraft(null)
+      emitIso('')
+      return
+    }
+    const parsed = parseDisplayDate(trimmed)
+    if (parsed) {
+      setDraft(null)
+      emitIso(parsed)
+      return
+    }
+    setDraft(null)
+  }
+
+  const minIso = typeof min === 'string' ? civilDateOnly(min) : undefined
+  const maxIso = typeof max === 'string' ? civilDateOnly(max) : undefined
+
+  return (
+    <FieldShell label={label} required={required} error={error} hint={hint} htmlFor={fieldId}>
+      <div className={`rpm-date ${className}`.trim()}>
+        <input
+          id={fieldId}
+          className="rpm-input rpm-input--date rpm-date__text"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="DD/MM/YYYY"
+          disabled={disabled}
+          required={required}
+          name={name}
+          value={text}
+          aria-label={label}
+          onFocus={() => setDraft(isoToDisplayDate(iso))}
+          onChange={(e) => setDraft(maskDisplayDateInput(e.target.value))}
+          onBlur={() => commitText(draft ?? text)}
+        />
+        <span className="rpm-date__cal" aria-hidden={false}>
+          <svg className="rpm-date__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+            <path
+              fill="currentColor"
+              d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1.5A2.5 2.5 0 0 1 22 6.5v13A2.5 2.5 0 0 1 19.5 22h-15A2.5 2.5 0 0 1 2 19.5v-13A2.5 2.5 0 0 1 4.5 4H6V3a1 1 0 0 1 1-1Zm12.5 8h-15v9.5a.5.5 0 0 0 .5.5h14a.5.5 0 0 0 .5-.5V10Zm-15-2h15V6.5a.5.5 0 0 0-.5-.5H4.5a.5.5 0 0 0-.5.5V8Z"
+            />
+          </svg>
+          <input
+            className="rpm-date__native"
+            type="date"
+            tabIndex={-1}
+            disabled={disabled}
+            value={iso}
+            min={minIso || undefined}
+            max={maxIso || undefined}
+            aria-label={`${label} — اختيار من التقويم`}
+            onChange={(e) => {
+              const next = e.target.value
+              setDraft(null)
+              emitIso(next)
+            }}
+          />
+        </span>
+      </div>
+    </FieldShell>
+  )
 }
 
 /**
- * Date-only field (storage/input: YYYY-MM-DD · display elsewhere: DD/MM/YYYY).
+ * Date-only field (storage/input: YYYY-MM-DD · display: DD/MM/YYYY).
  * Kept as DateTimeField for call-site compatibility; time is always midnight.
  * Value format accepted: `YYYY-MM-DD` or `YYYY-MM-DDTHH:mm` (time ignored).
  */
@@ -68,29 +172,29 @@ export function DateTimeField({
   onChange,
   disabled,
   name,
+  min,
+  max,
 }: TextProps) {
-  const fieldId = id ?? name
   const raw = typeof value === 'string' ? value : ''
   const datePart = civilDateOnly(raw)
 
-  function emit(nextDate: string) {
-    if (!onChange) return
-    onChange({ target: { value: nextDate, name: name || '' } } as never)
-  }
-
   return (
-    <FieldShell label={label} required={required} error={error} hint={hint} htmlFor={fieldId}>
-      <input
-        id={fieldId}
-        className="rpm-input rpm-input--date"
-        type="date"
-        disabled={disabled}
-        required={required}
-        value={datePart}
-        aria-label={label}
-        onChange={(e) => emit(e.target.value)}
-      />
-    </FieldShell>
+    <DateField
+      label={label}
+      error={error}
+      hint={hint}
+      required={required}
+      id={id}
+      name={name}
+      disabled={disabled}
+      min={min}
+      max={max}
+      value={datePart}
+      onChange={(e) => {
+        if (!onChange) return
+        onChange({ target: { value: e.target.value, name: name || '' } } as never)
+      }}
+    />
   )
 }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { todayCivilIso } from '@/shared/lib/dates'
-import { toApiDateTime } from '@/shared/lib/format'
+import { formatDate, toApiDateTime } from '@/shared/lib/format'
 import {
   PageHeader, FilterBar, Button, DataTable, useToast, IconCheck, IconClipboard, Sheet,
   SelectField, MoneyField, DateField, MediaUpload, type DataColumn,
@@ -88,7 +88,7 @@ function contractOption(c: ContractOption): { value: string; label: string; desc
   const raw = (c.number || c.code || '').trim()
   const no = raw || `CNT-${String(c.id).padStart(5, '0')}`
   const customer = c.customer?.full_name || 'عميل'
-  const day = (c.starts_at || '').slice(0, 10) || '—'
+  const day = formatDate(c.starts_at)
   const car = c.vehicle
     ? `${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}`.trim()
     : ''

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { todayCivilIso } from '@/shared/lib/dates'
-import { formatMoney, formatDateTime } from '@/shared/lib/format'
+import { formatMoney, formatDate, formatDateTime } from '@/shared/lib/format'
 import {
   PageHeader, MetricCardGrid, Button, StatusPill, useToast,
   SkeletonBlock, ErrorState, TextField, Sheet, DateField,
@@ -223,7 +223,7 @@ export function AccountsPage() {
           <>
             <MetricCardGrid
               className="ac-daily__kpis"
-              label={`ملخص ${daily.date}`}
+              label={`ملخص ${formatDate(daily.date)}`}
               mobile="wrap"
               items={[
                 { id: 'din', label: 'دخل', value: daily.totals.in, format: 'money', tone: 'success' },
