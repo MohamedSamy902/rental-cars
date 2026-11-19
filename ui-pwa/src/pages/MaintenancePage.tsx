@@ -108,7 +108,7 @@ export function MaintenancePage() {
 
   return (
     <div className="rpm-stack">
-      <PageHeader title="الصيانة" subtitle="فتح صيانة · صرف من المخزون أو العهدة · تنبيه الصيانة التالية" action={<Button onClick={() => setOpen(true)}>صيانة جديدة</Button>} mobileFab />
+      <PageHeader title="الصيانة" subtitle="تسجيل أول صيانة قادمة · بنود جاهزة · صرف اختياري · تنبيه الموعد/العداد" action={<Button onClick={() => setOpen(true)}>صيانة جديدة</Button>} mobileFab />
       <Fab label="صيانة جديدة" onClick={() => setOpen(true)} />
       <MetricCardGrid
         label="ملخص الصيانة"
