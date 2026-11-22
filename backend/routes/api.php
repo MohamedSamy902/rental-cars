@@ -191,6 +191,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/contracts/{contract}', [ContractController::class, 'show'])->middleware('permission:contracts.view');
     Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve'])->middleware('permission:contracts.approve');
     Route::post('/contracts/{contract}/pricing', [ContractController::class, 'updatePricing'])->middleware('permission:contracts_price.override');
+    Route::post('/contracts/{contract}/vehicle-value', [ContractController::class, 'updateVehicleValue'])
+        ->middleware('permission:contracts.update');
     Route::post('/contracts/soft-purge-all', [ContractController::class, 'softPurgeAll'])->middleware('integrator');
     Route::post('/contracts/{contract}/handover', [ContractController::class, 'handover'])->middleware('permission:contracts.update');
     Route::post('/contracts/{contract}/return', [ContractController::class, 'returnVehicle'])->middleware('permission:contracts.update');

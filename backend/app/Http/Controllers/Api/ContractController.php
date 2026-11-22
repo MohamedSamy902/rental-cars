@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ExtendContractRequest;
 use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\UpdateContractPricingRequest;
+use App\Http\Requests\UpdateContractVehicleValueRequest;
 use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\DocumentTemplate;
@@ -171,6 +172,22 @@ class ContractController extends Controller
         return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم تعديل الأسعار مع تسجيل في سجل التدقيق.']);
     }
 
+    public function updateVehicleValue(UpdateContractVehicleValueRequest $request, Contract $contract): JsonResponse
+    {
+        $this->authorize('view', $contract);
+        try {
+            $contract = $this->lifecycle->updateVehicleValueObligation(
+                $contract,
+                $request->validated(),
+                $request->user()?->id,
+            );
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $this->presentContract($contract), 'message' => 'تم تحديث التزام ثمن العربية.']);
+    }
+
     public function handover(Request $request, Contract $contract): JsonResponse
     {
         $this->authorize('view', $contract);
@@ -301,9 +318,9 @@ class ContractController extends Controller
                 );
                 $templates['contract'] = [
                     ...$this->documentTemplates->present($contractTpl),
-                    'rendered_html' => $this->documentTemplates->render(
-                        $contractTpl->content,
-                        $contractTpl->format,
+                    'rendered_html' => $this->documentTemplates->renderForContract(
+                        $contract,
+                        $contractTpl,
                         $contractVars,
                     ),
                     'variables' => $contractVars,
@@ -316,9 +333,9 @@ class ContractController extends Controller
                 );
                 $templates['handover_receipt'] = [
                     ...$this->documentTemplates->present($handoverTpl),
-                    'rendered_html' => $this->documentTemplates->render(
-                        $handoverTpl->content,
-                        $handoverTpl->format,
+                    'rendered_html' => $this->documentTemplates->renderForContract(
+                        $contract,
+                        $handoverTpl,
                         $handoverVars,
                     ),
                     'variables' => $handoverVars,

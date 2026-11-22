@@ -6,6 +6,7 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import {
   Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState,
   RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, IconAlert, PhoneActions,
+  Sheet, SwitchField, TextAreaField, useToast,
 } from '@/shared/ui'
 import {
   DepositBadge, inspectionTypeLabel, statusLabel, timelineLabel, type Contract,
@@ -27,11 +28,17 @@ const relationLabel: Record<string, string> = {
 export function ContractDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isIntegrator } = useAuth()
+  const { isIntegrator, can } = useAuth()
+  const toast = useToast()
   const contractId = Number(id)
   const [row, setRow] = useState<Contract | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [vehicleValueOpen, setVehicleValueOpen] = useState(false)
+  const [includeVehicleValue, setIncludeVehicleValue] = useState(false)
+  const [vehicleValueText, setVehicleValueText] = useState('')
+  const [vehicleValueError, setVehicleValueError] = useState('')
+  const [savingVehicleValue, setSavingVehicleValue] = useState(false)
 
   const load = useCallback(async () => {
     if (!Number.isFinite(contractId) || contractId <= 0) {
@@ -81,6 +88,36 @@ export function ContractDetailPage() {
   const documents = row.documents ?? []
   const related = row.related ?? []
   const timeline = row.timeline ?? []
+  const canEditVehicleValue = can('contracts.update')
+    && (row.status === 'pending' || row.status === 'approved')
+
+  async function saveVehicleValue() {
+    if (!row) return
+    if (includeVehicleValue && !vehicleValueText.trim()) {
+      setVehicleValueError('اكتب نص ثمن العربية عند تفعيل الالتزام')
+      return
+    }
+    setSavingVehicleValue(true)
+    setVehicleValueError('')
+    try {
+      const res = await api<{ data: Contract }>(`/contracts/${row.id}/vehicle-value`, {
+        method: 'POST',
+        json: {
+          include_vehicle_value_obligation: includeVehicleValue,
+          vehicle_value_text: includeVehicleValue ? vehicleValueText.trim() : null,
+        },
+      })
+      setRow(res.data)
+      setVehicleValueOpen(false)
+      toast.success('تم تحديث التزام ثمن العربية')
+      void load()
+    } catch (e) {
+      setVehicleValueError((e as ApiError).message)
+      toast.error((e as ApiError).message)
+    } finally {
+      setSavingVehicleValue(false)
+    }
+  }
 
   return (
     <div className="cd">
@@ -233,10 +270,64 @@ export function ContractDetailPage() {
                 : '—',
               wide: true,
             },
+            {
+              label: 'ثمن العربية (عقد/إقرار)',
+              value: row.include_vehicle_value_obligation
+                ? (row.frozen_vehicle_value_text || 'مفعّل بلا نص')
+                : 'غير ملزم — البند مخفي',
+              wide: true,
+            },
             { label: 'ملاحظات', value: row.notes || '—', wide: true },
           ]}
         />
+        {canEditVehicleValue ? (
+          <div className="rpm-actions-row" style={{ marginBlockStart: '0.75rem' }}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIncludeVehicleValue(Boolean(row.include_vehicle_value_obligation))
+                setVehicleValueText(row.frozen_vehicle_value_text || '')
+                setVehicleValueError('')
+                setVehicleValueOpen(true)
+              }}
+            >
+              تعديل التزام ثمن العربية
+            </Button>
+          </div>
+        ) : null}
       </section>
+
+      <Sheet
+        open={vehicleValueOpen}
+        onClose={() => !savingVehicleValue && setVehicleValueOpen(false)}
+        title="التزام ثمن العربية"
+      >
+        <div className="rpm-form-grid">
+          <SwitchField
+            label="ملزم بثمن العربية في العقد والإقرار"
+            checked={includeVehicleValue}
+            onChange={setIncludeVehicleValue}
+          />
+          {includeVehicleValue ? (
+            <TextAreaField
+              label="نص ثمن العربية"
+              required
+              value={vehicleValueText}
+              error={vehicleValueError}
+              onChange={(e) => setVehicleValueText(e.target.value)}
+              hint="نص حر يُجمَّد على هذا العقد فقط — لا يغيّر ثمن العربية في بطاقة الأسطول"
+            />
+          ) : (
+            <p className="muted">عند الإيقاف يختفي البند السادس من العقد وفقرة الثمن من الإقرار.</p>
+          )}
+          <div className="rpm-actions-row">
+            <Button variant="secondary" disabled={savingVehicleValue} onClick={() => setVehicleValueOpen(false)}>إلغاء</Button>
+            <Button disabled={savingVehicleValue} onClick={() => void saveVehicleValue()}>
+              {savingVehicleValue ? 'جارٍ الحفظ…' : 'حفظ'}
+            </Button>
+          </div>
+        </div>
+      </Sheet>
 
       <section className="rpm-panel">
         <div className="rpm-panel__head"><h3>فحوصات التسليم والاستلام</h3></div>

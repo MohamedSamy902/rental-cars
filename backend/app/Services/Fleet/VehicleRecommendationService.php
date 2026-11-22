@@ -82,7 +82,10 @@ class VehicleRecommendationService
                 'plate' => $v->plate,
                 'category' => $v->category,
                 'daily_rate' => (int) $v->daily_rate,
+                'half_monthly_rate' => $v->half_monthly_rate !== null ? (int) $v->half_monthly_rate : null,
+                'monthly_rate' => $v->monthly_rate !== null ? (int) $v->monthly_rate : null,
                 'default_deposit' => (int) $v->default_deposit,
+                'purchase_value_estimate' => $v->purchase_value_estimate !== null ? (int) $v->purchase_value_estimate : null,
                 'odometer' => (int) $v->odometer,
                 'accessories' => $v->accessories->map(fn ($a) => [
                     'id' => $a->id,

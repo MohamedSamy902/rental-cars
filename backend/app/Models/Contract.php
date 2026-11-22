@@ -18,7 +18,8 @@ class Contract extends Model
         'frozen_daily_rate', 'rent_basis', 'frozen_half_monthly_rate', 'frozen_monthly_rate',
         'frozen_daily_km_allowance', 'frozen_excess_km_rate',
         'prepaid_excess_km', 'prepaid_excess_km_amount',
-        'frozen_agreed_deposit', 'frozen_deposit_currency', 'frozen_operating_insurance_fee', 'frozen_min_days',
+        'frozen_agreed_deposit', 'frozen_deposit_currency', 'frozen_operating_insurance_fee',
+        'include_vehicle_value_obligation', 'frozen_vehicle_value_text', 'frozen_min_days',
         'tagged_late_days', 'odometer_out', 'odometer_in', 'allowed_km', 'excess_km',
         'excess_km_amount', 'period_rent', 'discount', 'damage_fee', 'other_fees',
         'other_fees_description', 'has_delivery_service', 'delivery_service_fee',
@@ -41,6 +42,7 @@ class Contract extends Model
             'extended_from_contract_id' => 'integer',
             'approved_days' => 'integer',
             'has_delivery_service' => 'boolean',
+            'include_vehicle_value_obligation' => 'boolean',
             'delivery_service_fee' => 'integer',
             'accessories_json' => 'array',
         ];

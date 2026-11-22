@@ -546,7 +546,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
           label="ثمن العربية التقديري"
           value={form.purchase_value_estimate}
           error={errors.purchase_value_estimate}
-          hint="يُطبع تلقائياً في البند السادس وإقرار الاستلام"
+          hint="اقتراح فقط عند تفعيل التزام الثمن في الحجز — لا يُطبع مباشرة"
           onChange={(e) => setForm({ ...form, purchase_value_estimate: e.target.value })}
         />
         <SelectField

@@ -332,6 +332,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 | GET | `/contracts/{id}` | تفاصيل + deposit + inspections |
 | POST | `/contracts/{id}/approve` | → `approved` + تثبيت أسعار |
 | ~~POST `/contracts/{id}/pricing`~~ | **ملغى** — لا تعديل أسعار بعد الإنشاء |
+| POST | `/contracts/{id}/vehicle-value` | تحديث التزام ثمن العربية (نص حر) قبل التسليم · `contracts.update` |
 | POST | `/contracts/{id}/handover` | → `active` + فحص تسليم |
 | POST | `/contracts/{id}/return` | → `completed` + إجمالي نهائي |
 | POST | `/contracts/{id}/cancel` | → `cancelled` (قبل التسليم) |
@@ -364,13 +365,23 @@ Query شائع: `?per_page=50&page=1&search=...`
   "has_delivery_service": true,
   "delivery_service_fee": 1000,
   "delivery_service_notes": "تسليم مطار القاهرة",
+  "include_vehicle_value_obligation": true,
+  "vehicle_value_text": "50% من قيمة السيارة وهو مبلغ وقدره 500.000 فقط خمسمائة ألف جنيه",
   "payment_amount": 1000,
   "payment_method": "cash",
   "balance_due_on": "2026-11-03",
   "notes": null
 }
 ```
-`payment_amount` مطلوب (≥ ١) ولا يتجاوز إجمالي العقد التقديري (`أيام × daily_rate + رسوم التسليم + رسوم أخرى − خصم`). صفر أو سالب أو أكبر من الإجمالي = 422.
+`payment_amount` مطلوب (≥ ١) ولا يتجاوز إجمالي العقد التقديري (`أيام × daily_rate + رسوم التسليم + رسوم أخرى − خصم`). صفر أو سالب أو أكبر من الإجمالي = 422.  
+`include_vehicle_value_obligation` اختياري (افتراضي false). عند `true` يجب `vehicle_value_text` نص حر غير فارغ (≤ ٥٠٠) يُجمَّد على العقد ويظهر في العقد/الإقرار؛ عند `false` يختفي بند الثمن بالكامل من الطباعة.
+
+### POST /contracts/{id}/vehicle-value
+`contracts.update` — لحالات `pending`/`approved` فقط:
+```json
+{ "include_vehicle_value_obligation": true, "vehicle_value_text": "قيمة السيارة وهو مبلغ وقدره 1000.000 فقط مليون جنيه" }
+```
+لا يمسّ `purchase_value_estimate` على العربية.
 
 ### POST …/approve
 بدون body. يتحقق من:
