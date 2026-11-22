@@ -156,6 +156,7 @@ class ContractLifecycleService
 
             $accessories = $this->resolveAccessoriesSnapshot($vehicle, $data['accessory_ids'] ?? null);
             $delivery = $this->pricing->normalizeDeliveryService($data);
+            [$includeVehicleValue, $vehicleValueText] = $this->normalizeVehicleValueObligation($data);
 
             if (array_key_exists('odometer', $data) && $data['odometer'] !== null) {
                 $odo = (int) $data['odometer'];
@@ -185,6 +186,8 @@ class ContractLifecycleService
                 'frozen_agreed_deposit' => $deposit,
                 'frozen_deposit_currency' => $depositCurrency,
                 'frozen_operating_insurance_fee' => $data['operating_insurance_fee'] ?? null,
+                'include_vehicle_value_obligation' => $includeVehicleValue,
+                'frozen_vehicle_value_text' => $vehicleValueText,
                 'discount' => $data['discount'] ?? 0,
                 'other_fees' => $data['other_fees'] ?? 0,
                 'other_fees_description' => $data['other_fees_description'] ?? null,
@@ -520,6 +523,23 @@ class ContractLifecycleService
                 );
                 $locked->fill($delivery);
             }
+            if (
+                array_key_exists('include_vehicle_value_obligation', $data)
+                || array_key_exists('vehicle_value_text', $data)
+            ) {
+                [$includeVehicleValue, $vehicleValueText] = $this->normalizeVehicleValueObligation([
+                    'include_vehicle_value_obligation' => array_key_exists('include_vehicle_value_obligation', $data)
+                        ? $data['include_vehicle_value_obligation']
+                        : $locked->include_vehicle_value_obligation,
+                    'vehicle_value_text' => array_key_exists('vehicle_value_text', $data)
+                        ? $data['vehicle_value_text']
+                        : $locked->frozen_vehicle_value_text,
+                ]);
+                $locked->fill([
+                    'include_vehicle_value_obligation' => $includeVehicleValue,
+                    'frozen_vehicle_value_text' => $vehicleValueText,
+                ]);
+            }
             $locked->save();
 
             if (array_key_exists('balance_due_on', $data)) {
@@ -558,6 +578,79 @@ class ContractLifecycleService
         }
 
         throw new DomainException('لا يمكن تعديل أسعار العقد بعد موافقة الإدارة.');
+    }
+
+    /**
+     * تحديث التزام ثمن العربية على عقد قيد المراجعة أو معتمد فقط (نص حر متجمّد على العقد).
+     *
+     * @param  array{include_vehicle_value_obligation?: bool, vehicle_value_text?: string|null}  $data
+     */
+    public function updateVehicleValueObligation(Contract $contract, array $data, ?int $userId = null): Contract
+    {
+        if (! in_array($contract->status, ['pending', 'approved'], true)) {
+            throw new DomainException('يمكن تعديل التزام ثمن العربية فقط قبل التسليم.');
+        }
+
+        return DB::transaction(function () use ($contract, $data, $userId) {
+            /** @var Contract $locked */
+            $locked = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($locked->status, ['pending', 'approved'], true)) {
+                throw new DomainException('يمكن تعديل التزام ثمن العربية فقط قبل التسليم.');
+            }
+
+            [$include, $text] = $this->normalizeVehicleValueObligation([
+                'include_vehicle_value_obligation' => array_key_exists('include_vehicle_value_obligation', $data)
+                    ? $data['include_vehicle_value_obligation']
+                    : $locked->include_vehicle_value_obligation,
+                'vehicle_value_text' => array_key_exists('vehicle_value_text', $data)
+                    ? $data['vehicle_value_text']
+                    : $locked->frozen_vehicle_value_text,
+            ]);
+
+            $before = [
+                'include_vehicle_value_obligation' => (bool) $locked->include_vehicle_value_obligation,
+                'frozen_vehicle_value_text' => $locked->frozen_vehicle_value_text,
+            ];
+            $locked->fill([
+                'include_vehicle_value_obligation' => $include,
+                'frozen_vehicle_value_text' => $text,
+            ])->save();
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'vehicle_value_obligation_updated',
+                'record_type' => Contract::class,
+                'record_id' => $locked->id,
+                'before' => $before,
+                'after' => [
+                    'include_vehicle_value_obligation' => $include,
+                    'frozen_vehicle_value_text' => $text,
+                ],
+            ]);
+
+            return $locked->fresh(['customer', 'vehicle', 'deposit']);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{0: bool, 1: string|null}
+     */
+    private function normalizeVehicleValueObligation(array $data): array
+    {
+        $include = filter_var($data['include_vehicle_value_obligation'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $text = trim((string) ($data['vehicle_value_text'] ?? ''));
+        if (! $include) {
+            return [false, null];
+        }
+        if ($text === '') {
+            throw new DomainException('اكتب نص ثمن العربية عند تفعيل الالتزام.');
+        }
+        if (mb_strlen($text) > 500) {
+            throw new DomainException('نص ثمن العربية أطول من الحد المسموح (500 حرف).');
+        }
+
+        return [true, $text];
     }
 
     /**
@@ -946,6 +1039,8 @@ class ContractLifecycleService
             'deposit' => $source->frozen_agreed_deposit,
             'deposit_currency' => $source->frozen_deposit_currency,
             'operating_insurance_fee' => $source->frozen_operating_insurance_fee,
+            'include_vehicle_value_obligation' => (bool) $source->include_vehicle_value_obligation,
+            'vehicle_value_text' => $source->frozen_vehicle_value_text,
             'min_days' => $source->frozen_min_days ?? $source->min_days,
             'has_delivery_service' => (bool) $source->has_delivery_service,
             'delivery_service_fee' => (int) ($source->delivery_service_fee ?? 0),

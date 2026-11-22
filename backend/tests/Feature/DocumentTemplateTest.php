@@ -210,13 +210,15 @@ class DocumentTemplateTest extends TestCase
             'frozen_daily_km_allowance' => 250,
             'frozen_excess_km_rate' => 6,
             'frozen_min_days' => 1,
+            'include_vehicle_value_obligation' => true,
+            'frozen_vehicle_value_text' => '450000',
             'odometer_out' => 22000,
         ]);
 
         $print = $this->getJson("/api/contracts/{$contract->id}/print")->assertOk();
         $rendered = (string) $print->json('data.templates.contract.rendered_html');
 
-        $this->assertStringContainsString('rpm-paper-v5', $rendered);
+        $this->assertStringContainsString('rpm-paper-v6', $rendered);
         $this->assertStringContainsString('شروط التعاقد', $rendered);
         $this->assertStringContainsString('البند الأول', $rendered);
         $this->assertStringContainsString('البند التاسع', $rendered);
@@ -252,7 +254,7 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringNotContainsString('صادرة من : <span class="fill"></span>', $rendered);
 
         $ack = (string) $print->json('data.templates.handover_receipt.rendered_html');
-        $this->assertStringContainsString('rpm-ack-v7', $ack);
+        $this->assertStringContainsString('rpm-ack-v8', $ack);
         $this->assertStringContainsString('إقرار استلام سيارة', $ack);
         $this->assertStringNotContainsString('محضر إثبات', $ack);
         $this->assertStringContainsString('خائنا للأمانة', $ack);
@@ -354,7 +356,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(1, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v7', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v8', (string) $active->content);
         $this->assertStringContainsString('إقرار استلام سيارة', (string) $active->content);
         $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
         $this->assertStringNotContainsString('rpm-ack-witnesses', (string) $active->content);
@@ -389,7 +391,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(2, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v7', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v8', (string) $active->content);
         $this->assertStringNotContainsString('rpm-ack-witnesses', (string) $active->content);
         $this->assertStringNotContainsString('الشهود', (string) $active->content);
         $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
@@ -427,7 +429,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(5, (int) $active->version);
-        $this->assertStringContainsString('rpm-ack-v7', (string) $active->content);
+        $this->assertStringContainsString('rpm-ack-v8', (string) $active->content);
         $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
     }
 
@@ -517,7 +519,7 @@ HTML,
 
         $this->assertNotNull($active);
         $this->assertGreaterThan(1, (int) $active->version);
-        $this->assertStringContainsString('rpm-paper-v5', (string) $active->content);
+        $this->assertStringContainsString('rpm-paper-v6', (string) $active->content);
         $this->assertStringContainsString('شروط التعاقد', (string) $active->content);
         $this->assertStringContainsString('البند السادس', (string) $active->content);
         $this->assertStringContainsString('خدمة توصيل', (string) $active->content);

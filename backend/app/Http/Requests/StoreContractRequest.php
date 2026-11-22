@@ -75,6 +75,8 @@ class StoreContractRequest extends FormRequest
             'prepaid_excess_km' => ['nullable', 'integer', 'min:0'],
             'deposit' => ['nullable', 'integer', 'min:0'],
             'deposit_currency' => ['nullable', 'string', 'max:40'],
+            'include_vehicle_value_obligation' => ['sometimes', 'boolean'],
+            'vehicle_value_text' => ['nullable', 'string', 'max:500'],
             'min_days' => ['nullable', 'integer', 'min:0'],
             'discount' => ['nullable', 'integer', 'min:0'],
             'other_fees' => ['nullable', 'integer', 'min:0'],
@@ -114,6 +116,15 @@ class StoreContractRequest extends FormRequest
                 $v->errors()->add('payment_amount', 'دفعة عند الإنشاء مطلوبة ولا يجوز أن تكون صفراً أو سالبة.');
 
                 return;
+            }
+
+            $includeVehicleValue = filter_var(
+                $this->input('include_vehicle_value_obligation', false),
+                FILTER_VALIDATE_BOOLEAN
+            );
+            $vehicleValueText = trim((string) $this->input('vehicle_value_text', ''));
+            if ($includeVehicleValue && $vehicleValueText === '') {
+                $v->errors()->add('vehicle_value_text', 'اكتب نص ثمن العربية عند تفعيل الالتزام.');
             }
 
             $starts = $this->input('starts_at');
@@ -196,6 +207,8 @@ class StoreContractRequest extends FormRequest
             'prepaid_excess_km' => 'كيلومترات زيادة مدفوعة مقدماً',
             'deposit' => 'التأمين النقدي',
             'deposit_currency' => 'عملة التأمين النقدي',
+            'include_vehicle_value_obligation' => 'الالتزام بثمن العربية',
+            'vehicle_value_text' => 'نص ثمن العربية',
             'min_days' => 'الحد الأدنى للأيام',
             'discount' => 'الخصم',
             'other_fees' => 'رسوم أخرى',

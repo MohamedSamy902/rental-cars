@@ -19,6 +19,7 @@ type Vehicle = {
   half_monthly_rate?: number | null
   monthly_rate?: number | null
   default_deposit: number
+  purchase_value_estimate?: number | null
   odometer?: number
   accessories?: Accessory[]
 }
@@ -64,10 +65,17 @@ const emptyForm = {
   daily_km_allowance: String(DEFAULT_DAILY_KM),
   excess_km_rate: String(DEFAULT_EXCESS_KM_RATE),
   prepaid_excess_km: '',
+  include_vehicle_value_obligation: false,
+  vehicle_value_text: '',
   has_delivery_service: false,
   delivery_service_fee: String(DEFAULT_DELIVERY_FEE),
   delivery_service_notes: '',
   payment_amount: '', payment_method: 'cash', payment_notes: '', balance_due_on: '',
+}
+
+function suggestVehicleValueText(estimate?: number | null): string {
+  if (estimate == null || Number(estimate) <= 0) return ''
+  return String(Math.round(Number(estimate)))
 }
 
 const emptyCustomer = {
@@ -135,6 +143,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     const monthly = v.monthly_rate != null && Number(v.monthly_rate) > 0
       ? Number(v.monthly_rate)
       : Math.round(daily * MONTHLY_FACTOR)
+    const suggested = suggestVehicleValueText(v.purchase_value_estimate)
     return {
       ...prev,
       vehicle_id: String(v.id),
@@ -143,6 +152,9 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       monthly_rate: String(monthly),
       deposit: String(v.default_deposit),
       odometer: v.odometer != null ? String(v.odometer) : prev.odometer,
+      vehicle_value_text: prev.include_vehicle_value_obligation
+        ? (prev.vehicle_value_text.trim() || suggested)
+        : prev.vehicle_value_text,
     }
   }, [])
 
@@ -281,6 +293,11 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       toast.error('حدد تاريخ تحصيل باقي المبلغ')
       return
     }
+    if (form.include_vehicle_value_obligation && !form.vehicle_value_text.trim()) {
+      setErrors({ vehicle_value_text: 'اكتب نص ثمن العربية عند تفعيل الالتزام' })
+      toast.error('اكتب نص ثمن العربية')
+      return
+    }
 
     setSaving(true)
     try {
@@ -299,6 +316,10 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
           daily_km_allowance: form.daily_km_allowance !== '' ? Number(form.daily_km_allowance) : undefined,
           excess_km_rate: form.excess_km_rate !== '' ? Number(form.excess_km_rate) : undefined,
           prepaid_excess_km: form.prepaid_excess_km !== '' ? Number(form.prepaid_excess_km) : 0,
+          include_vehicle_value_obligation: form.include_vehicle_value_obligation,
+          vehicle_value_text: form.include_vehicle_value_obligation
+            ? form.vehicle_value_text.trim()
+            : undefined,
           odometer: form.odometer !== '' ? Number(form.odometer) : undefined,
           accessory_ids: accessoryIds,
           has_delivery_service: form.has_delivery_service,
@@ -577,6 +598,37 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             onChange={(e) => setForm({ ...form, odometer: e.target.value })}
             hint="يُحدَّث عداد العربية عند الحفظ"
           />
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <SwitchField
+              label="ملزم بثمن العربية في العقد والإقرار"
+              checked={form.include_vehicle_value_obligation}
+              onChange={(checked) => {
+                const selected = vehicles.find((v) => String(v.id) === form.vehicle_id)
+                const suggested = suggestVehicleValueText(selected?.purchase_value_estimate)
+                setForm({
+                  ...form,
+                  include_vehicle_value_obligation: checked,
+                  vehicle_value_text: checked
+                    ? (form.vehicle_value_text.trim() || suggested)
+                    : form.vehicle_value_text,
+                })
+              }}
+            />
+          </div>
+          {form.include_vehicle_value_obligation ? (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <TextAreaField
+                label="نص ثمن العربية"
+                required
+                value={form.vehicle_value_text}
+                error={errors.vehicle_value_text}
+                onChange={(e) => setForm({ ...form, vehicle_value_text: e.target.value })}
+                hint="نص حر (أرقام وأحرف) يُطبع في البند السادس والإقرار — مثال: 50% من قيمة السيارة وهو مبلغ وقدره 500.000 فقط خمسمائة ألف جنيه"
+                placeholder="مثال: قيمة السيارة وهو مبلغ وقدره 1000.000 فقط مليون جنيه"
+              />
+            </div>
+          ) : null}
 
           <div style={{ gridColumn: '1 / -1' }}>
             <SwitchField

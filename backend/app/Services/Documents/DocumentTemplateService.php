@@ -66,7 +66,7 @@ class DocumentTemplateService
             ['key' => 'delivery_address', 'aliases' => ['عنوان_التوصيل'], 'label' => 'عنوان خدمة التوصيل', 'sample' => 'المعادي — القاهرة', 'group' => 'العقد'],
             ['key' => 'delivery_pickup_mark', 'aliases' => ['علامة_الاستلام'], 'label' => 'علامة استلام التوصيل', 'sample' => '☐', 'group' => 'العقد'],
             ['key' => 'delivery_dropoff_mark', 'aliases' => ['علامة_التسليم'], 'label' => 'علامة تسليم التوصيل', 'sample' => '☐', 'group' => 'العقد'],
-            ['key' => 'vehicle_value', 'aliases' => ['قيمة_السيارة', 'ثمن_السيارة'], 'label' => 'قيمة العربية التقديرية (من بيانات العربية)', 'sample' => '450000', 'group' => 'العربية'],
+            ['key' => 'vehicle_value', 'aliases' => ['قيمة_السيارة', 'ثمن_السيارة'], 'label' => 'نص ثمن العربية المتجمّد على العقد (اختياري)', 'sample' => '50% من قيمة السيارة وهو مبلغ وقدره 500.000 فقط خمسمائة ألف جنيه', 'group' => 'العربية'],
             ['key' => 'start_date', 'aliases' => ['تاريخ_البداية'], 'label' => 'تاريخ البداية', 'sample' => '01/11/2026 10:00', 'group' => 'العقد'],
             ['key' => 'end_date', 'aliases' => ['تاريخ_النهاية', 'النهاية_المخططة'], 'label' => 'تاريخ النهاية المخططة', 'sample' => '05/11/2026 10:00', 'group' => 'العقد'],
             ['key' => 'actual_end_date', 'aliases' => ['تاريخ_الاستلام_الفعلي'], 'label' => 'تاريخ الاستلام الفعلي', 'sample' => '05/11/2026 18:00', 'group' => 'العقد'],
@@ -195,18 +195,22 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
 
-        if (str_contains($content, 'rpm-ack-v7')) {
+        if (str_contains($content, 'rpm-ack-v8')) {
             return;
         }
 
         // Any active ack that still shows «محضر إثبات» must be replaced (even if tagged v5).
         $hasSubtitleLine = str_contains($content, 'محضر إثبات');
+        $needsV8Refresh = str_contains($content, 'rpm-ack-v7')
+            && ! str_contains($content, 'rpm-vehicle-value-clause');
         $needsV7Refresh = str_contains($content, 'أتعه ')
             || (str_contains($content, 'rpm-ack-v6') && ! str_contains($content, '{{vehicle_year}}'));
 
-        // Upgrade prior shipped ack (v1–v6 / witnesses) and legacy table stubs to the Word-form text.
-        $looksLikeShippedAck = $needsV7Refresh
+        // Upgrade prior shipped ack (v1–v7 / witnesses) and legacy table stubs to the Word-form text.
+        $looksLikeShippedAck = $needsV8Refresh
+            || $needsV7Refresh
             || $hasSubtitleLine
+            || str_contains($content, 'rpm-ack-v7')
             || str_contains($content, 'rpm-ack-v6')
             || str_contains($content, 'rpm-ack-v5')
             || str_contains($content, 'rpm-ack-v4')
@@ -249,9 +253,13 @@ class DocumentTemplateService
 
         $content = (string) $active->content;
 
-        if (str_contains($content, 'rpm-paper-v5')) {
+        if (str_contains($content, 'rpm-paper-v6')) {
             return;
         }
+
+        // Refresh stock v5 when the vehicle-value clause is not yet optional/stripable.
+        $needsV6Refresh = str_contains($content, 'rpm-paper-v5')
+            && ! str_contains($content, 'rpm-vehicle-value-clause');
 
         // Refresh stock v4/v3 when placeholders or copy still lag the current paper form.
         $needsV5Refresh = (str_contains($content, 'rpm-paper-v4') || str_contains($content, 'rpm-lc-'))
@@ -263,7 +271,9 @@ class DocumentTemplateService
             );
 
         // Upgrade only templates we previously shipped — never overwrite a custom published body.
-        $looksLikeOurPriorDefault = $needsV5Refresh
+        $looksLikeOurPriorDefault = $needsV6Refresh
+            || $needsV5Refresh
+            || str_contains($content, 'rpm-paper-v5')
             || str_contains($content, 'rpm-paper-v4')
             || str_contains($content, 'rpm-paper-v3')
             || str_contains($content, 'rpm-paper-v2')
@@ -447,6 +457,37 @@ class DocumentTemplateService
     }
 
     /**
+     * Render a contract/ack template and strip optional vehicle-value clause blocks when disabled.
+     *
+     * @param  array<string, string>  $variables
+     */
+    public function renderForContract(Contract $contract, DocumentTemplate $template, array $variables): string
+    {
+        $html = $this->render($template->content, $template->format, $variables);
+        if (! (bool) ($contract->include_vehicle_value_obligation ?? false)) {
+            $html = $this->stripVehicleValueClauses($html);
+        }
+
+        return $html;
+    }
+
+    public function stripVehicleValueClauses(string $html): string
+    {
+        $stripped = preg_replace(
+            '/<li\b[^>]*\brpm-vehicle-value-clause\b[^>]*>.*?<\/li>/is',
+            '',
+            $html
+        );
+        $stripped = preg_replace(
+            '/<(span|p|div)\b[^>]*\brpm-vehicle-value-clause\b[^>]*>.*?<\/\1>/is',
+            '',
+            (string) $stripped
+        );
+
+        return (string) $stripped;
+    }
+
+    /**
      * @return array{html:string,variables:array<string,string>,template:DocumentTemplate}
      */
     public function preview(string $type, ?array $overrideVariables = null): array
@@ -522,9 +563,9 @@ class DocumentTemplateService
         $handoverAt = $inTz($handover?->inspected_at);
         $returnAt = $inTz($ret?->inspected_at) ?? $actualEndsAt;
         $dailyKm = (int) ($contract->frozen_daily_km_allowance ?? $ops['default_daily_km'] ?? 0);
-        $vehicleValue = $vehicle?->purchase_value_estimate;
-        $vehicleValueStr = $vehicleValue !== null && $vehicleValue !== ''
-            ? (string) (int) $vehicleValue
+        $includeVehicleValue = (bool) ($contract->include_vehicle_value_obligation ?? false);
+        $vehicleValueStr = $includeVehicleValue
+            ? trim((string) ($contract->frozen_vehicle_value_text ?? ''))
             : '';
 
         $map = [
@@ -821,7 +862,7 @@ class DocumentTemplateService
     private function defaultContractHtml(): string
     {
         return <<<'HTML'
-<article class="rpm-legal-contract rpm-paper-v5">
+<article class="rpm-legal-contract rpm-paper-v6">
   <header class="rpm-lc-head">
     <div class="rpm-lc-badge rpm-lc-badge--contact">
       <div class="rpm-lc-signer-short">أ/ {{print_signer_name}}</div>
@@ -935,7 +976,7 @@ class DocumentTemplateService
       <li><span class="rpm-lc-band">البند الثالث</span> معدل أستخدام السيارة لا يتعدي ( <span class="fill">{{daily_km}}</span> ) كيلو متر في اليوم الواحد ، ما يزيد عن ذلك يحسب بعد كل كيلو متر مبلغ ( <span class="fill">{{excess_km_rate}}</span> ) .</li>
       <li><span class="rpm-lc-band">البند الرابع</span> من حق الطرف الأول سحب السيارة من الطرف الثاني إذا وجدت بقيادة شخص آخر أو تم أستخدام السيارة إستخدام غير شرعي أو بطريقة غير قانونية ولا يحق للطرف الثاني إسترداد باقي مبلغ الإيجار .</li>
       <li><span class="rpm-lc-band">البند الخامس</span> إذا حدث لقدر الله أي حادث للسيارة فعلى الطرف الثاني أن يرجع للطرف الأول قبل أن يقوم بأي تصليح للسيارة ، مع العلم أن فترة توقف السيارة وقت الإصلاح على عاتق الطرف الثاني المستأجر وبنفس قيمة الإيجار اليومي المتفق عليها .</li>
-      <li><span class="rpm-lc-band">البند السادس</span> في حالة عدم إعادة السيارة أو حدوث حادث جسيم للسيارة ولا يمكن إصلاحها بأي حال من الأحوال ، فالطرف الثاني يكون ملزم بدفع ثمن السيارة والذي يقدر بـ ( <span class="fill">{{vehicle_value}}</span> ) جنيه مصري لا غير .</li>
+      <li class="rpm-vehicle-value-clause"><span class="rpm-lc-band">البند السادس</span> في حالة عدم إعادة السيارة أو حدوث حادث جسيم للسيارة ولا يمكن إصلاحها بأي حال من الأحوال ، فالطرف الثاني يكون ملزم بدفع ثمن السيارة : ( <span class="fill wide">{{vehicle_value}}</span> ) .</li>
       <li><span class="rpm-lc-band">البند السابع</span> يقر الطرف الثاني بأنه إستلم السيارة بصفة أمانة وهي في حالة جيدة وأصبح مسؤولا عنها جنائيا ومدنيا وعن كل الأضرار التي تسببها هذه السيارة للغير وأيضا عن جميع المخالفات ، وكذلك يقر أنه على علم تام نافية للجهالة بجميع شروط وقوانين وتعليمات المرور والأمن العام ، كما يلتزم المستأجر في حالة حدوث سرقات أو أي جريمة جنائية تقع بسبب الطرف الثاني ( المستأجر ) أن يتحمل عقوبتها وحده دون أدنى مسؤولية على الطرف الأول المؤجر .</li>
       <li><span class="rpm-lc-band">البند الثامن</span> يلتزم الطرف الثاني بأنه ينفذ تعليمات المرور من حيث السرعة داخل الجمهورية والطرق الصحراوية والزراعية ، كما يلتزم بدفع قيمة المخالفات المرورية خلال فترة الإيجار وحتى تسليم السيارة وهي 400 للسرعة و 200 حزام أمان واستخدام الهاتف .</li>
       <li><span class="rpm-lc-band">البند التاسع</span> يلتزم المستأجر بدفع قيمة أربعة أيام إيجار في حالة سحب رخصة السيارة أو فقدها حتى يتم إسترداد الرخصة .</li>
@@ -986,7 +1027,7 @@ HTML;
     {
         // Texts match the customer Word form (إقرار استلام سيارة) exactly — including typos; blanks are placeholders.
         return <<<'HTML'
-<article class="rpm-ack-form rpm-ack-v7" dir="rtl">
+<article class="rpm-ack-form rpm-ack-v8" dir="rtl">
   <p class="rpm-ack2-brandhead">RPM &nbsp;•&nbsp; RENT A CAR &nbsp;|&nbsp; شركة RBM للنقل والسياحة</p>
   <div class="rpm-ack2-seal-top-wrap" data-rpm-lock="1">
     <img class="rpm-ack2-seal rpm-ack2-seal--top" src="/brand/rpm-ack-seal-gold.png" width="120" height="120" alt="" />
@@ -1040,7 +1081,7 @@ HTML;
   </p>
 
   <p class="rpm-ack2-body">
-    أقرّ أنا الموقّع أدناه بأنني إستلمت السيارة الموضحة بياناتها أعلاه من شركة RPM للنقل والسياحة ، وعاينت حالتها الظاهرة وإطلعت على قراءة العداد ومستوى الوقود/الشحن وما سُلّم معها من مفاتيح ووثائق وملحقات ، وأكون مسئولا مسئولية كاملة مدنيا وجنائيا عن السيارة موضوع الإقرار وعن كافة ما يلحق بالسيارة من تلف أو هلاك أو سرقة أو إصابتها بأي أضرار يقلل من قيمتها السعرية أو أي مخالفة لقواعد وقوانين المرور كما أتعهد أيضا بتسليمها بنفس الحالة الجيدة الخالية من أي أعطال أو عيوب أو نقص في الإجراء كما أستلمتها بناءا علي تصوير فيديو تم بوجود الطرفين وذلك في مدة تبدأ بتاريخ { <span class="fill mid">{{start_date_only}}</span> } ، وتنتهي في { <span class="fill mid">{{end_date_only}}</span> } عند تسليم السيارة أو عند الطلب قبل المؤجر وفي حالة أمتناعي عن ذلك أكون خائنا للأمانة وملزم بسداد ثمن السيارة المذكور ،وهومبلغ( <span class="fill">{{vehicle_value}}</span> ج) ( <span class="fill wide">{{vehicle_value}}</span> جنيه لا غير ) ويكون هذا المقدار حسب أسعار مثلها في المعارض وأسواق السيارات وذلك دون الحاجة إلي تنبيه أو إنذار وعدم الإخلال بحق التعويضات فضلا عن حق المالك أو المؤجر في مقاضاتي قانونيا وبوصفه مرتكبا جريمة خيانة الأمانة المعاقب عليها قانونيا ، ويكون ذلك من إختصاص المحاكم المختصة كما أتعهد بأنه لا يحق بيع السيارة أو تغيير أي شيء من معالمها الأساسية .
+    أقرّ أنا الموقّع أدناه بأنني إستلمت السيارة الموضحة بياناتها أعلاه من شركة RPM للنقل والسياحة ، وعاينت حالتها الظاهرة وإطلعت على قراءة العداد ومستوى الوقود/الشحن وما سُلّم معها من مفاتيح ووثائق وملحقات ، وأكون مسئولا مسئولية كاملة مدنيا وجنائيا عن السيارة موضوع الإقرار وعن كافة ما يلحق بالسيارة من تلف أو هلاك أو سرقة أو إصابتها بأي أضرار يقلل من قيمتها السعرية أو أي مخالفة لقواعد وقوانين المرور كما أتعهد أيضا بتسليمها بنفس الحالة الجيدة الخالية من أي أعطال أو عيوب أو نقص في الإجراء كما أستلمتها بناءا علي تصوير فيديو تم بوجود الطرفين وذلك في مدة تبدأ بتاريخ { <span class="fill mid">{{start_date_only}}</span> } ، وتنتهي في { <span class="fill mid">{{end_date_only}}</span> } عند تسليم السيارة أو عند الطلب قبل المؤجر وفي حالة أمتناعي عن ذلك أكون خائنا للأمانة<span class="rpm-vehicle-value-clause"> وملزم بسداد ثمن السيارة المذكور ، وهو ( <span class="fill wide">{{vehicle_value}}</span> ) ويكون هذا المقدار حسب أسعار مثلها في المعارض وأسواق السيارات</span> وذلك دون الحاجة إلي تنبيه أو إنذار وعدم الإخلال بحق التعويضات فضلا عن حق المالك أو المؤجر في مقاضاتي قانونيا وبوصفه مرتكبا جريمة خيانة الأمانة المعاقب عليها قانونيا ، ويكون ذلك من إختصاص المحاكم المختصة كما أتعهد بأنه لا يحق بيع السيارة أو تغيير أي شيء من معالمها الأساسية .
   </p>
 
   <div class="rpm-ack2-close">

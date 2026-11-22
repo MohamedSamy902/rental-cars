@@ -78,6 +78,8 @@ export type Contract = {
   delivery_service_fee?: number
   delivery_service_notes?: string | null
   frozen_operating_insurance_fee?: number | null
+  include_vehicle_value_obligation?: boolean
+  frozen_vehicle_value_text?: string | null
   discount?: number
   excess_km_amount?: number
   notes?: string | null
