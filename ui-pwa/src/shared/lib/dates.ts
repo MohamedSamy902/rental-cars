@@ -127,3 +127,54 @@ export function maskDisplayDateInput(raw: string): string {
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
 }
+
+/** YYYY-MM from YYYY-MM or YYYY-MM-DD (day ignored). Empty → ''. */
+export function civilMonthOnly(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const raw = String(iso).trim()
+  if (/^\d{4}-\d{2}$/.test(raw)) return raw
+  const day = civilDateOnly(raw)
+  return day ? day.slice(0, 7) : ''
+}
+
+/** Storage/API for month-only fields: YYYY-MM-01 (day always 01). */
+export function monthToStorageDate(iso: string | null | undefined): string {
+  const ym = civilMonthOnly(iso)
+  return ym ? `${ym}-01` : ''
+}
+
+/** YYYY-MM or YYYY-MM-DD → MM/YYYY (Western digits). Empty → ''. */
+export function isoToDisplayMonth(iso: string | null | undefined): string {
+  const ym = civilMonthOnly(iso)
+  if (!ym) return ''
+  const [y, m] = ym.split('-')
+  if (!y || !m) return ''
+  return `${m}/${y}`
+}
+
+/**
+ * Parse user-facing month/year into YYYY-MM.
+ * Accepts MM/YYYY, M/YYYY, MM-YYYY, or bare YYYY-MM / YYYY-MM-DD.
+ */
+export function parseDisplayMonth(raw: string | null | undefined): string | null {
+  if (raw == null) return null
+  const s = String(raw).trim()
+  if (!s) return null
+  if (/^\d{4}-\d{2}$/.test(s)) return s
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.slice(0, 7)
+
+  const match = s.match(/^(\d{1,2})[/.-](\d{4})$/)
+  if (!match) return null
+  const month = Number(match[1])
+  const year = Number(match[2])
+  if (!Number.isFinite(month) || !Number.isFinite(year)) return null
+  if (month < 1 || month > 12 || year < 1000) return null
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`
+}
+
+/** Auto-insert slash while typing digits for MM/YYYY. */
+export function maskDisplayMonthInput(raw: string): string {
+  const digits = String(raw).replace(/\D/g, '').slice(0, 6)
+  if (digits.length <= 2) return digits
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`
+}

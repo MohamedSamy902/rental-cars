@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Http\Requests\Concerns\NormalizesDigits;
 use App\Rules\EgyptianPhone;
 use App\Rules\MediaReference;
+use App\Support\CivilDate;
 use App\Support\DigitNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -42,12 +43,28 @@ class UpdateCustomerRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge(DigitNormalizer::fields($this->all(), $this->digitKeys()));
+        $this->normalizeNationalIdIssuedOn();
 
         $canBlacklist = (bool) $this->user()?->hasPermission('blacklist.manage');
         if (! $canBlacklist && ($this->exists('status') || $this->exists('blacklist_reason'))) {
             $this->forbidBlacklistFields = true;
             $this->replace($this->except(['status', 'blacklist_reason']));
         }
+    }
+
+    protected function normalizeNationalIdIssuedOn(): void
+    {
+        if (! $this->exists('national_id_issued_on')) {
+            return;
+        }
+        $raw = $this->input('national_id_issued_on');
+        if ($raw === null || $raw === '') {
+            $this->merge(['national_id_issued_on' => null]);
+
+            return;
+        }
+        $normalized = CivilDate::toMonthStartDate($raw, '');
+        $this->merge(['national_id_issued_on' => $normalized !== '' ? $normalized : $raw]);
     }
 
     /**
@@ -70,7 +87,8 @@ class UpdateCustomerRequest extends FormRequest
             ],
             'national_id_expires_on' => ['nullable', 'date'],
             'national_id_issued_from' => ['nullable', 'string', 'max:120'],
-            'national_id_issued_on' => ['nullable', 'date'],
+            // شهر/سنة فقط — يُطبَّع إلى YYYY-MM-01 في prepareForValidation
+            'national_id_issued_on' => ['nullable', 'date_format:Y-m-d'],
             'passport_number' => ['nullable', 'string', 'max:50'],
             'passport_expires_on' => ['nullable', 'date'],
             'birth_date' => ['sometimes', 'date'],

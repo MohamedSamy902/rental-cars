@@ -1,5 +1,15 @@
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
-import { civilDateOnly, isoToDisplayDate, maskDisplayDateInput, parseDisplayDate } from '@/shared/lib/dates'
+import {
+  civilDateOnly,
+  civilMonthOnly,
+  isoToDisplayDate,
+  isoToDisplayMonth,
+  maskDisplayDateInput,
+  maskDisplayMonthInput,
+  monthToStorageDate,
+  parseDisplayDate,
+  parseDisplayMonth,
+} from '@/shared/lib/dates'
 import './Field.css'
 
 export { SelectField } from './SelectField'
@@ -37,6 +47,19 @@ export function TextField({ label, error, hint, required, id, className = '', ty
   if (type === 'date') {
     return (
       <DateField
+        label={label}
+        error={error}
+        hint={hint}
+        required={required}
+        id={id}
+        className={className}
+        {...rest}
+      />
+    )
+  }
+  if (type === 'month') {
+    return (
+      <MonthYearField
         label={label}
         error={error}
         hint={hint}
@@ -149,6 +172,102 @@ export function DateField({
               const next = e.target.value
               setDraft(null)
               emitIso(next)
+            }}
+          />
+        </span>
+      </div>
+    </FieldShell>
+  )
+}
+
+/**
+ * Month/year field: visible MM/YYYY, storage/API YYYY-MM-01 (day always 01).
+ * Native month picker is affordance only — never the visible format.
+ */
+export function MonthYearField({
+  label,
+  error,
+  hint,
+  required,
+  id,
+  className = '',
+  value,
+  onChange,
+  disabled,
+  name,
+  min,
+  max,
+}: TextProps) {
+  const autoId = useId()
+  const fieldId = id ?? name ?? autoId
+  const month = civilMonthOnly(typeof value === 'string' ? value : '')
+  const [draft, setDraft] = useState<string | null>(null)
+  const text = draft !== null ? draft : isoToDisplayMonth(month)
+
+  function emitStorage(nextMonth: string) {
+    if (!onChange) return
+    const next = nextMonth ? monthToStorageDate(nextMonth) : ''
+    onChange({ target: { value: next, name: name || '' } } as never)
+  }
+
+  function commitText(raw: string) {
+    const trimmed = raw.trim()
+    if (!trimmed) {
+      setDraft(null)
+      emitStorage('')
+      return
+    }
+    const parsed = parseDisplayMonth(trimmed)
+    if (parsed) {
+      setDraft(null)
+      emitStorage(parsed)
+      return
+    }
+    setDraft(null)
+  }
+
+  const minMonth = typeof min === 'string' ? civilMonthOnly(min) : undefined
+  const maxMonth = typeof max === 'string' ? civilMonthOnly(max) : undefined
+
+  return (
+    <FieldShell label={label} required={required} error={error} hint={hint} htmlFor={fieldId}>
+      <div className={`rpm-date ${className}`.trim()}>
+        <input
+          id={fieldId}
+          className="rpm-input rpm-input--date rpm-date__text"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="MM/YYYY"
+          disabled={disabled}
+          required={required}
+          name={name}
+          value={text}
+          aria-label={label}
+          onFocus={() => setDraft(isoToDisplayMonth(month))}
+          onChange={(e) => setDraft(maskDisplayMonthInput(e.target.value))}
+          onBlur={() => commitText(draft ?? text)}
+        />
+        <span className="rpm-date__cal" aria-hidden={false}>
+          <svg className="rpm-date__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+            <path
+              fill="currentColor"
+              d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1.5A2.5 2.5 0 0 1 22 6.5v13A2.5 2.5 0 0 1 19.5 22h-15A2.5 2.5 0 0 1 2 19.5v-13A2.5 2.5 0 0 1 4.5 4H6V3a1 1 0 0 1 1-1Zm12.5 8h-15v9.5a.5.5 0 0 0 .5.5h14a.5.5 0 0 0 .5-.5V10Zm-15-2h15V6.5a.5.5 0 0 0-.5-.5H4.5a.5.5 0 0 0-.5.5V8Z"
+            />
+          </svg>
+          <input
+            className="rpm-date__native"
+            type="month"
+            tabIndex={-1}
+            disabled={disabled}
+            value={month}
+            min={minMonth || undefined}
+            max={maxMonth || undefined}
+            aria-label={`${label} — اختيار الشهر`}
+            onChange={(e) => {
+              const next = e.target.value
+              setDraft(null)
+              emitStorage(next)
             }}
           />
         </span>

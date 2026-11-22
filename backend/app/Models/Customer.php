@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CivilDate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -49,7 +50,7 @@ class Customer extends Model
      */
     public static function normalizeDateOnlyFields(array $payload): array
     {
-        foreach (['birth_date', 'license_expires_on', 'national_id_expires_on', 'national_id_issued_on', 'passport_expires_on'] as $dateKey) {
+        foreach (['birth_date', 'license_expires_on', 'national_id_expires_on', 'passport_expires_on'] as $dateKey) {
             if (! array_key_exists($dateKey, $payload) || $payload[$dateKey] === null || $payload[$dateKey] === '') {
                 continue;
             }
@@ -74,6 +75,16 @@ class Customer extends Model
                     ->toDateString();
             } catch (\Throwable) {
                 $payload[$dateKey] = substr($raw, 0, 10);
+            }
+        }
+
+        // تاريخ صدور البطاقة: شهر وسنة فقط — يُخزَّن YYYY-MM-01
+        if (array_key_exists('national_id_issued_on', $payload)
+            && $payload['national_id_issued_on'] !== null
+            && $payload['national_id_issued_on'] !== '') {
+            $payload['national_id_issued_on'] = CivilDate::toMonthStartDate($payload['national_id_issued_on'], '');
+            if ($payload['national_id_issued_on'] === '') {
+                $payload['national_id_issued_on'] = null;
             }
         }
 
