@@ -11,8 +11,6 @@ type Ops = {
   default_daily_km?: number
   excess_km_rate?: number
   currency?: string
-  block_expired_license?: boolean
-  block_expired_vehicle_docs?: boolean
   require_handover_signature?: boolean
   require_return_signature_always?: boolean
   owner_dues_counts_from?: string | null
@@ -60,8 +58,6 @@ export function SettingsPage() {
         default_daily_km: operational.default_daily_km ?? 200,
         excess_km_rate: operational.excess_km_rate ?? 5,
         currency: operational.currency ?? 'EGP',
-        block_expired_license: operational.block_expired_license ?? true,
-        block_expired_vehicle_docs: operational.block_expired_vehicle_docs ?? true,
         require_handover_signature: operational.require_handover_signature ?? true,
         require_return_signature_always: operational.require_return_signature_always ?? false,
         owner_dues_counts_from: operational.owner_dues_counts_from || '2026-11-01',
@@ -191,16 +187,6 @@ export function SettingsPage() {
             label="سعر الكيلومتر الزائد"
             value={String(ops.excess_km_rate ?? '')}
             onChange={(e) => setOps({ ...ops, excess_km_rate: Number(e.target.value) })}
-          />
-          <SwitchField
-            label="منع موافقة عقد برخصة منتهية"
-            checked={Boolean(ops.block_expired_license)}
-            onChange={(v) => setOps({ ...ops, block_expired_license: v })}
-          />
-          <SwitchField
-            label="منع موافقة عقد بمستند عربية منتهٍ"
-            checked={Boolean(ops.block_expired_vehicle_docs)}
-            onChange={(v) => setOps({ ...ops, block_expired_vehicle_docs: v })}
           />
           <SwitchField
             label="إلزام توقيع التسليم"
