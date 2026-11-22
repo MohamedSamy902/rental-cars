@@ -192,7 +192,7 @@ class QaV5FixTicketsTest extends TestCase
         ])->assertStatus(422);
     }
 
-    public function test_v5_08_blocks_a_contract_that_outlasts_the_vehicle_license(): void
+    public function test_v5_08_allows_a_contract_that_outlasts_the_vehicle_license(): void
     {
         $customer = $this->customer('01055550008', 'LIC-V5-8');
         $vehicle = $this->vehicle(null, []);
@@ -200,6 +200,7 @@ class QaV5FixTicketsTest extends TestCase
             'type' => 'رخصة تسيير',
             'issued_on' => '2025-01-01',
             'expires_on' => now()->addDays(2)->toDateString(),
+            'file_path' => 'demo/licenses/v5-08.pdf',
         ])->assertCreated();
 
         $this->postJson('/api/contracts', [
@@ -209,7 +210,7 @@ class QaV5FixTicketsTest extends TestCase
             'vehicle_id' => $vehicle->id,
             'starts_at' => now()->addDays(10)->format('Y-m-d H:i:s'),
             'planned_ends_at' => now()->addDays(20)->format('Y-m-d H:i:s'),
-        ])->assertStatus(422);
+        ])->assertCreated();
     }
 
     public function test_v5_10_topup_and_stock_receipt_hit_the_asset_accounts(): void
