@@ -1,4 +1,4 @@
-import { civilDateOnly, isoToDisplayDate, nowLocalDateTimeValue } from '@/shared/lib/dates'
+import { civilDateOnly, isoToDisplayDate, isoToDisplayMonth, nowLocalDateTimeValue } from '@/shared/lib/dates'
 
 /** Western digits (0-9) required — numberingSystem: latn */
 const latn = { numberingSystem: 'latn' as const }
@@ -70,6 +70,11 @@ export function toDateOnly(iso: string | null | undefined): string {
  */
 export function formatDate(iso: string | null | undefined): string {
   return isoToDisplayDate(iso) || '—'
+}
+
+/** Month-only display as MM/YYYY (e.g. ID card issue). Storage stays YYYY-MM-01. */
+export function formatMonthYear(iso: string | null | undefined): string {
+  return isoToDisplayMonth(iso) || '—'
 }
 
 /**

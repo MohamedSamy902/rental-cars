@@ -428,7 +428,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               />
               <TextField label="الرقم القومي / رقم الهوية" value={newCustomer.national_id} onChange={(e) => setNewCustomer({ ...newCustomer, national_id: e.target.value })} />
               <TextField label="صادرة من (البطاقة)" value={newCustomer.national_id_issued_from} onChange={(e) => setNewCustomer({ ...newCustomer, national_id_issued_from: e.target.value })} />
-              <TextField label="تاريخ صدور البطاقة" type="date" value={newCustomer.national_id_issued_on} onChange={(e) => setNewCustomer({ ...newCustomer, national_id_issued_on: e.target.value })} />
+              <TextField label="تاريخ صدور البطاقة" type="month" value={newCustomer.national_id_issued_on} onChange={(e) => setNewCustomer({ ...newCustomer, national_id_issued_on: e.target.value })} />
               <TextField label="محل الإقامة" value={newCustomer.address} onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })} />
               <TextField label="تاريخ الميلاد" required type="date" value={newCustomer.birth_date} onChange={(e) => setNewCustomer({ ...newCustomer, birth_date: e.target.value })} />
               <TextField label="رقم الرخصة" required value={newCustomer.license_number} onChange={(e) => setNewCustomer({ ...newCustomer, license_number: e.target.value })} />

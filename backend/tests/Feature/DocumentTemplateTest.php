@@ -233,7 +233,7 @@ class DocumentTemplateTest extends TestCase
         $this->assertStringContainsString('29001011234567', $rendered);
         $this->assertStringContainsString('مصري', $rendered);
         $this->assertStringContainsString('مصر الجديدة', $rendered);
-        $this->assertStringContainsString('12/05/2018', $rendered);
+        $this->assertStringContainsString('05/2018', $rendered);
         $this->assertStringContainsString('مرور القاهرة', $rendered);
         $this->assertStringContainsString('المعادي — القاهرة', $rendered);
         $this->assertStringContainsString('س ص ع 100', $rendered);

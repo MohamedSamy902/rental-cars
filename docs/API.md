@@ -306,9 +306,10 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 **POST Body**
 `full_name`, `phone`, `nationality`, `birth_date`, `license_number`, `license_expires_on`  
-اختياري: `phone_alt`, `email`, `national_id`, `national_id_expires_on`, `passport_number`, `passport_expires_on`, `address`, `notes`, `national_id_image_path`, `license_image_path`
+اختياري: `phone_alt`, `email`, `national_id`, `national_id_issued_from`, `national_id_issued_on`, `national_id_expires_on`, `passport_number`, `passport_expires_on`, `address`, `notes`, `national_id_image_path`, `license_image_path`
 
-> `nationality` نص حر (أي جنسية مكتوبة، حد أقصى 80 حرفاً؛ الاقتراحات في الواجهة اختيارية فقط). `national_id` يقبل أي نص حر (رقم قومي مصري أو هوية أجنبية أو جواز) بحروف وأرقام بلا صيغة إلزامية.
+> `nationality` نص حر (أي جنسية مكتوبة، حد أقصى 80 حرفاً؛ الاقتراحات في الواجهة اختيارية فقط). `national_id` يقبل أي نص حر (رقم قومي مصري أو هوية أجنبية أو جواز) بحروف وأرقام بلا صيغة إلزامية.  
+> `national_id_issued_on` شهر وسنة فقط: يقبل `YYYY-MM` أو `YYYY-MM-DD` ويُخزَّن دائماً كـ `YYYY-MM-01`؛ العرض/الطباعة `MM/YYYY` بلا يوم.
 
 > مسارات الصور تُملأ عادةً من `POST /media` (مثل `/media/{id}/file`) — التخزين محلي خاص بلا CDN خارجي.
 

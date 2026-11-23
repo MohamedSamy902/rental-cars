@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
-import { formatDate, formatMoney, toDateOnly } from '@/shared/lib/format'
+import { formatDate, formatMoney, formatMonthYear, toDateOnly } from '@/shared/lib/format'
 import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
 import { NationalityField } from '@/shared/forms/NationalityField'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -204,7 +204,7 @@ export function CustomerDetailPage() {
           { label: 'الجنسية', value: customer.nationality || '—' },
           { label: 'الرقم القومي / رقم الهوية', value: customer.national_id || '—' },
           { label: 'صادرة من (البطاقة)', value: customer.national_id_issued_from || '—' },
-          { label: 'تاريخ صدور البطاقة', value: formatDate(customer.national_id_issued_on) },
+          { label: 'تاريخ صدور البطاقة', value: formatMonthYear(customer.national_id_issued_on) },
           { label: 'محل الإقامة', value: customer.address || '—', wide: true },
           { label: 'تاريخ الميلاد', value: formatDate(customer.birth_date) },
           { label: 'رقم الرخصة', value: customer.license_number },
@@ -308,7 +308,7 @@ export function CustomerDetailPage() {
           />
           <TextField label="الرقم القومي / رقم الهوية" error={fieldErrors.national_id} value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} />
           <TextField label="صادرة من (البطاقة)" error={fieldErrors.national_id_issued_from} value={form.national_id_issued_from} onChange={(e) => setForm({ ...form, national_id_issued_from: e.target.value })} />
-          <TextField label="تاريخ صدور البطاقة" error={fieldErrors.national_id_issued_on} type="date" value={form.national_id_issued_on} onChange={(e) => setForm({ ...form, national_id_issued_on: e.target.value })} />
+          <TextField label="تاريخ صدور البطاقة" error={fieldErrors.national_id_issued_on} type="month" value={form.national_id_issued_on} onChange={(e) => setForm({ ...form, national_id_issued_on: e.target.value })} />
           <TextField label="محل الإقامة" error={fieldErrors.address} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <TextField label="تاريخ الميلاد" required type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
           <TextField label="رقم الرخصة" required value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
