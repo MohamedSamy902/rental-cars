@@ -346,7 +346,7 @@ HTML,
             'is_active' => true,
         ]);
 
-        app(DocumentTemplateService::class)->ensureDefaults();
+        app(DocumentTemplateService::class)->upgradeStockTemplatesIfNeeded();
 
         $active = DocumentTemplate::query()
             ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
@@ -381,7 +381,7 @@ HTML,
             'is_active' => true,
         ]);
 
-        app(DocumentTemplateService::class)->ensureDefaults();
+        app(DocumentTemplateService::class)->upgradeStockTemplatesIfNeeded();
 
         $active = DocumentTemplate::query()
             ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
@@ -419,7 +419,7 @@ HTML,
             'is_active' => true,
         ]);
 
-        app(DocumentTemplateService::class)->ensureDefaults();
+        app(DocumentTemplateService::class)->upgradeStockTemplatesIfNeeded();
 
         $active = DocumentTemplate::query()
             ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
@@ -456,11 +456,45 @@ HTML,
 
         // كان ensureDefaults يعيد نشر الافتراضي ويمحو التعديل عند كل قراءة/طباعة.
         app(DocumentTemplateService::class)->ensureDefaults();
+        app(DocumentTemplateService::class)->upgradeStockTemplatesIfNeeded();
         $list = $this->getJson('/api/document-templates?active=1')->assertOk();
         $ack = collect($list->json('data'))->firstWhere('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT);
         $this->assertNotNull($ack);
         $this->assertStringContainsString($marker, (string) $ack['content']);
         $this->assertStringNotContainsString('rpm-ack-v8', (string) $ack['content']);
+    }
+
+    public function test_ensure_defaults_on_read_does_not_upgrade_stock_ack(): void
+    {
+        $this->actingAdmin();
+        DocumentTemplate::query()->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)->delete();
+        DocumentTemplate::query()->create([
+            'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
+            'title' => 'إقرار استلام سيارة (ظهر العقد)',
+            'content' => <<<'HTML'
+<article class="rpm-ack-form rpm-ack-v5" dir="rtl">
+  <h1 class="rpm-ack2-title">إقرار استلام سيارة</h1>
+  <h2 class="rpm-ack2-sub">محضر إثبات تسلّم المركبة وحالتها الظاهرة</h2>
+  <p>نسخة قديمة ثابتة على مسار القراءة</p>
+</article>
+HTML,
+            'format' => 'html',
+            'version' => 5,
+            'is_active' => true,
+            'updated_by' => null,
+        ]);
+
+        // مسار القراءة (ensureDefaults فقط) لا يرقّي — حتى لا يُمسح تعديل لاحق بعد الحفظ.
+        app(DocumentTemplateService::class)->ensureDefaults();
+        $afterRead = DocumentTemplate::query()
+            ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->first();
+        $this->assertNotNull($afterRead);
+        $this->assertSame(5, (int) $afterRead->version);
+        $this->assertStringContainsString('rpm-ack-v5', (string) $afterRead->content);
+        $this->assertStringContainsString('محضر إثبات', (string) $afterRead->content);
     }
 
     public function test_editor_content_wins_over_uploaded_file_on_publish(): void
@@ -563,7 +597,7 @@ HTML,
             'is_active' => true,
         ]);
 
-        app(DocumentTemplateService::class)->ensureDefaults();
+        app(DocumentTemplateService::class)->upgradeStockTemplatesIfNeeded();
 
         $active = DocumentTemplate::query()
             ->where('type', DocumentTemplate::TYPE_CONTRACT)

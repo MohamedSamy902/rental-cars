@@ -6,6 +6,8 @@ use App\Models\Contract;
 use App\Models\DocumentTemplate;
 use App\Models\TenantSetting;
 use App\Models\Vehicle;
+use App\Support\CivilDate;
+use App\Support\DepositCurrency;
 use DomainException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -154,6 +156,20 @@ class DocumentTemplateService
                 'is_active' => true,
                 'updated_by' => $userId,
             ]);
+        }
+
+        // لا ترقيات هنا — القراءة/الطباعة/فتح الإعدادات يجب ألا تعيد كتابة قوالب منشورة.
+        // الترقية لمرة واحدة: upgradeStockTemplatesIfNeeded (ترحيل أو أمر نشر).
+    }
+
+    /**
+     * ترقية القوالب الافتراضية القديمة مرة واحدة — فقط الصفوف بلا updated_by (لم ينشرها مستخدم).
+     * لا تُستدعى من list/getActive حتى لا تُمحى تعديلات الإعدادات بعد الحفظ.
+     */
+    public function upgradeStockTemplatesIfNeeded(?int $userId = null): void
+    {
+        if (! $this->tableReady()) {
+            return;
         }
 
         // Soft rename for the stock v1 handover template if it still uses legacy wording.
@@ -626,7 +642,7 @@ class DocumentTemplateService
             'customer_national_id' => $nationalId,
             'customer_id_doc' => $idDoc,
             'customer_id_issued_from' => (string) ($customer?->national_id_issued_from ?: ''),
-            'customer_id_issued_on' => $idIssuedOn ? \App\Support\CivilDate::formatMonthYear($idIssuedOn, '') : '',
+            'customer_id_issued_on' => $idIssuedOn ? CivilDate::formatMonthYear($idIssuedOn, '') : '',
             'customer_nationality' => $nationality,
             'customer_address' => (string) ($customer?->address ?: ''),
             'customer_license' => (string) ($customer?->license_number ?: ''),
@@ -652,7 +668,7 @@ class DocumentTemplateService
             'daily_km' => (string) $dailyKm,
             'excess_km_rate' => (string) (int) ($contract->frozen_excess_km_rate ?? $ops['excess_km_rate'] ?? 0),
             'deposit' => (string) (int) ($deposit?->original_amount ?? $contract->frozen_agreed_deposit ?? 0),
-            'deposit_currency' => \App\Support\DepositCurrency::normalize($contract->frozen_deposit_currency ?? null),
+            'deposit_currency' => DepositCurrency::normalize($contract->frozen_deposit_currency ?? null),
             'deposit_status' => (string) ($deposit?->status ?? ''),
             'deposit_remaining' => (string) (int) ($deposit ? $deposit->remaining() : ($contract->frozen_agreed_deposit ?? 0)),
             'deposit_deductions' => (string) (int) ($deposit?->deductions_total ?? 0),
@@ -1380,4 +1396,3 @@ HTML;
 HTML;
     }
 }
-
