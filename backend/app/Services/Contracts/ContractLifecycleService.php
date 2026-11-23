@@ -13,7 +13,6 @@ use App\Models\Payment;
 use App\Models\TenantSetting;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleDocument;
 use App\Models\Violation;
 use App\Services\Accounting\AccountingService;
 use App\Services\Customers\CustomerCreditService;
@@ -90,11 +89,6 @@ class ContractLifecycleService
                 $data['planned_ends_at'],
                 isset($data['extended_from_contract_id']) ? (int) $data['extended_from_contract_id'] : null,
             );
-            $this->assertVehicleLicenseCoversRental(
-                (int) $vehicle->id,
-                Carbon::parse($data['planned_ends_at'])->toDateString(),
-            );
-
             $number = $data['number'] ?? $this->nextNumber();
 
             // ن٫٥: السعر اليومي والوديعة من النموذج عند الإنشاء بلا اشتراط صلاحية تجاوز السعر.
@@ -312,7 +306,6 @@ class ContractLifecycleService
             $vehicle = Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
 
             $this->assertOwnerAgreementCoversRental($vehicle, $locked->planned_ends_at);
-            $this->assertDocumentsAllowApproval($locked);
             $this->assertNoOverlap(
                 (int) $locked->vehicle_id,
                 $locked->starts_at,
@@ -415,10 +408,6 @@ class ContractLifecycleService
 
             $this->assertOwnerAgreementCoversRental($vehicle, $endsAt);
             $this->assertNoOverlap($vehicleId, $startsAt, $endsAt, $locked->id);
-            $this->assertVehicleLicenseCoversRental(
-                (int) $vehicle->id,
-                Carbon::parse($endsAt)->toDateString(),
-            );
 
             // قيد المراجعة: أي سعر مُرسل من النموذج يُثبَّت على العقد (نفس قاعدة الإنشاء).
             $dailyRate = array_key_exists('daily_rate', $data) && $data['daily_rate'] !== null
@@ -1097,10 +1086,6 @@ class ContractLifecycleService
             );
 
             $this->assertOwnerAgreementCoversRental($replacement, $locked->planned_ends_at);
-            $this->assertVehicleLicenseCoversRental(
-                (int) $replacement->id,
-                $locked->planned_ends_at->toDateString(),
-            );
             if (! $replacement->is_active) {
                 throw new DomainException('العربية البديلة غير نشطة.');
             }
@@ -1399,47 +1384,6 @@ class ContractLifecycleService
         }
     }
 
-    private function assertDocumentsAllowApproval(Contract $contract): void
-    {
-        $settings = TenantSetting::query()->first();
-        $ops = $settings?->operational ?? [];
-        $blockExpiredLicense = (bool) ($ops['block_expired_license'] ?? true);
-        $blockExpiredVehicleDocs = (bool) ($ops['block_expired_vehicle_docs'] ?? true);
-
-        $customer = $contract->customer ?? Customer::query()->find($contract->customer_id);
-        if ($blockExpiredLicense && $customer?->license_expires_on && $customer->license_expires_on->isPast()) {
-            throw new DomainException('رخصة العميل منتهية — تُمنع موافقة الإدارة.');
-        }
-
-        if ($customer?->license_expires_on && $customer->license_expires_on->lt($contract->planned_ends_at)) {
-            throw new DomainException('رخصة العميل تنتهي قبل نهاية العقد المخططة.');
-        }
-
-        if ($blockExpiredVehicleDocs) {
-            $this->assertVehicleLicenseCoversRental(
-                (int) $contract->vehicle_id,
-                $contract->planned_ends_at->toDateString(),
-            );
-            $expired = VehicleDocument::query()
-                ->where('vehicle_id', $contract->vehicle_id)
-                ->whereNotNull('expires_on')
-                ->whereDate('expires_on', '<', now()->toDateString())
-                ->first();
-            if ($expired) {
-                throw new DomainException('مستند عربية منتهٍ ('.$expired->type.') — تُمنع موافقة الإدارة.');
-            }
-
-            $endsBeforeContract = VehicleDocument::query()
-                ->where('vehicle_id', $contract->vehicle_id)
-                ->whereNotNull('expires_on')
-                ->whereDate('expires_on', '<', $contract->planned_ends_at->toDateString())
-                ->first();
-            if ($endsBeforeContract) {
-                throw new DomainException('مستند العربية ('.$endsBeforeContract->type.') ينتهي قبل نهاية العقد المخططة.');
-            }
-        }
-    }
-
     private function assertOwnerAgreementCoversRental(Vehicle $vehicle, mixed $plannedEndsAt): void
     {
         $ends = $vehicle->owner_agreement_ends_on?->toDateString();
@@ -1453,33 +1397,6 @@ class ContractLifecycleService
         $today = now()->timezone(config('app.timezone', 'Africa/Cairo'))->toDateString();
         if ($planned > $ends || $today > $ends) {
             throw new DomainException("عقد المالك لهذه العربية ينتهي في {$ends} — لا يمكن تأجيرها بعد هذا التاريخ");
-        }
-    }
-
-    private function assertVehicleLicenseCoversRental(int $vehicleId, string $plannedEndDate): void
-    {
-        $settings = TenantSetting::query()->first();
-        $block = (bool) (($settings?->operational ?? [])['block_expired_vehicle_docs'] ?? true);
-        if (! $block) {
-            return;
-        }
-
-        $doc = VehicleDocument::query()
-            ->where('vehicle_id', $vehicleId)
-            ->where(function ($q) {
-                $q->where('type', 'رخصة تسيير')
-                    ->orWhere('type', 'like', '%رخص%')
-                    ->orWhere('type', 'like', '%license%');
-            })
-            ->whereNotNull('expires_on')
-            ->orderByDesc('id')
-            ->first();
-        if (! $doc) {
-            return;
-        }
-        $expires = $doc->expires_on?->toDateString();
-        if ($expires && $expires < $plannedEndDate) {
-            throw new DomainException('رخصة العربية تنتهي قبل نهاية العقد المخططة.');
         }
     }
 
