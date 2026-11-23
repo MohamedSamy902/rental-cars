@@ -157,10 +157,12 @@ class DocumentTemplateService
         }
 
         // Soft rename for the stock v1 handover template if it still uses legacy wording.
+        // Never touch a row a user has published (updated_by set) — that wiped live edits.
         DocumentTemplate::query()
             ->where('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT)
             ->where('is_active', true)
             ->where('version', 1)
+            ->whereNull('updated_by')
             ->where(function ($q) {
                 $q->where('title', 'like', '%محضر%')
                     ->orWhere('title', 'like', '%سند%')
@@ -190,6 +192,11 @@ class DocumentTemplateService
             ->first();
 
         if (! $active) {
+            return;
+        }
+
+        // قالب نشره مستخدم من الإعدادات — ممنوع استبداله بالافتراضي (كان يمحو التعديلات عند كل طباعة/قراءة).
+        if ($this->isUserPublishedTemplate($active)) {
             return;
         }
 
@@ -251,6 +258,10 @@ class DocumentTemplateService
             return;
         }
 
+        if ($this->isUserPublishedTemplate($active)) {
+            return;
+        }
+
         $content = (string) $active->content;
 
         if (str_contains($content, 'rpm-paper-v6')) {
@@ -306,6 +317,10 @@ class DocumentTemplateService
             ->first();
 
         if (! $active) {
+            return;
+        }
+
+        if ($this->isUserPublishedTemplate($active)) {
             return;
         }
 
@@ -379,6 +394,12 @@ class DocumentTemplateService
      *
      * @param  array{type:string,title?:string,content?:string,format?:string}  $data
      */
+    /** قالب نشره مستخدم من لوحة الإعدادات (له updated_by) — لا يُستبدل تلقائياً. */
+    private function isUserPublishedTemplate(DocumentTemplate $template): bool
+    {
+        return $template->updated_by !== null;
+    }
+
     public function publish(array $data, ?UploadedFile $file = null, ?int $userId = null): DocumentTemplate
     {
         if (! $this->tableReady()) {
@@ -390,6 +411,7 @@ class DocumentTemplateService
 
         $format = $data['format'] ?? 'html';
         $content = (string) ($data['content'] ?? '');
+        $hasEditorContent = trim($content) !== '';
         $storagePath = null;
 
         if ($file) {
@@ -403,19 +425,22 @@ class DocumentTemplateService
             Storage::disk($disk)->putFileAs('templates', $file, $name);
             $storagePath = $relative;
 
-            if ($ext === 'docx') {
-                $absolute = Storage::disk($disk)->path($relative);
-                $extracted = $this->extractDocxToHtml($absolute);
-                if ($extracted !== '') {
-                    $content = $extracted;
+            // إن وُجد محتوى من المحرر في الطلب نُبقيه — ملف الاستبدال لا يطغى عليه (كان يمحو تعديلات الإعدادات).
+            if (! $hasEditorContent) {
+                if ($ext === 'docx') {
+                    $absolute = Storage::disk($disk)->path($relative);
+                    $extracted = $this->extractDocxToHtml($absolute);
+                    if ($extracted !== '') {
+                        $content = $extracted;
+                    }
+                    $format = 'docx';
+                } elseif (in_array($ext, ['md', 'txt'], true)) {
+                    $content = (string) file_get_contents(Storage::disk($disk)->path($relative));
+                    $format = 'markdown';
+                } else {
+                    $content = (string) file_get_contents(Storage::disk($disk)->path($relative));
+                    $format = 'html';
                 }
-                $format = 'docx';
-            } elseif (in_array($ext, ['md', 'txt'], true)) {
-                $content = (string) file_get_contents(Storage::disk($disk)->path($relative));
-                $format = 'markdown';
-            } else {
-                $content = (string) file_get_contents(Storage::disk($disk)->path($relative));
-                $format = 'html';
             }
         }
 

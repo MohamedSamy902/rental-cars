@@ -433,6 +433,60 @@ HTML,
         $this->assertStringNotContainsString('محضر إثبات', (string) $active->content);
     }
 
+    public function test_user_published_ack_edits_survive_ensure_defaults_and_reload(): void
+    {
+        $admin = $this->actingAdmin();
+        $marker = 'تعديل_عميل_محفوظ_'.uniqid();
+
+        $save = $this->postJson('/api/document-templates', [
+            'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
+            'title' => 'إقرار معدّل من الإعدادات',
+            'format' => 'html',
+            'content' => <<<HTML
+<article class="rpm-ack-form rpm-ack-v7" dir="rtl">
+  <h1>إقرار استلام سيارة</h1>
+  <p>خائنا للأمانة — {$marker}</p>
+  <p>بند بدون rpm-vehicle-value-clause عمداً</p>
+</article>
+HTML,
+        ])->assertCreated();
+
+        $this->assertSame($admin->id, (int) $save->json('data.updated_by'));
+        $this->assertStringContainsString($marker, (string) $save->json('data.content'));
+
+        // كان ensureDefaults يعيد نشر الافتراضي ويمحو التعديل عند كل قراءة/طباعة.
+        app(DocumentTemplateService::class)->ensureDefaults();
+        $list = $this->getJson('/api/document-templates?active=1')->assertOk();
+        $ack = collect($list->json('data'))->firstWhere('type', DocumentTemplate::TYPE_HANDOVER_RECEIPT);
+        $this->assertNotNull($ack);
+        $this->assertStringContainsString($marker, (string) $ack['content']);
+        $this->assertStringNotContainsString('rpm-ack-v8', (string) $ack['content']);
+    }
+
+    public function test_editor_content_wins_over_uploaded_file_on_publish(): void
+    {
+        $this->actingAdmin();
+        $marker = 'محتوى_المحرر_'.uniqid();
+        $tmp = tempnam(sys_get_temp_dir(), 'tpl');
+        file_put_contents($tmp, '<article><p>من الملف فقط — يجب ألا يظهر</p></article>');
+        $file = new UploadedFile($tmp, 'old.html', 'text/html', null, true);
+
+        $res = $this->post('/api/document-templates', [
+            'type' => DocumentTemplate::TYPE_HANDOVER_RECEIPT,
+            'title' => 'إقرار',
+            'format' => 'html',
+            'content' => '<article class="rpm-ack-form rpm-ack-v8"><p>'.$marker.'</p></article>',
+            'file' => $file,
+        ], [
+            'Accept' => 'application/json',
+        ])->assertCreated();
+
+        $content = (string) $res->json('data.content');
+        $this->assertStringContainsString($marker, $content);
+        $this->assertStringNotContainsString('من الملف فقط', $content);
+        @unlink($tmp);
+    }
+
     public function test_legacy_wrong_signer_and_company_defaults_are_normalized_on_print(): void
     {
         $this->actingAdmin();

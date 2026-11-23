@@ -372,7 +372,10 @@ export function DocumentTemplatesPanel() {
   const [saving, setSaving] = useState<TemplateType | null>(null)
   const [previewing, setPreviewing] = useState<TemplateType | null>(null)
   const [previewDoc, setPreviewDoc] = useState<{ title: string; html: string } | null>(null)
-  const [expanded, setExpanded] = useState<Partial<Record<TemplateType, boolean>>>({ contract: true })
+  const [expanded, setExpanded] = useState<Partial<Record<TemplateType, boolean>>>({
+    contract: true,
+    handover_receipt: true,
+  })
   const [codeMode, setCodeMode] = useState<Partial<Record<TemplateType, boolean>>>({})
   const [editorSeed, setEditorSeed] = useState<Record<TemplateType, number>>({
     contract: 0,
@@ -462,27 +465,44 @@ export function DocumentTemplatesPanel() {
       toast.error('لا صلاحية لتعديل قوالب المستندات.')
       return
     }
-    const content = codeMode[type] ? drafts[type].content : readVisualContent(type)
-    if (!codeMode[type]) {
-      setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content } }))
+    // اقرأ من المحرر الحي ثم ثبّت في المسودة قبل الإرسال — بدون الاعتماد على onInput فقط.
+    const content = (codeMode[type] ? drafts[type].content : readVisualContent(type)).trim()
+    const title = (drafts[type].title || TYPE_META[type].title).trim()
+    if (!content) {
+      toast.error('محتوى القالب فارغ — عدّل النص ثم احفظ.')
+      return
     }
+    setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content, title } }))
     setSaving(type)
     try {
-      const fd = new FormData()
-      fd.append('type', type)
-      fd.append('title', drafts[type].title || TYPE_META[type].title)
-      fd.append('content', content)
-      fd.append('format', 'html')
       const file = files[type]
-      if (file) fd.append('file', file)
-
-      const json = await apiUpload<{ data: TemplateRow; message?: string }>('/document-templates', fd)
-      const row = json.data
+      let row: TemplateRow
+      let message: string | undefined
+      if (file) {
+        // استبدال من ملف فقط عندما يختاره المستخدم صراحةً — المحتوى المحرَّر يُرسل معه وله الأولوية في الـ API.
+        const fd = new FormData()
+        fd.append('type', type)
+        fd.append('title', title)
+        fd.append('content', content)
+        fd.append('format', 'html')
+        fd.append('file', file)
+        const json = await apiUpload<{ data: TemplateRow; message?: string }>('/document-templates', fd)
+        row = json.data
+        message = json.message
+      } else {
+        // JSON أوثق من multipart للنص الطويل (تعديلات الإقرار/العقد من المحرر).
+        const json = await api<{ data: TemplateRow; message?: string }>('/document-templates', {
+          method: 'POST',
+          json: { type, title, content, format: 'html' },
+        })
+        row = json.data
+        message = json.message
+      }
       setActive((prev) => ({ ...prev, [type]: row }))
       setDrafts((prev) => ({ ...prev, [type]: { title: row.title, content: row.content } }))
       setEditorSeed((prev) => ({ ...prev, [type]: prev[type] + 1 }))
       setFiles((prev) => ({ ...prev, [type]: null }))
-      toast.success(json.message || 'تم حفظ القالب.')
+      toast.success(message || `تم حفظ القالب (الإصدار ${row.version}).`)
     } catch (e) {
       toast.error((e as ApiError).message || 'تعذّر حفظ القالب.')
     } finally {
@@ -713,7 +733,10 @@ export function DocumentTemplatesPanel() {
                       className="rpm-template-source"
                       disabled={!canEdit}
                       value={drafts[type].content}
-                      onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))}
+                      onChange={(e) => {
+                        setFiles((prev) => (prev[type] ? { ...prev, [type]: null } : prev))
+                        setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))
+                      }}
                       rows={16}
                       spellCheck={false}
                     />
@@ -724,10 +747,14 @@ export function DocumentTemplatesPanel() {
                       disabled={!canEdit}
                       editorRef={visualRefs[type]}
                       assetsRef={assetsRefs[type]}
-                      onChange={(nextHtml) => setDrafts((prev) => ({
-                        ...prev,
-                        [type]: { ...prev[type], content: nextHtml },
-                      }))}
+                      onChange={(nextHtml) => {
+                        // أي كتابة في المحرر تلغي ملف الاستبدال المعلّق حتى لا يطغى على التعديل عند الحفظ.
+                        setFiles((prev) => (prev[type] ? { ...prev, [type]: null } : prev))
+                        setDrafts((prev) => ({
+                          ...prev,
+                          [type]: { ...prev[type], content: nextHtml },
+                        }))
+                      }}
                     />
                   )}
                 </div>
