@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
-import { DocumentTemplatesPanel } from '@/shared/forms/DocumentTemplatesPanel'
+import {
+  DocumentTemplatesPanel,
+  type DocumentTemplatesPanelHandle,
+} from '@/shared/forms/DocumentTemplatesPanel'
 import {
   PageHeader, Button, TextField, TextAreaField, NumberField, SwitchField, MediaUpload, useToast, SkeletonBlock,
 } from '@/shared/ui'
@@ -26,6 +29,7 @@ type Ops = {
 export function SettingsPage() {
   const toast = useToast()
   const { isIntegrator, can } = useAuth()
+  const templatesRef = useRef<DocumentTemplatesPanelHandle>(null)
   const [data, setData] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [centerName, setCenterName] = useState('')
@@ -72,6 +76,13 @@ export function SettingsPage() {
     }
     setSaving(true)
     try {
+      // أولاً: ثبّت أي قوالب معدَّلة (إقرار/عقد) — كان زر الصفحة يحفظ الشركة فقط فيختفي التعديل عند الرجوع.
+      const flush = await templatesRef.current?.flushDirty()
+      if (flush && flush.failed > 0) {
+        toast.error(`تعذّر حفظ ${flush.failed} قالب — راجع قسم القوالب وأعد المحاولة.`)
+        return
+      }
+
       const res = await api<{ data: any; message: string }>('/settings/operational', {
         method: 'PUT',
         json: {
@@ -89,7 +100,8 @@ export function SettingsPage() {
         },
       })
       setData(res.data)
-      toast.success(res.message || 'تم الحفظ.')
+      const tplNote = flush && flush.saved > 0 ? ` · وحُفظ ${flush.saved} قالب` : ''
+      toast.success((res.message || 'تم الحفظ.') + tplNote)
     } catch (e) {
       toast.error((e as ApiError).message)
     } finally {
@@ -106,7 +118,7 @@ export function SettingsPage() {
       <PageHeader
         title="الإعدادات"
         subtitle="إعدادات التشغيل اليومية للمعرض"
-        action={canEditSettings ? <Button loading={saving} onClick={() => void save()}>حفظ</Button> : null}
+        action={canEditSettings ? <Button loading={saving} onClick={() => void save()}>حفظ الكل</Button> : null}
       />
 
       <section className="rpm-panel">
@@ -171,7 +183,7 @@ export function SettingsPage() {
         <header className="rpm-panel__head" style={{ margin: 0 }}>
           <h3 style={{ margin: 0 }}>قوالب العقود والمستندات</h3>
         </header>
-        <DocumentTemplatesPanel />
+        <DocumentTemplatesPanel ref={templatesRef} />
       </section>
       ) : null}
 

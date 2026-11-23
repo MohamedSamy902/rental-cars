@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import {
+  forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
+  type RefObject,
+} from 'react'
 import { api, apiUpload, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { Button, Sheet, TextField, useToast } from '@/shared/ui'
@@ -8,7 +11,16 @@ import { shellRentalContractHtml } from '@/shared/contracts/rentalContractPrint'
 import { fitPrintPreviewIframe } from '@/shared/contracts/fitPrintPreview'
 import './DocumentTemplatesPanel.css'
 
+export type DocumentTemplatesPanelHandle = {
+  /** هل فيه تعديلات قالب لم تُنشر بعد؟ */
+  hasDirty: () => boolean
+  /** حفظ كل القوالب المعدَّلة — يُستدعى من زر حفظ صفحة الإعدادات. */
+  flushDirty: () => Promise<{ saved: number; failed: number }>
+}
+
 type TemplateType = 'contract' | 'handover_receipt' | 'owner_agreement' | 'custody_agreement'
+
+const ALL_TYPES: TemplateType[] = ['contract', 'handover_receipt', 'owner_agreement', 'custody_agreement']
 
 type Placeholder = {
   key: string
@@ -355,7 +367,7 @@ function VisualBodyEditor({
   )
 }
 
-export function DocumentTemplatesPanel() {
+export const DocumentTemplatesPanel = forwardRef<DocumentTemplatesPanelHandle>(function DocumentTemplatesPanel(_props, ref) {
   const toast = useToast()
   const { can, isIntegrator } = useAuth()
   const canEdit = can('settings.update') || isIntegrator
@@ -387,20 +399,30 @@ export function DocumentTemplatesPanel() {
     contract: useRef<HTMLDivElement | null>(null),
     handover_receipt: useRef<HTMLDivElement | null>(null),
     owner_agreement: useRef<HTMLDivElement | null>(null),
-     custody_agreement: useRef<HTMLDivElement | null>(null),
+    custody_agreement: useRef<HTMLDivElement | null>(null),
   }
   const assetsRefs = {
     contract: useRef<Map<string, string>>(new Map()),
     handover_receipt: useRef<Map<string, string>>(new Map()),
     owner_agreement: useRef<Map<string, string>>(new Map()),
-     custody_agreement: useRef<Map<string, string>>(new Map()),
+    custody_agreement: useRef<Map<string, string>>(new Map()),
   }
   const textRefs = {
     contract: useRef<HTMLTextAreaElement | null>(null),
     handover_receipt: useRef<HTMLTextAreaElement | null>(null),
     owner_agreement: useRef<HTMLTextAreaElement | null>(null),
-     custody_agreement: useRef<HTMLTextAreaElement | null>(null),
+    custody_agreement: useRef<HTMLTextAreaElement | null>(null),
   }
+  /** آخر محتوى مؤكَّد من المحرر — لا يعتمد على توقيت setState قبل الحفظ. */
+  const latestContentRef = useRef<Partial<Record<TemplateType, string>>>({})
+  const latestTitleRef = useRef<Partial<Record<TemplateType, string>>>({})
+  const dirtyRef = useRef<Partial<Record<TemplateType, boolean>>>({})
+  const codeModeRef = useRef(codeMode)
+  codeModeRef.current = codeMode
+  const draftsRef = useRef(drafts)
+  draftsRef.current = drafts
+  const filesRef = useRef(files)
+  filesRef.current = files
 
   const groupedPlaceholders = useMemo(() => {
     const map = new Map<string, Placeholder[]>()
@@ -414,11 +436,27 @@ export function DocumentTemplatesPanel() {
       .map((g) => ({ group: g, items: map.get(g)! }))
   }, [placeholders])
 
+  function markDirty(type: TemplateType, content: string, title?: string) {
+    dirtyRef.current[type] = true
+    latestContentRef.current[type] = content
+    if (title !== undefined) latestTitleRef.current[type] = title
+  }
+
   function readVisualContent(type: TemplateType): string {
     const visual = visualRefs[type].current
     const assets = assetsRefs[type].current
     if (visual && assets) return restoreVisualHtml(visual.innerHTML, assets)
-    return drafts[type].content
+    return latestContentRef.current[type] ?? draftsRef.current[type].content
+  }
+
+  function resolveContentForSave(type: TemplateType): string {
+    if (codeModeRef.current[type]) {
+      return (latestContentRef.current[type] ?? draftsRef.current[type].content).trim()
+    }
+    // فضّل DOM الحي ثم الـ ref ثم المسودة.
+    const live = readVisualContent(type).trim()
+    if (live) return live
+    return (latestContentRef.current[type] ?? draftsRef.current[type].content).trim()
   }
 
   useEffect(() => {
@@ -438,16 +476,26 @@ export function DocumentTemplatesPanel() {
         for (const row of res.data || []) {
           if (row.type !== 'contract' && row.type !== 'handover_receipt' && row.type !== 'owner_agreement' && row.type !== 'custody_agreement') continue
           nextActive[row.type] = row
-          nextDrafts[row.type] = { title: row.title, content: row.content }
+          // لا تمسح مسودة المستخدم إن كان يعدّل أثناء إعادة التحميل.
+          if (dirtyRef.current[row.type]) {
+            nextDrafts[row.type] = {
+              title: latestTitleRef.current[row.type] ?? draftsRef.current[row.type].title ?? row.title,
+              content: latestContentRef.current[row.type] ?? draftsRef.current[row.type].content ?? row.content,
+            }
+          } else {
+            nextDrafts[row.type] = { title: row.title, content: row.content }
+            latestContentRef.current[row.type] = row.content
+            latestTitleRef.current[row.type] = row.title
+          }
         }
         setActive(nextActive)
         setDrafts(nextDrafts)
-        setEditorSeed({
-          contract: (nextActive.contract?.version ?? 0) + 1,
-          handover_receipt: (nextActive.handover_receipt?.version ?? 0) + 1,
-          owner_agreement: (nextActive.owner_agreement?.version ?? 0) + 1,
-          custody_agreement: (nextActive.custody_agreement?.version ?? 0) + 1,
-        })
+        setEditorSeed((prev) => ({
+          contract: dirtyRef.current.contract ? prev.contract : (nextActive.contract?.version ?? 0) + 1,
+          handover_receipt: dirtyRef.current.handover_receipt ? prev.handover_receipt : (nextActive.handover_receipt?.version ?? 0) + 1,
+          owner_agreement: dirtyRef.current.owner_agreement ? prev.owner_agreement : (nextActive.owner_agreement?.version ?? 0) + 1,
+          custody_agreement: dirtyRef.current.custody_agreement ? prev.custody_agreement : (nextActive.custody_agreement?.version ?? 0) + 1,
+        }))
       })
       .catch((e) => {
         if (!cancelled) toast.error((e as ApiError).message || 'تعذّر تحميل القوالب.')
@@ -458,28 +506,30 @@ export function DocumentTemplatesPanel() {
     return () => {
       cancelled = true
     }
-  }, [toast])
+    // تحميل مرة عند الدخول فقط — لا تعتمد على هوية toast حتى لا تُمسَح المسودة.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only load
+  }, [])
 
-  async function save(type: TemplateType) {
+  async function save(type: TemplateType, opts?: { quiet?: boolean }): Promise<boolean> {
     if (!canEdit) {
-      toast.error('لا صلاحية لتعديل قوالب المستندات.')
-      return
+      if (!opts?.quiet) toast.error('لا صلاحية لتعديل قوالب المستندات.')
+      return false
     }
-    // اقرأ من المحرر الحي ثم ثبّت في المسودة قبل الإرسال — بدون الاعتماد على onInput فقط.
-    const content = (codeMode[type] ? drafts[type].content : readVisualContent(type)).trim()
-    const title = (drafts[type].title || TYPE_META[type].title).trim()
+    const content = resolveContentForSave(type)
+    const title = (latestTitleRef.current[type] ?? draftsRef.current[type].title ?? TYPE_META[type].title).trim()
     if (!content) {
-      toast.error('محتوى القالب فارغ — عدّل النص ثم احفظ.')
-      return
+      if (!opts?.quiet) toast.error('محتوى القالب فارغ — عدّل النص ثم احفظ.')
+      return false
     }
+    latestContentRef.current[type] = content
+    latestTitleRef.current[type] = title
     setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content, title } }))
     setSaving(type)
     try {
-      const file = files[type]
+      const file = filesRef.current[type]
       let row: TemplateRow
       let message: string | undefined
       if (file) {
-        // استبدال من ملف فقط عندما يختاره المستخدم صراحةً — المحتوى المحرَّر يُرسل معه وله الأولوية في الـ API.
         const fd = new FormData()
         fd.append('type', type)
         fd.append('title', title)
@@ -490,7 +540,6 @@ export function DocumentTemplatesPanel() {
         row = json.data
         message = json.message
       } else {
-        // JSON أوثق من multipart للنص الطويل (تعديلات الإقرار/العقد من المحرر).
         const json = await api<{ data: TemplateRow; message?: string }>('/document-templates', {
           method: 'POST',
           json: { type, title, content, format: 'html' },
@@ -498,17 +547,46 @@ export function DocumentTemplatesPanel() {
         row = json.data
         message = json.message
       }
-      setActive((prev) => ({ ...prev, [type]: row }))
-      setDrafts((prev) => ({ ...prev, [type]: { title: row.title, content: row.content } }))
+
+      // تحقق فوري من الثبات بعد الحفظ — لو GET رجّع غير ما نُشر ننبّه بدل نجاح كاذب.
+      const verify = await api<{ data: TemplateRow[] }>('/document-templates?active=1').catch(() => null)
+      const confirmed = verify?.data?.find((r) => r.type === type)
+      if (confirmed && confirmed.content !== row.content) {
+        throw new Error('الحفظ لم يثبت على السيرفر — أعد المحاولة.')
+      }
+      const stuck = confirmed ?? row
+
+      dirtyRef.current[type] = false
+      latestContentRef.current[type] = stuck.content
+      latestTitleRef.current[type] = stuck.title
+      setActive((prev) => ({ ...prev, [type]: stuck }))
+      setDrafts((prev) => ({ ...prev, [type]: { title: stuck.title, content: stuck.content } }))
       setEditorSeed((prev) => ({ ...prev, [type]: prev[type] + 1 }))
       setFiles((prev) => ({ ...prev, [type]: null }))
-      toast.success(message || `تم حفظ القالب (الإصدار ${row.version}).`)
+      if (!opts?.quiet) toast.success(message || `تم حفظ القالب (الإصدار ${stuck.version}).`)
+      return true
     } catch (e) {
-      toast.error((e as ApiError).message || 'تعذّر حفظ القالب.')
+      if (!opts?.quiet) toast.error((e as ApiError).message || 'تعذّر حفظ القالب.')
+      return false
     } finally {
       setSaving(null)
     }
   }
+
+  useImperativeHandle(ref, () => ({
+    hasDirty: () => ALL_TYPES.some((t) => Boolean(dirtyRef.current[t])),
+    flushDirty: async () => {
+      let saved = 0
+      let failed = 0
+      for (const type of ALL_TYPES) {
+        if (!dirtyRef.current[type]) continue
+        const ok = await save(type, { quiet: true })
+        if (ok) saved += 1
+        else failed += 1
+      }
+      return { saved, failed }
+    },
+  }))
 
   async function preview(type: TemplateType) {
     setPreviewing(type)
@@ -539,6 +617,7 @@ export function DocumentTemplatesPanel() {
         const start = el.selectionStart ?? el.value.length
         const end = el.selectionEnd ?? el.value.length
         const next = `${el.value.slice(0, start)}${snippet}${el.value.slice(end)}`
+        markDirty(type, next)
         setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: next } }))
         requestAnimationFrame(() => {
           el.focus()
@@ -564,9 +643,11 @@ export function DocumentTemplatesPanel() {
           range.collapse(true)
           sel.removeAllRanges()
           sel.addRange(range)
+          const nextHtml = restoreVisualHtml(root.innerHTML, assetsRefs[type].current)
+          markDirty(type, nextHtml)
           setDrafts((prev) => ({
             ...prev,
-            [type]: { ...prev[type], content: restoreVisualHtml(root.innerHTML, assetsRefs[type].current) },
+            [type]: { ...prev[type], content: nextHtml },
           }))
           toast.success(`أُدرج: ${label}`)
           return
@@ -576,20 +657,21 @@ export function DocumentTemplatesPanel() {
       const p = document.createElement('p')
       p.textContent = snippet
       root.appendChild(p)
+      const nextHtml = restoreVisualHtml(root.innerHTML, assetsRefs[type].current)
+      markDirty(type, nextHtml)
       setDrafts((prev) => ({
         ...prev,
-        [type]: { ...prev[type], content: restoreVisualHtml(root.innerHTML, assetsRefs[type].current) },
+        [type]: { ...prev[type], content: nextHtml },
       }))
       toast.success(`أُدرج في النص: ${label}`)
       return
     }
 
+    const fallback = `${draftsRef.current[type].content}${draftsRef.current[type].content && !draftsRef.current[type].content.endsWith('\n') ? ' ' : ''}${snippet}`
+    markDirty(type, fallback)
     setDrafts((prev) => ({
       ...prev,
-      [type]: {
-        ...prev[type],
-        content: `${prev[type].content}${prev[type].content && !prev[type].content.endsWith('\n') ? ' ' : ''}${snippet}`,
-      },
+      [type]: { ...prev[type], content: fallback },
     }))
     setEditorSeed((prev) => ({ ...prev, [type]: prev[type] + 1 }))
     toast.success(`أُدرج في النص: ${label}`)
@@ -608,10 +690,11 @@ export function DocumentTemplatesPanel() {
         onClose={() => setPreviewDoc(null)}
       />
       <p className="rpm-template-intro">
-        محرّر نص خفيف للبنود والجمل — الرسوم والترويسة والختم تظهر كشارات محمية ولا تتكسر أثناء التعديل. استخدم «معاينة» لرؤية الشكل النهائي قبل الحفظ.
+        عدّل النص ثم اضغط «حفظ ونشر» بجانب القالب — أو «حفظ الكل» أعلى الصفحة ليثبّت القوالب المعدَّلة مع إعدادات الشركة.
+        الرسوم والترويسة والختم شارات محمية. «معاينة» تعرض الشكل النهائي قبل النشر.
       </p>
 
-      {(['contract', 'handover_receipt', 'owner_agreement', 'custody_agreement'] as TemplateType[]).map((type) => {
+      {ALL_TYPES.map((type) => {
         const meta = TYPE_META[type]
         const row = active[type]
         const isOpen = Boolean(expanded[type])
@@ -663,7 +746,12 @@ export function DocumentTemplatesPanel() {
                   label="عنوان القالب"
                   value={drafts[type].title}
                   disabled={!canEdit}
-                  onChange={(e) => setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], title: e.target.value } }))}
+                  onChange={(e) => {
+                    const title = e.target.value
+                    latestTitleRef.current[type] = title
+                    dirtyRef.current[type] = true
+                    setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], title } }))
+                  }}
                 />
 
                 <div className="rpm-field">
@@ -734,8 +822,10 @@ export function DocumentTemplatesPanel() {
                       disabled={!canEdit}
                       value={drafts[type].content}
                       onChange={(e) => {
+                        const next = e.target.value
+                        markDirty(type, next)
                         setFiles((prev) => (prev[type] ? { ...prev, [type]: null } : prev))
-                        setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: e.target.value } }))
+                        setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], content: next } }))
                       }}
                       rows={16}
                       spellCheck={false}
@@ -748,7 +838,7 @@ export function DocumentTemplatesPanel() {
                       editorRef={visualRefs[type]}
                       assetsRef={assetsRefs[type]}
                       onChange={(nextHtml) => {
-                        // أي كتابة في المحرر تلغي ملف الاستبدال المعلّق حتى لا يطغى على التعديل عند الحفظ.
+                        markDirty(type, nextHtml)
                         setFiles((prev) => (prev[type] ? { ...prev, [type]: null } : prev))
                         setDrafts((prev) => ({
                           ...prev,
@@ -766,6 +856,7 @@ export function DocumentTemplatesPanel() {
                     accept=".docx,.html,.htm,.md,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/markdown,text/plain"
                     disabled={!canEdit}
                     onChange={(e) => {
+                      dirtyRef.current[type] = true
                       setFiles((prev) => ({ ...prev, [type]: e.target.files?.[0] || null }))
                     }}
                     style={{ marginBlockStart: '0.35rem', width: '100%' }}
@@ -783,4 +874,4 @@ export function DocumentTemplatesPanel() {
       })}
     </div>
   )
-}
+})
