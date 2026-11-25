@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLatestRequest } from '@/shared/lib/useLatestRequest'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { detailNavState } from '@/shared/lib/detailNav'
+import { pinScrollForNavigation, readScrollY, routeScrollKey } from '@/shared/lib/scrollMemory'
 import { api, type ApiError } from '@/shared/api/client'
 import { addCivilDays, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
@@ -92,6 +94,11 @@ const statusLabel: Record<string, string> = {
 export function VehiclesPage() {
   const toast = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
+  const openVehicle = (id: number) => {
+    pinScrollForNavigation(routeScrollKey(location.pathname, location.search), readScrollY())
+    navigate(`/vehicles/${id}`, { state: detailNavState(location.pathname, location.search) })
+  }
   const [rows, setRows] = useState<Vehicle[]>([])
   const [summary, setSummary] = useState({
     total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0,
@@ -510,7 +517,7 @@ export function VehiclesPage() {
 
   function vehicleMenu(v: Vehicle): MenuItem[] {
     const items: MenuItem[] = [
-      { id: 'open', label: 'فتح الملف الكامل', icon: <IconEye size={16} />, onSelect: () => navigate(`/vehicles/${v.id}`) },
+      { id: 'open', label: 'فتح الملف الكامل', icon: <IconEye size={16} />, onSelect: () => openVehicle(v.id) },
       { id: 'edit', label: 'تعديل بيانات العربية', icon: <IconEdit size={16} />, onSelect: () => void openEdit(v) },
       { id: 'whatsapp', label: 'مشاركة واتساب', icon: <IconClipboard size={16} />, onSelect: () => void shareVehicleWhatsApp(v) },
     ]
@@ -813,7 +820,7 @@ export function VehiclesPage() {
           rowKey={(v) => v.id}
           rowLabel={(v) => `${v.brand} ${v.model} · ${v.plate}`}
           loading={loading}
-          onRowClick={(v) => navigate(`/vehicles/${v.id}`)}
+          onRowClick={(v) => openVehicle(v.id)}
           rowActions={vehicleMenu}
           emptyTitle="لا توجد عربيات مطابقة"
           emptyDescription="جرّب كلمة بحث أخرى أو غيّر فلتر الحالة."

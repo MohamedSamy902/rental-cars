@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { detailNavState } from '@/shared/lib/detailNav'
+import { pinScrollForNavigation, readScrollY, routeScrollKey } from '@/shared/lib/scrollMemory'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useLatestRequest } from '@/shared/lib/useLatestRequest'
@@ -27,8 +29,13 @@ const LIST_PER_PAGE = 50
 
 export function BookingsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { can, isIntegrator } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
+  const openContract = (id: number) => {
+    pinScrollForNavigation(routeScrollKey(location.pathname, location.search), readScrollY())
+    navigate(`/contracts/${id}`, { state: detailNavState(location.pathname, location.search) })
+  }
   const [rows, setRows] = useState<Contract[]>([])
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
@@ -290,10 +297,10 @@ export function BookingsPage() {
           rowKey={(b) => b.id}
           rowLabel={(b) => `عقد ${b.number}`}
           loading={loading}
-          onRowClick={(b) => navigate(`/contracts/${b.id}`)}
+          onRowClick={(b) => openContract(b.id)}
           rowActions={(b) =>
             contractMenu(b, {
-              view: () => navigate(`/contracts/${b.id}`),
+              view: () => openContract(b.id),
               approve: () => void life.approve(b.id),
               openAction: (kind) => void life.openAction(kind, b),
               print: (kind = 'contract') => openPrint(b.id, kind),

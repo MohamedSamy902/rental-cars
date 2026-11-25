@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { detailNavState } from '@/shared/lib/detailNav'
+import { pinScrollForNavigation, readScrollY, routeScrollKey } from '@/shared/lib/scrollMemory'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import {
@@ -34,6 +36,11 @@ const columns: DataColumn<Account>[] = [
 export function PettyCashPage() {
   const toast = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
+  const openAccount = (id: number) => {
+    pinScrollForNavigation(routeScrollKey(location.pathname, location.search), readScrollY())
+    navigate(`/petty-cash/${id}`, { state: detailNavState(location.pathname, location.search) })
+  }
   const [rows, setRows] = useState<Account[]>([])
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 })
@@ -140,9 +147,9 @@ export function PettyCashPage() {
         rowKey={(a) => a.id}
         rowLabel={(a) => `عهدة ${a.employee?.name ?? ''}`}
         loading={loading}
-        onRowClick={(a) => navigate(`/petty-cash/${a.id}`)}
+        onRowClick={(a) => openAccount(a.id)}
         rowActions={(a) => [
-          { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: () => navigate(`/petty-cash/${a.id}`) },
+          { id: 'view', label: 'عرض التفاصيل', icon: <IconEye size={16} />, onSelect: () => openAccount(a.id) },
           {
             id: 'topup',
             label: 'تغذية عهدة',
