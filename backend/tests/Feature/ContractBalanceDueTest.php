@@ -151,4 +151,75 @@ class ContractBalanceDueTest extends TestCase
         app(DueNotificationService::class)->scan();
         $this->assertGreaterThan(0, Notification::query()->where('title', 'like', '%CNT-DUE-1%')->count());
     }
+
+    public function test_contracts_index_with_balance_tab_and_ledger(): void
+    {
+        $owed = Contract::query()->create([
+            'number' => 'CNT-OWED-1',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'status' => 'active',
+            'starts_at' => now()->subDays(1),
+            'planned_ends_at' => now()->addDays(10),
+            'approved_days' => 11,
+            'frozen_daily_rate' => 1000,
+            'frozen_agreed_deposit' => 0,
+            'final_total' => 5000,
+            'balance_due_on' => now()->addDays(3)->toDateString(),
+        ]);
+        $this->postJson('/api/accounting/payments', [
+            'amount' => 1000,
+            'method' => 'cash',
+            'direction' => 'in',
+            'link_type' => 'contract',
+            'link_id' => $owed->id,
+        ])->assertCreated();
+
+        $settledVehicle = Vehicle::query()->create([
+            'code' => 'BAL-SETTLED',
+            'plate' => 'ب ل ق 9',
+            'brand' => 'MG',
+            'model' => 'HS',
+            'year' => 2024,
+            'category' => 'SUV',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 900,
+            'default_deposit' => 1000,
+            'is_active' => true,
+        ]);
+        $settled = Contract::query()->create([
+            'number' => 'CNT-PAID-1',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $settledVehicle->id,
+            'status' => 'active',
+            'starts_at' => now()->subDays(1),
+            'planned_ends_at' => now()->addDays(5),
+            'approved_days' => 6,
+            'frozen_daily_rate' => 900,
+            'frozen_agreed_deposit' => 0,
+            'final_total' => 2000,
+        ]);
+        $this->postJson('/api/accounting/payments', [
+            'amount' => 2000,
+            'method' => 'cash',
+            'direction' => 'in',
+            'link_type' => 'contract',
+            'link_id' => $settled->id,
+        ])->assertCreated();
+
+        $list = $this->getJson('/api/contracts?tab=with_balance&per_page=100')
+            ->assertOk()
+            ->json();
+
+        $ids = collect($list['data'])->pluck('id')->all();
+        $this->assertContains($owed->id, $ids);
+        $this->assertNotContains($settled->id, $ids);
+        $this->assertGreaterThanOrEqual(1, (int) ($list['summary']['with_balance'] ?? 0));
+
+        $row = collect($list['data'])->firstWhere('id', $owed->id);
+        $this->assertNotNull($row);
+        $this->assertSame(4000, (int) ($row['ledger']['balance'] ?? 0));
+        $this->assertSame(1000, (int) ($row['ledger']['paid'] ?? 0));
+    }
 }

@@ -5,7 +5,7 @@ import { formatDate, formatDateTime, formatDepositAmount, formatMoney, formatNum
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
   Button, BackNavButton, StatusPill, MetricCardGrid, DetailList, SkeletonBlock, ErrorState, EmptyState,
-  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, IconAlert, PhoneActions,
+  RentalProgressBar, IconCash, IconWallet, IconClipboard, IconKey, IconAlert, IconTrash, PhoneActions,
   Sheet, SwitchField, TextAreaField, useToast,
 } from '@/shared/ui'
 import {
@@ -119,11 +119,28 @@ export function ContractDetailPage() {
     }
   }
 
+  const balanceDue = Number(ledger?.balance ?? 0)
+
   return (
     <div className="cd">
       <header className="cd-hero">
         <div className="cd-hero__top">
           <BackNavButton to="/bookings" label="رجوع للعقود" />
+          {isIntegrator ? (
+            <button
+              type="button"
+              className="rpm-icon-btn cd-hero__delete"
+              aria-label="حذف"
+              title="حذف"
+              onClick={() => {
+                void life.softDelete(row.id).then((ok) => {
+                  if (ok) navigate('/bookings', { replace: true })
+                })
+              }}
+            >
+              <IconTrash size={16} />
+            </button>
+          ) : null}
         </div>
         <div className="cd-identity">
           <div className="cd-identity__pills">
@@ -136,26 +153,32 @@ export function ContractDetailPage() {
             <span className="cd-code">{row.number}</span>
           </div>
           <div className="cd-identity__who">
-            <h1>{row.customer?.full_name || 'عقد'}</h1>
+            <div className="cd-identity__who-row">
+              <h1>{row.customer?.full_name || 'عقد'}</h1>
+              {row.customer?.phone ? (
+                <PhoneActions phone={row.customer.phone} name={row.customer.full_name} compact />
+              ) : null}
+            </div>
             <p>{vehicleLabel}</p>
           </div>
-          {row.customer?.phone ? (
-            <div className="cd-identity__phone">
-              <PhoneActions phone={row.customer.phone} name={row.customer.full_name} compact />
-            </div>
-          ) : null}
-          <RentalProgressBar progress={row.progress} />
+          <div className="cd-identity__progress">
+            <RentalProgressBar progress={row.progress} />
+            {balanceDue > 0 ? (
+              <div className="cd-deferred">
+                <span className="cd-deferred__label">فلوس متأجلة</span>
+                <strong className="cd-deferred__amount tabular-nums">{formatMoney(balanceDue)}</strong>
+                {row.balance_due_on ? (
+                  <span className="cd-deferred__due muted">استحقاق {formatDate(row.balance_due_on)}</span>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
         <ContractActionsBar
           contract={row}
           onApprove={() => void life.approve(row.id)}
           onAction={(kind) => void life.openAction(kind, row)}
           onPrint={(kind = 'contract') => openPrint(row.id, kind)}
-          onSoftDelete={isIntegrator ? () => {
-            void life.softDelete(row.id).then((ok) => {
-              if (ok) navigate('/bookings', { replace: true })
-            })
-          } : undefined}
         />
       </header>
       {printSheet}

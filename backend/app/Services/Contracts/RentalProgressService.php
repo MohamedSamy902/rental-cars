@@ -111,14 +111,14 @@ class RentalProgressService
             $tone = 'danger';
             $remainingLabel = "متأخر {$overdueDays} يوم";
             $percent = 100;
-            $message = "متأخر عن الموعد — ينتهي فعلياً بسبب: {$limitingLabel}.";
+            $message = 'متأخر عن الموعد.';
         } elseif ($remainingHours <= self::WARNING_HOURS) {
             $tone = 'warning';
             $remainingLabel = $this->formatRemaining($remainingHours);
-            $message = "قرب الانتهاء — ينتهي فعلياً بسبب: {$limitingLabel}.";
+            $message = 'قرب الانتهاء.';
         } else {
             $remainingLabel = $this->formatRemaining($remainingHours);
-            $message = "ينتهي فعلياً بسبب: {$limitingLabel}.";
+            $message = $remainingLabel;
         }
 
         if ($contract->status === 'pending' || $contract->status === 'approved') {

@@ -20,7 +20,7 @@ import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
 import './pages.css'
 
-const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed'] as const
+const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed', 'with_balance', 'cancelled'] as const
 
 type PageMeta = { current_page: number; last_page: number; total: number }
 const LIST_PER_PAGE = 50
@@ -33,7 +33,7 @@ export function BookingsPage() {
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
   const [summary, setSummary] = useState({
-    total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0, handover_today: 0,
+    total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0, handover_today: 0, with_balance: 0,
   })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: BookingsPageTabs, defaultValue: 'all' })
@@ -84,9 +84,15 @@ export function BookingsPage() {
         attentionLabel: attention.overdue_returns > 0 ? 'عقود متأخرة' : 'استلامات اليوم',
       },
       { id: 'completed', label: 'تم الاستلام' },
+      {
+        id: 'with_balance',
+        label: 'عليها فلوس',
+        attention: summary.with_balance > 0 ? ('warning' as const) : null,
+        attentionLabel: 'عقود بمتبقي على العميل',
+      },
       { id: 'cancelled', label: 'تم الإلغاء' },
     ],
-    [summary.pending, summary.upcoming, summary.handover_today, attention.pickups_today, attention.overdue_returns, attention.returning_today],
+    [summary.pending, summary.upcoming, summary.handover_today, summary.with_balance, attention.pickups_today, attention.overdue_returns, attention.returning_today],
   )
 
   async function load(nextPage = page) {
@@ -98,7 +104,7 @@ export function BookingsPage() {
       qs.set('page', String(nextPage))
       qs.set('per_page', String(LIST_PER_PAGE))
       if (search.trim()) qs.set('search', search.trim())
-      if (chip === 'upcoming' || chip === 'handover_today') {
+      if (chip === 'upcoming' || chip === 'handover_today' || chip === 'with_balance') {
         qs.set('tab', chip)
       } else if (chip !== 'all') {
         qs.set('status', chip)
@@ -120,6 +126,7 @@ export function BookingsPage() {
         completed: res.summary.completed ?? 0,
         upcoming: res.summary.upcoming ?? 0,
         handover_today: res.summary.handover_today ?? 0,
+        with_balance: res.summary.with_balance ?? 0,
       })
     } catch (e) {
       if (!isCurrent()) return
@@ -155,12 +162,10 @@ export function BookingsPage() {
       id: 'customer',
       header: 'العميل',
       cell: (b) => (
-        <div>
-          <strong className="rpm-table__primary">{b.customer?.full_name || '—'}</strong>
+        <div className="rpm-contract-customer">
+          <strong className="rpm-table__primary rpm-contract-customer__name">{b.customer?.full_name || '—'}</strong>
           {b.customer?.phone ? (
-            <div className="rpm-table__sub">
-              <PhoneActions phone={b.customer.phone} name={b.customer.full_name} compact />
-            </div>
+            <PhoneActions phone={b.customer.phone} name={b.customer.full_name} compact />
           ) : null}
         </div>
       ),
@@ -183,12 +188,21 @@ export function BookingsPage() {
     {
       id: 'period',
       header: 'الفترة',
-      cell: (b) => (
-        <>
-          <span className="rpm-table__primary">{formatDate(b.starts_at)}</span>
-          <span className="rpm-table__sub">حتى {formatDate(b.planned_ends_at)}</span>
-        </>
-      ),
+      cell: (b) => {
+        const deferred = Number(b.ledger?.balance ?? 0)
+        return (
+          <>
+            <span className="rpm-table__primary">{formatDate(b.starts_at)}</span>
+            <span className="rpm-table__sub">حتى {formatDate(b.planned_ends_at)}</span>
+            {deferred > 0 ? (
+              <span className="rpm-table__sub rpm-contract-deferred">
+                متأجل {formatMoney(deferred)}
+                {b.balance_due_on ? ` · ${formatDate(b.balance_due_on)}` : ''}
+              </span>
+            ) : null}
+          </>
+        )
+      },
       sortValue: (b) => b.starts_at,
       wide: true,
     },

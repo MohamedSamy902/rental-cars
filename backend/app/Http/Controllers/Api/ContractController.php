@@ -14,6 +14,7 @@ use App\Models\Payment;
 use App\Models\TenantSetting;
 use App\Models\Violation;
 use App\Services\Contracts\ContractDossierService;
+use App\Services\Contracts\ContractLedgerMath;
 use App\Services\Contracts\ContractLifecycleService;
 use App\Services\Contracts\ContractSoftDeleteService;
 use App\Services\Contracts\RentalProgressService;
@@ -32,6 +33,7 @@ class ContractController extends Controller
         private readonly RentalProgressService $progress,
         private readonly DocumentTemplateService $documentTemplates,
         private readonly ContractSoftDeleteService $softDelete,
+        private readonly ContractLedgerMath $ledgerMath,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -58,6 +60,8 @@ class ContractController extends Controller
             } elseif ($tab === 'handover_today') {
                 $q->whereIn('status', ['pending', 'approved'])
                     ->whereDate('starts_at', now()->toDateString());
+            } elseif ($tab === 'with_balance') {
+                $this->scopeWithOutstandingBalance($q);
             }
         }
         if ($search = $request->string('search')->toString()) {
@@ -83,8 +87,9 @@ class ContractController extends Controller
                 ->groupBy('contract_id')
                 ->get()
                 ->keyBy('contract_id');
+        $paymentNets = $this->paymentNetsFor($contractIds);
 
-        $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals, $user) {
+        $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals, $paymentNets, $user) {
             $arr = $c->toArray();
             if (isset($arr['customer']) && is_array($arr['customer'])) {
                 $arr['customer'] = Customer::normalizeDateOnlyFields($arr['customer']);
@@ -97,6 +102,13 @@ class ContractController extends Controller
             $agg = $openViolationTotals->get($c->id);
             $arr['open_violations_total'] = (int) ($agg->total_amount ?? 0);
             $arr['open_violations_count'] = (int) ($agg->cnt ?? 0);
+            $total = $this->ledgerMath->chargeTotal($c);
+            $paid = (int) ($paymentNets[$c->id] ?? 0);
+            $arr['ledger'] = [
+                'contract_total' => $total,
+                'paid' => $paid,
+                'balance' => max(0, $total - $paid),
+            ];
 
             return VehicleOwnerVisibility::redactEmbedded(NestedCustomerRedactor::contract($arr, $user), $user);
         })->all();
@@ -125,8 +137,69 @@ class ContractController extends Controller
                     ->whereIn('status', ['pending', 'approved'])
                     ->whereDate('starts_at', $today)
                     ->count(),
+                'with_balance' => $this->countWithOutstandingBalance(),
             ],
         ]);
+    }
+
+    /**
+     * @param  list<int|string>  $contractIds
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    private function paymentNetsFor(array $contractIds): \Illuminate\Support\Collection
+    {
+        if ($contractIds === []) {
+            return collect();
+        }
+
+        return Payment::query()
+            ->where('link_type', 'contract')
+            ->whereIn('link_id', $contractIds)
+            ->groupBy('link_id')
+            ->selectRaw("link_id, SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) as net")
+            ->pluck('net', 'link_id')
+            ->mapWithKeys(fn ($net, $id) => [(int) $id => (int) $net]);
+    }
+
+    /**
+     * Approximate outstanding rent balance using stored totals (same floor as notifications).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Contract>  $q
+     */
+    private function scopeWithOutstandingBalance($q): void
+    {
+        // SQLite (tests) lacks GREATEST — use CASE for max(0, period charge).
+        $periodCharge = 'COALESCE(period_rent, 0)
+            + COALESCE(prepaid_excess_km_amount, 0)
+            + COALESCE(excess_km_amount, 0)
+            + COALESCE(damage_fee, 0)
+            + COALESCE(other_fees, 0)
+            + COALESCE(delivery_service_fee, 0)
+            + COALESCE(frozen_operating_insurance_fee, 0)
+            - COALESCE(discount, 0)';
+
+        $q->whereIn('status', ['pending', 'approved', 'active', 'completed'])
+            ->whereRaw(
+                "(CASE
+                    WHEN COALESCE(final_total, 0) > 0 THEN final_total
+                    WHEN ({$periodCharge}) > 0 THEN ({$periodCharge})
+                    ELSE 0
+                END) > COALESCE((
+                    SELECT SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END)
+                    FROM payments
+                    WHERE payments.link_type = 'contract'
+                      AND payments.link_id = contracts.id
+                      AND payments.deleted_at IS NULL
+                ), 0)"
+            );
+    }
+
+    private function countWithOutstandingBalance(): int
+    {
+        $q = Contract::query();
+        $this->scopeWithOutstandingBalance($q);
+
+        return (int) $q->count();
     }
 
     public function store(StoreContractRequest $request): JsonResponse
