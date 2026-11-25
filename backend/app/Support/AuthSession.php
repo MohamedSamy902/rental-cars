@@ -30,7 +30,8 @@ final class AuthSession
 
     public static function touch(mixed $token, ?User $user): void
     {
-        if (! $token instanceof PersonalAccessToken) {
+        // تجاهل TransientToken / موك اختبارات Sanctum::actingAs (بلا صف حقيقي في DB).
+        if (! $token instanceof PersonalAccessToken || ! $token->exists || ! $token->getKey()) {
             return;
         }
 
