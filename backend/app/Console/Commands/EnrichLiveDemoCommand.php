@@ -129,13 +129,14 @@ class EnrichLiveDemoCommand extends Command
     }
 
     /**
-     * يملأ period_rent للعقود النشطة/المكتملة إن كان فارغاً حتى تُحسب شرائح الإيجار.
+     * يملأ period_rent للعقود المكتملة فقط إن كان فارغاً — بشرائح ن٫٥ (يومي/نص شهري/شهري).
+     * العقود النشطة تُحسب حيّاً من الأسعار المجمّدة؛ ممنوع ختم أيام×يومي عليها.
      */
     private function ensurePeriodRent(ContractPricingService $pricing): int
     {
         $n = 0;
         Contract::query()
-            ->whereIn('status', ['active', 'completed'])
+            ->where('status', 'completed')
             ->where(function ($q) {
                 $q->whereNull('period_rent')->orWhere('period_rent', '<=', 0);
             })
@@ -149,18 +150,29 @@ class EnrichLiveDemoCommand extends Command
                 if (! $start || ! $end || $rate <= 0 || $end <= $start) {
                     return;
                 }
-                $days = $pricing->countRentalDays($start, $end);
-                $rent = max(0, $days * $rate);
+                $days = max(1, (int) ($c->approved_days ?: $pricing->countRentalDays($start, $end)));
+                $rent = $pricing->periodRent(
+                    $days,
+                    (string) ($c->rent_basis ?? ContractPricingService::BASIS_DAILY),
+                    $rate,
+                    $c->frozen_half_monthly_rate !== null ? (int) $c->frozen_half_monthly_rate : null,
+                    $c->frozen_monthly_rate !== null ? (int) $c->frozen_monthly_rate : null,
+                );
                 if ($rent <= 0) {
                     return;
                 }
                 $c->period_rent = $rent;
-                if ($c->status === 'completed' && (int) ($c->final_total ?? 0) <= 0) {
-                    $c->final_total = $rent
-                        + (int) ($c->excess_km_fee ?? 0)
-                        + (int) ($c->damage_fee ?? 0)
-                        + (int) ($c->other_fees ?? 0)
-                        - (int) ($c->discount ?? 0);
+                if ((int) ($c->final_total ?? 0) <= 0) {
+                    $c->final_total = (int) round($pricing->finalTotal([
+                        'period_rent' => $rent,
+                        'discount' => (int) ($c->discount ?? 0),
+                        'prepaid_excess_km_fee' => (int) ($c->prepaid_excess_km_amount ?? 0),
+                        'excess_km_fee' => (int) ($c->excess_km_amount ?? 0),
+                        'damage_fee' => (int) ($c->damage_fee ?? 0),
+                        'operating_insurance_fee' => (int) ($c->frozen_operating_insurance_fee ?? 0),
+                        'other_fees' => (int) ($c->other_fees ?? 0),
+                        'delivery_service_fee' => (int) ($c->delivery_service_fee ?? 0),
+                    ]));
                 }
                 $c->save();
                 $n++;

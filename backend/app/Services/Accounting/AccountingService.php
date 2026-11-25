@@ -211,17 +211,7 @@ class AccountingService
             return 0;
         }
 
-        $periodRent = (int) ($contract->period_rent ?? 0);
-        if ($periodRent <= 0) {
-            $days = $this->pricing->countRentalDays($start, $end);
-            $periodRent = $this->pricing->periodRent(
-                $days,
-                (string) ($contract->rent_basis ?? \App\Services\Contracts\ContractPricingService::BASIS_DAILY),
-                $rate,
-                $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
-                $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
-            );
-        }
+        $periodRent = $this->resolvePeriodRentAmount($contract, $start, $end, $rate);
         if ($periodRent <= 0) {
             return 0;
         }
@@ -233,6 +223,33 @@ class AccountingService
         }
 
         return 0;
+    }
+
+    /**
+     * Completed contracts keep locked period_rent; open ones always use ن٫٥ live tiers.
+     */
+    private function resolvePeriodRentAmount(
+        Contract $contract,
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+        int $dailyRate,
+    ): int {
+        if ((string) $contract->status === 'completed') {
+            $stored = (int) ($contract->period_rent ?? 0);
+            if ($stored > 0) {
+                return $stored;
+            }
+        }
+
+        $days = max(1, (int) ($contract->approved_days ?: $this->pricing->countRentalDays($start, $end)));
+
+        return $this->pricing->periodRent(
+            $days,
+            (string) ($contract->rent_basis ?? \App\Services\Contracts\ContractPricingService::BASIS_DAILY),
+            $dailyRate,
+            $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
+            $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
+        );
     }
 
     /**
@@ -350,17 +367,12 @@ class AccountingService
             return 0;
         }
 
-        $periodRent = (int) ($contract->period_rent ?? 0);
-        if ($periodRent <= 0) {
-            $days = $this->pricing->countRentalDays($start, $end);
-            $periodRent = $this->pricing->periodRent(
-                $days,
-                (string) ($contract->rent_basis ?? \App\Services\Contracts\ContractPricingService::BASIS_DAILY),
-                (int) $contract->frozen_daily_rate,
-                $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
-                $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
-            );
-        }
+        $periodRent = $this->resolvePeriodRentAmount(
+            $contract,
+            $start,
+            $end,
+            (int) $contract->frozen_daily_rate,
+        );
         if ($periodRent <= 0) {
             return 0;
         }

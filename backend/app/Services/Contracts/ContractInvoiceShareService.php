@@ -16,7 +16,10 @@ use Carbon\CarbonInterface;
  */
 class ContractInvoiceShareService
 {
-    public function __construct(private readonly PublicMediaLinkService $links) {}
+    public function __construct(
+        private readonly PublicMediaLinkService $links,
+        private readonly ContractLedgerMath $ledgerMath,
+    ) {}
 
     /**
      * @return array{share_url: string, message_text: string, customer_phone: ?string, expires_in_days: int, invoice_number: string}
@@ -407,18 +410,10 @@ HTML;
      */
     private function totals(Contract $contract): array
     {
-        $days = $this->rentalDays($contract);
-        $daily = (int) ($contract->frozen_daily_rate ?? 0);
-        $rent = $contract->period_rent != null ? (int) $contract->period_rent : $days * $daily;
-        $prepaidAmt = (int) ($contract->prepaid_excess_km_amount ?? 0);
-        $excessAmt = (int) ($contract->excess_km_amount ?? 0);
-        $other = (int) ($contract->other_fees ?? 0);
-        $damage = (int) ($contract->damage_fee ?? 0);
-        $delivery = (int) ($contract->delivery_service_fee ?? 0);
-        $discount = (int) ($contract->discount ?? 0);
-        $total = $contract->final_total != null
-            ? (int) $contract->final_total
-            : max(0, $rent + $prepaidAmt + $excessAmt + $other + $damage + $delivery - $discount);
+        $rent = $this->ledgerMath->trustStoredPeriodRent($contract)
+            ? (int) $contract->period_rent
+            : $this->ledgerMath->livePeriodRent($contract);
+        $total = $this->ledgerMath->chargeTotal($contract);
 
         $payments = Payment::query()
             ->where('link_type', 'contract')

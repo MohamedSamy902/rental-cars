@@ -47,7 +47,9 @@ class ContractLedgerMath
 
         $prepaid = (int) ($contract->prepaid_excess_km_amount ?? 0);
 
-        if ($contract->period_rent !== null && (int) $contract->period_rent > 0) {
+        // period_rent is locked at close. Before that, never trust a stored value —
+        // post-deploy enrich used to stamp days×daily and desync from monthly tiers.
+        if ($this->trustStoredPeriodRent($contract)) {
             return (int) $contract->period_rent
                 + $prepaid
                 + (int) $contract->excess_km_amount
@@ -58,6 +60,32 @@ class ContractLedgerMath
                 - (int) $contract->discount;
         }
 
+        $rent = $this->livePeriodRent($contract);
+
+        return $rent
+            + $prepaid
+            + (int) $contract->other_fees
+            + (int) ($contract->delivery_service_fee ?? 0)
+            - (int) $contract->discount;
+    }
+
+    /**
+     * Stored period_rent is authoritative only after the contract is completed.
+     */
+    public function trustStoredPeriodRent(Contract $contract): bool
+    {
+        if ((string) $contract->status !== 'completed') {
+            return false;
+        }
+
+        return $contract->period_rent !== null && (int) $contract->period_rent > 0;
+    }
+
+    /**
+     * Open-contract rent from frozen rates + billable days (ن٫٥ tiers).
+     */
+    public function livePeriodRent(Contract $contract): int
+    {
         $days = max(0, (int) ($contract->approved_days ?? 0));
         if ($days <= 0 && $contract->starts_at && $contract->planned_ends_at) {
             $ops = TenantSetting::query()->first()?->operational ?? [];
@@ -69,19 +97,14 @@ class ContractLedgerMath
             );
         }
         $days = max(1, $days);
-        $rent = $this->pricing->periodRent(
+
+        return $this->pricing->periodRent(
             $days,
             (string) ($contract->rent_basis ?? ContractPricingService::BASIS_DAILY),
             (int) $contract->frozen_daily_rate,
             $contract->frozen_half_monthly_rate !== null ? (int) $contract->frozen_half_monthly_rate : null,
             $contract->frozen_monthly_rate !== null ? (int) $contract->frozen_monthly_rate : null,
         );
-
-        return $rent
-            + $prepaid
-            + (int) $contract->other_fees
-            + (int) ($contract->delivery_service_fee ?? 0)
-            - (int) $contract->discount;
     }
 
     public function remainingCollectible(Contract $contract): int

@@ -1056,7 +1056,8 @@ class DueNotificationService
             return (int) $contract->final_total;
         }
 
-        if ($contract->period_rent !== null) {
+        // بعد الإقفال فقط نثق بـ period_rent المخزّن؛ قبله الحساب الحيّ (ن٫٥).
+        if ((string) $contract->status === 'completed' && $contract->period_rent !== null) {
             return max(0, (int) $contract->period_rent
                 - (int) $contract->discount
                 + (int) ($contract->excess_km_amount ?? 0)
