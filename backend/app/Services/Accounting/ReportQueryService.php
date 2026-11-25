@@ -37,9 +37,9 @@ class ReportQueryService
         $from = $from?->copy()->startOfDay();
         $to = $to?->copy()->endOfDay();
 
-        return Account::query()->orderBy('code')->get()->map(function (Account $account) use ($from, $to) {
-            $q = JournalLine::query()->where('account_id', $account->id);
-            if ($from || $to) {
+        $sums = JournalLine::query()
+            ->selectRaw('account_id, SUM(debit) as debit_sum, SUM(credit) as credit_sum')
+            ->when($from || $to, function ($q) use ($from, $to) {
                 $q->whereHas('entry', function ($eq) use ($from, $to) {
                     if ($from) {
                         $eq->where('entry_date', '>=', $from);
@@ -48,9 +48,15 @@ class ReportQueryService
                         $eq->where('entry_date', '<=', $to);
                     }
                 });
-            }
-            $debit = (int) (clone $q)->sum('debit');
-            $credit = (int) (clone $q)->sum('credit');
+            })
+            ->groupBy('account_id')
+            ->get()
+            ->keyBy('account_id');
+
+        return Account::query()->orderBy('code')->get()->map(function (Account $account) use ($sums) {
+            $row = $sums->get($account->id);
+            $debit = (int) ($row->debit_sum ?? 0);
+            $credit = (int) ($row->credit_sum ?? 0);
 
             return [
                 'code' => $account->code,

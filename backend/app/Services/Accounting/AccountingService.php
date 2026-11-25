@@ -25,6 +25,9 @@ use Illuminate\Support\Facades\DB;
 
 class AccountingService
 {
+    /** @var array<string, Account>|null */
+    private ?array $chartByCode = null;
+
     public function __construct(
         private readonly MonthAllocationService $allocation,
         private readonly ContractPricingService $pricing,
@@ -37,6 +40,10 @@ class AccountingService
      */
     public function ensureChartOfAccounts(): array
     {
+        if ($this->chartByCode !== null) {
+            return array_values($this->chartByCode);
+        }
+
         $defs = [
             ['code' => '1000', 'name' => 'الصندوق', 'type' => 'asset'],
             ['code' => '1100', 'name' => 'البنك', 'type' => 'asset'],
@@ -65,7 +72,22 @@ class AccountingService
             );
         }
 
+        $this->chartByCode = [];
+        foreach ($rows as $row) {
+            $this->chartByCode[$row->code] = $row;
+        }
+
         return $rows;
+    }
+
+    public function accountByCode(string $code): Account
+    {
+        $this->ensureChartOfAccounts();
+        if ($this->chartByCode === null || ! isset($this->chartByCode[$code])) {
+            return Account::query()->where('code', $code)->firstOrFail();
+        }
+
+        return $this->chartByCode[$code];
     }
 
     /**
@@ -252,7 +274,7 @@ class AccountingService
             $existing = JournalEntry::query()->where('source', $source)->lockForUpdate()->first();
             $primaryCredit = 0;
             if ($existing) {
-                $rent = Account::query()->where('code', '4000')->firstOrFail();
+                $rent = $this->accountByCode('4000');
                 $primaryCredit = (int) JournalLine::query()
                     ->where('journal_entry_id', $existing->id)
                     ->where('account_id', $rent->id)
@@ -266,8 +288,8 @@ class AccountingService
             }
 
             $delta = $targetPrimary - $primaryCredit;
-            $ar = Account::query()->where('code', '1200')->firstOrFail();
-            $rent = Account::query()->where('code', '4000')->firstOrFail();
+            $ar = $this->accountByCode('1200');
+            $rent = $this->accountByCode('4000');
 
             if (! $existing) {
                 $existing = JournalEntry::query()->create([
@@ -371,7 +393,7 @@ class AccountingService
     /** Net rent income (credit − debit) for a contract/month after primary + adjustment entries. */
     public function rentRecognizedNet(int $contractId, int $year, int $month): int
     {
-        $rent = Account::query()->where('code', '4000')->firstOrFail();
+        $rent = $this->accountByCode('4000');
         $sources = [
             sprintf('rent_recog:%d:%04d-%02d', $contractId, $year, $month),
             sprintf('rent_recog_adj:%d:%04d-%02d', $contractId, $year, $month),
@@ -393,7 +415,7 @@ class AccountingService
 
     public function rentRecognitionAdjustmentDebits(int $contractId, int $year, int $month): int
     {
-        $rent = Account::query()->where('code', '4000')->firstOrFail();
+        $rent = $this->accountByCode('4000');
         $adj = JournalEntry::query()
             ->where('source', sprintf('rent_recog_adj:%d:%04d-%02d', $contractId, $year, $month))
             ->first();
@@ -439,8 +461,8 @@ class AccountingService
             ]);
         }
 
-        $rent = Account::query()->where('code', '4000')->firstOrFail();
-        $ar = Account::query()->where('code', '1200')->firstOrFail();
+        $rent = $this->accountByCode('4000');
+        $ar = $this->accountByCode('1200');
 
         JournalLine::query()->create([
             'journal_entry_id' => $adj->id,
@@ -523,12 +545,12 @@ class AccountingService
                 'posted_by' => $userId,
             ]);
 
-            $ar = Account::query()->where('code', '1200')->firstOrFail();
-            $rent = Account::query()->where('code', '4000')->firstOrFail();
-            $excess = Account::query()->where('code', '4100')->firstOrFail();
-            $damage = Account::query()->where('code', '4200')->firstOrFail();
-            $fees = Account::query()->where('code', '4300')->firstOrFail();
-            $delivery = Account::query()->where('code', '4400')->firstOrFail();
+            $ar = $this->accountByCode('1200');
+            $rent = $this->accountByCode('4000');
+            $excess = $this->accountByCode('4100');
+            $damage = $this->accountByCode('4200');
+            $fees = $this->accountByCode('4300');
+            $delivery = $this->accountByCode('4400');
 
             // Prepaid package + additional excess beyond it both credit إيراد كيلومترات زيادة.
             $excessRevenue = (int) ($contract->prepaid_excess_km_amount ?? 0) + (int) $contract->excess_km_amount;
@@ -603,8 +625,8 @@ class AccountingService
         $dt = new \DateTimeImmutable($date);
         $this->assertMonthOpen((int) $dt->format('Y'), (int) $dt->format('n'));
 
-        $expense = Account::query()->where('code', '5300')->firstOrFail();
-        $inventory = Account::query()->where('code', '1400')->firstOrFail();
+        $expense = $this->accountByCode('5300');
+        $inventory = $this->accountByCode('1400');
         // source must be unique (idempotency key) — never reuse a bare type string
         $source = $sourceKey
             ? (str_starts_with($sourceKey, 'inventory_usage:') ? $sourceKey : 'inventory_usage:'.$sourceKey)
@@ -671,7 +693,7 @@ class AccountingService
                 'is_active' => true,
             ],
         );
-        $custody = Account::query()->where('code', '1500')->firstOrFail();
+        $custody = $this->accountByCode('1500');
         $source = $sourceKey
             ? (str_starts_with($sourceKey, 'custody_spend:') ? $sourceKey : 'custody_spend:'.$sourceKey)
             : 'custody_spend:'.uniqid('', true);
@@ -977,8 +999,8 @@ class AccountingService
             if ($existing) {
                 return $existing;
             }
-            $debit = Account::query()->where('code', $debitCode)->firstOrFail();
-            $credit = Account::query()->where('code', $creditCode)->firstOrFail();
+            $debit = $this->accountByCode($debitCode);
+            $credit = $this->accountByCode($creditCode);
             $entry = JournalEntry::query()->create([
                 'entry_date' => $date,
                 'narration' => $narration,
@@ -1019,8 +1041,8 @@ class AccountingService
         }
 
         $cashCode = $this->methods->cashAccountCode((string) $payment->method);
-        $cash = Account::query()->where('code', $cashCode)->firstOrFail();
-        $ar = Account::query()->where('code', '1200')->firstOrFail();
+        $cash = $this->accountByCode($cashCode);
+        $ar = $this->accountByCode('1200');
         $amount = (int) $payment->amount;
         $date = $payment->paid_at?->toDateString() ?? now()->toDateString();
 

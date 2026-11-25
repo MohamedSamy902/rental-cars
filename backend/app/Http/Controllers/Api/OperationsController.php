@@ -62,58 +62,58 @@ class OperationsController extends Controller
             ? trim((string) $ops['print_phone'])
             : (string) config('rpm.center_public_phone', '01125253888');
 
-        $rows = Vehicle::query()->where('is_active', true)->orderBy('brand')->orderBy('model')->get()
-            ->map(function (Vehicle $v) use ($activeIds, $reservedIds, $halfMonthlyFactor, $monthlyFactor) {
-                $status = $this->availability->statusOnDate([
-                    'manual_status' => $v->manual_status,
-                    'has_active_handover' => $activeIds->has($v->id),
-                    'has_approved_covering_date' => $reservedIds->has($v->id),
-                    'open_work_order_blocks' => $v->manual_status === 'maintenance'
-                        || WorkOrder::query()
-                            ->where('vehicle_id', $v->id)
-                            ->where('puts_in_maintenance', true)
-                            ->whereIn('status', ['open', 'in_progress'])
-                            ->exists(),
-                ]);
+        $fleet = Vehicle::query()->where('is_active', true)->orderBy('brand')->orderBy('model')->get();
+        $blockingWo = WorkOrder::query()
+            ->where('puts_in_maintenance', true)
+            ->whereIn('status', ['open', 'in_progress'])
+            ->pluck('vehicle_id')
+            ->flip();
+        $returningByVehicle = Contract::query()
+            ->whereIn('status', ['active', 'approved'])
+            ->whereIn('vehicle_id', $fleet->pluck('id')->all() ?: [0])
+            ->orderBy('planned_ends_at')
+            ->get(['vehicle_id', 'planned_ends_at'])
+            ->groupBy('vehicle_id')
+            ->map(fn ($group) => $group->first()->planned_ends_at);
 
-                $returning = null;
-                if ($status !== 'available') {
-                    $returning = Contract::query()
-                        ->where('vehicle_id', $v->id)
-                        ->whereIn('status', ['active', 'approved'])
-                        ->orderBy('planned_ends_at')
-                        ->value('planned_ends_at');
-                }
+        $rows = $fleet->map(function (Vehicle $v) use ($activeIds, $reservedIds, $halfMonthlyFactor, $monthlyFactor, $blockingWo, $returningByVehicle) {
+            $status = $this->availability->statusOnDate([
+                'manual_status' => $v->manual_status,
+                'has_active_handover' => $activeIds->has($v->id),
+                'has_approved_covering_date' => $reservedIds->has($v->id),
+                'open_work_order_blocks' => $v->manual_status === 'maintenance' || $blockingWo->has($v->id),
+            ]);
 
-                $daily = (int) $v->daily_rate;
-                $half = $v->half_monthly_rate !== null
-                    ? (int) $v->half_monthly_rate
-                    : (int) round($daily * $halfMonthlyFactor);
-                $monthly = $v->monthly_rate !== null
-                    ? (int) $v->monthly_rate
-                    : (int) round($daily * $monthlyFactor);
+            $returning = $status !== 'available' ? $returningByVehicle->get($v->id) : null;
 
-                return [
-                    'id' => $v->id,
-                    'brand' => $v->brand,
-                    'model' => $v->model,
-                    'year' => $v->year,
-                    'category' => $v->category,
-                    'fuel_type' => $v->fuel_type,
-                    'transmission' => $v->transmission,
-                    'color' => $v->color,
-                    'seats' => $v->seats,
-                    'plate' => $v->plate,
-                    'daily_rate' => $daily,
-                    'half_monthly_rate' => $half,
-                    'monthly_rate' => $monthly,
-                    'default_deposit' => (int) $v->default_deposit,
-                    'status' => $status,
-                    'available' => $status === 'available',
-                    'returning_on' => $returning?->toDateString(),
-                ];
-            })
-            ->values();
+            $daily = (int) $v->daily_rate;
+            $half = $v->half_monthly_rate !== null
+                ? (int) $v->half_monthly_rate
+                : (int) round($daily * $halfMonthlyFactor);
+            $monthly = $v->monthly_rate !== null
+                ? (int) $v->monthly_rate
+                : (int) round($daily * $monthlyFactor);
+
+            return [
+                'id' => $v->id,
+                'brand' => $v->brand,
+                'model' => $v->model,
+                'year' => $v->year,
+                'category' => $v->category,
+                'fuel_type' => $v->fuel_type,
+                'transmission' => $v->transmission,
+                'color' => $v->color,
+                'seats' => $v->seats,
+                'plate' => $v->plate,
+                'daily_rate' => $daily,
+                'half_monthly_rate' => $half,
+                'monthly_rate' => $monthly,
+                'default_deposit' => (int) $v->default_deposit,
+                'status' => $status,
+                'available' => $status === 'available',
+                'returning_on' => $returning?->toDateString(),
+            ];
+        })->values();
 
         $minRentalDays = is_numeric($ops['default_min_days'] ?? null)
             ? max(1, (int) $ops['default_min_days'])

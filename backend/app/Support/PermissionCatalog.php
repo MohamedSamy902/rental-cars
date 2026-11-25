@@ -129,7 +129,21 @@ class PermissionCatalog
 
     public static function ensureSeeded(): void
     {
-        foreach (self::definitions() as $def) {
+        $defs = self::definitions();
+        $roleNames = [
+            'super_admin', 'ops_manager', 'sales', 'fleet',
+            'maintenance', 'accounts', 'hr', 'viewer',
+        ];
+
+        // مسار ساخن: كتالوج مكتمل — استعلاما عدّ فقط بدل عشرات firstOrCreate.
+        if (
+            Permission::query()->count() >= count($defs)
+            && Role::query()->whereIn('name', $roleNames)->count() >= count($roleNames)
+        ) {
+            return;
+        }
+
+        foreach ($defs as $def) {
             Permission::query()->firstOrCreate(
                 ['key' => $def['key']],
                 ['label' => $def['label'], 'module' => $def['module']],
