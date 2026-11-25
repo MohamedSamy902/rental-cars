@@ -291,7 +291,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       const a = new Date(form.starts_at)
       const b = new Date(form.planned_ends_at)
       if (!Number.isNaN(a.getTime()) && !Number.isNaN(b.getTime()) && b > a) {
-        days = Math.max(1, Math.ceil((b.getTime() - a.getTime()) / 86400000))
+        // مطابقة عدّ الأيام في الباكند: أيام كاملة (floor) بلا ceil
+        days = Math.max(1, Math.floor((b.getTime() - a.getTime()) / 86400000))
       }
     }
     const excessRate = Number(form.excess_km_rate || 0)
@@ -390,7 +391,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     const b = new Date(form.planned_ends_at)
     if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b <= a) return 0
     const ms = b.getTime() - a.getTime()
-    return Math.max(1, Math.ceil(ms / 86400000))
+    // مطابقة ن٫٢ / ContractPricingService::countRentalDays — أيام كاملة بلا ceil
+    return Math.max(1, Math.floor(ms / 86400000))
   }, [form.starts_at, form.planned_ends_at])
 
   const rentTier = useMemo(() => resolveRentTier(estimatedDays), [estimatedDays])
