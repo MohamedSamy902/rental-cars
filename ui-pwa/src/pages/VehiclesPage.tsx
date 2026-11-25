@@ -29,7 +29,7 @@ const SIM_RECHARGE_PRESETS = [3, 7, 14, 30] as const
 const SIM_RECHARGE_DEFAULT_DAYS = 14
 const OWNER_AGREEMENT_PRESETS = [7, 14, 30] as const
 const OWNER_AGREEMENT_DEFAULT_DAYS = 30
-const LIST_PER_PAGE = 50
+const LIST_PER_PAGE = 20
 
 function addDaysIso(base: string, days: number): string {
   return addCivilDays(base, days)
@@ -635,7 +635,7 @@ export function VehiclesPage() {
         chips={chips}
         activeChip={chip}
         onChipChange={(id) => { setChip(id); setPage(1) }}
-        placeholder="بحث بالكود أو اللوحة أو الموديل…"
+        placeholder="بحث بالكود أو اللوحة أو الموديل أو المالك…"
       />
 
       {chip === 'expiring' ? (
