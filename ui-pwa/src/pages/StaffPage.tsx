@@ -118,6 +118,17 @@ export function StaffPage() {
     [roles, selectedRoleId],
   )
 
+  /** أدوار شاشة الموظفين — بدون المدير الأعلى (حسابات نظام فقط). */
+  const assignableRoles = useMemo(
+    () => roles.filter((r) => r.name !== 'super_admin'),
+    [roles],
+  )
+
+  const defaultAssignableRoleId = useMemo(() => {
+    const ops = assignableRoles.find((r) => r.name === 'ops_manager')
+    return String((ops ?? assignableRoles[0])?.id ?? '')
+  }, [assignableRoles])
+
   async function loadUsers(q = search) {
     const qs = new URLSearchParams()
     if (q.trim()) qs.set('search', q.trim())
@@ -181,7 +192,7 @@ export function StaffPage() {
     setEditingUser(null)
     setUserForm({
       ...emptyUserForm,
-      role_id: roles[0] ? String(roles[0].id) : '',
+      role_id: defaultAssignableRoleId,
       hired_on: todayCivilIso(),
     })
     setUserErrors({})
@@ -724,7 +735,7 @@ export function StaffPage() {
           <SelectField
             label="الدور"
             required
-            options={roles.map((r) => ({ value: String(r.id), label: r.label }))}
+            options={assignableRoles.map((r) => ({ value: String(r.id), label: r.label }))}
             value={userForm.role_id}
             error={userErrors.role_id}
             onChange={(e) => setUserForm({ ...userForm, role_id: e.target.value })}

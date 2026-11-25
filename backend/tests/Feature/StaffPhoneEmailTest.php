@@ -100,11 +100,12 @@ class StaffPhoneEmailTest extends TestCase
 
     public function test_employee_show_dossier_still_works(): void
     {
+        $ops = Role::query()->where('name', 'ops_manager')->firstOrFail();
         $created = $this->postJson('/api/staff', [
             'name' => 'سارة للتفاصيل',
             'phone' => '01055556666',
             'password' => 'password',
-            'role_id' => $this->adminRole->id,
+            'role_id' => $ops->id,
             'create_employee' => true,
             'base_salary' => 8000,
         ])->assertCreated()->json('data');

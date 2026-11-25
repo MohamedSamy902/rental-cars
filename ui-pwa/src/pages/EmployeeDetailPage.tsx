@@ -94,12 +94,26 @@ export function EmployeeDetailPage() {
   const [assignOpen, setAssignOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', job_title: '', hired_on: '', base_salary: '', status: 'active' })
-  const [accountForm, setAccountForm] = useState({ name: '', phone: '', email: '', is_active: true })
+  const [accountForm, setAccountForm] = useState({ name: '', phone: '', email: '', role_id: '', is_active: true })
   const [accountErrors, setAccountErrors] = useState<Record<string, string>>({})
+  const [roleOptions, setRoleOptions] = useState<Array<{ value: string; label: string }>>([])
   const [passwordForm, setPasswordForm] = useState({ password: '', password_confirmation: '' })
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
   const [advanceForm, setAdvanceForm] = useState({ amount: '', advanced_on: todayCivilIso(), method: 'cash', notes: '' })
   const [assignForm, setAssignForm] = useState({ notes: '', handed_on: todayCivilIso() })
+
+  async function loadRoles() {
+    try {
+      const res = await api<{ data: { roles: Array<{ id: number; name: string; label: string }> } }>('/roles')
+      setRoleOptions(
+        (res.data.roles || [])
+          .filter((r) => r.name !== 'super_admin')
+          .map((r) => ({ value: String(r.id), label: r.label })),
+      )
+    } catch {
+      setRoleOptions([])
+    }
+  }
 
   async function load() {
     if (!id) return
@@ -122,6 +136,7 @@ export function EmployeeDetailPage() {
           name: u.name,
           phone: u.phone || '',
           email: u.email || '',
+          role_id: u.role?.id ? String(u.role.id) : '',
           is_active: u.is_active,
         })
       }
@@ -133,6 +148,7 @@ export function EmployeeDetailPage() {
   }
 
   useEffect(() => { void load() }, [id])
+  useEffect(() => { void loadRoles() }, [])
 
   async function saveEmployee() {
     if (!data) return
@@ -163,14 +179,18 @@ export function EmployeeDetailPage() {
     setSaving(true)
     setAccountErrors({})
     try {
+      const payload: Record<string, unknown> = {
+        name: accountForm.name,
+        phone: (accountForm.phone || '').trim(),
+        email: (accountForm.email || '').trim() || null,
+        is_active: accountForm.is_active,
+      }
+      if (accountForm.role_id) {
+        payload.role_id = Number(accountForm.role_id)
+      }
       await api(`/staff/${data.user.id}`, {
         method: 'PUT',
-        json: {
-          name: accountForm.name,
-          phone: (accountForm.phone || '').trim(),
-          email: (accountForm.email || '').trim() || null,
-          is_active: accountForm.is_active,
-        },
+        json: payload,
       })
       toast.success('تم تحديث حساب الدخول.')
       setAccountOpen(false)
@@ -179,6 +199,7 @@ export function EmployeeDetailPage() {
       const err = e as ApiError
       const next: Record<string, string> = {}
       if (err.errors) for (const [k, v] of Object.entries(err.errors)) next[k] = v[0]
+      if (!Object.keys(next).length && err.message) next.role_id = err.message
       setAccountErrors(next)
       toast.error(err.message)
     } finally {
@@ -199,9 +220,12 @@ export function EmployeeDetailPage() {
     }
     setSaving(true)
     try {
-      await api(`/staff/${data.user.id}`, {
-        method: 'PUT',
-        json: { password: passwordForm.password },
+      await api(`/staff/${data.user.id}/password`, {
+        method: 'POST',
+        json: {
+          password: passwordForm.password,
+          password_confirmation: passwordForm.password_confirmation,
+        },
       })
       toast.success('تم تحديث كلمة المرور.')
       setPasswordOpen(false)
@@ -210,6 +234,9 @@ export function EmployeeDetailPage() {
       const err = e as ApiError
       const next: Record<string, string> = {}
       if (err.errors) for (const [k, v] of Object.entries(err.errors)) next[k] = v[0]
+      if (!next.password && !next.password_confirmation && err.message) {
+        next.password = err.message
+      }
       setPasswordErrors(next)
       toast.error(err.message)
     } finally {
@@ -339,7 +366,7 @@ export function EmployeeDetailPage() {
           <h3>حساب الدخول والدور</h3>
           {user ? (
             <div className="rpm-card__actions">
-              <Button size="sm" variant="secondary" onClick={() => { setAccountErrors({}); setAccountOpen(true) }}>تعديل الحساب</Button>
+              <Button size="sm" variant="secondary" onClick={() => { setAccountErrors({}); void loadRoles(); setAccountOpen(true) }}>تعديل الحساب</Button>
               <Button size="sm" variant="secondary" onClick={() => { setPasswordErrors({}); setPasswordForm({ password: '', password_confirmation: '' }); setPasswordOpen(true) }}>تعيين كلمة مرور</Button>
               <Button size="sm" variant="ghost" onClick={() => navigate('/staff?tab=permissions')}>الصلاحيات</Button>
             </div>
@@ -497,6 +524,22 @@ export function EmployeeDetailPage() {
             error={accountErrors.email}
             hint="اختياري"
             onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })}
+          />
+          <SelectField
+            label="الدور"
+            required
+            options={
+              data?.user?.role?.name === 'super_admin' && data.user.role.id
+                ? [
+                    { value: String(data.user.role.id), label: `${data.user.role.label} (غير صالح لموظف — غيّره)` },
+                    ...roleOptions,
+                  ]
+                : roleOptions
+            }
+            value={accountForm.role_id}
+            error={accountErrors.role_id}
+            hint={data?.user?.role?.name === 'super_admin' ? 'هذا الحساب مُعيَّن كمدير أعلى بالخطأ — اختر مدير تشغيل ثم احفظ' : undefined}
+            onChange={(e) => setAccountForm({ ...accountForm, role_id: e.target.value })}
           />
           <SwitchField
             label="الحساب نشط"

@@ -96,6 +96,96 @@ class ResetSuperAdminsAndStaffHideTest extends TestCase
             ->assertJsonMissing(['phone' => '01150100104']);
 
         $this->putJson('/api/staff/'.$super->id, ['name' => 'مخفي'])
-            ->assertNotFound();
+            ->assertForbidden()
+            ->assertJsonPath('message', 'حسابات النظام العليا تُدار من أمر إعادة التعيين فقط، وليس من شاشة الموظفين.');
+    }
+
+    public function test_employee_linked_misassigned_super_can_reset_password_and_demote(): void
+    {
+        $adminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $ops = Role::query()->where('name', 'ops_manager')->firstOrFail();
+        $actor = User::factory()->create([
+            'role_id' => $adminRole->id,
+            'phone' => '01150100104',
+            'email' => null,
+            'is_active' => true,
+        ]);
+        $employee = \App\Models\Employee::query()->create([
+            'name' => 'هيثم صلاح',
+            'job_title' => 'مدير تشغيل',
+            'hired_on' => now()->toDateString(),
+            'base_salary' => 8500,
+            'status' => 'active',
+        ]);
+        $misassigned = User::factory()->create([
+            'name' => 'هيثم صلاح',
+            'role_id' => $adminRole->id,
+            'phone' => '01099628409',
+            'email' => null,
+            'employee_id' => $employee->id,
+            'is_active' => true,
+            'password' => 'password',
+        ]);
+
+        Sanctum::actingAs($actor);
+
+        $this->postJson('/api/staff/'.$misassigned->id.'/password', [
+            'password' => 'NewOpsPass1',
+            'password_confirmation' => 'NewOpsPass1',
+        ])->assertOk()
+            ->assertJsonPath('message', 'تم تحديث كلمة المرور.');
+
+        $this->assertTrue(Hash::check('NewOpsPass1', $misassigned->fresh()->password));
+
+        $this->putJson('/api/staff/'.$misassigned->id, [
+            'role_id' => $ops->id,
+        ])->assertOk()
+            ->assertJsonPath('data.role.name', 'ops_manager');
+    }
+
+    public function test_ops_manager_password_reset_endpoint(): void
+    {
+        $adminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $ops = Role::query()->where('name', 'ops_manager')->firstOrFail();
+        $actor = User::factory()->create([
+            'role_id' => $adminRole->id,
+            'phone' => '01150100104',
+            'is_active' => true,
+        ]);
+        $target = User::factory()->create([
+            'role_id' => $ops->id,
+            'phone' => '01000000099',
+            'is_active' => true,
+            'password' => 'password',
+        ]);
+
+        Sanctum::actingAs($actor);
+
+        $this->postJson('/api/staff/'.$target->id.'/password', [
+            'password' => 'OpsPass1234',
+            'password_confirmation' => 'OpsPass1234',
+        ])->assertOk();
+
+        $this->assertTrue(Hash::check('OpsPass1234', $target->fresh()->password));
+    }
+
+    public function test_staff_store_rejects_super_admin_role(): void
+    {
+        $adminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $actor = User::factory()->create([
+            'role_id' => $adminRole->id,
+            'phone' => '01150100104',
+            'is_active' => true,
+        ]);
+        Sanctum::actingAs($actor);
+
+        $this->postJson('/api/staff', [
+            'name' => 'محاولة سوبر',
+            'phone' => '01077778888',
+            'password' => 'password',
+            'role_id' => $adminRole->id,
+            'create_employee' => true,
+        ])->assertForbidden()
+            ->assertJsonPath('message', 'لا يُنشأ ولا يُمنح دور المدير الأعلى من شاشة الموظفين.');
     }
 }
