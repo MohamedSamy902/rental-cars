@@ -160,7 +160,9 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
       ) : (
         <div className="rpm-stack" style={{ gap: '0.85rem' }}>
           <p className="muted" style={{ margin: 0 }}>
-            معاينة المستند بعد تعبئة بيانات العقد. لتعديل القالب العام استخدم الإعدادات.
+            {kind === 'contract'
+              ? 'الطباعة: العقد (وش) ثم إقرار الاستلام (ضهر) ثم نسخة إضافية من العقد فقط بلا إقرار. لتعديل القالب العام استخدم الإعدادات.'
+              : 'معاينة المستند بعد تعبئة بيانات العقد. لتعديل القالب العام استخدم الإعدادات.'}
           </p>
 
           <div className="rpm-print-preview">

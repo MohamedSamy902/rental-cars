@@ -162,6 +162,20 @@ class VehicleOwnerController extends Controller
         ], 201);
     }
 
+    public function destroyPayout(Request $request, VehicleOwner $owner, OwnerPayout $payout): JsonResponse
+    {
+        try {
+            $this->owners->voidPayout($owner, $payout, $request->user()?->id);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'balance' => $this->owners->balance($owner),
+            'message' => 'تم حذف الصرف وعكسه من الحسابات.',
+        ]);
+    }
+
     public function payoutsIndex(Request $request): JsonResponse
     {
         $q = OwnerPayout::query()->with(['owner:id,full_name', 'vehicle:id,code,plate'])->latest('paid_on')->latest('id');
