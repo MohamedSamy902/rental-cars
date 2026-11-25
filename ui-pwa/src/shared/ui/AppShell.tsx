@@ -289,17 +289,10 @@ export function AppShell() {
         </header>
 
         <main className="shell-main">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+          {/* Stable outlet: no pathname key — avoids full remount/refetch on every navigation. */}
+          <div className="shell-main__page">
+            <Outlet />
+          </div>
         </main>
 
         <footer className="shell-credit">

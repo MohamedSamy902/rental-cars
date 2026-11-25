@@ -156,23 +156,26 @@ class DashboardController extends Controller
                 : [],
             'fleet_prep' => $this->dailyPrep->summarize(now(), 5, $canContracts, $canCustomers),
             'daily_cash' => $canFinance ? $this->dailyCash->forUser($request->user()) : null,
-            'recent_contracts' => $canContracts ? Contract::query()
-                ->with($canCustomers
-                    ? ['customer:id,full_name', 'vehicle:id,brand,model,plate']
-                    : ['vehicle:id,brand,model,plate'])
-                ->latest('id')
-                ->limit(5)
-                ->get()
-                ->map(function (Contract $c) use ($canCustomers) {
+            'recent_contracts' => $canContracts ? (function () use ($canCustomers) {
+                $recent = Contract::query()
+                    ->with($canCustomers
+                        ? ['customer:id,full_name', 'vehicle:id,brand,model,plate']
+                        : ['vehicle:id,brand,model,plate'])
+                    ->latest('id')
+                    ->limit(5)
+                    ->get();
+                $openMaint = $this->progress->openMaintenanceByVehicleIds($recent->pluck('vehicle_id')->all());
+
+                return $recent->map(function (Contract $c) use ($canCustomers, $openMaint) {
                     $arr = $c->toArray();
                     if (! $canCustomers) {
                         $arr['customer'] = null;
                     }
-                    $arr['progress'] = $this->progress->forContract($c);
+                    $arr['progress'] = $this->progress->forContract($c, null, $openMaint);
 
                     return $arr;
-                })
-                ->values() : [],
+                })->values();
+            })() : [],
         ]);
     }
 }

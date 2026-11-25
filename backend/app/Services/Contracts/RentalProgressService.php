@@ -30,8 +30,38 @@ class RentalProgressService
      *   message: string
      * }
      */
-    public function forContract(Contract $contract, ?CarbonInterface $now = null): array
+    /**
+     * Earliest open blocking work order per vehicle (same orderBy opened_on as markers()).
+     *
+     * @param  list<int>  $vehicleIds
+     * @return array<int, WorkOrder>
+     */
+    public function openMaintenanceByVehicleIds(array $vehicleIds): array
     {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $vehicleIds))));
+        if ($ids === []) {
+            return [];
+        }
+
+        return WorkOrder::query()
+            ->whereIn('vehicle_id', $ids)
+            ->whereIn('status', ['open', 'in_progress'])
+            ->where('puts_in_maintenance', true)
+            ->orderBy('opened_on')
+            ->get()
+            ->groupBy('vehicle_id')
+            ->map(fn ($group) => $group->first())
+            ->all();
+    }
+
+    /**
+     * @param  array<int, WorkOrder>|null  $openMaintenanceByVehicleId  Preloaded map; null = query per contract (legacy)
+     */
+    public function forContract(
+        Contract $contract,
+        ?CarbonInterface $now = null,
+        ?array $openMaintenanceByVehicleId = null,
+    ): array {
         $now = Carbon::parse($now ?? now())->timezone(config('app.timezone', 'Africa/Cairo'));
         $contract->loadMissing(['customer', 'vehicle']);
 
@@ -75,14 +105,14 @@ class RentalProgressService
                 'effective_ends_at' => Carbon::parse($contract->planned_ends_at)->toIso8601String(),
                 'limiting_factor' => 'schedule',
                 'limiting_label' => 'نهاية المدة',
-                'markers' => $this->markers($contract),
+                'markers' => $this->markers($contract, $openMaintenanceByVehicleId),
                 'message' => 'العقد لم يبدأ بعد.',
             ];
         }
 
         $start = Carbon::parse($contract->starts_at);
         $plannedEnd = Carbon::parse($contract->planned_ends_at);
-        $markers = $this->markers($contract);
+        $markers = $this->markers($contract, $openMaintenanceByVehicleId);
 
         $effectiveEnd = $plannedEnd->copy();
         $limiting = 'schedule';
@@ -142,9 +172,10 @@ class RentalProgressService
     }
 
     /**
+     * @param  array<int, WorkOrder>|null  $openMaintenanceByVehicleId
      * @return list<array{type: string, at: string, label: string}>
      */
-    private function markers(Contract $contract): array
+    private function markers(Contract $contract, ?array $openMaintenanceByVehicleId = null): array
     {
         $out = [];
         $license = $contract->customer?->license_expires_on;
@@ -156,12 +187,16 @@ class RentalProgressService
             ];
         }
 
-        $openWo = WorkOrder::query()
-            ->where('vehicle_id', $contract->vehicle_id)
-            ->whereIn('status', ['open', 'in_progress'])
-            ->where('puts_in_maintenance', true)
-            ->orderBy('opened_on')
-            ->first();
+        if ($openMaintenanceByVehicleId !== null) {
+            $openWo = $openMaintenanceByVehicleId[(int) $contract->vehicle_id] ?? null;
+        } else {
+            $openWo = WorkOrder::query()
+                ->where('vehicle_id', $contract->vehicle_id)
+                ->whereIn('status', ['open', 'in_progress'])
+                ->where('puts_in_maintenance', true)
+                ->orderBy('opened_on')
+                ->first();
+        }
         if ($openWo) {
             $out[] = [
                 'type' => 'maintenance',

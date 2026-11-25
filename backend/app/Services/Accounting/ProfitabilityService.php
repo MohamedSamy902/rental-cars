@@ -110,48 +110,63 @@ class ProfitabilityService
                 ->sum('period_rent');
         }
 
-        $maintenance = (int) WorkOrder::query()
+        $workOrders = WorkOrder::query()
             ->where(function ($q) use ($from, $to) {
                 $q->whereBetween('opened_on', [$from->toDateString(), $to->toDateString()])
                     ->orWhereBetween('closed_on', [$from->toDateString(), $to->toDateString()]);
             })
-            ->get(['parts_cost', 'labor_cost'])
-            ->sum(fn ($w) => (int) $w->parts_cost + (int) $w->labor_cost);
+            ->get(['vehicle_id', 'parts_cost', 'labor_cost']);
 
-        $expenses = (int) Expense::query()
+        $maintenance = (int) $workOrders->sum(fn ($w) => (int) $w->parts_cost + (int) $w->labor_cost);
+        $maintenanceByVehicle = [];
+        foreach ($workOrders as $w) {
+            $vid = (int) $w->vehicle_id;
+            $maintenanceByVehicle[$vid] = ($maintenanceByVehicle[$vid] ?? 0)
+                + (int) $w->parts_cost
+                + (int) $w->labor_cost;
+        }
+
+        $expenseRows = Expense::query()
             ->whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
-            ->sum('amount');
+            ->get(['vehicle_id', 'amount']);
+        $expenses = (int) $expenseRows->sum(fn ($e) => (int) $e->amount);
+        $expensesByVehicle = [];
+        foreach ($expenseRows as $e) {
+            if ($e->vehicle_id === null) {
+                continue;
+            }
+            $vid = (int) $e->vehicle_id;
+            $expensesByVehicle[$vid] = ($expensesByVehicle[$vid] ?? 0) + (int) $e->amount;
+        }
+
+        $contractRevByVehicle = [];
+        if (! $useJournals) {
+            $contractRevByVehicle = Contract::query()
+                ->selectRaw('vehicle_id, SUM(period_rent) as aggregate')
+                ->whereIn('status', ['completed', 'active'])
+                ->where(function ($q) use ($from, $to) {
+                    $q->whereBetween('actual_ends_at', [$from, $to])
+                        ->orWhere(function ($qq) use ($from, $to) {
+                            $qq->whereNull('actual_ends_at')
+                                ->where('starts_at', '<=', $to)
+                                ->where('planned_ends_at', '>=', $from);
+                        });
+                })
+                ->groupBy('vehicle_id')
+                ->pluck('aggregate', 'vehicle_id')
+                ->map(fn ($v) => (int) $v)
+                ->all();
+        }
 
         $vehicles = [];
         foreach (Vehicle::query()->where('is_active', true)->get(['id', 'brand', 'model', 'plate']) as $v) {
             if ($useJournals) {
                 $vRev = (int) ($revenueByVehicle[$v->id] ?? 0);
             } else {
-                $vRev = (int) Contract::query()
-                    ->where('vehicle_id', $v->id)
-                    ->whereIn('status', ['completed', 'active'])
-                    ->where(function ($q) use ($from, $to) {
-                        $q->whereBetween('actual_ends_at', [$from, $to])
-                            ->orWhere(function ($qq) use ($from, $to) {
-                                $qq->whereNull('actual_ends_at')
-                                    ->where('starts_at', '<=', $to)
-                                    ->where('planned_ends_at', '>=', $from);
-                            });
-                    })
-                    ->sum('period_rent');
+                $vRev = (int) ($contractRevByVehicle[$v->id] ?? 0);
             }
-            $vMaint = (int) WorkOrder::query()
-                ->where('vehicle_id', $v->id)
-                ->where(function ($q) use ($from, $to) {
-                    $q->whereBetween('opened_on', [$from->toDateString(), $to->toDateString()])
-                        ->orWhereBetween('closed_on', [$from->toDateString(), $to->toDateString()]);
-                })
-                ->get(['parts_cost', 'labor_cost'])
-                ->sum(fn ($w) => (int) $w->parts_cost + (int) $w->labor_cost);
-            $vExp = (int) Expense::query()
-                ->where('vehicle_id', $v->id)
-                ->whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
-                ->sum('amount');
+            $vMaint = (int) ($maintenanceByVehicle[$v->id] ?? 0);
+            $vExp = (int) ($expensesByVehicle[$v->id] ?? 0);
             $vehicles[$v->id] = [
                 'vehicle_id' => $v->id,
                 'label' => trim("{$v->brand} {$v->model} · {$v->plate}"),

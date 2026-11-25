@@ -187,8 +187,11 @@ class VehicleController extends Controller
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
 
-        $data = collect($rows->items())->map(function (Vehicle $v) use ($request) {
-            return $this->present($v, $request->user());
+        // One fleet snapshot for list rows + summary (same statusOnDate inputs as before).
+        $availability = $this->fleetAvailabilityIndex();
+
+        $data = collect($rows->items())->map(function (Vehicle $v) use ($request, $availability) {
+            return $this->present($v, $request->user(), $availability);
         });
 
         return response()->json([
@@ -198,7 +201,7 @@ class VehicleController extends Controller
                 'last_page' => $rows->lastPage(),
                 'total' => $rows->total(),
             ],
-            'summary' => $this->summary(),
+            'summary' => $this->summary($availability),
         ]);
     }
 
@@ -607,29 +610,63 @@ class VehicleController extends Controller
     }
 
     /**
+     * Fleet-wide flags for statusOnDate — identical predicates to the former per-row exists().
+     *
+     * @return array{active: \Illuminate\Support\Collection<int, int>, reserved: \Illuminate\Support\Collection<int, int>, blocking_wo: \Illuminate\Support\Collection<int, int>}
+     */
+    private function fleetAvailabilityIndex(): array
+    {
+        return [
+            'active' => Contract::query()->where('status', 'active')->pluck('vehicle_id')->flip(),
+            'reserved' => Contract::query()
+                ->where('status', 'approved')
+                ->where('starts_at', '<=', now())
+                ->where('planned_ends_at', '>=', now())
+                ->pluck('vehicle_id')
+                ->flip(),
+            'blocking_wo' => WorkOrder::query()
+                ->where('puts_in_maintenance', true)
+                ->whereIn('status', ['open', 'in_progress'])
+                ->pluck('vehicle_id')
+                ->flip(),
+        ];
+    }
+
+    /**
+     * @param  array{active: \Illuminate\Support\Collection, reserved: \Illuminate\Support\Collection, blocking_wo: \Illuminate\Support\Collection}|null  $availability
      * @return array<string, mixed>
      */
-    private function present(Vehicle $v, ?User $viewer = null): array
+    private function present(Vehicle $v, ?User $viewer = null, ?array $availability = null): array
     {
         $viewer ??= request()->user();
         $canOwners = VehicleOwnerVisibility::canSeeProfile($viewer);
         $canAmount = VehicleOwnerVisibility::canSeeAmount($viewer);
         $canContracts = (bool) $viewer?->hasPermission('contracts.view');
-        $status = $this->availability->statusOnDate([
-            'manual_status' => $v->manual_status,
-            'has_active_handover' => $v->contracts()->where('status', 'active')->exists(),
-            'has_approved_covering_date' => $v->contracts()
-                ->where('status', 'approved')
-                ->where('starts_at', '<=', now())
-                ->where('planned_ends_at', '>=', now())
-                ->exists(),
-            'open_work_order_blocks' => $v->manual_status === 'maintenance'
-                || WorkOrder::query()
-                    ->where('vehicle_id', $v->id)
-                    ->where('puts_in_maintenance', true)
-                    ->whereIn('status', ['open', 'in_progress'])
+        if ($availability !== null) {
+            $status = $this->availability->statusOnDate([
+                'manual_status' => $v->manual_status,
+                'has_active_handover' => $availability['active']->has($v->id),
+                'has_approved_covering_date' => $availability['reserved']->has($v->id),
+                'open_work_order_blocks' => $v->manual_status === 'maintenance'
+                    || $availability['blocking_wo']->has($v->id),
+            ]);
+        } else {
+            $status = $this->availability->statusOnDate([
+                'manual_status' => $v->manual_status,
+                'has_active_handover' => $v->contracts()->where('status', 'active')->exists(),
+                'has_approved_covering_date' => $v->contracts()
+                    ->where('status', 'approved')
+                    ->where('starts_at', '<=', now())
+                    ->where('planned_ends_at', '>=', now())
                     ->exists(),
-        ]);
+                'open_work_order_blocks' => $v->manual_status === 'maintenance'
+                    || WorkOrder::query()
+                        ->where('vehicle_id', $v->id)
+                        ->where('puts_in_maintenance', true)
+                        ->whereIn('status', ['open', 'in_progress'])
+                        ->exists(),
+            ]);
+        }
 
         return [
             'id' => $v->id,
@@ -739,11 +776,13 @@ class VehicleController extends Controller
     }
 
     /**
+     * @param  array{active: \Illuminate\Support\Collection, reserved: \Illuminate\Support\Collection, blocking_wo: \Illuminate\Support\Collection}|null  $availability
      * @return array<string, int>
      */
-    private function summary(): array
+    private function summary(?array $availability = null): array
     {
-        $all = Vehicle::query()->where('is_active', true)->get();
+        $availability ??= $this->fleetAvailabilityIndex();
+        $all = Vehicle::query()->where('is_active', true)->get(['id', 'manual_status']);
         $counts = [
             'total' => $all->count(),
             'available' => 0,
@@ -755,7 +794,13 @@ class VehicleController extends Controller
             'owner_agreement_expiring' => 0,
         ];
         foreach ($all as $v) {
-            $status = $this->present($v)['status'];
+            $status = $this->availability->statusOnDate([
+                'manual_status' => $v->manual_status,
+                'has_active_handover' => $availability['active']->has($v->id),
+                'has_approved_covering_date' => $availability['reserved']->has($v->id),
+                'open_work_order_blocks' => $v->manual_status === 'maintenance'
+                    || $availability['blocking_wo']->has($v->id),
+            ]);
             if (isset($counts[$status]) && ! in_array($status, ['license_expiring', 'sim_recharge', 'owner_agreement_expiring'], true)) {
                 $counts[$status]++;
             }

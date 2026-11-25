@@ -89,12 +89,16 @@ class ContractController extends Controller
                 ->keyBy('contract_id');
         $paymentNets = $this->paymentNetsFor($contractIds);
 
-        $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals, $paymentNets, $user) {
+        $openMaintenanceByVehicle = $this->progress->openMaintenanceByVehicleIds(
+            collect($rows->items())->pluck('vehicle_id')->all()
+        );
+
+        $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals, $paymentNets, $user, $openMaintenanceByVehicle) {
             $arr = $c->toArray();
             if (isset($arr['customer']) && is_array($arr['customer'])) {
                 $arr['customer'] = Customer::normalizeDateOnlyFields($arr['customer']);
             }
-            $arr['progress'] = $this->progress->forContract($c);
+            $arr['progress'] = $this->progress->forContract($c, null, $openMaintenanceByVehicle);
             $arr['created_by'] = $c->salesUser?->displayName();
             $arr['sales_user'] = $c->salesUser
                 ? ['id' => $c->salesUser->id, 'name' => $c->salesUser->displayName()]
