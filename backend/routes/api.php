@@ -244,6 +244,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::middleware('permission:owners.update')->put('/owners/{owner}', [VehicleOwnerController::class, 'update']);
     Route::middleware('permission:owners.accrue,owners.payout')->post('/owners/{owner}/accruals', [VehicleOwnerController::class, 'accrue']);
     Route::middleware('permission:owners.payout')->post('/owners/{owner}/payouts', [VehicleOwnerController::class, 'payout']);
+    Route::middleware('permission:owners.payout')->delete('/owners/{owner}/payouts/{payout}', [VehicleOwnerController::class, 'destroyPayout']);
 
     Route::get('/accounting/overview', [AccountingController::class, 'overview'])->middleware('permission:accounting.view');
     Route::get('/accounting/daily-cash', [AccountingController::class, 'dailyCash'])->middleware('permission:accounting.view');

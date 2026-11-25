@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class OwnerPayout extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'owner_id', 'vehicle_id', 'amount', 'paid_on', 'payment_method', 'notes',
         'journal_entry_id', 'recorded_by',

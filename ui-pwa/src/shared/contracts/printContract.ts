@@ -373,11 +373,13 @@ export function renderDoc(kind: PrintDocKind, payload: PrintPayload): string {
   }
 
   if (kind === 'contract' && templates?.contract?.rendered_html) {
-    let body = applyRuntimeAssets(templates.contract.rendered_html, tenant)
-    // ظهر العقد — إقرار استلام السيارة في الصفحة ٢ (نفس تصميم الطباعة).
+    const contractOnly = applyRuntimeAssets(templates.contract.rendered_html, tenant)
+    let body = contractOnly
+    // صفحة ١: العقد · صفحة ٢: الإقرار (ظهر) · صفحة ٣+: نسخة إضافية من العقد فقط بلا إقرار.
     if (templates?.handover_receipt?.rendered_html) {
       const back = applyRuntimeAssets(templates.handover_receipt.rendered_html, tenant)
-      body = `${body}<div class="rpm-print-pagebreak" aria-hidden="true"></div>${back}`
+      const breakEl = '<div class="rpm-print-pagebreak" aria-hidden="true"></div>'
+      body = `${contractOnly}${breakEl}${back}${breakEl}${contractOnly}`
     }
     return wrapTemplateHtml(title, body, 'contract')
   }

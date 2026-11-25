@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
+import { useAuth } from '@/shared/auth/AuthContext'
 import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
@@ -72,11 +73,14 @@ export function OwnerDetailPage() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const toast = useToast()
+  const { can, isIntegrator } = useAuth()
+  const canPayout = can('owners.payout') || isIntegrator
   const [owner, setOwner] = useState<Owner | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [voidingPayoutId, setVoidingPayoutId] = useState<number | null>(null)
   const [printingAgreementId, setPrintingAgreementId] = useState<number | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [payoutOpen, setPayoutOpen] = useState(false)
@@ -177,6 +181,24 @@ export function OwnerDetailPage() {
     }
   }
 
+  async function onVoidPayout(p: Payout) {
+    if (!owner || !canPayout) return
+    const ok = window.confirm(
+      `حذف صرف ${formatMoney(p.amount)} بتاريخ ${formatDate(p.paid_on)}؟\nسيتم عكسه من الحسابات وإعادة المتأخر كما قبل التسجيل.`,
+    )
+    if (!ok) return
+    setVoidingPayoutId(p.id)
+    try {
+      const res = await api<{ message?: string }>(`/owners/${owner.id}/payouts/${p.id}`, { method: 'DELETE' })
+      toast.success(res.message || 'تم حذف الصرف وعكسه من الحسابات.')
+      await load()
+    } catch (e) {
+      toast.error((e as ApiError).message || 'تعذّر حذف الصرف.')
+    } finally {
+      setVoidingPayoutId(null)
+    }
+  }
+
   if (loading) return <div className="rpm-stack"><SkeletonBlock rows={8} /></div>
   if (error || !owner) {
     return (
@@ -202,16 +224,18 @@ export function OwnerDetailPage() {
           <>
             <BackNavButton to="/owners" label="رجوع للملاك" />
             <Button variant="secondary" onClick={() => setEditing(true)}>تعديل</Button>
-            <Button onClick={() => {
-              setPayoutForm({
-                amount: String(balance?.vehicles_monthly_total || ''),
-                paid_on: todayCivilIso(),
-                payment_method: 'cash',
-                vehicle_id: '',
-                notes: '',
-              })
-              setPayoutOpen(true)
-            }}>تسجيل صرف</Button>
+            {canPayout ? (
+              <Button onClick={() => {
+                setPayoutForm({
+                  amount: String(balance?.vehicles_monthly_total || ''),
+                  paid_on: todayCivilIso(),
+                  payment_method: 'cash',
+                  vehicle_id: '',
+                  notes: '',
+                })
+                setPayoutOpen(true)
+              }}>تسجيل صرف</Button>
+            ) : null}
           </>
         }
       />
@@ -299,9 +323,21 @@ export function OwnerDetailPage() {
           <div className="rpm-card-list">
             {(owner.payouts || []).map((p) => (
               <article key={p.id} className="rpm-card">
-                <div className="rpm-card__row">
+                <div className="rpm-card__row" style={{ alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <strong>{formatMoney(p.amount)}</strong>
                   <span>{formatDate(p.paid_on)}</span>
+                  {canPayout ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={voidingPayoutId === p.id}
+                      disabled={voidingPayoutId != null && voidingPayoutId !== p.id}
+                      onClick={() => void onVoidPayout(p)}
+                      style={{ marginInlineStart: 'auto' }}
+                    >
+                      حذف الصرف
+                    </Button>
+                  ) : null}
                 </div>
                 <p className="muted">{p.payment_method}{p.vehicle ? ` · ${p.vehicle.plate}` : ''}{p.notes ? ` · ${p.notes}` : ''}</p>
               </article>

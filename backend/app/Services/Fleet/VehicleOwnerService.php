@@ -108,6 +108,7 @@ class VehicleOwnerService
                     if ($repairProration && (int) $existing->amount !== $amount) {
                         $repaired += $this->repairDueAmount($existing, $amount) ? 1 : 0;
                     }
+
                     continue;
                 }
                 $this->assertMonthOpenForAccrual($ym);
@@ -470,6 +471,69 @@ class VehicleOwnerService
             $payout->update(['journal_entry_id' => $entry->id]);
 
             return $payout->fresh('vehicle');
+        });
+    }
+
+    /**
+     * إلغاء صرف مالك: soft-delete للصف + تحرير قيد اليومية المرتبط (ك٫١).
+     * يعيد الرصيد/المتأخر وكأن الصرف لم يُسجَّل.
+     */
+    public function voidPayout(VehicleOwner $owner, OwnerPayout $payout, ?int $userId = null): void
+    {
+        if ((int) $payout->owner_id !== (int) $owner->id) {
+            throw new DomainException('سجل الصرف لا يخص هذا المالك.');
+        }
+        if ($payout->trashed()) {
+            return;
+        }
+
+        $paidOn = (string) ($payout->paid_on?->toDateString() ?? $payout->getRawOriginal('paid_on') ?? '');
+        if ($paidOn === '') {
+            throw new DomainException('تاريخ الصرف غير صالح.');
+        }
+        $date = new DateTimeImmutable($paidOn);
+        $this->accounting->assertMonthOpen((int) $date->format('Y'), (int) $date->format('n'));
+
+        DB::transaction(function () use ($owner, $payout, $userId, $paidOn) {
+            $locked = OwnerPayout::query()
+                ->whereKey($payout->id)
+                ->where('owner_id', $owner->id)
+                ->lockForUpdate()
+                ->first();
+            if (! $locked || $locked->trashed()) {
+                return;
+            }
+
+            $entries = JournalEntry::query()
+                ->where(function ($q) use ($locked) {
+                    $q->where('source', 'owner_payout:'.$locked->id);
+                    if ($locked->journal_entry_id) {
+                        $q->orWhere('id', $locked->journal_entry_id);
+                    }
+                })
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($entries as $entry) {
+                $entry->softDeleteReleasingSource();
+            }
+
+            $locked->update(['journal_entry_id' => null]);
+            $locked->delete();
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'owner_payout_voided',
+                'record_type' => OwnerPayout::class,
+                'record_id' => $locked->id,
+                'before' => [
+                    'owner_id' => $owner->id,
+                    'amount' => (int) $locked->amount,
+                    'paid_on' => $paidOn,
+                    'payment_method' => $locked->payment_method,
+                    'vehicle_id' => $locked->vehicle_id,
+                ],
+            ]);
         });
     }
 
