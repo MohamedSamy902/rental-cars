@@ -65,13 +65,19 @@ export function SelectField({
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const remoteTimer = useRef<number | null>(null)
+  const onRemoteSearchRef = useRef(onRemoteSearch)
+  onRemoteSearchRef.current = onRemoteSearch
+  /** Ignore outside/backdrop dismiss for the opening gesture (iOS/Android ghost click). */
+  const ignoreOutsideUntilRef = useRef(0)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const [pos, setPos] = useState<PanelPos | null>(null)
+  const [backdropArmed, setBackdropArmed] = useState(false)
   const [uncontrolled, setUncontrolled] = useState(String(defaultValue ?? ''))
   const selectedValue = value !== undefined ? String(value) : uncontrolled
   const showSearch = searchable && (Boolean(onRemoteSearch) || options.length > 6)
+  const hasRemoteSearch = Boolean(onRemoteSearch)
 
   const selected = useMemo(
     () => options.find((o) => o.value === selectedValue) || null,
@@ -79,26 +85,26 @@ export function SelectField({
   )
 
   const filtered = useMemo(() => {
-    if (onRemoteSearch) return options
+    if (hasRemoteSearch) return options
     const q = query.trim().toLowerCase()
     if (!q) return options
     return options.filter((o) =>
       o.label.toLowerCase().includes(q)
       || (o.description || '').toLowerCase().includes(q)
       || o.value.toLowerCase().includes(q))
-  }, [options, query, onRemoteSearch])
+  }, [options, query, hasRemoteSearch])
 
   useEffect(() => {
-    if (!onRemoteSearch || !open) return
+    if (!hasRemoteSearch || !open) return
     if (remoteTimer.current != null) window.clearTimeout(remoteTimer.current)
     remoteTimer.current = window.setTimeout(() => {
       remoteTimer.current = null
-      void onRemoteSearch(query.trim())
+      void onRemoteSearchRef.current?.(query.trim())
     }, 280)
     return () => {
       if (remoteTimer.current != null) window.clearTimeout(remoteTimer.current)
     }
-  }, [query, open, onRemoteSearch])
+  }, [query, open, hasRemoteSearch])
 
   function emit(next: string) {
     if (value === undefined) setUncontrolled(next)
@@ -144,10 +150,16 @@ export function SelectField({
   function openPanel() {
     if (disabled) return
     setQuery('')
+    setBackdropArmed(false)
+    // Block the same tap/click that opened us from dismissing via backdrop/outside listeners.
+    ignoreOutsideUntilRef.current = Date.now() + 500
     setOpen(true)
     const idx = Math.max(0, options.findIndex((o) => o.value === selectedValue))
     setActiveIndex(idx < 0 ? 0 : idx)
-    // Keep the field visible inside its scroll parent (sheet body) — never scroll the page
+    // Position immediately so the panel is visible without waiting on sheet scroll.
+    updatePosition()
+    // Only nudge the sheet if the trigger is clipped — avoid scroll races that
+    // move the field under a delayed synthetic click.
     window.setTimeout(() => {
       const el = triggerRef.current
       if (el) {
@@ -155,7 +167,10 @@ export function SelectField({
         if (sheetBody) {
           const bodyRect = sheetBody.getBoundingClientRect()
           const elRect = el.getBoundingClientRect()
-          sheetBody.scrollTop += elRect.top - bodyRect.top - bodyRect.height * 0.28
+          const pad = 24
+          if (elRect.top < bodyRect.top + pad || elRect.bottom > bodyRect.bottom - pad) {
+            sheetBody.scrollTop += elRect.top - bodyRect.top - bodyRect.height * 0.28
+          }
         }
       }
       updatePosition()
@@ -166,6 +181,12 @@ export function SelectField({
     setOpen(false)
     setQuery('')
     setPos(null)
+    setBackdropArmed(false)
+  }
+
+  function closeFromOutside() {
+    if (Date.now() < ignoreOutsideUntilRef.current) return
+    closePanel()
   }
 
   function pick(opt: Option) {
@@ -177,13 +198,17 @@ export function SelectField({
   useEffect(() => {
     if (!open) return
     updatePosition()
+    // Arm backdrop after the opening gesture finishes (covers ~300ms iOS ghost click).
+    const armTimer = window.setTimeout(() => setBackdropArmed(true), 420)
     // Do NOT autofocus search — that opens the keyboard and shoves the sheet away
     const onWin = () => updatePosition()
     const onDoc = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node
       if (rootRef.current?.contains(target)) return
       if (listRef.current?.contains(target)) return
-      closePanel()
+      // Backdrop handles its own dismiss; still guard other outside targets.
+      if ((target as Element)?.closest?.('.rpm-select-backdrop')) return
+      closeFromOutside()
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -200,6 +225,7 @@ export function SelectField({
     document.addEventListener('touchstart', onDoc, { passive: true })
     document.addEventListener('keydown', onKey)
     return () => {
+      window.clearTimeout(armTimer)
       window.removeEventListener('resize', onWin)
       window.removeEventListener('scroll', onWin, true)
       window.visualViewport?.removeEventListener('resize', onWin)
@@ -254,9 +280,17 @@ export function SelectField({
         <motion.button
           key="backdrop"
           type="button"
-          className="rpm-select-backdrop"
+          className={`rpm-select-backdrop ${backdropArmed ? 'is-armed' : 'is-guarding'}`}
           aria-label="إغلاق القائمة"
-          onClick={closePanel}
+          tabIndex={-1}
+          // Swallow the opening gesture; only dismiss after the guard window.
+          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+          onTouchStart={(e) => { e.stopPropagation() }}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            closeFromOutside()
+          }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
