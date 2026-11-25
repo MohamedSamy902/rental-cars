@@ -167,8 +167,8 @@ export function EmployeeDetailPage() {
         method: 'PUT',
         json: {
           name: accountForm.name,
-          phone: accountForm.phone.trim(),
-          email: accountForm.email.trim() || null,
+          phone: (accountForm.phone || '').trim(),
+          email: (accountForm.email || '').trim() || null,
           is_active: accountForm.is_active,
         },
       })

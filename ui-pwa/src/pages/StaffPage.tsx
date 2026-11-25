@@ -192,7 +192,7 @@ export function StaffPage() {
     setEditingUser(user)
     setUserForm({
       name: user.name,
-      email: user.email,
+      email: user.email || '',
       phone: user.phone || '',
       password: '',
       role_id: user.role_id ? String(user.role_id) : '',
@@ -212,8 +212,8 @@ export function StaffPage() {
     try {
       const payload: Record<string, unknown> = {
         name: userForm.name,
-        phone: userForm.phone.trim(),
-        email: userForm.email.trim() || null,
+        phone: (userForm.phone || '').trim(),
+        email: (userForm.email || '').trim() || null,
         role_id: Number(userForm.role_id),
         is_active: userForm.is_active,
       }

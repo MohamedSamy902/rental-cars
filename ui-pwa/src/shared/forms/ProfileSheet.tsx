@@ -55,9 +55,9 @@ export function ProfileSheet({ open, onClose }: Props) {
     setErrors({})
     try {
       const payload: Record<string, string | null> = {
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim() || null,
+        name: (form.name || '').trim(),
+        phone: (form.phone || '').trim(),
+        email: (form.email || '').trim() || null,
       }
       if (form.password) {
         payload.current_password = form.current_password
