@@ -222,7 +222,7 @@ export function ViolationInquiriesPage() {
       const statuses = ['active', 'approved', 'completed']
       const batches = await Promise.all(
         statuses.map((status) =>
-          api<{ data: ContractOption[] }>(`/contracts?per_page=100&status=${status}&vehicle_id=${row.vehicle_id}`)
+          api<{ data: ContractOption[] }>(`/contracts?view=options&per_page=100&status=${status}&vehicle_id=${row.vehicle_id}`)
             .catch(() => ({ data: [] as ContractOption[] })),
         ),
       )
@@ -239,7 +239,7 @@ export function ViolationInquiriesPage() {
       // Fallback: all operational contracts if vehicle filter unsupported
       let list = [...byId.values()]
       if (list.length === 0) {
-        const all = await api<{ data: ContractOption[] }>('/contracts?per_page=100&status=active')
+        const all = await api<{ data: ContractOption[] }>('/contracts?view=options&per_page=100&status=active')
           .catch(() => ({ data: [] as ContractOption[] }))
         list = all.data.filter((c) => {
           const vid = c.vehicle_id ?? c.vehicle?.id

@@ -39,15 +39,20 @@ class ContractController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $view = $request->string('view')->toString();
         // Calendar needs only schedule fields — skip progress/ledger/dossier-weight payload.
-        if ($request->string('view')->toString() === 'calendar') {
+        if ($view === 'calendar') {
             return $this->calendarIndex($request);
+        }
+        // Pickers (مخالفات / استعلامات): id + labels فقط.
+        if ($view === 'options') {
+            return $this->optionsIndex($request);
         }
 
         $q = Contract::query()->with([
-            'customer',
-            'vehicle',
-            'deposit',
+            'customer:id,full_name,phone,national_id,status',
+            'vehicle:id,brand,model,plate,code',
+            'deposit:id,contract_id,original_amount,status,deductions_total',
             'salesUser:id,name,phone,email,role_id,employee_id',
             'salesUser.role:id,name,label',
             'salesUser.employee:id,name',
@@ -82,7 +87,15 @@ class ContractController extends Controller
 
         $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
-        $rows = $q->paginate($perPage, ['*'], 'page', $page);
+        $rows = $q->paginate($perPage, [
+            'id', 'number', 'status', 'customer_id', 'vehicle_id', 'sales_user_id',
+            'starts_at', 'planned_ends_at', 'actual_ends_at', 'balance_due_on',
+            'frozen_daily_rate', 'frozen_half_monthly_rate', 'frozen_monthly_rate',
+            'frozen_agreed_deposit', 'frozen_deposit_currency', 'rent_basis',
+            'period_rent', 'final_total', 'approved_days',
+            'prepaid_excess_km_amount', 'excess_km_amount', 'damage_fee',
+            'frozen_operating_insurance_fee', 'other_fees', 'delivery_service_fee', 'discount',
+        ], 'page', $page);
         $contractIds = collect($rows->items())->pluck('id')->all();
         $openViolationTotals = $contractIds === []
             ? collect()
@@ -100,24 +113,60 @@ class ContractController extends Controller
         );
 
         $data = collect($rows->items())->map(function (Contract $c) use ($openViolationTotals, $paymentNets, $user, $openMaintenanceByVehicle) {
-            $arr = $c->toArray();
-            if (isset($arr['customer']) && is_array($arr['customer'])) {
-                $arr['customer'] = Customer::normalizeDateOnlyFields($arr['customer']);
-            }
-            $arr['progress'] = $this->progress->forContract($c, null, $openMaintenanceByVehicle);
-            $arr['created_by'] = $c->salesUser?->displayName();
-            $arr['sales_user'] = $c->salesUser
-                ? ['id' => $c->salesUser->id, 'name' => $c->salesUser->displayName()]
-                : null;
-            $agg = $openViolationTotals->get($c->id);
-            $arr['open_violations_total'] = (int) ($agg->total_amount ?? 0);
-            $arr['open_violations_count'] = (int) ($agg->cnt ?? 0);
+            $customer = $c->customer ? Customer::normalizeDateOnlyFields([
+                'id' => $c->customer->id,
+                'full_name' => $c->customer->full_name,
+                'phone' => $c->customer->phone,
+                'national_id' => $c->customer->national_id,
+                'status' => $c->customer->status,
+            ]) : null;
+            $deposit = $c->deposit ? [
+                'id' => $c->deposit->id,
+                'original_amount' => (int) $c->deposit->original_amount,
+                'status' => $c->deposit->status,
+                'deductions_total' => (int) ($c->deposit->deductions_total ?? 0),
+                'remaining' => $c->deposit->remaining(),
+            ] : null;
             $total = $this->ledgerMath->chargeTotal($c);
             $paid = (int) ($paymentNets[$c->id] ?? 0);
-            $arr['ledger'] = [
-                'contract_total' => $total,
-                'paid' => $paid,
-                'balance' => max(0, $total - $paid),
+            $agg = $openViolationTotals->get($c->id);
+            $arr = [
+                'id' => $c->id,
+                'number' => $c->number,
+                'status' => $c->status,
+                'starts_at' => $c->starts_at?->toIso8601String(),
+                'planned_ends_at' => $c->planned_ends_at?->toIso8601String(),
+                'actual_ends_at' => $c->actual_ends_at?->toIso8601String(),
+                'balance_due_on' => $c->balance_due_on?->toDateString(),
+                'frozen_daily_rate' => (int) $c->frozen_daily_rate,
+                'frozen_half_monthly_rate' => $c->frozen_half_monthly_rate !== null ? (int) $c->frozen_half_monthly_rate : null,
+                'frozen_monthly_rate' => $c->frozen_monthly_rate !== null ? (int) $c->frozen_monthly_rate : null,
+                'frozen_agreed_deposit' => (int) ($c->frozen_agreed_deposit ?? 0),
+                'frozen_deposit_currency' => $c->frozen_deposit_currency,
+                'rent_basis' => $c->rent_basis,
+                'period_rent' => $c->period_rent !== null ? (int) $c->period_rent : null,
+                'final_total' => $c->final_total !== null ? (int) $c->final_total : null,
+                'customer' => $customer,
+                'vehicle' => $c->vehicle ? [
+                    'id' => $c->vehicle->id,
+                    'brand' => $c->vehicle->brand,
+                    'model' => $c->vehicle->model,
+                    'plate' => $c->vehicle->plate,
+                    'code' => $c->vehicle->code,
+                ] : null,
+                'deposit' => $deposit,
+                'progress' => $this->progress->forContract($c, null, $openMaintenanceByVehicle),
+                'created_by' => $c->salesUser?->displayName(),
+                'sales_user' => $c->salesUser
+                    ? ['id' => $c->salesUser->id, 'name' => $c->salesUser->displayName()]
+                    : null,
+                'open_violations_total' => (int) ($agg->total_amount ?? 0),
+                'open_violations_count' => (int) ($agg->cnt ?? 0),
+                'ledger' => [
+                    'contract_total' => $total,
+                    'paid' => $paid,
+                    'balance' => max(0, $total - $paid),
+                ],
             ];
 
             return VehicleOwnerVisibility::redactEmbedded(NestedCustomerRedactor::contract($arr, $user), $user);
@@ -131,6 +180,66 @@ class ContractController extends Controller
                 'total' => $rows->total(),
             ],
             'summary' => $this->contractsSummary(),
+        ]);
+    }
+
+    /**
+     * Compact picker feed (violations / inquiries) — no progress/ledger/sales nesting.
+     */
+    private function optionsIndex(Request $request): JsonResponse
+    {
+        $q = Contract::query()
+            ->with([
+                'customer:id,full_name',
+                'vehicle:id,brand,model,plate',
+            ])
+            ->latest('id');
+
+        $user = $request->user();
+        if ($user && $user->role?->name === 'sales' && ! $user->hasPermission('contracts.approve')) {
+            $q->where('sales_user_id', $user->id);
+        }
+        if ($status = $request->string('status')->toString()) {
+            $q->where('status', $status);
+        }
+        if ($vehicleId = $request->integer('vehicle_id')) {
+            $q->where('vehicle_id', $vehicleId);
+        }
+
+        $perPage = PaginationInput::perPage($request, 100, PaginationInput::MAX_PER_PAGE);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, [
+            'id', 'number', 'status', 'starts_at', 'planned_ends_at', 'customer_id', 'vehicle_id',
+        ], 'page', $page);
+
+        $data = collect($rows->items())->map(function (Contract $c) {
+            return [
+                'id' => $c->id,
+                'number' => $c->number,
+                'status' => $c->status,
+                'starts_at' => $c->starts_at?->toIso8601String(),
+                'planned_ends_at' => $c->planned_ends_at?->toIso8601String(),
+                'vehicle_id' => $c->vehicle_id,
+                'customer' => $c->customer ? [
+                    'id' => $c->customer->id,
+                    'full_name' => $c->customer->full_name,
+                ] : null,
+                'vehicle' => $c->vehicle ? [
+                    'id' => $c->vehicle->id,
+                    'brand' => $c->vehicle->brand,
+                    'model' => $c->vehicle->model,
+                    'plate' => $c->vehicle->plate,
+                ] : null,
+            ];
+        })->all();
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'total' => $rows->total(),
+            ],
         ]);
     }
 

@@ -64,6 +64,18 @@ class AccountingService
             ['code' => '5400', 'name' => 'مصروف رواتب', 'type' => 'expense'],
         ];
 
+        $codes = array_column($defs, 'code');
+        $existing = Account::query()->whereIn('code', $codes)->get()->keyBy('code');
+        // Fast path: chart already complete — one SELECT, no write (ك٫١ / قراءة فقط).
+        if ($existing->count() === count($defs)) {
+            $this->chartByCode = [];
+            foreach ($defs as $def) {
+                $this->chartByCode[$def['code']] = $existing->get($def['code']);
+            }
+
+            return array_values($this->chartByCode);
+        }
+
         $rows = [];
         foreach ($defs as $def) {
             $rows[] = Account::query()->updateOrCreate(
@@ -1138,6 +1150,9 @@ class AccountingService
     }
 
     /**
+     * Read-only overview. Rent recognition is written on handover/return/close + cron
+     * (`accounting:sync-rent-recognition`) — never on GET (ك٫١ / ي٫٢).
+     *
      * @return array{months: list<array<string, mixed>>, accounts: list<Account>, payments_in: int, payments_out: int}
      */
     public function overview(): array
@@ -1145,53 +1160,113 @@ class AccountingService
         $this->ensureChartOfAccounts();
 
         $keysAsc = $this->overviewMonthKeys();
-        $this->syncRentRecognition($keysAsc);
+        if ($keysAsc === []) {
+            return [
+                'months' => [],
+                'accounts' => Account::query()->orderBy('code')->get(),
+                'payments_in' => (int) Payment::query()->where('direction', 'in')->sum('amount'),
+                'payments_out' => (int) Payment::query()->where('direction', 'out')->sum('amount'),
+            ];
+        }
 
         $tz = config('app.timezone');
         $currentYm = now($tz)->format('Y-m');
+        [$fromY, $fromM] = $keysAsc[0];
+        [$toY, $toM] = $keysAsc[array_key_last($keysAsc)];
+        $rangeStart = CarbonImmutable::create($fromY, $fromM, 1, 0, 0, 0, $tz)->toDateString();
+        $rangeEnd = CarbonImmutable::create($toY, $toM, 1, 0, 0, 0, $tz)->endOfMonth()->toDateString();
+
+        $feeCodes = ['4100', '4200', '4300', '4400'];
+        $rentByYm = [];
+        $feesByYm = [];
+        $journalRows = JournalLine::query()
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->join('accounts', 'accounts.id', '=', 'journal_lines.account_id')
+            ->whereNull('journal_lines.deleted_at')
+            ->whereNull('journal_entries.deleted_at')
+            ->whereIn('accounts.code', array_merge(['4000'], $feeCodes))
+            ->whereBetween('journal_entries.entry_date', [$rangeStart, $rangeEnd])
+            ->get([
+                'accounts.code as account_code',
+                'journal_entries.entry_date as entry_date',
+                'journal_lines.debit as debit',
+                'journal_lines.credit as credit',
+            ]);
+        foreach ($journalRows as $row) {
+            $ym = CarbonImmutable::parse((string) $row->entry_date, $tz)->format('Y-m');
+            $net = (int) $row->credit - (int) $row->debit;
+            if ((string) $row->account_code === '4000') {
+                $rentByYm[$ym] = ($rentByYm[$ym] ?? 0) + $net;
+            } else {
+                $feesByYm[$ym] = ($feesByYm[$ym] ?? 0) + $net;
+            }
+        }
+
+        $expensesByYm = [];
+        foreach (
+            Expense::query()
+                ->whereBetween('spent_on', [$rangeStart, $rangeEnd])
+                ->get(['spent_on', 'amount']) as $expense
+        ) {
+            $ym = CarbonImmutable::parse((string) $expense->spent_on, $tz)->format('Y-m');
+            $expensesByYm[$ym] = ($expensesByYm[$ym] ?? 0) + (int) $expense->amount;
+        }
+
+        $payrollByYm = [];
+        foreach (
+            PayrollPayout::query()
+                ->whereBetween('paid_on', [$rangeStart, $rangeEnd])
+                ->get(['paid_on', 'amount']) as $payout
+        ) {
+            $ym = CarbonImmutable::parse((string) $payout->paid_on, $tz)->format('Y-m');
+            $payrollByYm[$ym] = ($payrollByYm[$ym] ?? 0) + (int) $payout->amount;
+        }
+
+        $completedByYm = [];
+        foreach (
+            Contract::query()
+                ->where('status', 'completed')
+                ->whereNotNull('actual_ends_at')
+                ->whereBetween('actual_ends_at', [
+                    CarbonImmutable::parse($rangeStart, $tz)->startOfDay()->toDateTimeString(),
+                    CarbonImmutable::parse($rangeEnd, $tz)->endOfDay()->toDateTimeString(),
+                ])
+                ->get(['actual_ends_at']) as $contract
+        ) {
+            $ym = CarbonImmutable::parse($contract->actual_ends_at, $tz)->format('Y-m');
+            $completedByYm[$ym] = ($completedByYm[$ym] ?? 0) + 1;
+        }
+
+        $lockedByYm = MonthLock::query()
+            ->where(function ($q) use ($fromY, $fromM) {
+                $q->where('year', '>', $fromY)
+                    ->orWhere(function ($qq) use ($fromY, $fromM) {
+                        $qq->where('year', $fromY)->where('month', '>=', $fromM);
+                    });
+            })
+            ->where(function ($q) use ($toY, $toM) {
+                $q->where('year', '<', $toY)
+                    ->orWhere(function ($qq) use ($toY, $toM) {
+                        $qq->where('year', $toY)->where('month', '<=', $toM);
+                    });
+            })
+            ->get()
+            ->filter(fn (MonthLock $lock) => $lock->isLocked())
+            ->mapWithKeys(fn (MonthLock $lock) => [
+                sprintf('%04d-%02d', (int) $lock->year, (int) $lock->month) => true,
+            ])
+            ->all();
+
         $months = [];
         foreach (array_reverse($keysAsc) as [$year, $month]) {
             $dt = CarbonImmutable::create($year, $month, 1, 0, 0, 0, $tz);
             $ym = sprintf('%04d-%02d', $year, $month);
-            $lock = MonthLock::query()->where(compact('year', 'month'))->first();
-            $locked = $lock?->isLocked() ?? false;
-            $rentCredit = (int) JournalLine::query()
-                ->whereHas('account', fn ($q) => $q->where('code', '4000'))
-                ->whereHas('entry', function ($q) use ($year, $month) {
-                    $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
-                })
-                ->sum('credit')
-                - (int) JournalLine::query()
-                    ->whereHas('account', fn ($q) => $q->where('code', '4000'))
-                    ->whereHas('entry', function ($q) use ($year, $month) {
-                        $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
-                    })
-                    ->sum('debit');
-            $feesCredit = (int) JournalLine::query()
-                ->whereHas('account', fn ($q) => $q->whereIn('code', ['4100', '4200', '4300', '4400']))
-                ->whereHas('entry', function ($q) use ($year, $month) {
-                    $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
-                })
-                ->sum('credit')
-                - (int) JournalLine::query()
-                    ->whereHas('account', fn ($q) => $q->whereIn('code', ['4100', '4200', '4300', '4400']))
-                    ->whereHas('entry', function ($q) use ($year, $month) {
-                        $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month);
-                    })
-                    ->sum('debit');
-            $expensesTotal = (int) Expense::query()
-                ->whereYear('spent_on', $year)
-                ->whereMonth('spent_on', $month)
-                ->sum('amount');
-            $payrollPaid = (int) PayrollPayout::query()
-                ->whereYear('paid_on', $year)
-                ->whereMonth('paid_on', $month)
-                ->sum('amount');
-            $completed = Contract::query()
-                ->where('status', 'completed')
-                ->whereYear('actual_ends_at', $year)
-                ->whereMonth('actual_ends_at', $month)
-                ->count();
+            $locked = (bool) ($lockedByYm[$ym] ?? false);
+            $rentCredit = (int) ($rentByYm[$ym] ?? 0);
+            $feesCredit = (int) ($feesByYm[$ym] ?? 0);
+            $expensesTotal = (int) ($expensesByYm[$ym] ?? 0);
+            $payrollPaid = (int) ($payrollByYm[$ym] ?? 0);
+            $completed = (int) ($completedByYm[$ym] ?? 0);
 
             $isCurrent = $ym === $currentYm;
             $isFuture = $ym > $currentYm;

@@ -208,17 +208,36 @@ class DashboardController extends Controller
                         : ['vehicle:id,brand,model,plate'])
                     ->latest('id')
                     ->limit(5)
-                    ->get();
+                    ->get([
+                        'id', 'number', 'status', 'customer_id', 'vehicle_id',
+                        'starts_at', 'planned_ends_at', 'actual_ends_at',
+                        'frozen_daily_rate', 'period_rent', 'final_total',
+                    ]);
                 $openMaint = $this->progress->openMaintenanceByVehicleIds($recent->pluck('vehicle_id')->all());
 
                 return $recent->map(function (Contract $c) use ($canCustomers, $openMaint) {
-                    $arr = $c->toArray();
-                    if (! $canCustomers) {
-                        $arr['customer'] = null;
-                    }
-                    $arr['progress'] = $this->progress->forContract($c, null, $openMaint);
-
-                    return $arr;
+                    return [
+                        'id' => $c->id,
+                        'number' => $c->number,
+                        'status' => $c->status,
+                        'starts_at' => $c->starts_at?->toIso8601String(),
+                        'planned_ends_at' => $c->planned_ends_at?->toIso8601String(),
+                        'actual_ends_at' => $c->actual_ends_at?->toIso8601String(),
+                        'frozen_daily_rate' => (int) $c->frozen_daily_rate,
+                        'period_rent' => $c->period_rent !== null ? (int) $c->period_rent : null,
+                        'final_total' => $c->final_total !== null ? (int) $c->final_total : null,
+                        'customer' => $canCustomers && $c->customer ? [
+                            'id' => $c->customer->id,
+                            'full_name' => $c->customer->full_name,
+                        ] : null,
+                        'vehicle' => $c->vehicle ? [
+                            'id' => $c->vehicle->id,
+                            'brand' => $c->vehicle->brand,
+                            'model' => $c->vehicle->model,
+                            'plate' => $c->vehicle->plate,
+                        ] : null,
+                        'progress' => $this->progress->forContract($c, null, $openMaint),
+                    ];
                 })->values();
             })() : [],
         ];

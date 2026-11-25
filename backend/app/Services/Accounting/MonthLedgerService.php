@@ -41,7 +41,7 @@ class MonthLedgerService
         }
 
         $this->accounting->ensureChartOfAccounts();
-        $this->accounting->syncRentRecognition([[$year, $month]]);
+        // قراءة فقط — لا مزامنة rent_recog هنا (ك٫١). الكتابة: تسليم/إقفال + Cron.
         $start = CarbonImmutable::create($year, $month, 1)->startOfDay();
         $end = $start->endOfMonth()->endOfDay();
         $range = [$start, $end];

@@ -244,6 +244,11 @@ function measurePage(Illuminate\Contracts\Http\Kernel $kernel, User $user, array
     ];
 }
 
+$journalBefore = (int) \App\Models\JournalEntry::query()->count();
+$paymentBefore = (int) \App\Models\Payment::query()->count();
+$contractBefore = (int) \App\Models\Contract::query()->count();
+$recogBefore = (int) \App\Models\JournalEntry::query()->where('source', 'like', 'rent_recog%')->count();
+
 $results = [];
 foreach ($pages as $key => $def) {
     $cold = measurePage($kernel, $user, $def, true, true);
@@ -255,17 +260,37 @@ foreach ($pages as $key => $def) {
     ];
 }
 
+$journalAfter = (int) \App\Models\JournalEntry::query()->count();
+$paymentAfter = (int) \App\Models\Payment::query()->count();
+$contractAfter = (int) \App\Models\Contract::query()->count();
+$recogAfter = (int) \App\Models\JournalEntry::query()->where('source', 'like', 'rent_recog%')->count();
+
 $payload = [
-    'measured_at' => now()->toIso8601String(),
+    'measured_at' => now()->timezone('Africa/Cairo')->toIso8601String(),
     'zone' => 'Africa/Cairo',
     'user' => $user->email,
     'ids' => $ids,
     'shell' => 'كل صفحة تتضمن GET /attention من AppShell (مرة لكل جلسة قطبية فعلياً؛ هنا تُحسب مع كل صفحة للأسوأ)',
     'budgets' => [
-        'page_queries_warn' => 40,
+        // APIs الخاصة بالصفحة فقط (بدون /attention المشترك من الشلّ)
+        'page_only_queries_warn' => 40,
         'page_queries_critical' => 80,
         'page_bytes_warn' => 250_000,
         'page_ms_warn' => 500,
+    ],
+    'data_safety' => [
+        'journals_before' => $journalBefore,
+        'journals_after' => $journalAfter,
+        'journals_delta' => $journalAfter - $journalBefore,
+        'rent_recog_before' => $recogBefore,
+        'rent_recog_after' => $recogAfter,
+        'rent_recog_delta' => $recogAfter - $recogBefore,
+        'payments_delta' => $paymentAfter - $paymentBefore,
+        'contracts_delta' => $contractAfter - $contractBefore,
+        'ok' => ($journalAfter === $journalBefore)
+            && ($recogAfter === $recogBefore)
+            && ($paymentAfter === $paymentBefore)
+            && ($contractAfter === $contractBefore),
     ],
     'pages' => $results,
 ];

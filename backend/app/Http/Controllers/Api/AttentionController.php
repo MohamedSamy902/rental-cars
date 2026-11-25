@@ -83,11 +83,13 @@ class AttentionController extends Controller
                 ->whereNotIn('status', ['paid', 'confirmed'])
                 ->count() : null;
 
-            $lowStock = $user?->hasPermission('inventory.view') ? InventoryItem::query()
-                ->withSum('batches as remaining_sum', 'remaining')
-                ->get()
-                ->filter(fn (InventoryItem $item) => (int) ($item->remaining_sum ?? 0) <= (int) $item->reorder_level)
-                ->count() : null;
+            $lowStock = $user?->hasPermission('inventory.view')
+                ? (int) InventoryItem::query()
+                    ->whereRaw(
+                        '(select coalesce(sum(remaining), 0) from inventory_batches where inventory_batches.inventory_item_id = inventory_items.id) <= inventory_items.reorder_level'
+                    )
+                    ->count()
+                : null;
 
             $unread = Notification::query()
                 ->when($user, fn ($q) => $q->where('user_id', $user->id))

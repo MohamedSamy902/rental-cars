@@ -780,12 +780,52 @@ class VehicleOwnerService
         return $value;
     }
 
-    /** عدد الملاك النشطين الذين عليهم فلوس متأخرة (شهور مكتملة − مصروف). */
+    /** عدد الملاك النشطين الذين عليهم فلوس متأخرة (شهور مكتملة − مصروف) — دفعة واحدة بلا N+1. */
     public function countOwnersWithOverdue(): int
     {
+        $tz = config('app.timezone', 'Africa/Cairo');
+        $today = now()->timezone($tz)->toDateString();
+        $countsFrom = $this->duesCountsFrom();
+
+        $owners = VehicleOwner::query()
+            ->where('is_active', true)
+            ->with(['vehicles' => function ($q) {
+                $q->where('is_active', true)
+                    ->whereNotNull('owner_monthly_amount')
+                    ->where('owner_monthly_amount', '>', 0)
+                    ->select([
+                        'id', 'owner_id', 'code', 'plate', 'owner_monthly_amount',
+                        'owner_agreement_starts_on', 'owner_agreement_ends_on',
+                    ]);
+            }])
+            ->orderBy('id')
+            ->get(['id']);
+
+        if ($owners->isEmpty()) {
+            return 0;
+        }
+
+        $paidByOwner = OwnerPayout::query()
+            ->whereIn('owner_id', $owners->pluck('id')->all())
+            ->selectRaw('owner_id, SUM(amount) as paid_sum')
+            ->groupBy('owner_id')
+            ->pluck('paid_sum', 'owner_id');
+
         $n = 0;
-        foreach (VehicleOwner::query()->where('is_active', true)->orderBy('id')->cursor() as $owner) {
-            if ($this->balance($owner)['overdue'] > 0) {
+        foreach ($owners as $owner) {
+            $earnedTotal = 0;
+            foreach ($owner->vehicles as $vehicle) {
+                $shares = $this->rentSchedule->shares(
+                    $vehicle->owner_agreement_starts_on?->toDateString(),
+                    $vehicle->owner_agreement_ends_on?->toDateString(),
+                    (int) $vehicle->owner_monthly_amount,
+                    $today,
+                    $countsFrom,
+                );
+                $earnedTotal += (int) array_sum($shares);
+            }
+            $paid = (int) ($paidByOwner[$owner->id] ?? 0);
+            if (($earnedTotal - $paid) > 0) {
                 $n++;
             }
         }

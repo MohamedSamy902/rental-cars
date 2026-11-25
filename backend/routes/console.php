@@ -13,5 +13,10 @@ Schedule::command('notifications:scan')
     ->hourly()
     ->withoutOverlapping();
 
+// إثبات إيجار للشهور المفتوحة (idempotent) — الكتابة هنا وليس على GET الحسابات/التقارير
+Schedule::command('accounting:sync-rent-recognition')
+    ->dailyAt('01:15')
+    ->withoutOverlapping();
+
 // توقّف ترحيل استحقاق الملاك اليومي — الصرف التشغيلي = مصروف شهري نقدي مباشرة (owners:purge-accrual-ledger).
 

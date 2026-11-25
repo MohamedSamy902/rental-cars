@@ -358,38 +358,43 @@ class VehicleController extends Controller
                 'created_at' => $m->created_at?->toIso8601String(),
             ]);
 
-        $ownerDues = OwnerMonthDue::query()
-            ->where('vehicle_id', $vehicle->id)
-            ->latest('year_month')
-            ->limit(36)
-            ->get()
-            ->map(fn (OwnerMonthDue $d) => [
-                'id' => $d->id,
-                'year_month' => $d->year_month,
-                'amount' => $d->amount,
-            ]);
-
-        $ownerPayouts = OwnerPayout::query()
-            ->where('vehicle_id', $vehicle->id)
-            ->latest('id')
-            ->limit(50)
-            ->get()
-            ->map(fn (OwnerPayout $p) => [
-                'id' => $p->id,
-                'amount' => $p->amount,
-                'paid_on' => $p->paid_on?->toDateString() ?? $p->paid_on,
-                'payment_method' => $p->payment_method,
-                'notes' => $p->notes,
-            ]);
-
-        $qr = $this->qrVisitor->payloadUrl($vehicle);
-        $qrLabel = trim($vehicle->brand.' '.$vehicle->model.' · '.$vehicle->plate);
-
         $user = $viewer;
         $canExpenses = (bool) ($user?->hasPermission('expenses.view') || $user?->hasPermission('hr.expenses'));
         $canOwners = (bool) $user?->hasPermission('owners.view');
         $canCustomers = (bool) $user?->hasPermission('customers.view');
         $canFinance = (bool) ($user?->hasPermission('reports.view') || $user?->hasPermission('accounting.view'));
+
+        $ownerDues = $canOwners
+            ? OwnerMonthDue::query()
+                ->where('vehicle_id', $vehicle->id)
+                ->latest('year_month')
+                ->limit(36)
+                ->get()
+                ->map(fn (OwnerMonthDue $d) => [
+                    'id' => $d->id,
+                    'year_month' => $d->year_month,
+                    'amount' => $d->amount,
+                ])
+            : collect();
+
+        $ownerPayouts = $canOwners
+            ? OwnerPayout::query()
+                ->where('vehicle_id', $vehicle->id)
+                ->latest('id')
+                ->limit(50)
+                ->get()
+                ->map(fn (OwnerPayout $p) => [
+                    'id' => $p->id,
+                    'amount' => $p->amount,
+                    'paid_on' => $p->paid_on?->toDateString() ?? $p->paid_on,
+                    'payment_method' => $p->payment_method,
+                    'notes' => $p->notes,
+                ])
+            : collect();
+
+        $qr = $this->qrVisitor->payloadUrl($vehicle);
+        $qrLabel = trim($vehicle->brand.' '.$vehicle->model.' · '.$vehicle->plate);
+
         $contractMoney = $contracts;
         if (! $canCustomers) {
             $contracts = $contracts->map(function (array $row) {
@@ -449,10 +454,6 @@ class VehicleController extends Controller
         if (! $canExpenses) {
             $expenses = collect();
             $expensesByMonth = $expensesByMonth->map(fn (array $row) => ['month' => $row['month'], 'amount' => 0]);
-        }
-        if (! $canOwners) {
-            $ownerDues = collect();
-            $ownerPayouts = collect();
         }
         if (! $canFinance) {
             $assetExtras['defaults']['lost_income_daily_basis'] = 0;

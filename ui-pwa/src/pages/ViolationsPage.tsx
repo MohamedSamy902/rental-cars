@@ -172,8 +172,8 @@ export function ViolationsPage() {
     const statuses = ['active', 'approved', 'completed']
     const batches = await Promise.all(
       statuses.map((status) =>
-        api<{ data: ContractOption[] }>(`/contracts?per_page=100&status=${status}`)
-          .catch(() => api<{ data: ContractOption[] }>(`/bookings?per_page=100&status=${status}`))
+        api<{ data: ContractOption[] }>(`/contracts?view=options&per_page=100&status=${status}`)
+          .catch(() => api<{ data: ContractOption[] }>(`/bookings?view=options&per_page=100&status=${status}`))
           .catch(() => ({ data: [] as ContractOption[] })),
       ),
     )
