@@ -68,7 +68,9 @@
   overflow: hidden;
 }
 
-/* Transparent click-catcher on desktop; a soft dim on phones */
+/* Transparent click-catcher on desktop; a soft dim on phones.
+   Always captures pointer events so the opening gesture cannot fall
+   through onto a parent sheet backdrop. Dismiss is gated in JS until armed. */
 .rpm-select-backdrop {
   position: fixed;
   inset: 0;
@@ -76,6 +78,7 @@
   border: 0;
   background: transparent;
   cursor: default;
+  pointer-events: auto;
 }
 
 /* Panel */

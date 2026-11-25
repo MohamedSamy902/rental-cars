@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type ApiError } from '@/shared/api/client'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { civilDateOnly, nowLocalDateTimeValue } from '@/shared/lib/dates'
@@ -93,7 +93,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     [selectedItems, extraItems],
   )
 
-  async function searchVehicles(q: string) {
+  const searchVehicles = useCallback(async (q: string) => {
     setVehicleSearching(true)
     try {
       const params = new URLSearchParams({ per_page: '30' })
@@ -103,9 +103,9 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     } finally {
       setVehicleSearching(false)
     }
-  }
+  }, [])
 
-  async function searchInventory(q: string) {
+  const searchInventory = useCallback(async (q: string) => {
     setInventorySearching(true)
     try {
       const params = new URLSearchParams({ per_page: '30' })
@@ -115,7 +115,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     } finally {
       setInventorySearching(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (!open) return
