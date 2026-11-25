@@ -161,15 +161,17 @@ export function ContractDetailPage() {
             </div>
             <p>{vehicleLabel}</p>
           </div>
-          <div className="cd-identity__progress">
+          <div className={`cd-identity__progress${balanceDue > 0 ? ' has-deferred' : ''}`}>
             <RentalProgressBar progress={row.progress} />
             {balanceDue > 0 ? (
               <div className="cd-deferred">
-                <span className="cd-deferred__label">فلوس متأجلة</span>
+                <span className="cd-deferred__label">متأجل</span>
                 <strong className="cd-deferred__amount tabular-nums">{formatMoney(balanceDue)}</strong>
                 {row.balance_due_on ? (
-                  <span className="cd-deferred__due muted">استحقاق {formatDate(row.balance_due_on)}</span>
-                ) : null}
+                  <span className="cd-deferred__due muted">{formatDate(row.balance_due_on)}</span>
+                ) : (
+                  <span className="cd-deferred__due muted">بدون تاريخ</span>
+                )}
               </div>
             ) : null}
           </div>
