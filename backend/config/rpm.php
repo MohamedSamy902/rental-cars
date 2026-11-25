@@ -1,29 +1,21 @@
 <?php
 
 return [
+    /*
+    |--------------------------------------------------------------------------
+    | كاش قراءة قصير (cPanel: database/file)
+    |--------------------------------------------------------------------------
+    */
+    'perf_read_cache' => (bool) env('RPM_PERF_READ_CACHE', true),
+
+    /** تفعيل الكاش داخل phpunit عند الحاجة لاختبار الإبطال */
+    'perf_cache_in_tests' => (bool) env('RPM_PERF_CACHE_IN_TESTS', false),
 
     /*
     |--------------------------------------------------------------------------
-    | نسبة المنصّة / المطوّر (بطاقة QR للزائر وفوتر النظام)
+    | قراءة ربحية الداشبورد من الملخص المشتق (افتراضي: لا)
+    | لا تُفعَّل إلا بعد برهان تكافؤ 100٪ على مختبر الحجم.
     |--------------------------------------------------------------------------
     */
-    'platform_author_name' => env('PLATFORM_AUTHOR_NAME', 'محمد سامي'),
-    'platform_whatsapp_url' => env('PLATFORM_WHATSAPP_URL', 'https://wa.me/201150100104'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | بيانات الشركة العامة (بطاقة QR للزائر / احتياطي إن نقصت الإعدادات)
-    |--------------------------------------------------------------------------
-    */
-    'center_public_phone' => env('CENTER_PUBLIC_PHONE', '01125253888'),
-    'center_public_address' => env(
-        'CENTER_PUBLIC_ADDRESS',
-        '17 شارع كورنيش النيل - حدائق حلوان - محافظة القاهرة'
-    ),
-    'center_public_map_url' => env(
-        'CENTER_PUBLIC_MAP_URL',
-        'https://maps.app.goo.gl/7xn2CMaJ3socdB6r9?g_st=ic'
-    ),
-    'center_public_tagline' => env('CENTER_PUBLIC_TAGLINE', 'لخدمات رجال الأعمال'),
-
+    'use_profit_month_summaries' => (bool) env('RPM_USE_PROFIT_MONTH_SUMMARIES', false),
 ];

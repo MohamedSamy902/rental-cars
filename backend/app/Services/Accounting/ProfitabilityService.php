@@ -78,6 +78,24 @@ class ProfitabilityService
      */
     public function monthSnapshot(Carbon $monthStart): array
     {
+        // BE-8: قراءة من الملخص المشتق فقط إن فُعّل العلم صراحةً وبعد إعادة البناء.
+        if ((bool) config('rpm.use_profit_month_summaries', false)) {
+            $fromSnap = app(ProfitabilitySnapshotService::class)->tryMonthSnapshot($monthStart);
+            if ($fromSnap !== null) {
+                return $fromSnap;
+            }
+        }
+
+        return $this->computeMonthSnapshotLive($monthStart);
+    }
+
+    /**
+     * التجميع المباشر — مصدر الحقيقة لإعادة بناء الملخص المشتق واختبارات التكافؤ.
+     *
+     * @return array{label:string,revenue:int,maintenance:int,expenses:int,operating_profit:int,vehicles:array<int,array<string,mixed>>}
+     */
+    public function computeMonthSnapshotLive(Carbon $monthStart): array
+    {
         $year = (int) $monthStart->format('Y');
         $month = (int) $monthStart->format('n');
         $from = $monthStart->copy()->startOfMonth();

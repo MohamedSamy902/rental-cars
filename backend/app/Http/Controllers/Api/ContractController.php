@@ -21,6 +21,7 @@ use App\Services\Contracts\RentalProgressService;
 use App\Services\Documents\DocumentTemplateService;
 use App\Support\NestedCustomerRedactor;
 use App\Support\PaginationInput;
+use App\Support\PerfReadCache;
 use App\Support\VehicleOwnerVisibility;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -195,44 +196,46 @@ class ContractController extends Controller
      */
     private function contractsSummary(): array
     {
-        $endOfDay = now()->endOfDay()->toDateTimeString();
-        $todayStart = now()->startOfDay()->toDateTimeString();
-        $tomorrowStart = now()->copy()->addDay()->startOfDay()->toDateTimeString();
+        return PerfReadCache::remember('contracts:summary', function () {
+            $endOfDay = now()->endOfDay()->toDateTimeString();
+            $todayStart = now()->startOfDay()->toDateTimeString();
+            $tomorrowStart = now()->copy()->addDay()->startOfDay()->toDateTimeString();
 
-        $row = Contract::query()
-            ->toBase()
-            ->selectRaw(
-                'COUNT(*) as total,
-                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved,
-                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active,
-                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed,
-                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as cancelled,
-                SUM(CASE WHEN status IN (?, ?) AND starts_at > ? THEN 1 ELSE 0 END) as upcoming,
-                SUM(CASE WHEN status IN (?, ?) AND starts_at >= ? AND starts_at < ? THEN 1 ELSE 0 END) as handover_today',
-                [
-                    'pending',
-                    'approved',
-                    'active',
-                    'completed',
-                    'cancelled',
-                    'pending', 'approved', $endOfDay,
-                    'pending', 'approved', $todayStart, $tomorrowStart,
-                ]
-            )
-            ->first();
+            $row = Contract::query()
+                ->toBase()
+                ->selectRaw(
+                    'COUNT(*) as total,
+                    SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending,
+                    SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved,
+                    SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active,
+                    SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as cancelled,
+                    SUM(CASE WHEN status IN (?, ?) AND starts_at > ? THEN 1 ELSE 0 END) as upcoming,
+                    SUM(CASE WHEN status IN (?, ?) AND starts_at >= ? AND starts_at < ? THEN 1 ELSE 0 END) as handover_today',
+                    [
+                        'pending',
+                        'approved',
+                        'active',
+                        'completed',
+                        'cancelled',
+                        'pending', 'approved', $endOfDay,
+                        'pending', 'approved', $todayStart, $tomorrowStart,
+                    ]
+                )
+                ->first();
 
-        return [
-            'total' => (int) ($row->total ?? 0),
-            'pending' => (int) ($row->pending ?? 0),
-            'approved' => (int) ($row->approved ?? 0),
-            'active' => (int) ($row->active ?? 0),
-            'completed' => (int) ($row->completed ?? 0),
-            'cancelled' => (int) ($row->cancelled ?? 0),
-            'upcoming' => (int) ($row->upcoming ?? 0),
-            'handover_today' => (int) ($row->handover_today ?? 0),
-            'with_balance' => $this->countWithOutstandingBalance(),
-        ];
+            return [
+                'total' => (int) ($row->total ?? 0),
+                'pending' => (int) ($row->pending ?? 0),
+                'approved' => (int) ($row->approved ?? 0),
+                'active' => (int) ($row->active ?? 0),
+                'completed' => (int) ($row->completed ?? 0),
+                'cancelled' => (int) ($row->cancelled ?? 0),
+                'upcoming' => (int) ($row->upcoming ?? 0),
+                'handover_today' => (int) ($row->handover_today ?? 0),
+                'with_balance' => $this->countWithOutstandingBalance(),
+            ];
+        });
     }
 
     /**
