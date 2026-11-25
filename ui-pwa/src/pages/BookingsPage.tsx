@@ -25,7 +25,7 @@ import './pages.css'
 const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed', 'with_balance', 'cancelled'] as const
 
 type PageMeta = { current_page: number; last_page: number; total: number }
-const LIST_PER_PAGE = 50
+const LIST_PER_PAGE = 20
 
 export function BookingsPage() {
   const navigate = useNavigate()
@@ -291,7 +291,7 @@ export function BookingsPage() {
         chips={chips}
         activeChip={chip}
         onChipChange={(id) => { setChip(id); setPage(1) }}
-        placeholder="بحث برقم العقد أو العميل…"
+        placeholder="بحث برقم العقد أو العميل أو اللوحة…"
       />
 
       {error && rows.length === 0 ? (

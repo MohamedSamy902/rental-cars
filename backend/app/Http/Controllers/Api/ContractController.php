@@ -76,16 +76,26 @@ class ContractController extends Controller
             }
         }
         if ($search = $request->string('search')->toString()) {
+            // بحث سيرفر على كل العقود (قبل الترقيم) — رقم · عميل · هاتف · لوحة/كود العربية.
             $q->where(function ($qq) use ($search) {
                 $qq->where('number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', fn ($c) => $c->where('full_name', 'like', "%{$search}%"));
+                    ->orWhereHas('customer', function ($c) use ($search) {
+                        $c->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('vehicle', function ($v) use ($search) {
+                        $v->where('plate', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%")
+                            ->orWhere('brand', 'like', "%{$search}%")
+                            ->orWhere('model', 'like', "%{$search}%");
+                    });
             });
         }
         if ($vehicleId = $request->integer('vehicle_id')) {
             $q->where('vehicle_id', $vehicleId);
         }
 
-        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+        $perPage = PaginationInput::perPage($request, 20, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, [
             'id', 'number', 'status', 'customer_id', 'vehicle_id', 'sales_user_id',

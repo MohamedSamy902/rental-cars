@@ -91,11 +91,13 @@ class VehicleController extends Controller
         $q = Vehicle::query()->latest('id');
 
         if ($search = $request->string('search')->toString()) {
+            // بحث سيرفر على كل الأسطول (قبل الترقيم) — كود · لوحة · ماركة/موديل · مالك.
             $q->where(function ($qq) use ($search) {
                 $qq->where('code', 'like', "%{$search}%")
                     ->orWhere('plate', 'like', "%{$search}%")
                     ->orWhere('brand', 'like', "%{$search}%")
-                    ->orWhere('model', 'like', "%{$search}%");
+                    ->orWhere('model', 'like', "%{$search}%")
+                    ->orWhereHas('owner', fn ($o) => $o->where('full_name', 'like', "%{$search}%"));
             });
         }
 
@@ -183,7 +185,7 @@ class VehicleController extends Controller
             };
         }
         $q->with($with);
-        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+        $perPage = PaginationInput::perPage($request, 20, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
 
