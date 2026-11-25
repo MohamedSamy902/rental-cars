@@ -48,7 +48,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     api<AuthUser>('/me')
       .then(setUser)
-      .catch(() => setToken(null))
+      .catch((e) => {
+        // امسح التوكن فقط عند رفض المصادقة — أخطاء الشبكة/٥٠٠ لا تسجّل خروجاً كاذباً.
+        const status = (e as { status?: number })?.status
+        if (status === 401 || status === 403) {
+          setToken(null)
+          setUser(null)
+        }
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -66,9 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const next = await api<AuthUser>('/me')
       setUser(next)
       return next
-    } catch {
-      setToken(null)
-      setUser(null)
+    } catch (e) {
+      const status = (e as { status?: number })?.status
+      if (status === 401 || status === 403) {
+        setToken(null)
+        setUser(null)
+      }
       return null
     }
   }, [])

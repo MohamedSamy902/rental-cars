@@ -7,12 +7,14 @@ use App\Models\Employee;
 use App\Models\TenantSetting;
 use App\Models\User;
 use App\Rules\EgyptianPhone;
+use App\Support\AuthSession;
 use App\Support\Phone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -60,12 +62,13 @@ class AuthController extends Controller
             ]);
         }
 
-        $minutes = (int) ($user->session_minutes ?: config('sanctum.expiration') ?: 720);
-        $token = $user->createToken('rpm-spa', ['*'], now()->addMinutes(max(15, $minutes)))->plainTextToken;
+        $minutes = AuthSession::minutesFor($user);
+        $token = $user->createToken('rpm-spa', ['*'], now()->addMinutes($minutes))->plainTextToken;
 
         return response()->json([
             'token' => $token,
             'user' => $this->presentUser($user),
+            'session_minutes' => $minutes,
         ]);
     }
 
@@ -95,6 +98,10 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user()->load('role.permissions');
+        $access = $request->user()->currentAccessToken();
+        if ($access instanceof PersonalAccessToken) {
+            AuthSession::touch($access, $user);
+        }
 
         return response()->json($this->presentUser($user));
     }
