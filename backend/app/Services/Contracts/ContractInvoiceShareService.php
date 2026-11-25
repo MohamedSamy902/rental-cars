@@ -9,6 +9,7 @@ use App\Services\Media\PublicMediaLinkService;
 use App\Support\CivilDate;
 use App\Support\DepositCurrency;
 use App\Support\PublicAppUrl;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
 /**
@@ -19,7 +20,30 @@ class ContractInvoiceShareService
     public function __construct(
         private readonly PublicMediaLinkService $links,
         private readonly ContractLedgerMath $ledgerMath,
+        private readonly ContractPricingService $pricing,
     ) {}
+
+    /**
+     * صلاحية رابط الفاتورة: شهر بعد نهاية الإيجار المخططة/الفعلية (حد أدنى ٣٠ يوماً من الآن).
+     */
+    public function invoiceShareExpiresAt(Contract $contract): Carbon
+    {
+        $end = $contract->actual_ends_at ?? $contract->planned_ends_at ?? now();
+        $expires = Carbon::parse($end)->addMonth()->endOfDay();
+        $min = now()->copy()->addDays(30)->endOfDay();
+        if ($expires->lt($min)) {
+            return $min;
+        }
+
+        return $expires;
+    }
+
+    public function invoiceShareTtlDays(Contract $contract): int
+    {
+        $seconds = max(86_400, $this->invoiceShareExpiresAt($contract)->getTimestamp() - now()->getTimestamp());
+
+        return max(1, (int) ceil($seconds / 86_400));
+    }
 
     /**
      * @return array{share_url: string, message_text: string, customer_phone: ?string, expires_in_days: int, invoice_number: string}
@@ -27,7 +51,8 @@ class ContractInvoiceShareService
     public function prepare(Contract $contract): array
     {
         $contract->loadMissing(['customer', 'vehicle', 'deposit', 'inspections']);
-        $shareUrl = $this->links->temporaryContractInvoiceShareUrl((int) $contract->id);
+        $ttlDays = $this->invoiceShareTtlDays($contract);
+        $shareUrl = $this->links->temporaryContractInvoiceShareUrl((int) $contract->id, $ttlDays);
         $tenant = TenantSetting::query()->first();
         $center = $tenant?->center_name ?: 'شركة آر بي إم للتأجير';
         $number = $contract->number ?: ('C-'.$contract->id);
@@ -54,13 +79,12 @@ class ContractInvoiceShareService
             $lines[] = 'المدفوع: '.$this->moneyPlain($totals['paid_net']).' ج.م.';
         }
         $lines[] = 'المتبقي: '.$this->moneyPlain($totals['remaining']).' ج.م.';
-        $lines[] = 'الرابط صالح لمدة '.PublicMediaLinkService::DEFAULT_TTL_DAYS.' يوماً.';
 
         return [
             'share_url' => $shareUrl,
             'message_text' => implode("\n", $lines),
             'customer_phone' => $customerPhone,
-            'expires_in_days' => PublicMediaLinkService::DEFAULT_TTL_DAYS,
+            'expires_in_days' => $ttlDays,
             'invoice_number' => $invoiceNumber,
         ];
     }
@@ -84,7 +108,9 @@ class ContractInvoiceShareService
         $odoIn = $ret?->odometer ?? $contract->odometer_in;
 
         $days = $this->rentalDays($contract);
-        $daily = (int) ($contract->frozen_daily_rate ?? 0);
+        $basis = $this->pricing->resolveRentBasisFromDays(max(1, $days));
+        [$rateLabel, $unitRate] = $this->rateDisplay($contract, $basis);
+
         $deposit = (int) ($contract->deposit?->original_amount ?? $contract->frozen_agreed_deposit ?? 0);
         $depositCurrency = DepositCurrency::normalize($contract->frozen_deposit_currency ?? null);
         $prepaidQty = (int) ($contract->prepaid_excess_km ?? 0);
@@ -111,52 +137,45 @@ class ContractInvoiceShareService
             ? '<p class="inv-print-footer">'.e($printFooter).'</p>'
             : '';
 
-        $customerName = e((string) ($customer?->full_name ?? ''));
-        $customerPhone = e((string) ($customer?->phone ?? ''));
-        $customerAddress = e((string) ($customer?->address ?? ''));
-        $idOrPassport = e((string) ($customer?->national_id ?: $customer?->passport_number ?: ($ops['print_tax_info'] ?? '')));
+        $customerName = e((string) ($customer?->full_name ?? '—'));
+        $customerPhone = e((string) ($customer?->phone ?? '—'));
+        $customerAddress = e((string) ($customer?->address ?? '—'));
+        $idOrPassport = e((string) ($customer?->national_id ?: $customer?->passport_number ?: ($ops['print_tax_info'] ?? '—')));
         $idExpiryRaw = $customer?->national_id_expires_on ?? $customer?->license_expires_on;
-        $idExpiry = e($idExpiryRaw ? CivilDate::formatDisplay($idExpiryRaw, '') : '');
-        $nationalityEsc = e($nationality);
-        $vehicleName = e(trim(($vehicle?->brand ?? '').' '.($vehicle?->model ?? '')));
-        $vehicleYear = e($this->dash($vehicle?->year));
-        $vehiclePlate = e((string) ($vehicle?->plate ?? ''));
-        $vehicleColor = e((string) ($vehicle?->color ?? ''));
-        $outAtLabel = e($this->whenLabel($outAt));
-        $inAtLabel = e($this->whenLabel($inAt));
-        $odoOutLabel = $odoOut != null ? e(number_format((int) $odoOut, 0, '.', ',')) : '';
-        $odoInLabel = $odoIn != null ? e(number_format((int) $odoIn, 0, '.', ',')) : '';
+        $idExpiry = e($idExpiryRaw ? CivilDate::formatDisplay($idExpiryRaw, '—') : '—');
+        $nationalityEsc = e($nationality !== '' ? $nationality : '—');
+        $crCell = $printCr !== '' ? $printCr : '—';
+        $vehicleName = e(trim(($vehicle?->brand ?? '').' '.($vehicle?->model ?? '')) ?: '—');
+        $vehicleYear = e($this->dash($vehicle?->year) ?: '—');
+        $vehiclePlate = e((string) ($vehicle?->plate ?? '—'));
+        $vehicleColor = e((string) ($vehicle?->color ?: '—'));
+        $outAtLabel = e($this->whenLabel($outAt) ?: '—');
+        $inAtLabel = e($this->whenLabel($inAt) ?: '—');
+        $odoOutLabel = $odoOut != null ? e(number_format((int) $odoOut, 0, '.', ',').' كم') : '—';
+        $odoInLabel = $odoIn != null ? e(number_format((int) $odoIn, 0, '.', ',').' كم') : '—';
 
-        $deliveryRow = $hasDelivery
-            ? '<tr><td class="desc">خدمة تسليم واستلام السيارة'
-                .($deliveryNotes !== '' ? ' · '.e($deliveryNotes) : '')
-                .'</td><td class="num">1</td><td class="num">—</td><td class="num">'
-                .e($this->moneyPlain($delivery)).'</td></tr>'
-            : '<tr><td class="desc">خدمة تسليم واستلام السيارة</td><td class="num"></td><td class="num"></td><td class="num"></td></tr>';
-
-        $otherRow = ($other > 0 || $damage > 0)
-            ? '<tr><td class="desc">رسوم أخرى / خدمات إضافية'
-                .($damage > 0 ? ' · أضرار' : '')
-                .($otherLabel !== '' ? ' · '.e($otherLabel) : '')
-                .'</td><td class="num">1</td><td class="num">—</td><td class="num">'
-                .e($this->moneyPlain($other + $damage)).'</td></tr>'
-            : '<tr><td class="desc">رسوم أخرى / خدمات إضافية</td><td class="num"></td><td class="num"></td><td class="num"></td></tr>';
-
+        $rateLabelEsc = e($rateLabel);
+        $daysCell = $days > 0 ? (string) $days : '—';
+        $unitRateCell = $unitRate > 0 ? e($this->moneyPlain($unitRate)) : '—';
+        $rentCell = e($this->moneyPlain($totals['rent']));
         $depositCell = $deposit > 0
             ? e(number_format($deposit, 0, '.', ',').' '.$depositCurrency)
-            : '';
-        $ttl = PublicMediaLinkService::DEFAULT_TTL_DAYS;
-        $daysCell = $days > 0 ? (string) $days : '';
-        $dailyCell = $this->moneyCell($daily);
-        $rentCell = $this->moneyCell($totals['rent']);
-        $depositQty = $this->qtyCell($deposit);
-        $prepaidQtyCell = $this->qtyCell($prepaidQty);
-        $prepaidAmtCell = $this->moneyCell($prepaidAmt);
-        $excessQtyCell = $this->qtyCell($excessQty);
-        $excessAmtCell = $this->moneyCell($excessAmt);
-        $totalCell = $this->moneyCell($totals['total']);
-        $paidCell = $this->moneyCell($totals['paid_net']);
-        $remainingCell = $this->moneyCell($totals['remaining']);
+            : '—';
+        $prepaidQtyCell = $prepaidQty > 0 ? (string) $prepaidQty : '—';
+        $prepaidAmtCell = $prepaidAmt > 0 ? e($this->moneyPlain($prepaidAmt)) : '—';
+        $excessQtyCell = $excessQty > 0 ? (string) $excessQty : '—';
+        $excessAmtCell = $excessAmt > 0 ? e($this->moneyPlain($excessAmt)) : '—';
+        $deliveryDesc = 'خدمة تسليم واستلام'
+            .($deliveryNotes !== '' ? ' · '.e($deliveryNotes) : '');
+        $deliveryAmt = $hasDelivery ? e($this->moneyPlain($delivery)) : '—';
+        $otherDesc = 'رسوم أخرى / خدمات'
+            .($damage > 0 ? ' · أضرار' : '')
+            .($otherLabel !== '' ? ' · '.e($otherLabel) : '');
+        $otherAmt = ($other > 0 || $damage > 0) ? e($this->moneyPlain($other + $damage)) : '—';
+        $totalCell = e($this->moneyPlain($totals['total']));
+        $paidCell = e($this->moneyPlain($totals['paid_net']));
+        $remainingCell = e($this->moneyPlain($totals['remaining']));
+        $remainingTone = $totals['remaining'] > 0 ? 'is-due' : 'is-settled';
 
         return <<<HTML
 <!DOCTYPE html>
@@ -166,96 +185,203 @@ class ContractInvoiceShareService
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <title>فاتورة {$invNo} — {$centerEsc}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    @page { size: A4; margin: 10mm 9mm; }
-    * { box-sizing: border-box; }
-    html{ margin:0; }
+    @page { size: A4; margin: 12mm 10mm; }
+    :root{
+      --ink:#0f172a;
+      --muted:#64748b;
+      --line:#e2e8f0;
+      --surface:#ffffff;
+      --bg:#eef2f7;
+      --accent:#b91c1c;
+      --accent-soft:#fef2f2;
+      --navy:#0b1f3a;
+      --ok:#047857;
+      --warn:#b45309;
+      --radius:18px;
+      --shadow:0 18px 50px rgba(15,23,42,.08);
+    }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; }
     body{
-      margin:0; padding:12px 10px calc(16px + env(safe-area-inset-bottom, 0px));
-      background:#f4f4f5; color:#111;
-      font-family: Tahoma,'Segoe UI',Arial,sans-serif;
-      font-size: 11px; line-height: 1.45;
-      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      min-height:100vh;
+      padding:18px 14px calc(28px + env(safe-area-inset-bottom, 0px));
+      background:
+        radial-gradient(1200px 420px at 100% -10%, rgba(185,28,28,.10), transparent 55%),
+        radial-gradient(900px 380px at -10% 0%, rgba(11,31,58,.10), transparent 50%),
+        linear-gradient(180deg, #f8fafc 0%, var(--bg) 100%);
+      color:var(--ink);
+      font-family:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",Arial,sans-serif;
+      font-size:14px; line-height:1.55;
+      -webkit-font-smoothing:antialiased;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
     }
     .sheet{
-      background:#fff; border-radius:12px; padding:14px 12px 18px;
-      box-shadow: 0 8px 28px rgba(24,24,27,.08);
-      max-width: 210mm; margin: 0 auto;
+      max-width:760px; margin:0 auto;
+      background:var(--surface);
+      border:1px solid rgba(226,232,240,.9);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
     }
-    .share-banner{
-      margin: 0 auto 10px; max-width: 210mm; padding: 8px 12px;
-      background:#18181b; color:#fff; border-radius:10px;
-      font-size:12px; text-align:center;
-    }
-    .rpm-invoice-v1{ --inv-navy:#0b1f3a; --inv-red:#c40000; width:100%; max-width:192mm; margin:0 auto; }
+    .rpm-invoice-v2{ padding:22px 18px 20px; }
     .inv-head{
-      display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
-      margin-bottom:10px; border-bottom:2px solid var(--inv-navy); padding-bottom:8px;
-      direction: ltr;
+      display:flex; flex-wrap:wrap; justify-content:space-between; gap:18px;
+      align-items:flex-start;
+      padding-bottom:18px;
+      border-bottom:1px solid var(--line);
     }
-    .inv-brand{ display:flex; align-items:center; gap:10px; }
-    .inv-title-block, .inv-meta, .inv-meta .lbl { direction: rtl; text-align: right; }
-    .inv-brand img{ width:64px; height:auto; object-fit:contain; }
-    .inv-brand-text{ display:flex; flex-direction:column; line-height:1.15; }
-    .inv-brand-text strong{ font-size:15px; color:var(--inv-navy); }
-    .inv-brand-text span{ font-size:11px; color:var(--inv-red); font-weight:800; letter-spacing:.06em; border-bottom:2px solid var(--inv-red); padding-bottom:1px; width:max-content; }
-    .inv-title-block{ text-align:start; min-width:42%; }
-    .inv-title-block h1{ margin:0 0 6px; font-size:22px; color:#111; letter-spacing:.02em; }
-    .inv-meta{ font-size:11px; }
-    .inv-meta > div{ margin:2px 0; display:flex; gap:6px; flex-wrap:wrap; }
-    .inv-meta .lbl{ color:#333; font-weight:700; }
-    .inv-meta .val{ border-bottom:1px dotted #333; min-width:7em; padding:0 4px; font-weight:800; }
-    .inv-section{ margin:10px 0; }
+    .inv-brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+    .inv-brand img{
+      width:64px; height:64px; object-fit:contain;
+      border-radius:16px; background:#fff;
+      border:1px solid var(--line);
+      padding:6px;
+    }
+    .inv-brand-text{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+    .inv-brand-text strong{
+      font-size:1.05rem; font-weight:700; color:var(--navy);
+      letter-spacing:-.01em;
+    }
+    .inv-brand-text span{
+      display:inline-flex; align-self:flex-start;
+      font-size:.72rem; font-weight:700; letter-spacing:.08em;
+      color:var(--accent); background:var(--accent-soft);
+      border-radius:999px; padding:3px 10px;
+    }
+    .inv-title-block{ text-align:start; min-width:min(100%, 240px); }
+    .inv-title-block h1{
+      margin:0 0 10px; font-size:1.55rem; font-weight:700;
+      color:var(--ink); letter-spacing:-.02em;
+    }
+    .inv-meta{ display:grid; gap:6px; }
+    .inv-meta-row{
+      display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline;
+      font-size:.9rem;
+    }
+    .inv-meta-row .lbl{ color:var(--muted); font-weight:500; }
+    .inv-meta-row .val{
+      font-weight:700; font-variant-numeric:tabular-nums;
+      background:#f8fafc; border:1px solid var(--line);
+      border-radius:999px; padding:2px 10px;
+    }
+    .inv-section{ margin-top:18px; }
     .inv-section-title{
-      background: var(--inv-navy); color:#fff; font-weight:800; font-size:12px;
-      padding:5px 10px; text-align:center;
+      display:flex; align-items:center; gap:8px;
+      margin:0 0 10px; font-size:.95rem; font-weight:700; color:var(--navy);
     }
-    .inv-grid{ width:100%; border-collapse:collapse; table-layout:fixed; }
-    .inv-grid th, .inv-grid td{
-      border:1px solid #222; padding:5px 7px; vertical-align:top; font-size:11px;
+    .inv-section-title::before{
+      content:""; width:8px; height:8px; border-radius:999px; background:var(--accent);
+      box-shadow:0 0 0 4px var(--accent-soft);
     }
-    .inv-grid th{ width:18%; background:#f3f5f8; font-weight:800; white-space:nowrap; }
-    .inv-finance{ position:relative; }
-    .inv-watermark{
-      position:absolute; inset:28% 10% 18%;
-      display:flex; align-items:center; justify-content:center;
-      font-size:42px; font-weight:900; color:rgba(11,31,58,.06);
-      pointer-events:none; transform:rotate(-18deg); letter-spacing:.04em;
+    .inv-cards{
+      display:grid; grid-template-columns:1fr 1fr; gap:10px;
     }
-    .inv-finance-table{ width:100%; border-collapse:collapse; position:relative; z-index:1; }
-    .inv-finance-table th, .inv-finance-table td{
-      border:1px solid #222; padding:6px 7px; font-size:11px;
+    .inv-card{
+      background:#f8fafc; border:1px solid var(--line);
+      border-radius:16px; padding:12px 14px;
     }
-    .inv-finance-table thead th{ background:var(--inv-navy); color:#fff; font-weight:800; }
+    .inv-card .k{
+      display:block; font-size:.75rem; color:var(--muted); margin-bottom:2px; font-weight:500;
+    }
+    .inv-card .v{
+      display:block; font-weight:600; font-size:.95rem; word-break:break-word;
+      font-variant-numeric:tabular-nums;
+    }
+    .inv-card.wide{ grid-column:1 / -1; }
+    .inv-finance{
+      margin-top:8px; border:1px solid var(--line); border-radius:18px; overflow:hidden;
+      background:#fff;
+    }
+    .inv-finance-table{ width:100%; border-collapse:collapse; }
+    .inv-finance-table thead th{
+      background:linear-gradient(180deg, #0b1f3a 0%, #123056 100%);
+      color:#fff; font-weight:600; font-size:.8rem;
+      padding:11px 12px; text-align:start;
+    }
+    .inv-finance-table td{
+      padding:11px 12px; border-top:1px solid var(--line);
+      font-size:.9rem; vertical-align:middle;
+    }
+    .inv-finance-table tbody tr:nth-child(even) td{ background:#fbfdff; }
     .inv-finance-table .desc{ text-align:start; }
-    .inv-finance-table .num{ text-align:center; font-variant-numeric:tabular-nums; width:18%; }
-    .inv-finance-table tr.totals td{ background:#f7f8fa; font-weight:700; }
-    .inv-note{ margin:6px 0 0; font-size:10px; color:#555; }
+    .inv-finance-table .num{
+      text-align:center; font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap;
+    }
+    .inv-finance-table tr.totals td{
+      background:#f1f5f9; font-weight:700;
+    }
+    .inv-finance-table tr.balance td{
+      background:var(--accent-soft);
+    }
+    .inv-finance-table tr.balance.is-settled td{ background:#ecfdf5; }
+    .inv-finance-table tr.balance .num{ color:var(--warn); font-size:1.05rem; }
+    .inv-finance-table tr.balance.is-settled .num{ color:var(--ok); }
+    .inv-note{
+      margin:10px 2px 0; font-size:.8rem; color:var(--muted);
+    }
     .inv-terms{
-      margin-top:12px; background:#f2f2f2; border:1px solid #cfcfcf; border-radius:4px; padding:8px 12px;
+      margin-top:18px; background:#f8fafc; border:1px solid var(--line);
+      border-radius:16px; padding:14px 16px;
     }
-    .inv-terms h3{ margin:0 0 6px; font-size:12px; }
-    .inv-terms ol{ margin:0; padding-inline-start:1.3rem; }
-    .inv-terms li{ margin:3px 0; }
-    .inv-sign{ display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:22px; }
-    .inv-sign strong{ display:block; margin-bottom:28px; font-size:11px; }
-    .sign-line{ border-bottom:1px solid #333; height:1px; }
+    .inv-terms h3{ margin:0 0 8px; font-size:.95rem; color:var(--navy); }
+    .inv-terms ol{ margin:0; padding-inline-start:1.2rem; color:#334155; font-size:.88rem; }
+    .inv-terms li{ margin:5px 0; }
+    .inv-sign{
+      display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px;
+    }
+    .inv-sign .box{
+      border:1px dashed #cbd5e1; border-radius:14px; padding:14px;
+      min-height:88px;
+    }
+    .inv-sign strong{ display:block; margin-bottom:36px; font-size:.85rem; color:var(--muted); font-weight:600; }
     .inv-foot{
-      display:flex; justify-content:space-between; gap:12px; margin-top:16px;
-      font-size:10px; color:#444; border-top:1px solid #ddd; padding-top:6px;
+      display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      margin-top:18px; padding-top:12px; border-top:1px solid var(--line);
+      font-size:.75rem; color:var(--muted);
     }
-    .inv-print-footer{ margin-top:6px; font-size:10px; color:#666; text-align:center; }
+    .inv-print-footer{ margin-top:8px; font-size:.75rem; color:var(--muted); text-align:center; }
+    @media (max-width:640px){
+      body{ padding:10px 8px 22px; }
+      .rpm-invoice-v2{ padding:16px 12px 14px; }
+      .inv-brand img{ width:52px; height:52px; }
+      .inv-title-block h1{ font-size:1.3rem; }
+      .inv-cards{ grid-template-columns:1fr; }
+      .inv-finance-table thead{ display:none; }
+      .inv-finance-table, .inv-finance-table tbody, .inv-finance-table tr, .inv-finance-table td{
+        display:block; width:100%;
+      }
+      .inv-finance-table tr{ padding:10px 12px; border-top:1px solid var(--line); }
+      .inv-finance-table td{
+        border:0; padding:3px 0; text-align:start !important;
+      }
+      .inv-finance-table td.desc{ font-weight:700; margin-bottom:4px; }
+      .inv-finance-table td.num::before{
+        content:attr(data-label) ": ";
+        color:var(--muted); font-weight:500;
+      }
+      .inv-sign{ grid-template-columns:1fr; }
+    }
     @media print{
       body{ background:#fff; padding:0; }
-      .share-banner{ display:none; }
-      .sheet{ box-shadow:none; border-radius:0; padding:0; }
+      .sheet{ box-shadow:none; border:0; border-radius:0; }
+      .rpm-invoice-v2{ padding:0; }
+      .inv-finance-table thead{ display:table-header-group; }
+      .inv-finance-table, .inv-finance-table tbody, .inv-finance-table tr, .inv-finance-table td{
+        display:table; width:auto;
+      }
+      .inv-finance-table tr{ display:table-row; }
+      .inv-finance-table td{ display:table-cell; }
+      .inv-finance-table td.num::before{ content:none; }
     }
   </style>
 </head>
 <body>
-  <p class="share-banner">فاتورة مؤقتة عبر واتساب · صالحة {$ttl} يوماً · بلا تسجيل دخول</p>
   <div class="sheet">
-<article class="rpm-invoice-v1">
+<article class="rpm-invoice-v2">
   <header class="inv-head">
     <div class="inv-brand">
       <img src="{$logoEsc}" alt="{$centerEsc}" />
@@ -265,137 +391,130 @@ class ContractInvoiceShareService
       </div>
     </div>
     <div class="inv-title-block">
-      <h1>INVOICE / فاتورة</h1>
+      <h1>فاتورة</h1>
       <div class="inv-meta">
-        <div><span class="lbl">Invoice # / رقم الفاتورة:</span> <span class="val" dir="ltr">{$invNo}</span></div>
-        <div><span class="lbl">Date / التاريخ:</span> <span class="val" dir="ltr">{$invDate}</span></div>
-        <div><span class="lbl">Agreement # / رقم العقد:</span> <span class="val" dir="ltr">{$numberEsc}</span></div>
+        <div class="inv-meta-row"><span class="lbl">رقم الفاتورة</span><span class="val" dir="ltr">{$invNo}</span></div>
+        <div class="inv-meta-row"><span class="lbl">التاريخ</span><span class="val" dir="ltr">{$invDate}</span></div>
+        <div class="inv-meta-row"><span class="lbl">رقم العقد</span><span class="val" dir="ltr">{$numberEsc}</span></div>
       </div>
     </div>
   </header>
 
   <section class="inv-section">
-    <div class="inv-section-title">بيانات المستأجر / Tenant Details</div>
-    <table class="inv-grid">
-      <tr>
-        <th>اسم المستأجر:</th><td>{$customerName}</td>
-        <th>سجل تجاري:</th><td dir="ltr">{$printCr}</td>
-      </tr>
-      <tr>
-        <th>رقم الهاتف:</th><td dir="ltr">{$customerPhone}</td>
-        <th>الجنسية:</th><td>{$nationalityEsc}</td>
-      </tr>
-      <tr>
-        <th>بطاقة ضريبية / قومي:</th><td dir="ltr">{$idOrPassport}</td>
-        <th>تاريخ انتهائها:</th><td dir="ltr">{$idExpiry}</td>
-      </tr>
-      <tr>
-        <th>العنوان:</th><td colspan="3">{$customerAddress}</td>
-      </tr>
-    </table>
+    <h2 class="inv-section-title">بيانات المستأجر</h2>
+    <div class="inv-cards">
+      <div class="inv-card"><span class="k">الاسم</span><span class="v">{$customerName}</span></div>
+      <div class="inv-card"><span class="k">الهاتف</span><span class="v" dir="ltr">{$customerPhone}</span></div>
+      <div class="inv-card"><span class="k">قومي / هوية</span><span class="v" dir="ltr">{$idOrPassport}</span></div>
+      <div class="inv-card"><span class="k">الجنسية</span><span class="v">{$nationalityEsc}</span></div>
+      <div class="inv-card"><span class="k">انتهاء الهوية / الرخصة</span><span class="v" dir="ltr">{$idExpiry}</span></div>
+      <div class="inv-card"><span class="k">سجل تجاري</span><span class="v" dir="ltr">{$crCell}</span></div>
+      <div class="inv-card wide"><span class="k">العنوان</span><span class="v">{$customerAddress}</span></div>
+    </div>
   </section>
 
   <section class="inv-section">
-    <div class="inv-section-title">بيانات السيارة / Vehicle Details</div>
-    <table class="inv-grid">
-      <tr>
-        <th>نوع السيارة / الموديل:</th><td>{$vehicleName}</td>
-        <th>سنة الصنع:</th><td dir="ltr">{$vehicleYear}</td>
-      </tr>
-      <tr>
-        <th>رقم اللوحة:</th><td>{$vehiclePlate}</td>
-        <th>اللون:</th><td>{$vehicleColor}</td>
-      </tr>
-      <tr>
-        <th>تاريخ الخروج:</th><td dir="ltr">{$outAtLabel}</td>
-        <th>عداد الخروج (كم):</th><td dir="ltr">{$odoOutLabel}</td>
-      </tr>
-      <tr>
-        <th>تاريخ الدخول:</th><td dir="ltr">{$inAtLabel}</td>
-        <th>عداد الدخول (كم):</th><td dir="ltr">{$odoInLabel}</td>
-      </tr>
-    </table>
+    <h2 class="inv-section-title">بيانات السيارة</h2>
+    <div class="inv-cards">
+      <div class="inv-card"><span class="k">النوع / الموديل</span><span class="v">{$vehicleName}</span></div>
+      <div class="inv-card"><span class="k">سنة الصنع</span><span class="v" dir="ltr">{$vehicleYear}</span></div>
+      <div class="inv-card"><span class="k">اللوحة</span><span class="v">{$vehiclePlate}</span></div>
+      <div class="inv-card"><span class="k">اللون</span><span class="v">{$vehicleColor}</span></div>
+      <div class="inv-card"><span class="k">تاريخ الخروج</span><span class="v" dir="ltr">{$outAtLabel}</span></div>
+      <div class="inv-card"><span class="k">عداد الخروج</span><span class="v" dir="ltr">{$odoOutLabel}</span></div>
+      <div class="inv-card"><span class="k">تاريخ الدخول</span><span class="v" dir="ltr">{$inAtLabel}</span></div>
+      <div class="inv-card"><span class="k">عداد الدخول</span><span class="v" dir="ltr">{$odoInLabel}</span></div>
+    </div>
   </section>
 
-  <section class="inv-section inv-finance">
-    <div class="inv-section-title">تفاصيل الحساب المالية / Financial Summary</div>
-    <div class="inv-watermark" aria-hidden="true">{$centerEsc}</div>
-    <table class="inv-finance-table">
-      <thead>
-        <tr>
-          <th>البيان / Description</th>
-          <th>الكمية / الأيام</th>
-          <th>السعر اليومي</th>
-          <th>الإجمالي</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="desc">إيجار سيارة (Rental Days)</td>
-          <td class="num">{$daysCell}</td>
-          <td class="num">{$dailyCell}</td>
-          <td class="num">{$rentCell}</td>
-        </tr>
-        <tr>
-          <td class="desc">تأمين مؤقت (Insurance Deposit)</td>
-          <td class="num">{$depositQty}</td>
-          <td class="num">—</td>
-          <td class="num">{$depositCell}</td>
-        </tr>
-        <tr>
-          <td class="desc">كم زيادة مدفوعة مقدماً (Prepaid Extra KM)</td>
-          <td class="num">{$prepaidQtyCell}</td>
-          <td class="num">—</td>
-          <td class="num">{$prepaidAmtCell}</td>
-        </tr>
-        <tr>
-          <td class="desc">زيادة إضافية عند الاستلام (Extra KM beyond prepaid)</td>
-          <td class="num">{$excessQtyCell}</td>
-          <td class="num">—</td>
-          <td class="num">{$excessAmtCell}</td>
-        </tr>
-        {$deliveryRow}
-        {$otherRow}
-        <tr class="totals">
-          <td colspan="3">المبلغ الإجمالي / Total Amount</td>
-          <td class="num"><strong>{$totalCell}</strong></td>
-        </tr>
-        <tr class="totals">
-          <td colspan="3">المبلغ المدفوع / Amount Paid</td>
-          <td class="num">{$paidCell}</td>
-        </tr>
-        <tr class="totals">
-          <td colspan="3">المتبقي / Remaining Balance</td>
-          <td class="num"><strong>{$remainingCell}</strong></td>
-        </tr>
-      </tbody>
-    </table>
-    <p class="inv-note">ملاحظة: التأمين المؤقت خارج إجمالي الإيجار ويُسوَّى عند الاستلام.</p>
+  <section class="inv-section">
+    <h2 class="inv-section-title">تفاصيل الحساب</h2>
+    <div class="inv-finance">
+      <table class="inv-finance-table">
+        <thead>
+          <tr>
+            <th>البيان</th>
+            <th>الكمية / الأيام</th>
+            <th>{$rateLabelEsc}</th>
+            <th>الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="desc">إيجار السيارة</td>
+            <td class="num" data-label="الأيام">{$daysCell}</td>
+            <td class="num" data-label="{$rateLabelEsc}">{$unitRateCell}</td>
+            <td class="num" data-label="الإجمالي">{$rentCell}</td>
+          </tr>
+          <tr>
+            <td class="desc">تأمين مؤقت</td>
+            <td class="num" data-label="الكمية">—</td>
+            <td class="num" data-label="السعر">—</td>
+            <td class="num" data-label="الإجمالي">{$depositCell}</td>
+          </tr>
+          <tr>
+            <td class="desc">كم زيادة مدفوعة مقدماً</td>
+            <td class="num" data-label="الكمية">{$prepaidQtyCell}</td>
+            <td class="num" data-label="السعر">—</td>
+            <td class="num" data-label="الإجمالي">{$prepaidAmtCell}</td>
+          </tr>
+          <tr>
+            <td class="desc">زيادة كم عند الاستلام</td>
+            <td class="num" data-label="الكمية">{$excessQtyCell}</td>
+            <td class="num" data-label="السعر">—</td>
+            <td class="num" data-label="الإجمالي">{$excessAmtCell}</td>
+          </tr>
+          <tr>
+            <td class="desc">{$deliveryDesc}</td>
+            <td class="num" data-label="الكمية">—</td>
+            <td class="num" data-label="السعر">—</td>
+            <td class="num" data-label="الإجمالي">{$deliveryAmt}</td>
+          </tr>
+          <tr>
+            <td class="desc">{$otherDesc}</td>
+            <td class="num" data-label="الكمية">—</td>
+            <td class="num" data-label="السعر">—</td>
+            <td class="num" data-label="الإجمالي">{$otherAmt}</td>
+          </tr>
+          <tr class="totals">
+            <td class="desc" colspan="3">المبلغ الإجمالي</td>
+            <td class="num" data-label="الإجمالي"><strong>{$totalCell}</strong></td>
+          </tr>
+          <tr class="totals">
+            <td class="desc" colspan="3">المبلغ المدفوع</td>
+            <td class="num" data-label="المدفوع">{$paidCell}</td>
+          </tr>
+          <tr class="balance {$remainingTone}">
+            <td class="desc" colspan="3">المتبقي</td>
+            <td class="num" data-label="المتبقي"><strong>{$remainingCell}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="inv-note">التأمين المؤقت خارج إجمالي الإيجار ويُسوَّى عند الاستلام.</p>
   </section>
 
   <section class="inv-terms">
-    <h3>الشروط والأحكام العامة:</h3>
+    <h3>الشروط والأحكام</h3>
     <ol>
       <li>يتعهد المستأجر بإعادة السيارة بنفس الحالة التي استلمها عليها وفي الوقت المحدد بالعقد.</li>
-      <li>المستأجر مسؤول عن كافة المخالفات المرورية التي تسجل على السيارة خلال فترة الإيجار.</li>
-      <li>يمنع استخدام السيارة في غير الأغراض المخصصة لها أو قيادتها من غير الأشخاص المصرح لهم.</li>
+      <li>المستأجر مسؤول عن كافة المخالفات المرورية التي تُسجَّل على السيارة خلال فترة الإيجار.</li>
+      <li>يمنع استخدام السيارة في غير الأغراض المخصصة لها أو قيادتها من غير الأشخاص المصرّح لهم.</li>
     </ol>
   </section>
 
   <footer class="inv-sign">
-    <div>
-      <strong>توقيع المستأجر / Tenant Signature</strong>
-      <div class="sign-line"></div>
+    <div class="box">
+      <strong>توقيع المستأجر</strong>
     </div>
-    <div>
-      <strong>توقيع المستلم / المعرض / Authorized Signature</strong>
-      <div class="sign-line"></div>
+    <div class="box">
+      <strong>توقيع المعرض / المفوض</strong>
     </div>
   </footer>
 
   <div class="inv-foot">
-    <span>Page 1 of 1</span>
-    <span>{$centerEsc} - Official Receipt &amp; Agreement Summary</span>
+    <span>{$centerEsc}</span>
+    <span>ملخص اتفاق الإيجار</span>
   </div>
   {$printFooterHtml}
 </article>
@@ -403,6 +522,28 @@ class ContractInvoiceShareService
 </body>
 </html>
 HTML;
+    }
+
+    /**
+     * @return array{0: string, 1: int}
+     */
+    private function rateDisplay(Contract $contract, string $basis): array
+    {
+        $daily = (int) ($contract->frozen_daily_rate ?? 0);
+
+        return match ($basis) {
+            ContractPricingService::BASIS_MONTHLY => [
+                'السعر الشهري',
+                (int) ($contract->frozen_monthly_rate
+                    ?: round($daily * ContractPricingService::DEFAULT_MONTHLY_FACTOR)),
+            ],
+            ContractPricingService::BASIS_HALF_MONTHLY => [
+                'سعر نص الشهر',
+                (int) ($contract->frozen_half_monthly_rate
+                    ?: round($daily * ContractPricingService::DEFAULT_HALF_MONTHLY_FACTOR)),
+            ],
+            default => ['السعر اليومي', $daily],
+        };
     }
 
     /**
@@ -442,9 +583,8 @@ HTML;
         if (! $start instanceof CarbonInterface || ! $end instanceof CarbonInterface) {
             return 0;
         }
-        $seconds = $end->getTimestamp() - $start->getTimestamp();
 
-        return max(1, (int) ceil($seconds / 86_400) ?: 1);
+        return $this->pricing->countRentalDays($start, $end);
     }
 
     private function invoiceNumber(string $contractNumber): string
@@ -510,15 +650,5 @@ HTML;
     private function moneyPlain(int $amount): string
     {
         return number_format($amount, 0, '.', ',');
-    }
-
-    private function moneyCell(int $amount): string
-    {
-        return $amount ? e($this->moneyPlain($amount)) : '';
-    }
-
-    private function qtyCell(int $qty): string
-    {
-        return $qty > 0 ? (string) $qty : '';
     }
 }
