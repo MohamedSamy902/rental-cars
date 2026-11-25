@@ -8,11 +8,10 @@ type Props = {
   onApprove: () => void
   onAction: (kind: Exclude<ActionKind, null>) => void
   onPrint: (kind?: PrintDocKind) => void
-  onSoftDelete?: () => void
 }
 
-export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint, onSoftDelete }: Props) {
-  const { can, isIntegrator } = useAuth()
+export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }: Props) {
+  const { can } = useAuth()
   const canApprove = can('contracts.approve')
   const canUpdate = can('contracts.update')
   const canCancel = can('contracts_cancel.approve')
@@ -21,6 +20,11 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint, 
   const canDeposit = can('deposits.collect')
   const canSettle = can('deposits.settle')
   const canPrint = can('contracts.print')
+  const canCollect = can('payments.create')
+  const balance = Number(b.ledger?.balance ?? 0)
+  const showCollect = canCollect
+    && (b.status === 'pending' || b.status === 'approved' || b.status === 'active' || b.status === 'completed')
+    && balance > 0
 
   return (
     <div className="rpm-card__actions cd-actions" role="group" aria-label="إجراءات العقد">
@@ -49,6 +53,9 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint, 
       {b.status === 'completed' && canExtend ? (
         <Button type="button" size="sm" variant="secondary" onClick={() => onAction('extend')}>تمديد</Button>
       ) : null}
+      {showCollect ? (
+        <Button type="button" size="sm" variant="secondary" onClick={() => onAction('collect')}>تسديد</Button>
+      ) : null}
       {b.deposit && b.deposit.status !== 'returned' && canSettle ? (
         <>
           <Button type="button" size="sm" variant="secondary" onClick={() => onAction('deduct')}>خصم تأمين</Button>
@@ -61,11 +68,6 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint, 
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('invoice')}>الفاتورة</Button>
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('receipt')}>إقرار استلام سيارة</Button>
         </div>
-      ) : null}
-      {isIntegrator && onSoftDelete ? (
-        <Button type="button" size="sm" variant="danger" className="cd-actions__danger" onClick={onSoftDelete}>
-          حذف ناعم
-        </Button>
       ) : null}
     </div>
   )

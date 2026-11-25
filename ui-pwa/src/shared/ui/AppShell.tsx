@@ -5,6 +5,7 @@ import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
+import { useRouteScrollMemory } from '@/shared/lib/useRouteScrollMemory'
 import { AttentionDot } from './AttentionDot'
 import { BrandLogo } from './BrandLogo'
 import { CommandPalette } from './CommandPalette'
@@ -71,6 +72,7 @@ export function AppShell() {
   const { openNewContract } = useNewContract()
   const navigate = useNavigate()
   const location = useLocation()
+  useRouteScrollMemory()
   const [cmdOpen, setCmdOpen] = useState(false)
   const [drawer, setDrawer] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)

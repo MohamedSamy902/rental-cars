@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { detailNavState } from '@/shared/lib/detailNav'
+import { pinScrollForNavigation, readScrollY, routeScrollKey } from '@/shared/lib/scrollMemory'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMonthYear } from '@/shared/lib/format'
 import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
@@ -54,6 +56,11 @@ const CustomersPageTabs = ['all', 'active', 'blacklist'] as const
 export function CustomersPage() {
   const toast = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
+  const openCustomer = (id: number) => {
+    pinScrollForNavigation(routeScrollKey(location.pathname, location.search), readScrollY())
+    navigate(`/customers/${id}`, { state: detailNavState(location.pathname, location.search) })
+  }
   const [rows, setRows] = useState<Customer[]>([])
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
@@ -120,7 +127,7 @@ export function CustomersPage() {
   }, [search, chip, page])
 
   async function openDetail(id: number) {
-    navigate(`/customers/${id}`)
+    openCustomer(id)
   }
 
   function mapApiErrors(e: unknown) {
@@ -191,7 +198,7 @@ export function CustomersPage() {
   }
 
   async function openEdit(id: number) {
-    navigate(`/customers/${id}`)
+    openCustomer(id)
   }
 
   const statusPill = (c: Customer) => (

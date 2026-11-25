@@ -67,6 +67,13 @@
   min-inline-size: 0;
 }
 
+.rpm-phone-actions--compact {
+  flex-wrap: nowrap;
+  gap: 6px;
+  width: auto;
+  max-inline-size: 100%;
+}
+
 .rpm-phone-actions--compact .rpm-phone-actions__call,
 .rpm-phone-actions--compact .rpm-phone-actions__wa {
   padding-block: 0.28rem;
@@ -75,9 +82,15 @@
   white-space: nowrap;
 }
 
+.rpm-phone-actions--compact .rpm-phone-actions__call {
+  flex: 0 1 auto;
+  max-inline-size: min(100%, 11rem);
+}
+
 .rpm-phone-actions--compact .rpm-phone-actions__wa {
   inline-size: 2rem;
   block-size: 2rem;
+  min-inline-size: 2rem;
   padding: 0;
   justify-content: center;
   border-radius: 999px;
@@ -85,13 +98,15 @@
 
 @media (max-width: 640px) {
   .rpm-phone-actions {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
-    width: 100%;
+    width: auto;
+    max-inline-size: 100%;
   }
 
   .rpm-phone-actions__call {
-    flex: 1 1 8rem;
+    flex: 0 1 auto;
+    max-inline-size: min(100%, 11rem);
   }
 
   .rpm-phone-actions__call,

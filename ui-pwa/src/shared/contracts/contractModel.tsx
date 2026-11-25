@@ -256,7 +256,7 @@ export function contractMenu(
       { id: 'sep-soft-delete', separator: true },
       {
         id: 'soft-delete',
-        label: 'حذف ناعم (عقد + ماليات)',
+        label: 'حذف',
         icon: <IconTrash size={16} />,
         tone: 'danger',
         onSelect: handlers.softDelete,

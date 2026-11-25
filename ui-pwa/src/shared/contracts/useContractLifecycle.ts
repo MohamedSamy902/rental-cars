@@ -75,14 +75,14 @@ export function useContractLifecycle(onMutated?: () => void) {
   /** سوبر أدمن فقط — حذف ناعم للعقد وكل الماليات/المخالفات/الصيانة المرتبطة. */
   async function softDelete(id: number): Promise<boolean> {
     const ok1 = window.confirm(
-      'حذف ناعم لهذا العقد؟ سيُخفى العقد مع المدفوعات والقيود والتأمين والمخالفات والفحوصات والصيانة المرتبطة. لا يمكن التراجع من الواجهة.',
+      'حذف هذا العقد؟ سيُخفى العقد مع المدفوعات والقيود والتأمين والمخالفات والفحوصات والصيانة المرتبطة. لا يمكن التراجع من الواجهة.',
     )
     if (!ok1) return false
-    const ok2 = window.confirm('تأكيد نهائي: حذف ناعم للعقد وكل ما يخصه؟')
+    const ok2 = window.confirm('تأكيد نهائي: حذف العقد وكل ما يخصه؟')
     if (!ok2) return false
     try {
       await api(`/contracts/${id}`, { method: 'DELETE' })
-      toast.success('تم الحذف الناعم للعقد وما يخصه.')
+      toast.success('تم حذف العقد وما يخصه.')
       onMutated?.()
       return true
     } catch (e) {

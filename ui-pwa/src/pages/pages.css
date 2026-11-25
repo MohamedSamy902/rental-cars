@@ -202,6 +202,34 @@
   font-size: 0.78rem;
 }
 
+.rpm-contract-customer {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.65rem;
+  width: 100%;
+  min-inline-size: 0;
+}
+
+.rpm-contract-customer__name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rpm-contract-customer .rpm-phone-actions {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+.rpm-contract-deferred {
+  color: var(--warning-ink, var(--warning, #b45309)) !important;
+  font-weight: 700;
+}
+
 /* ───────────── List cards (mobile lists / clickable rows) ───────────── */
 .rpm-card-list {
   display: grid;

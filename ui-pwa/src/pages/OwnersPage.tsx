@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { detailNavState } from '@/shared/lib/detailNav'
+import { pinScrollForNavigation, readScrollY, routeScrollKey } from '@/shared/lib/scrollMemory'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatMoney } from '@/shared/lib/format'
 import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
@@ -56,6 +58,11 @@ function ownerOverdue(o: Owner): number {
 export function OwnersPage() {
   const toast = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
+  const openOwner = (id: number, suffix = '') => {
+    pinScrollForNavigation(routeScrollKey(location.pathname, location.search), readScrollY())
+    navigate(`/owners/${id}${suffix}`, { state: detailNavState(location.pathname, location.search) })
+  }
   const [rows, setRows] = useState<Owner[]>([])
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
@@ -251,10 +258,10 @@ export function OwnersPage() {
         rowKey={(o) => o.id}
         rowLabel={(o) => o.full_name}
         loading={loading}
-        onRowClick={(o) => navigate(`/owners/${o.id}`)}
-        rowActions={(o) => [
-          { id: 'view', label: 'عرض الملف', icon: <IconEye size={16} />, onSelect: () => navigate(`/owners/${o.id}`) },
-          { id: 'edit', label: 'تعديل', onSelect: () => navigate(`/owners/${o.id}?edit=1`) },
+        onRowClick={(o) => openOwner(o.id)}
+          rowActions={(o) => [
+          { id: 'view', label: 'عرض الملف', icon: <IconEye size={16} />, onSelect: () => openOwner(o.id) },
+          { id: 'edit', label: 'تعديل', onSelect: () => openOwner(o.id, '?edit=1') },
         ]}
         emptyTitle="لا ملاك بعد"
         emptyDescription="أضف مالكاً ثم اربطه من شاشة العربيات مع المبلغ الشهري"

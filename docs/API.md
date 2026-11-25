@@ -329,7 +329,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | الحالة المتوقعة |
 |--------|------|------------------|
-| GET | `/contracts` | قائمة + summary — `?status=&search=` |
+| GET | `/contracts` | قائمة + summary + `ledger` مختصر — `?status=&search=&tab=upcoming\|handover_today\|with_balance` (`with_balance` = متبقي على العميل) |
 | POST | `/contracts` | إنشاء → `pending` |
 | GET | `/contracts/{id}` | تفاصيل + deposit + inspections |
 | POST | `/contracts/{id}/approve` | → `approved` + تثبيت أسعار |
