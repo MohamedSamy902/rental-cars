@@ -112,7 +112,8 @@ class ContractInvoiceShareService
         $customerPhone = e((string) ($customer?->phone ?? ''));
         $customerAddress = e((string) ($customer?->address ?? ''));
         $idOrPassport = e((string) ($customer?->national_id ?: $customer?->passport_number ?: ($ops['print_tax_info'] ?? '')));
-        $idExpiry = e($this->dash($customer?->national_id_expires_on ?? $customer?->license_expires_on));
+        $idExpiryRaw = $customer?->national_id_expires_on ?? $customer?->license_expires_on;
+        $idExpiry = e($idExpiryRaw ? CivilDate::formatDisplay($idExpiryRaw, '') : '');
         $nationalityEsc = e($nationality);
         $vehicleName = e(trim(($vehicle?->brand ?? '').' '.($vehicle?->model ?? '')));
         $vehicleYear = e($this->dash($vehicle?->year));
