@@ -44,13 +44,16 @@ return [
     | Expiration Minutes
     |--------------------------------------------------------------------------
     |
-    | This value controls the number of minutes until an issued token will be
-    | considered expired. This will override any values set in the token's
-    | "expires_at" attribute, but first-party sessions are not affected.
+    | Optional ceiling based on token created_at. When null/empty, only the
+    | token's expires_at is enforced (preferred for long SPA sessions with
+    | sliding refresh via AuthSession::touch). Set SANCTUM_EXPIRATION in .env
+    | only if you need a hard global cap.
     |
     */
 
-    'expiration' => env('SANCTUM_EXPIRATION', 720),
+    'expiration' => (($sanctumExpiration = env('SANCTUM_EXPIRATION')) === null || $sanctumExpiration === '')
+        ? null
+        : (int) $sanctumExpiration,
 
     /*
     |--------------------------------------------------------------------------

@@ -28,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // جلسة SPA طويلة: لا تُقصّر بـ SANCTUM_EXPIRATION على created_at — الاعتماد على expires_at + AuthSession.
+        config(['sanctum.expiration' => null]);
+
         Gate::policy(Contract::class, ContractPolicy::class);
         Gate::policy(Customer::class, CustomerPolicy::class);
         Gate::policy(Vehicle::class, VehiclePolicy::class);

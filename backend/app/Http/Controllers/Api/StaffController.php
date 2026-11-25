@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Access\RoleAssignmentGuard;
+use App\Support\AuthSession;
 use App\Support\PaginationInput;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -68,7 +69,7 @@ class StaffController extends Controller
             'role_id' => ['required', 'exists:roles,id'],
             'employee_id' => ['nullable', 'exists:employees,id'],
             'is_active' => ['sometimes', 'boolean'],
-            'session_minutes' => ['nullable', 'integer', 'min:15', 'max:1440'],
+            'session_minutes' => ['nullable', 'integer', 'min:'.AuthSession::MIN_MINUTES, 'max:'.AuthSession::MAX_MINUTES],
             'create_employee' => ['sometimes', 'boolean'],
             'job_title' => ['nullable', 'string', 'max:120'],
             'hired_on' => ['nullable', 'date'],
@@ -148,7 +149,7 @@ class StaffController extends Controller
             'role_id' => ['sometimes', 'exists:roles,id'],
             'employee_id' => ['nullable', 'exists:employees,id'],
             'is_active' => ['sometimes', 'boolean'],
-            'session_minutes' => ['nullable', 'integer', 'min:15', 'max:1440'],
+            'session_minutes' => ['nullable', 'integer', 'min:'.AuthSession::MIN_MINUTES, 'max:'.AuthSession::MAX_MINUTES],
         ], [
             'phone.required' => 'رقم الموبايل مطلوب.',
             'phone.unique' => 'رقم الموبايل مستخدم مسبقاً.',

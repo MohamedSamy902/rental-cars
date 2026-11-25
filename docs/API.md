@@ -54,12 +54,13 @@ Query شائع: `?per_page=50&page=1&search=...`
 ### `POST /login` — عام
 **Body**
 ```json
-{ "email": "admin@rpm.local", "password": "password" }
+{ "login": "admin@rpm.local", "password": "password" }
 ```
 **Response `200`**
 ```json
 {
   "token": "1|...",
+  "session_minutes": 43200,
   "user": {
     "id": 1,
     "name": "مدير النظام",
@@ -71,9 +72,10 @@ Query شائع: `?per_page=50&page=1&search=...`
   }
 }
 ```
+`session_minutes` الافتراضي `43200` (٣٠ يوماً) ما لم يُضبط `users.session_minutes`. التوكن يعتمد على `expires_at` ويُمدَّد عند النشاط.
 
 ### `GET /me` — مصادق
-نفس كائن `user` أعلاه.
+نفس كائن `user` أعلاه. يمدّد `expires_at` للجلسة النشطة عند الحاجة.
 
 ### `POST /logout` — مصادق
 يلغي التوكن الحالي. `{ "message": "تم تسجيل الخروج." }`
@@ -212,7 +214,7 @@ Query شائع: `?per_page=50&page=1&search=...`
   "role_id": 1,
   "employee_id": null,
   "is_active": true,
-  "session_minutes": 480,
+  "session_minutes": 43200,
   "create_employee": true,
   "job_title": "مبيعات",
   "hired_on": "2026-01-01",
