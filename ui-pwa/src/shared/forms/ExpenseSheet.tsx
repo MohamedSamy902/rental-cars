@@ -72,6 +72,19 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
   const [vehicles, setVehicles] = useState<VehicleOption[]>([])
   const [workOrders, setWorkOrders] = useState<WorkOrderOption[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
+  const [vehicleSearching, setVehicleSearching] = useState(false)
+
+  async function searchVehicles(q: string) {
+    setVehicleSearching(true)
+    try {
+      const params = new URLSearchParams({ per_page: '30' })
+      if (q) params.set('search', q)
+      const r = await api<{ data: VehicleOption[] }>(`/vehicles?${params}`)
+      setVehicles(r.data)
+    } finally {
+      setVehicleSearching(false)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -109,7 +122,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
       })
     }
     setErrors({})
-    void api<{ data: VehicleOption[] }>('/vehicles?per_page=100')
+    void api<{ data: VehicleOption[] }>('/vehicles?per_page=30')
       .then((r) => setVehicles(r.data))
       .catch(() => setVehicles([]))
     if (canManagePetty) {
@@ -238,6 +251,9 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
               { value: '', label: form.category === 'صيانة' ? 'اختر عربية…' : '— اختر عربية —' },
               ...vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` })),
             ]}
+            onRemoteSearch={searchVehicles}
+            remoteSearching={vehicleSearching}
+            searchPlaceholder="ابحث باللوحة أو الموديل…"
             onChange={(e) => setForm({ ...form, vehicle_id: e.target.value, work_order_id: '' })}
           />
         ) : null}

@@ -17,5 +17,6 @@ return [
     | لا تُفعَّل إلا بعد برهان تكافؤ 100٪ على مختبر الحجم.
     |--------------------------------------------------------------------------
     */
-    'use_profit_month_summaries' => (bool) env('RPM_USE_PROFIT_MONTH_SUMMARIES', false),
+    // true = اقرأ الملخص إن وُجد، وإلا التجميع المباشر (بعد إبطال الكتابة أو قبل أول rebuild).
+    'use_profit_month_summaries' => (bool) env('RPM_USE_PROFIT_MONTH_SUMMARIES', true),
 ];

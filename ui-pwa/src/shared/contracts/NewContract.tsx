@@ -104,6 +104,8 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   const [createdVersion, setCreatedVersion] = useState(0)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [customerSearching, setCustomerSearching] = useState(false)
+  const [vehicleSearching, setVehicleSearching] = useState(false)
   const [inlineCustomer, setInlineCustomer] = useState(false)
   const [newCustomer, setNewCustomer] = useState(emptyCustomer)
   const [saving, setSaving] = useState(false)
@@ -122,17 +124,43 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       const v = await api<{ data: Vehicle[] }>(path)
       setVehicles(v.data)
       if (preferredId && !v.data.some((x) => x.id === preferredId)) {
-        const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=100').catch(() => ({ data: [] as Vehicle[] }))
+        const fallback = await api<{ data: Vehicle[] }>(`/vehicles?per_page=30&search=`).catch(() => ({ data: [] as Vehicle[] }))
         const found = fallback.data.find((x) => x.id === preferredId)
         if (found) setVehicles((prev) => [{ ...found }, ...prev.filter((p) => p.id !== found.id)])
       }
       return v.data
     } catch {
-      const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=100')
+      const fallback = await api<{ data: Vehicle[] }>('/vehicles?per_page=30')
       setVehicles(fallback.data)
       return fallback.data
     }
   }, [])
+
+  const searchCustomers = useCallback(async (q: string) => {
+    setCustomerSearching(true)
+    try {
+      const params = new URLSearchParams({ per_page: '30' })
+      if (q) params.set('search', q)
+      const c = await api<{ data: Customer[] }>(`/customers?${params}`)
+      setCustomers(c.data)
+    } finally {
+      setCustomerSearching(false)
+    }
+  }, [])
+
+  const searchVehicles = useCallback(async (q: string) => {
+    setVehicleSearching(true)
+    try {
+      const params = new URLSearchParams({ per_page: '30' })
+      if (q) params.set('search', q)
+      if (form.starts_at) params.set('from', toApiDateTime(form.starts_at))
+      if (form.planned_ends_at) params.set('to', toApiDateTime(form.planned_ends_at))
+      const v = await api<{ data: Vehicle[] }>(`/vehicles?${params}`)
+      setVehicles(v.data)
+    } finally {
+      setVehicleSearching(false)
+    }
+  }, [form.starts_at, form.planned_ends_at])
 
   const applyVehicleDefaults = useCallback((v: Vehicle | undefined, prev: typeof emptyForm) => {
     if (!v) return prev
@@ -171,7 +199,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
       customer_id: opts?.customerId ? String(opts.customerId) : '',
     })
     void Promise.all([
-      api<{ data: Customer[] }>('/customers?per_page=100'),
+      api<{ data: Customer[] }>('/customers?per_page=30'),
       loadVehicles(undefined, undefined, opts?.vehicleId),
       api<{ data: { operational?: Record<string, unknown> } }>('/settings/tenant')
         .catch(() => ({ data: { operational: {} as Record<string, unknown> } })),
@@ -410,6 +438,9 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
               value={form.customer_id}
               error={errors.customer_id}
               onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
+              onRemoteSearch={searchCustomers}
+              remoteSearching={customerSearching}
+              searchPlaceholder="ابحث بالاسم أو الهاتف…"
             />
             <Button type="button" variant="secondary" size="sm" onClick={() => setInlineCustomer((v) => !v)}>
               + تسجيل عميل جديد
@@ -499,6 +530,9 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             ]}
             value={form.vehicle_id}
             error={errors.vehicle_id}
+            onRemoteSearch={searchVehicles}
+            remoteSearching={vehicleSearching}
+            searchPlaceholder="ابحث باللوحة أو الموديل…"
             onChange={(e) => {
               const id = e.target.value
               const v = vehicles.find((x) => String(x.id) === id)

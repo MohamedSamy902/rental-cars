@@ -17,7 +17,8 @@ class InventoryController extends Controller
     {
         $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
-        $rows = $this->inventory->catalogPage($perPage, $page);
+        $search = $request->string('search')->toString() ?: null;
+        $rows = $this->inventory->catalogPage($perPage, $page, $search);
 
         return response()->json([
             'data' => $rows->items(),

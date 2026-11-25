@@ -24,6 +24,9 @@ type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'children'> & {
   placeholder?: string
   searchable?: boolean
   searchPlaceholder?: string
+  /** بحث خادم مؤجّل — عند التمرير يحدّث الأب `options` */
+  onRemoteSearch?: (query: string) => void | Promise<void>
+  remoteSearching?: boolean
 }
 
 type PanelPos = {
@@ -45,6 +48,8 @@ export function SelectField({
   placeholder = 'اختر…',
   searchable = true,
   searchPlaceholder = 'بحث…',
+  onRemoteSearch,
+  remoteSearching = false,
   className = '',
   value,
   defaultValue,
@@ -59,13 +64,14 @@ export function SelectField({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const remoteTimer = useRef<number | null>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const [pos, setPos] = useState<PanelPos | null>(null)
   const [uncontrolled, setUncontrolled] = useState(String(defaultValue ?? ''))
   const selectedValue = value !== undefined ? String(value) : uncontrolled
-  const showSearch = searchable && options.length > 6
+  const showSearch = searchable && (Boolean(onRemoteSearch) || options.length > 6)
 
   const selected = useMemo(
     () => options.find((o) => o.value === selectedValue) || null,
@@ -73,13 +79,26 @@ export function SelectField({
   )
 
   const filtered = useMemo(() => {
+    if (onRemoteSearch) return options
     const q = query.trim().toLowerCase()
     if (!q) return options
     return options.filter((o) =>
       o.label.toLowerCase().includes(q)
       || (o.description || '').toLowerCase().includes(q)
       || o.value.toLowerCase().includes(q))
-  }, [options, query])
+  }, [options, query, onRemoteSearch])
+
+  useEffect(() => {
+    if (!onRemoteSearch || !open) return
+    if (remoteTimer.current != null) window.clearTimeout(remoteTimer.current)
+    remoteTimer.current = window.setTimeout(() => {
+      remoteTimer.current = null
+      void onRemoteSearch(query.trim())
+    }, 280)
+    return () => {
+      if (remoteTimer.current != null) window.clearTimeout(remoteTimer.current)
+    }
+  }, [query, open, onRemoteSearch])
 
   function emit(next: string) {
     if (value === undefined) setUncontrolled(next)
@@ -281,7 +300,9 @@ export function SelectField({
           ) : null}
 
           <div className="rpm-select-panel__list">
-            {filtered.length === 0 ? (
+            {remoteSearching ? (
+              <div className="rpm-select-panel__empty">جاري البحث…</div>
+            ) : filtered.length === 0 ? (
               <div className="rpm-select-panel__empty">لا توجد نتائج</div>
             ) : (
               filtered.map((opt, idx) => {

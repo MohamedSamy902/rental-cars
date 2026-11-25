@@ -18,6 +18,7 @@ use App\Policies\ContractPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\MediaFilePolicy;
 use App\Policies\VehiclePolicy;
+use App\Services\Accounting\ProfitabilitySnapshotService;
 use App\Support\PerfReadCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -48,13 +49,19 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(MediaFile::class, MediaFilePolicy::class);
 
         // OPS-2: إبطال كاش العدّادات/الملخص عند أي كتابة مؤثرة.
-        $bump = static fn () => PerfReadCache::bump();
+        $bump = static function () {
+            PerfReadCache::bump();
+        };
+        $bumpProfit = static function () {
+            PerfReadCache::bump();
+            try {
+                app(ProfitabilitySnapshotService::class)->invalidateRecentMonths();
+            } catch (\Throwable) {
+                // جدول الملخص قد لا يكون مُهاجَراً بعد في بيئات قديمة.
+            }
+        };
         foreach ([
-            Contract::class,
-            Payment::class,
-            WorkOrder::class,
             Violation::class,
-            Expense::class,
             InventoryItem::class,
             Notification::class,
             Customer::class,
@@ -66,6 +73,14 @@ class AppServiceProvider extends ServiceProvider
             $modelClass::deleted($bump);
             if (in_array(SoftDeletes::class, class_uses_recursive($modelClass), true)) {
                 $modelClass::restored($bump);
+            }
+        }
+        foreach ([Contract::class, Payment::class, WorkOrder::class, Expense::class] as $modelClass) {
+            /** @var class-string<Model> $modelClass */
+            $modelClass::saved($bumpProfit);
+            $modelClass::deleted($bumpProfit);
+            if (in_array(SoftDeletes::class, class_uses_recursive($modelClass), true)) {
+                $modelClass::restored($bumpProfit);
             }
         }
     }

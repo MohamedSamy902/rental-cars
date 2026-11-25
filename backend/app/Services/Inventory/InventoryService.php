@@ -126,9 +126,18 @@ class InventoryService
         return $this->catalogPage(10000, 1)->items();
     }
 
-    public function catalogPage(int $perPage, int $page): LengthAwarePaginator
+    public function catalogPage(int $perPage, int $page, ?string $search = null): LengthAwarePaginator
     {
-        $rows = InventoryItem::query()->with('batches')->latest('id')->paginate($perPage, ['*'], 'page', $page);
+        $q = InventoryItem::query()->with('batches')->latest('id');
+        if ($search !== null && trim($search) !== '') {
+            $term = '%'.trim($search).'%';
+            $q->where(function ($qq) use ($term) {
+                $qq->where('name', 'like', $term)
+                    ->orWhere('code', 'like', $term)
+                    ->orWhere('category', 'like', $term);
+            });
+        }
+        $rows = $q->paginate($perPage, ['*'], 'page', $page);
         $rows->setCollection($rows->getCollection()->map(fn (InventoryItem $item) => $this->presentItem($item)));
 
         return $rows;

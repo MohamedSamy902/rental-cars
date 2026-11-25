@@ -12,7 +12,7 @@ use Carbon\CarbonInterface;
  */
 class OccupancyService
 {
-    public function percent(?CarbonInterface $from = null, ?CarbonInterface $to = null): float
+    public function percent(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $activeVehicleCount = null): float
     {
         $from = Carbon::parse($from ?? now()->startOfMonth())->startOfDay();
         $to = Carbon::parse($to ?? now())->endOfDay();
@@ -21,7 +21,7 @@ class OccupancyService
         }
 
         $periodDays = max(1, (int) $from->diffInDays($to->copy()->startOfDay()) + 1);
-        $activeVehicles = Vehicle::query()->where('is_active', true)->count();
+        $activeVehicles = $activeVehicleCount ?? Vehicle::query()->where('is_active', true)->count();
         if ($activeVehicles < 1) {
             return 0.0;
         }

@@ -7,6 +7,7 @@ use App\Models\WorkOrder;
 use App\Support\MaintenanceContractLabel;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Collection;
 
 /**
  * تجهيز العربيات اليومي — ملخص تسليم / استلام / صيانة
@@ -36,11 +37,15 @@ class FleetDailyPrepService
      *   totals: array{pickups:int,returns:int,maintenance:int,total:int}
      * }
      */
+    /**
+     * @param  Collection<int, WorkOrder>|null  $openWorkOrders
+     */
     public function summarize(
         ?Carbon $from = null,
         int $horizonDays = 5,
         bool $includeContracts = true,
         bool $includeCustomers = true,
+        ?Collection $openWorkOrders = null,
     ): array {
         $from = ($from ? $from->copy() : now())->timezone(config('app.timezone', 'Africa/Cairo'))->startOfDay();
         $horizonDays = max(1, min(14, $horizonDays));
@@ -63,12 +68,14 @@ class FleetDailyPrepService
                 ->get()
             : collect();
 
-        $workOrders = WorkOrder::query()
-            ->with(['vehicle:id,brand,model,plate,code'])
-            ->whereIn('status', ['open', 'in_progress'])
-            ->orderBy('opened_on')
-            ->limit(200)
-            ->get();
+        $workOrders = $openWorkOrders
+            ? $openWorkOrders->sortBy('opened_on')->take(200)->values()
+            : WorkOrder::query()
+                ->with(['vehicle:id,brand,model,plate,code'])
+                ->whereIn('status', ['open', 'in_progress'])
+                ->orderBy('opened_on')
+                ->limit(200)
+                ->get();
 
         $days = [];
         $totals = ['pickups' => 0, 'returns' => 0, 'maintenance' => 0, 'total' => 0];

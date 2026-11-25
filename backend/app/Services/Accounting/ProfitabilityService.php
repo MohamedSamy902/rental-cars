@@ -16,11 +16,15 @@ class ProfitabilityService
      *
      * @return array<string, mixed>
      */
-    public function monthOverMonth(?Carbon $anchor = null): array
+    /**
+     * @param  \Illuminate\Support\Collection<int, Vehicle>|null  $activeVehicles
+     */
+    public function monthOverMonth(?Carbon $anchor = null, $activeVehicles = null): array
     {
         $anchor = ($anchor ?? now())->copy()->startOfMonth();
-        $current = $this->monthSnapshot($anchor);
-        $previous = $this->monthSnapshot($anchor->copy()->subMonth());
+        $activeVehicles = $activeVehicles ?? Vehicle::query()->where('is_active', true)->get(['id', 'brand', 'model', 'plate']);
+        $current = $this->monthSnapshot($anchor, $activeVehicles);
+        $previous = $this->monthSnapshot($anchor->copy()->subMonth(), $activeVehicles);
 
         $delta = $current['operating_profit'] - $previous['operating_profit'];
         $deltaPct = $previous['operating_profit'] == 0
@@ -74,27 +78,29 @@ class ProfitabilityService
     }
 
     /**
+     * @param  \Illuminate\Support\Collection<int, Vehicle>|null  $activeVehicles
      * @return array{label:string,revenue:int,maintenance:int,expenses:int,operating_profit:int,vehicles:array<int,array<string,mixed>>}
      */
-    public function monthSnapshot(Carbon $monthStart): array
+    public function monthSnapshot(Carbon $monthStart, $activeVehicles = null): array
     {
-        // BE-8: قراءة من الملخص المشتق فقط إن فُعّل العلم صراحةً وبعد إعادة البناء.
-        if ((bool) config('rpm.use_profit_month_summaries', false)) {
+        // BE-8: استخدم الملخص المشتق إن وُجد (يُبطل عند الكتابة · يُعاد بناؤه عبر Cron/أمر).
+        if ((bool) config('rpm.use_profit_month_summaries', true)) {
             $fromSnap = app(ProfitabilitySnapshotService::class)->tryMonthSnapshot($monthStart);
             if ($fromSnap !== null) {
                 return $fromSnap;
             }
         }
 
-        return $this->computeMonthSnapshotLive($monthStart);
+        return $this->computeMonthSnapshotLive($monthStart, $activeVehicles);
     }
 
     /**
      * التجميع المباشر — مصدر الحقيقة لإعادة بناء الملخص المشتق واختبارات التكافؤ.
      *
+     * @param  \Illuminate\Support\Collection<int, Vehicle>|null  $activeVehicles
      * @return array{label:string,revenue:int,maintenance:int,expenses:int,operating_profit:int,vehicles:array<int,array<string,mixed>>}
      */
-    public function computeMonthSnapshotLive(Carbon $monthStart): array
+    public function computeMonthSnapshotLive(Carbon $monthStart, $activeVehicles = null): array
     {
         $year = (int) $monthStart->format('Y');
         $month = (int) $monthStart->format('n');
@@ -102,30 +108,24 @@ class ProfitabilityService
         $to = $monthStart->copy()->endOfMonth();
 
         $journalCredits = JournalLine::query()
-            ->whereHas('account', fn ($q) => $q->whereIn('code', ['4000', '4100', '4200', '4300', '4400']))
-            ->whereHas('entry', fn ($q) => $q->whereYear('entry_date', $year)->whereMonth('entry_date', $month))
-            ->get(['vehicle_id', 'credit']);
+            ->join('accounts', 'accounts.id', '=', 'journal_lines.account_id')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->whereIn('accounts.code', ['4000', '4100', '4200', '4300', '4400'])
+            ->whereYear('journal_entries.entry_date', $year)
+            ->whereMonth('journal_entries.entry_date', $month)
+            ->whereNull('journal_lines.deleted_at')
+            ->whereNull('journal_entries.deleted_at')
+            ->get(['journal_lines.vehicle_id', 'journal_lines.credit']);
 
         $useJournals = $journalCredits->isNotEmpty();
         $revenueByVehicle = [];
+        $revenue = 0;
         if ($useJournals) {
             foreach ($journalCredits as $line) {
                 $vid = (int) ($line->vehicle_id ?? 0);
                 $revenueByVehicle[$vid] = ($revenueByVehicle[$vid] ?? 0) + (int) $line->credit;
             }
             $revenue = (int) array_sum($revenueByVehicle);
-        } else {
-            $revenue = (int) Contract::query()
-                ->whereIn('status', ['completed', 'active'])
-                ->where(function ($q) use ($from, $to) {
-                    $q->whereBetween('actual_ends_at', [$from, $to])
-                        ->orWhere(function ($qq) use ($from, $to) {
-                            $qq->whereNull('actual_ends_at')
-                                ->where('starts_at', '<=', $to)
-                                ->where('planned_ends_at', '>=', $from);
-                        });
-                })
-                ->sum('period_rent');
         }
 
         $workOrders = WorkOrder::query()
@@ -174,10 +174,12 @@ class ProfitabilityService
                 ->pluck('aggregate', 'vehicle_id')
                 ->map(fn ($v) => (int) $v)
                 ->all();
+            $revenue = (int) array_sum($contractRevByVehicle);
         }
 
+        $fleetVehicles = $activeVehicles ?? Vehicle::query()->where('is_active', true)->get(['id', 'brand', 'model', 'plate']);
         $vehicles = [];
-        foreach (Vehicle::query()->where('is_active', true)->get(['id', 'brand', 'model', 'plate']) as $v) {
+        foreach ($fleetVehicles as $v) {
             if ($useJournals) {
                 $vRev = (int) ($revenueByVehicle[$v->id] ?? 0);
             } else {

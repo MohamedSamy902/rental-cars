@@ -61,6 +61,8 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
   const [vehicles, setVehicles] = useState<VehicleOption[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
+  const [vehicleSearching, setVehicleSearching] = useState(false)
+  const [inventorySearching, setInventorySearching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [firstUpcoming, setFirstUpcoming] = useState(true)
   const [putsInMaintenance, setPutsInMaintenance] = useState(false)
@@ -91,6 +93,30 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     [selectedItems, extraItems],
   )
 
+  async function searchVehicles(q: string) {
+    setVehicleSearching(true)
+    try {
+      const params = new URLSearchParams({ per_page: '30' })
+      if (q) params.set('search', q)
+      const r = await api<{ data: VehicleOption[] }>(`/vehicles?${params}`)
+      setVehicles(r.data)
+    } finally {
+      setVehicleSearching(false)
+    }
+  }
+
+  async function searchInventory(q: string) {
+    setInventorySearching(true)
+    try {
+      const params = new URLSearchParams({ per_page: '30' })
+      if (q) params.set('search', q)
+      const r = await api<{ data: Item[] }>(`/inventory?${params}`)
+      setItems(Array.isArray(r.data) ? r.data : [])
+    } finally {
+      setInventorySearching(false)
+    }
+  }
+
   useEffect(() => {
     if (!open) return
     const defaultEmployeeId = canManagePetty
@@ -110,7 +136,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     setFirstUpcoming(!lockCustody)
     setPutsInMaintenance(false)
     const requests: Promise<unknown>[] = [
-      api<{ data: Item[] }>('/inventory?per_page=100')
+      api<{ data: Item[] }>('/inventory?per_page=30')
         .then((r) => setItems(Array.isArray(r.data) ? r.data : []))
         .catch((e) => {
           setItems([])
@@ -127,7 +153,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
       setEmployees([])
     }
     if (!lockedId) {
-      requests.push(api<{ data: VehicleOption[] }>('/vehicles?per_page=100').then((r) => setVehicles(r.data)))
+      requests.push(api<{ data: VehicleOption[] }>('/vehicles?per_page=30').then((r) => setVehicles(r.data)))
     }
     Promise.all(requests).catch((e) => toast.error((e as ApiError).message))
   }, [open, lockedId, lockedOdometer, lockCustody, custodyEmployee?.id, toast, canManagePetty, ownEmployeeId])
@@ -317,6 +343,9 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
             error={fieldErrors.vehicle_id}
             options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))}
             value={form.vehicle_id}
+            onRemoteSearch={searchVehicles}
+            remoteSearching={vehicleSearching}
+            searchPlaceholder="ابحث باللوحة أو الموديل…"
             onChange={(e) => {
               const v = vehicles.find((x) => String(x.id) === e.target.value)
               setForm({ ...form, vehicle_id: e.target.value, odometer: v?.odometer != null ? String(v.odometer) : form.odometer })
@@ -449,6 +478,9 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
                   label: `${i.code} · ${i.name} · متبقي ${i.remaining ?? 0}${i.unit_cost != null ? ` · ${formatMoney(i.unit_cost)}` : ''}`,
                 }))}
                 value={form.inventory_item_id}
+                onRemoteSearch={searchInventory}
+                remoteSearching={inventorySearching}
+                searchPlaceholder="ابحث عن صنف…"
                 onChange={(e) => {
                   setForm({ ...form, inventory_item_id: e.target.value })
                   setFieldErrors((prev) => ({ ...prev, inventory_item_id: '' }))

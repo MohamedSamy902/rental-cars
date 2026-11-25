@@ -10,7 +10,7 @@ use App\Models\VehicleDocument;
 use App\Models\Violation;
 use App\Models\WorkOrder;
 use App\Support\MaintenanceContractLabel;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Collection;
 
 /**
  * مهام تشغيلية للوحة اليوم — مفلترة بصلاحيات المستخدم الحالي.
@@ -38,7 +38,14 @@ class HomeImportantTasksService
      *   due_on: string|null
      * }>
      */
-    public function forUser(User $user): array
+    /**
+     * @param  array{
+     *   open_work_orders?: Collection<int, WorkOrder>,
+     *   low_stock_items?: Collection<int, InventoryItem>,
+     *   open_violations?: Collection<int, Violation>
+     * }  $preloaded
+     */
+    public function forUser(User $user, array $preloaded = []): array
     {
         $items = [];
 
@@ -46,7 +53,10 @@ class HomeImportantTasksService
             $items = array_merge($items, $this->contractTasks($this->can($user, 'customers.view')));
         }
         if ($this->can($user, 'maintenance.view') || $this->can($user, 'vehicles.view')) {
-            $items = array_merge($items, $this->maintenanceTasks($this->can($user, 'contracts.view')));
+            $items = array_merge($items, $this->maintenanceTasks(
+                $this->can($user, 'contracts.view'),
+                $preloaded['open_work_orders'] ?? null,
+            ));
         }
         if ($this->can($user, 'vehicles.view')) {
             $items = array_merge($items, $this->licenseTasks());
@@ -56,10 +66,10 @@ class HomeImportantTasksService
             $items = array_merge($items, $this->ownerAgreementTasks($this->can($user, 'owners.view')));
         }
         if ($this->can($user, 'violations.view')) {
-            $items = array_merge($items, $this->violationTasks());
+            $items = array_merge($items, $this->violationTasks($preloaded['open_violations'] ?? null));
         }
         if ($this->can($user, 'inventory.view')) {
-            $items = array_merge($items, $this->lowStockTasks());
+            $items = array_merge($items, $this->lowStockTasks($preloaded['low_stock_items'] ?? null));
         }
 
         usort($items, function (array $a, array $b) {
@@ -93,13 +103,27 @@ class HomeImportantTasksService
             ? ['customer:id,full_name', 'vehicle:id,brand,model,plate']
             : ['vehicle:id,brand,model,plate'];
 
-        $overdue = Contract::query()
+        $now = now();
+        $today = today()->toDateString();
+        // استعلام واحد يغطي الأربع سلال · نفس الحدود والترتيب في الذاكرة.
+        $pool = Contract::query()
             ->with($with)
-            ->where('status', 'active')
-            ->where('planned_ends_at', '<', now())
-            ->orderBy('planned_ends_at')
-            ->limit(8)
+            ->where(function ($q) use ($now, $today) {
+                $q->where(function ($qq) use ($now) {
+                    $qq->where('status', 'active')->where('planned_ends_at', '<', $now);
+                })->orWhere('status', 'pending')
+                    ->orWhere(function ($qq) use ($today) {
+                        $qq->where('status', 'approved')->whereDate('starts_at', $today);
+                    })->orWhere(function ($qq) use ($now, $today) {
+                        $qq->where('status', 'active')
+                            ->whereDate('planned_ends_at', $today)
+                            ->where('planned_ends_at', '>=', $now);
+                    });
+            })
             ->get();
+
+        $overdue = $pool->filter(fn (Contract $c) => $c->status === 'active' && $c->planned_ends_at < $now)
+            ->sortBy('planned_ends_at')->take(8);
         foreach ($overdue as $c) {
             $items[] = $this->item(
                 'contract_overdue:'.$c->id,
@@ -112,12 +136,8 @@ class HomeImportantTasksService
             );
         }
 
-        $pending = Contract::query()
-            ->with($with)
-            ->where('status', 'pending')
-            ->orderBy('starts_at')
-            ->limit(6)
-            ->get();
+        $pending = $pool->filter(fn (Contract $c) => $c->status === 'pending')
+            ->sortBy('starts_at')->take(6);
         foreach ($pending as $c) {
             $items[] = $this->item(
                 'contract_pending:'.$c->id,
@@ -130,13 +150,9 @@ class HomeImportantTasksService
             );
         }
 
-        $pickups = Contract::query()
-            ->with($with)
-            ->where('status', 'approved')
-            ->whereDate('starts_at', today())
-            ->orderBy('starts_at')
-            ->limit(6)
-            ->get();
+        $pickups = $pool->filter(fn (Contract $c) => $c->status === 'approved'
+            && $c->starts_at?->toDateString() === $today)
+            ->sortBy('starts_at')->take(6);
         foreach ($pickups as $c) {
             $items[] = $this->item(
                 'contract_pickup:'.$c->id,
@@ -149,14 +165,10 @@ class HomeImportantTasksService
             );
         }
 
-        $returns = Contract::query()
-            ->with($with)
-            ->where('status', 'active')
-            ->whereDate('planned_ends_at', today())
-            ->where('planned_ends_at', '>=', now())
-            ->orderBy('planned_ends_at')
-            ->limit(6)
-            ->get();
+        $returns = $pool->filter(fn (Contract $c) => $c->status === 'active'
+            && $c->planned_ends_at?->toDateString() === $today
+            && $c->planned_ends_at >= $now)
+            ->sortBy('planned_ends_at')->take(6);
         foreach ($returns as $c) {
             $items[] = $this->item(
                 'contract_return:'.$c->id,
@@ -175,17 +187,28 @@ class HomeImportantTasksService
     /**
      * @return list<array<string, mixed>>
      */
-    private function maintenanceTasks(bool $showContracts): array
+    /**
+     * @param  Collection<int, WorkOrder>|null  $openWorkOrders
+     */
+    private function maintenanceTasks(bool $showContracts, ?Collection $openWorkOrders = null): array
     {
         $items = [];
 
-        $open = WorkOrder::query()
-            ->with('vehicle:id,plate,brand,model')
-            ->whereIn('status', ['open', 'in_progress'])
-            ->orderByDesc('puts_in_maintenance')
-            ->orderBy('opened_on')
-            ->limit(8)
-            ->get();
+        $open = $openWorkOrders
+            ? $openWorkOrders
+                ->sortBy([
+                    ['puts_in_maintenance', 'desc'],
+                    ['opened_on', 'asc'],
+                ])
+                ->take(8)
+                ->values()
+            : WorkOrder::query()
+                ->with('vehicle:id,plate,brand,model')
+                ->whereIn('status', ['open', 'in_progress'])
+                ->orderByDesc('puts_in_maintenance')
+                ->orderBy('opened_on')
+                ->limit(8)
+                ->get();
         foreach ($open as $wo) {
             $label = $wo->vehicle?->plate ?: ('#'.$wo->id);
             $blocking = (bool) $wo->puts_in_maintenance;
@@ -200,30 +223,28 @@ class HomeImportantTasksService
             );
         }
 
-        if (Schema::hasColumn('work_orders', 'next_service_on')) {
-            $deadline = now()->addDays(self::MAINTENANCE_LEAD_DAYS)->toDateString();
-            $due = WorkOrder::query()
-                ->with('vehicle:id,plate,brand,model')
-                ->where('status', 'closed')
-                ->whereNotNull('next_service_on')
-                ->whereDate('next_service_on', '<=', $deadline)
-                ->orderBy('next_service_on')
-                ->limit(8)
-                ->get();
-            foreach ($due as $wo) {
-                $label = $wo->vehicle?->plate ?: ('#'.$wo->id);
-                $on = $wo->next_service_on?->toDateString();
-                $severity = $on && $on < now()->toDateString() ? 'critical' : 'warning';
-                $items[] = $this->item(
-                    'maintenance_due:'.$wo->id,
-                    'maintenance_due',
-                    $severity,
-                    'صيانة مستحقة · '.$label,
-                    'الموعد '.($on ?: '—').($wo->next_service_odometer ? ' · عداد '.$wo->next_service_odometer : ''),
-                    $wo->vehicle_id ? '/vehicles/'.$wo->vehicle_id : '/maintenance',
-                    $on,
-                );
-            }
+        $deadline = now()->addDays(self::MAINTENANCE_LEAD_DAYS)->toDateString();
+        $due = WorkOrder::query()
+            ->with('vehicle:id,plate,brand,model')
+            ->where('status', 'closed')
+            ->whereNotNull('next_service_on')
+            ->whereDate('next_service_on', '<=', $deadline)
+            ->orderBy('next_service_on')
+            ->limit(8)
+            ->get();
+        foreach ($due as $wo) {
+            $label = $wo->vehicle?->plate ?: ('#'.$wo->id);
+            $on = $wo->next_service_on?->toDateString();
+            $severity = $on && $on < now()->toDateString() ? 'critical' : 'warning';
+            $items[] = $this->item(
+                'maintenance_due:'.$wo->id,
+                'maintenance_due',
+                $severity,
+                'صيانة مستحقة · '.$label,
+                'الموعد '.($on ?: '—').($wo->next_service_odometer ? ' · عداد '.$wo->next_service_odometer : ''),
+                $wo->vehicle_id ? '/vehicles/'.$wo->vehicle_id : '/maintenance',
+                $on,
+            );
         }
 
         return $items;
@@ -234,10 +255,6 @@ class HomeImportantTasksService
      */
     private function licenseTasks(): array
     {
-        if (! Schema::hasTable('vehicle_documents')) {
-            return [];
-        }
-
         $deadline = now()->addDays(self::LICENSE_LEAD_DAYS)->toDateString();
         $docs = VehicleDocument::query()
             ->with('vehicle:id,plate,brand,model')
@@ -276,10 +293,6 @@ class HomeImportantTasksService
      */
     private function simRechargeTasks(): array
     {
-        if (! Schema::hasColumn('vehicles', 'tracker_sim_next_recharge_on')) {
-            return [];
-        }
-
         $deadline = now()->addDays(self::SIM_LEAD_DAYS)->toDateString();
         $vehicles = Vehicle::query()
             ->where('is_active', true)
@@ -313,10 +326,6 @@ class HomeImportantTasksService
      */
     private function ownerAgreementTasks(bool $showOwner): array
     {
-        if (! Schema::hasColumn('vehicles', 'owner_agreement_ends_on')) {
-            return [];
-        }
-
         $deadline = now()->addDays(self::OWNER_AGREEMENT_LEAD_DAYS)->toDateString();
         $vehicles = Vehicle::query()
             ->when($showOwner, fn ($q) => $q->with('owner:id,full_name'))
@@ -352,14 +361,19 @@ class HomeImportantTasksService
     /**
      * @return list<array<string, mixed>>
      */
-    private function violationTasks(): array
+    /**
+     * @param  Collection<int, Violation>|null  $preloaded
+     */
+    private function violationTasks(?Collection $preloaded = null): array
     {
-        $rows = Violation::query()
-            ->with('vehicle:id,plate')
-            ->whereNotIn('status', ['paid', 'confirmed'])
-            ->orderByDesc('occurred_at')
-            ->limit(6)
-            ->get();
+        $rows = $preloaded
+            ? $preloaded->sortByDesc('occurred_at')->take(6)->values()
+            : Violation::query()
+                ->with('vehicle:id,plate')
+                ->whereNotIn('status', ['paid', 'confirmed'])
+                ->orderByDesc('occurred_at')
+                ->limit(6)
+                ->get();
 
         $items = [];
         foreach ($rows as $v) {
@@ -381,21 +395,22 @@ class HomeImportantTasksService
     /**
      * @return list<array<string, mixed>>
      */
-    private function lowStockTasks(): array
+    /**
+     * @param  Collection<int, InventoryItem>|null  $preloadedLow
+     */
+    private function lowStockTasks(?Collection $preloadedLow = null): array
     {
-        if (! Schema::hasTable('inventory_items')) {
-            return [];
-        }
-
         $items = [];
-        $rows = InventoryItem::query()
-            ->where('is_active', true)
-            ->withSum('batches as remaining_sum', 'remaining')
-            ->orderBy('name')
-            ->limit(40)
-            ->get()
-            ->filter(fn (InventoryItem $item) => (int) ($item->remaining_sum ?? 0) <= (int) $item->reorder_level)
-            ->take(6);
+        $rows = $preloadedLow
+            ? $preloadedLow->sortBy('name')->take(6)->values()
+            : InventoryItem::query()
+                ->where('is_active', true)
+                ->withSum('batches as remaining_sum', 'remaining')
+                ->orderBy('name')
+                ->limit(40)
+                ->get()
+                ->filter(fn (InventoryItem $item) => (int) ($item->remaining_sum ?? 0) <= (int) $item->reorder_level)
+                ->take(6);
 
         foreach ($rows as $item) {
             $remaining = (int) ($item->remaining_sum ?? 0);

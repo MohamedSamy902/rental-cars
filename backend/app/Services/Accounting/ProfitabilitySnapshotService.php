@@ -63,6 +63,19 @@ class ProfitabilitySnapshotService
         ];
     }
 
+    /** إبطال ملخص الشهر الحالي والسابق بعد كتابة مؤثرة على الربحية. */
+    public function invalidateRecentMonths(): void
+    {
+        $now = now();
+        $months = [
+            [(int) $now->format('Y'), (int) $now->format('n')],
+            [(int) $now->copy()->subMonth()->format('Y'), (int) $now->copy()->subMonth()->format('n')],
+        ];
+        foreach ($months as [$y, $m]) {
+            VehicleProfitMonthSummary::query()->where('year', $y)->where('month', $m)->delete();
+        }
+    }
+
     /**
      * مقارنة حرفية لكل عربية: ملخص مشتق ≡ تجميع مباشر.
      *
@@ -118,10 +131,6 @@ class ProfitabilitySnapshotService
      */
     public function tryMonthSnapshot(Carbon $monthStart): ?array
     {
-        if (! (bool) config('rpm.use_profit_month_summaries', false)) {
-            return null;
-        }
-
         $monthStart = $monthStart->copy()->startOfMonth();
         $year = (int) $monthStart->format('Y');
         $month = (int) $monthStart->format('n');
