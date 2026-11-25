@@ -94,6 +94,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::middleware('permission:staff.manage')->group(function () {
         Route::post('/staff', [StaffController::class, 'store']);
         Route::put('/staff/{user}', [StaffController::class, 'update']);
+        Route::post('/staff/{user}/password', [StaffController::class, 'resetPassword']);
         Route::post('/roles', [RoleController::class, 'store']);
         Route::put('/roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
     });

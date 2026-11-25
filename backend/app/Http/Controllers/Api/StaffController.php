@@ -94,6 +94,7 @@ class StaffController extends Controller
 
         try {
             app(RoleAssignmentGuard::class)->assertCanAssignRole($request->user(), (int) $data['role_id']);
+            $this->assertNotSuperAdminRoleId((int) $data['role_id']);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 403);
         }
@@ -137,9 +138,8 @@ class StaffController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $user->loadMissing('role');
-        if ($user->role?->name === 'super_admin') {
-            return response()->json(['message' => 'غير موجود.'], 404);
-        }
+        $actor = $request->user();
+        $actor->loadMissing('role');
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:200'],
@@ -179,10 +179,12 @@ class StaffController extends Controller
         }
 
         try {
+            $this->assertCanMutateStaffUser($actor, $user, $data);
             $guard = app(RoleAssignmentGuard::class);
-            $guard->assertCanEditUser($request->user(), $user);
+            $guard->assertCanEditUser($actor, $user);
             if (isset($data['role_id'])) {
-                $guard->assertCanAssignRole($request->user(), (int) $data['role_id']);
+                $guard->assertCanAssignRole($actor, (int) $data['role_id']);
+                $this->assertNotSuperAdminRoleId((int) $data['role_id']);
             }
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 403);
@@ -197,8 +199,78 @@ class StaffController extends Controller
 
         return response()->json([
             'data' => $this->present($user->fresh()->load('role:id,name,label')),
-            'message' => 'تم تحديث الموظف.',
+            'message' => array_key_exists('password', $data) && count($data) === 1
+                ? 'تم تحديث كلمة المرور.'
+                : 'تم تحديث الموظف.',
         ]);
+    }
+
+    /**
+     * تعيين/تغيير كلمة مرور موظف من ملفه — مسار واضح بلا لبس «غير موجود».
+     */
+    public function resetPassword(Request $request, User $user): JsonResponse
+    {
+        $user->loadMissing('role');
+        $actor = $request->user();
+        $actor->loadMissing('role');
+
+        $data = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'max:100', 'confirmed'],
+        ], [
+            'password.required' => 'كلمة المرور مطلوبة.',
+            'password.min' => 'كلمة المرور ٨ أحرف على الأقل.',
+            'password.confirmed' => 'تأكيد كلمة المرور غير متطابق.',
+        ], [
+            'password' => 'كلمة المرور',
+        ]);
+
+        try {
+            $this->assertCanMutateStaffUser($actor, $user, ['password' => $data['password']]);
+            app(RoleAssignmentGuard::class)->assertCanEditUser($actor, $user);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
+
+        $user->update(['password' => $data['password']]);
+
+        return response()->json([
+            'data' => $this->present($user->fresh()->load('role:id,name,label')),
+            'message' => 'تم تحديث كلمة المرور.',
+        ]);
+    }
+
+    /**
+     * حسابات المدير الأعلى النظامية (بلا موظف HR) تبقى مخفية.
+     * إن وُجد حساب مربوط بموظف ومُعيَّن خطأً كمدير أعلى، يسمح المدير الأعلى بإصلاحه (كلمة مرور / تخفيض الدور).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertCanMutateStaffUser(User $actor, User $target, array $data): void
+    {
+        if ($target->role?->name !== 'super_admin') {
+            return;
+        }
+
+        if ($actor->role?->name !== 'super_admin') {
+            throw new DomainException('لا يمكن تعديل حساب المدير الأعلى.');
+        }
+
+        if (! $target->employee_id) {
+            throw new DomainException('حسابات النظام العليا تُدار من أمر إعادة التعيين فقط، وليس من شاشة الموظفين.');
+        }
+
+        // حساب موظف مُنح دور المدير الأعلى بالخطأ — يُسمح بإصلاحه كاملاً (بما فيها تخفيض الدور).
+        if (isset($data['role_id'])) {
+            $this->assertNotSuperAdminRoleId((int) $data['role_id']);
+        }
+    }
+
+    private function assertNotSuperAdminRoleId(int $roleId): void
+    {
+        $role = \App\Models\Role::query()->find($roleId);
+        if ($role?->name === 'super_admin') {
+            throw new DomainException('لا يُنشأ ولا يُمنح دور المدير الأعلى من شاشة الموظفين.');
+        }
     }
 
     private function present(User $user): array
