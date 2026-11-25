@@ -99,6 +99,21 @@
   margin-block: 1rem 0;
 }
 
+.cd-identity__progress.has-deferred {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+  align-items: stretch;
+}
+
+.cd-identity__progress.has-deferred .rpm-rental-progress {
+  height: 100%;
+  padding-block: 0.55rem;
+  padding-inline: 0.75rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
 .cd-identity .rpm-rental-progress {
   margin-block: 0;
   gap: 0.4rem;
@@ -125,31 +140,39 @@
 }
 
 .cd-deferred {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.65rem;
+  display: grid;
+  align-content: center;
+  gap: 0.2rem;
+  min-width: 0;
   padding-block: 0.55rem;
   padding-inline: 0.75rem;
   border-radius: 12px;
   background: color-mix(in srgb, var(--warning, #f59e0b) 12%, var(--surface-2));
   border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 28%, var(--border));
+  box-sizing: border-box;
 }
 
 .cd-deferred__label {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   color: var(--warning-ink, var(--warning, #b45309));
 }
 
 .cd-deferred__amount {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 800;
   color: var(--text);
+  line-height: 1.25;
 }
 
 .cd-deferred__due {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 420px) {
+  .cd-identity__progress.has-deferred {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+  }
 }
 
 .cd-actions.rpm-card__actions {
@@ -315,6 +338,24 @@
 
   .cd-actions.rpm-card__actions {
     margin-block: 1rem 0.15rem;
+  }
+
+  /* Fill the orphan cell when تسديد (or any action) sits alone on the last row */
+  .cd-actions.rpm-card__actions > .rpm-btn:last-child:nth-child(odd),
+  .cd-actions.rpm-card__actions > .rpm-btn:nth-child(odd):has(+ .cd-print-actions) {
+    grid-column: 1 / -1;
+  }
+
+  .cd-actions.rpm-card__actions > .cd-print-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+    width: 100%;
+  }
+
+  .cd-actions.rpm-card__actions > .cd-print-actions > .rpm-btn:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 
   .cd-metrics.rpm-metrics--wrap {

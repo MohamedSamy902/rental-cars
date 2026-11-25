@@ -195,23 +195,34 @@ export function BookingsPage() {
     {
       id: 'period',
       header: 'الفترة',
+      cell: (b) => (
+        <>
+          <span className="rpm-table__primary">{formatDate(b.starts_at)}</span>
+          <span className="rpm-table__sub">حتى {formatDate(b.planned_ends_at)}</span>
+        </>
+      ),
+      sortValue: (b) => b.starts_at,
+    },
+    {
+      id: 'deferred',
+      header: 'متأجل',
       cell: (b) => {
         const deferred = Number(b.ledger?.balance ?? 0)
+        if (deferred <= 0) {
+          return <span className="rpm-table__primary">—</span>
+        }
         return (
           <>
-            <span className="rpm-table__primary">{formatDate(b.starts_at)}</span>
-            <span className="rpm-table__sub">حتى {formatDate(b.planned_ends_at)}</span>
-            {deferred > 0 ? (
-              <span className="rpm-table__sub rpm-contract-deferred">
-                متأجل {formatMoney(deferred)}
-                {b.balance_due_on ? ` · ${formatDate(b.balance_due_on)}` : ''}
-              </span>
-            ) : null}
+            <span className="rpm-table__primary rpm-contract-deferred">{formatMoney(deferred)}</span>
+            {b.balance_due_on ? (
+              <span className="rpm-table__sub rpm-contract-deferred">{formatDate(b.balance_due_on)}</span>
+            ) : (
+              <span className="rpm-table__sub">بدون تاريخ</span>
+            )}
           </>
         )
       },
-      sortValue: (b) => b.starts_at,
-      wide: true,
+      sortValue: (b) => Number(b.ledger?.balance ?? 0),
     },
     {
       id: 'rate',
