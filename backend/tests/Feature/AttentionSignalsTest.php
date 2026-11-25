@@ -14,6 +14,7 @@ use App\Services\Accounting\AccountingService;
 use App\Support\PermissionCatalog;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -133,6 +134,16 @@ class AttentionSignalsTest extends TestCase
         $res = $this->getJson('/api/attention')->assertOk();
         $res->assertJsonPath('data.owners_unpaid', 1);
         Carbon::setTestNow();
+    }
+
+    public function test_attention_cold_query_budget(): void
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->getJson('/api/attention')->assertOk();
+        $n = count(DB::getQueryLog());
+        DB::disableQueryLog();
+        $this->assertLessThanOrEqual(12, $n, "attention cold queries={$n}");
     }
 
     private function vehicle(string $code, int $ownerId, array $extra = []): Vehicle

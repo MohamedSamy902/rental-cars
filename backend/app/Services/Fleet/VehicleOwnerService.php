@@ -780,12 +780,18 @@ class VehicleOwnerService
         return $value;
     }
 
-    /** عدد الملاك النشطين الذين عليهم فلوس متأخرة (شهور مكتملة − مصروف) — دفعة واحدة بلا N+1. */
-    public function countOwnersWithOverdue(): int
+    /**
+     * عدد الملاك النشطين الذين عليهم فلوس متأخرة (شهور مكتملة − مصروف) — دفعة واحدة بلا N+1.
+     *
+     * @param  string|null|false  $countsFrom  false = اقرأ من الإعدادات؛ null/string = استخدم القيمة المعطاة
+     */
+    public function countOwnersWithOverdue(string|false|null $countsFrom = false): int
     {
         $tz = config('app.timezone', 'Africa/Cairo');
         $today = now()->timezone($tz)->toDateString();
-        $countsFrom = $this->duesCountsFrom();
+        if ($countsFrom === false) {
+            $countsFrom = $this->duesCountsFrom();
+        }
 
         $owners = VehicleOwner::query()
             ->where('is_active', true)

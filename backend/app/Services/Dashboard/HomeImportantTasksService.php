@@ -42,12 +42,14 @@ class HomeImportantTasksService
      * @param  array{
      *   open_work_orders?: Collection<int, WorkOrder>,
      *   low_stock_items?: Collection<int, InventoryItem>,
-     *   open_violations?: Collection<int, Violation>
+     *   open_violations?: Collection<int, Violation>,
+     *   fleet_vehicles?: Collection<int, Vehicle>
      * }  $preloaded
      */
     public function forUser(User $user, array $preloaded = []): array
     {
         $items = [];
+        $fleet = $preloaded['fleet_vehicles'] ?? null;
 
         if ($this->can($user, 'contracts.view')) {
             $items = array_merge($items, $this->contractTasks($this->can($user, 'customers.view')));
@@ -60,10 +62,13 @@ class HomeImportantTasksService
         }
         if ($this->can($user, 'vehicles.view')) {
             $items = array_merge($items, $this->licenseTasks());
-            $items = array_merge($items, $this->simRechargeTasks());
+            $items = array_merge($items, $this->simRechargeTasks($fleet));
         }
         if ($this->can($user, 'vehicles.view') || $this->can($user, 'owners.view')) {
-            $items = array_merge($items, $this->ownerAgreementTasks($this->can($user, 'owners.view')));
+            $items = array_merge($items, $this->ownerAgreementTasks(
+                $this->can($user, 'owners.view'),
+                $fleet,
+            ));
         }
         if ($this->can($user, 'violations.view')) {
             $items = array_merge($items, $this->violationTasks($preloaded['open_violations'] ?? null));
@@ -289,18 +294,29 @@ class HomeImportantTasksService
     }
 
     /**
+     * @param  Collection<int, Vehicle>|null  $fleet
      * @return list<array<string, mixed>>
      */
-    private function simRechargeTasks(): array
+    private function simRechargeTasks(?Collection $fleet = null): array
     {
         $deadline = now()->addDays(self::SIM_LEAD_DAYS)->toDateString();
-        $vehicles = Vehicle::query()
-            ->where('is_active', true)
-            ->whereNotNull('tracker_sim_next_recharge_on')
-            ->whereDate('tracker_sim_next_recharge_on', '<=', $deadline)
-            ->orderBy('tracker_sim_next_recharge_on')
-            ->limit(8)
-            ->get(['id', 'plate', 'brand', 'model', 'tracker_sim_number', 'tracker_sim_next_recharge_on', 'tracker_sim_last_recharged_on']);
+        $vehicles = $fleet
+            ? $fleet
+                ->filter(function (Vehicle $v) use ($deadline) {
+                    $on = $v->tracker_sim_next_recharge_on?->toDateString();
+
+                    return $on !== null && $on <= $deadline;
+                })
+                ->sortBy(fn (Vehicle $v) => $v->tracker_sim_next_recharge_on?->toDateString() ?? '9999-12-31')
+                ->take(8)
+                ->values()
+            : Vehicle::query()
+                ->where('is_active', true)
+                ->whereNotNull('tracker_sim_next_recharge_on')
+                ->whereDate('tracker_sim_next_recharge_on', '<=', $deadline)
+                ->orderBy('tracker_sim_next_recharge_on')
+                ->limit(8)
+                ->get(['id', 'plate', 'brand', 'model', 'tracker_sim_number', 'tracker_sim_next_recharge_on', 'tracker_sim_last_recharged_on']);
 
         $items = [];
         foreach ($vehicles as $v) {
@@ -322,22 +338,38 @@ class HomeImportantTasksService
     }
 
     /**
+     * @param  Collection<int, Vehicle>|null  $fleet
      * @return list<array<string, mixed>>
      */
-    private function ownerAgreementTasks(bool $showOwner): array
+    private function ownerAgreementTasks(bool $showOwner, ?Collection $fleet = null): array
     {
         $deadline = now()->addDays(self::OWNER_AGREEMENT_LEAD_DAYS)->toDateString();
-        $vehicles = Vehicle::query()
-            ->when($showOwner, fn ($q) => $q->with('owner:id,full_name'))
-            ->where('is_active', true)
-            ->whereNotNull('owner_agreement_ends_on')
-            ->whereDate('owner_agreement_ends_on', '<=', $deadline)
-            ->orderBy('owner_agreement_ends_on')
-            ->limit(8)
-            ->get([
-                'id', 'plate', 'brand', 'model', 'owner_id',
-                'owner_agreement_starts_on', 'owner_agreement_ends_on',
-            ]);
+        if ($fleet) {
+            $vehicles = $fleet
+                ->filter(function (Vehicle $v) use ($deadline) {
+                    $on = $v->owner_agreement_ends_on?->toDateString();
+
+                    return $on !== null && $on <= $deadline;
+                })
+                ->sortBy(fn (Vehicle $v) => $v->owner_agreement_ends_on?->toDateString() ?? '9999-12-31')
+                ->take(8)
+                ->values();
+            if ($showOwner && $vehicles->isNotEmpty()) {
+                $vehicles->loadMissing('owner:id,full_name');
+            }
+        } else {
+            $vehicles = Vehicle::query()
+                ->when($showOwner, fn ($q) => $q->with('owner:id,full_name'))
+                ->where('is_active', true)
+                ->whereNotNull('owner_agreement_ends_on')
+                ->whereDate('owner_agreement_ends_on', '<=', $deadline)
+                ->orderBy('owner_agreement_ends_on')
+                ->limit(8)
+                ->get([
+                    'id', 'plate', 'brand', 'model', 'owner_id',
+                    'owner_agreement_starts_on', 'owner_agreement_ends_on',
+                ]);
+        }
 
         $items = [];
         foreach ($vehicles as $v) {

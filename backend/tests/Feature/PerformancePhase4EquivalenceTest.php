@@ -90,7 +90,7 @@ class PerformancePhase4EquivalenceTest extends TestCase
         $this->getJson('/api/dashboard')->assertOk();
         $n = count(DB::getQueryLog());
         DB::disableQueryLog();
-        $this->assertLessThanOrEqual(45, $n, "dashboard cold queries={$n}");
+        $this->assertLessThanOrEqual(35, $n, "dashboard cold queries={$n}");
     }
 
     public function test_profit_snapshot_preferred_when_present(): void
