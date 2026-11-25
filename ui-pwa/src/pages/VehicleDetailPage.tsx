@@ -22,6 +22,7 @@ import { ContractActionsBar } from '@/shared/contracts/ContractActionsBar'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
+import { shareContractInvoiceWhatsApp } from '@/shared/contracts/shareContractInvoice'
 import type { Contract } from '@/shared/contracts/contractModel'
 import { printDomSubtree, printHtmlDocument } from '@/utils/printHtml'
 import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
@@ -504,6 +505,18 @@ export function VehicleDetailPage() {
   useEffect(() => { void load() }, [vehicleId])
   const life = useContractLifecycle(() => { void load() })
   const { openPrint, printSheet } = useContractPrint()
+
+  async function shareInvoice(contract: Contract) {
+    const result = await shareContractInvoiceWhatsApp({
+      contractId: contract.id,
+      phone: contract.customer?.phone,
+    })
+    if (result.ok) {
+      toast.success('تم فتح واتساب بالفاتورة مع رابط يفتح بدون تسجيل دخول.')
+    } else {
+      toast.error(result.error)
+    }
+  }
 
   async function closeWorkOrder(id: number) {
     try {
@@ -1011,6 +1024,7 @@ export function VehicleDetailPage() {
                     onApprove={() => void life.approve(c.id)}
                     onAction={(kind) => void life.openAction(kind, contract)}
                     onPrint={(kind = 'contract') => openPrint(c.id, kind)}
+                    onShareInvoice={() => void shareInvoice(contract)}
                   />
                 </div>
               </article>

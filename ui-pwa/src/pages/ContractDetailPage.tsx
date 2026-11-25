@@ -15,6 +15,7 @@ import { ContractActionsBar } from '@/shared/contracts/ContractActionsBar'
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
+import { shareContractInvoiceWhatsApp } from '@/shared/contracts/shareContractInvoice'
 import './pages.css'
 import './ContractDetailPage.css'
 
@@ -62,6 +63,18 @@ export function ContractDetailPage() {
 
   const life = useContractLifecycle(() => void load())
   const { openPrint, printSheet } = useContractPrint()
+
+  async function shareInvoice(contract: Contract) {
+    const result = await shareContractInvoiceWhatsApp({
+      contractId: contract.id,
+      phone: contract.customer?.phone,
+    })
+    if (result.ok) {
+      toast.success('تم فتح واتساب بالفاتورة مع رابط يفتح بدون تسجيل دخول.')
+    } else {
+      toast.error(result.error)
+    }
+  }
 
   if (loading && !row) return <div className="cd"><SkeletonBlock rows={10} /></div>
   if (error || !row) {
@@ -181,6 +194,7 @@ export function ContractDetailPage() {
           onApprove={() => void life.approve(row.id)}
           onAction={(kind) => void life.openAction(kind, row)}
           onPrint={(kind = 'contract') => openPrint(row.id, kind)}
+          onShareInvoice={() => void shareInvoice(row)}
         />
       </header>
       {printSheet}

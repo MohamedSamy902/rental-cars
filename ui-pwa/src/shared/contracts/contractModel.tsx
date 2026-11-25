@@ -1,7 +1,7 @@
 import { formatDepositAmount } from '@/shared/lib/format'
 import { StatusPill, type MenuItem } from '@/shared/ui'
 import {
-  IconEye, IconCheck, IconKey, IconReturn, IconCash, IconCalendar, IconCar, IconBan, IconPrinter, IconWallet, IconTrash,
+  IconEye, IconCheck, IconKey, IconReturn, IconCash, IconCalendar, IconCar, IconBan, IconPrinter, IconWallet, IconTrash, IconPhone,
 } from '@/shared/ui'
 
 export type Deposit = { id: number; original_amount: number; status: string; deductions_total: number; remaining?: number }
@@ -198,6 +198,7 @@ export function contractMenu(
     approve: () => void
     openAction: (kind: Exclude<ActionKind, null>) => void
     print: (kind?: 'contract' | 'invoice' | 'receipt') => void
+    shareInvoice?: () => void
     softDelete?: () => void
     can?: (permission: string) => boolean
     isIntegrator?: boolean
@@ -242,6 +243,16 @@ export function contractMenu(
     items.push(
       { id: 'print-contract', label: 'طباعة العقد', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('contract') },
       { id: 'print-invoice', label: 'الفاتورة', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('invoice') },
+    )
+    if (handlers.shareInvoice && b.customer?.phone?.trim()) {
+      items.push({
+        id: 'wa-invoice',
+        label: 'واتساب الفاتورة',
+        icon: <IconPhone size={16} />,
+        onSelect: handlers.shareInvoice,
+      })
+    }
+    items.push(
       { id: 'print-receipt', label: 'إقرار استلام سيارة', icon: <IconPrinter size={16} />, onSelect: () => handlers.print('receipt') },
     )
   }
