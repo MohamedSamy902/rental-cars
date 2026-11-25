@@ -344,8 +344,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/contracts/{id}/deposit/deduct` | خصم من التأمين |
 | POST | `/contracts/{id}/deposit/return` | رد متبقي |
 | GET | `/contracts/{id}/print` | بيانات الطباعة |
-| POST | `/contracts/{id}/invoice/share` | تجهيز نص واتساب + رابط فاتورة موقّع (`share_url` · `message_text`) — صلاحية `contracts.print` |
-| GET | `/public/contracts/invoice` | صفحة HTML عامة للفاتورة (توقيع مؤقت · بلا لوجين) |
+| POST | `/contracts/{id}/invoice/share` | تجهيز نص واتساب + رابط فاتورة موقّع (`share_url` · `message_text` · `expires_in_days`) — التوقيع حتى شهر بعد نهاية الإيجار · صلاحية `contracts.print` |
+| GET | `/public/contracts/invoice` | صفحة HTML عامة للفاتورة (`rpm-invoice-v2` · بلا شريط صلاحية ظاهر · بلا لوجين) |
 | DELETE | `/contracts/{id}` | حذف ناعم + cascade مالي/تشغيلي — **سوبر أدمن فقط** (`integrator`) |
 | POST | `/contracts/soft-purge-all` | مسح كل العقود ناعماً + أوامر الشغل المتبقية — جسم `{ "confirm": "حذف الكل" }` · سوبر أدمن فقط |
 

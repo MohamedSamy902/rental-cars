@@ -102,9 +102,11 @@ class ContractInvoiceShareTest extends TestCase
 
         $res = $this->postJson('/api/contracts/'.$this->contract->id.'/invoice/share')
             ->assertOk()
-            ->assertJsonPath('data.expires_in_days', 14)
             ->assertJsonPath('data.invoice_number', 'INV-INV-100')
             ->assertJsonPath('data.customer_phone', '01001112233');
+
+        $expiresInDays = (int) $res->json('data.expires_in_days');
+        $this->assertGreaterThanOrEqual(30, $expiresInDays, 'صلاحية الرابط ≥ ٣٠ يوماً / حتى شهر بعد نهاية الإيجار');
 
         $shareUrl = (string) $res->json('data.share_url');
         $message = (string) $res->json('data.message_text');
@@ -115,22 +117,42 @@ class ContractInvoiceShareTest extends TestCase
         $this->assertStringContainsString($shareUrl, $message);
         $this->assertStringContainsString('5,600', $message);
         $this->assertStringContainsString('2,000', $message);
+        $this->assertStringNotContainsString('صالح لمدة', $message);
+        $this->assertStringNotContainsString('فاتورة مؤقتة', $message);
     }
 
     public function test_public_invoice_page_opens_without_login(): void
     {
-        $url = app(PublicMediaLinkService::class)->temporaryContractInvoiceShareUrl($this->contract->id);
+        $ttl = app(\App\Services\Contracts\ContractInvoiceShareService::class)
+            ->invoiceShareTtlDays($this->contract);
+        $url = app(PublicMediaLinkService::class)->temporaryContractInvoiceShareUrl($this->contract->id, $ttl);
         $path = $this->pathAndQuery($url);
 
         $this->get($path)
             ->assertOk()
             ->assertHeader('Content-Type', 'text/html; charset=UTF-8')
-            ->assertSee('INVOICE / فاتورة', false)
+            ->assertSee('فاتورة', false)
             ->assertSee('عميل فاتورة', false)
             ->assertSee('INV-INV-100', false)
             ->assertSee('كورولا', false)
-            ->assertSee('rpm-invoice-v1', false)
-            ->assertSee('5,600', false);
+            ->assertSee('rpm-invoice-v2', false)
+            ->assertSee('5,600', false)
+            ->assertDontSee('فاتورة مؤقتة عبر واتساب', false)
+            ->assertDontSee('صالحة', false)
+            ->assertDontSee('share-banner', false);
+    }
+
+    public function test_invoice_share_ttl_extends_one_month_past_planned_end(): void
+    {
+        $service = app(\App\Services\Contracts\ContractInvoiceShareService::class);
+        $expires = $service->invoiceShareExpiresAt($this->contract);
+        $plannedEnd = $this->contract->planned_ends_at->copy()->addMonth()->endOfDay();
+
+        $this->assertTrue(
+            $expires->greaterThanOrEqualTo($plannedEnd->copy()->subDay()),
+            'انتهاء الرابط ≈ شهر بعد نهاية الإيجار'
+        );
+        $this->assertGreaterThanOrEqual(30, $service->invoiceShareTtlDays($this->contract));
     }
 
     public function test_public_invoice_rejects_missing_signature(): void
