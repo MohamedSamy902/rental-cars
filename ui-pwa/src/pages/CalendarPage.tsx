@@ -83,7 +83,7 @@ export function CalendarPage() {
 
   useEffect(() => {
     Promise.all([
-      api<{ data: Contract[]; meta?: { total?: number } }>('/contracts?per_page=200'),
+      api<{ data: Contract[]; meta?: { total?: number } }>('/contracts?view=calendar&per_page=200'),
       api<{ summary?: { total?: number } }>('/vehicles?per_page=1'),
     ])
       .then(([res, fleet]) => {

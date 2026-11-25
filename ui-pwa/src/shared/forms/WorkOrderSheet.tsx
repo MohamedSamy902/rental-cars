@@ -110,7 +110,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
     setFirstUpcoming(!lockCustody)
     setPutsInMaintenance(false)
     const requests: Promise<unknown>[] = [
-      api<{ data: Item[] }>('/inventory?per_page=200')
+      api<{ data: Item[] }>('/inventory?per_page=100')
         .then((r) => setItems(Array.isArray(r.data) ? r.data : []))
         .catch((e) => {
           setItems([])

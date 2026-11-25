@@ -7,7 +7,7 @@ import { formatMoney } from '@/shared/lib/format'
 import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
 import { NationalityField } from '@/shared/forms/NationalityField'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
-import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
+import { useSharedAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, Sheet, Fab, DataTable, TextField, TextAreaField, SwitchField,
   StatusPill, useToast, IconEye, MediaUpload, PhoneActions, type DataColumn,
@@ -73,7 +73,7 @@ export function OwnersPage() {
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [chip, setChip] = useQueryTab({ allowed: OwnersPageTabs, defaultValue: 'all' })
-  const { counts: attention } = useAttentionSignals(true)
+  const { counts: attention } = useSharedAttentionSignals()
 
   const chips = useMemo(
     () => [

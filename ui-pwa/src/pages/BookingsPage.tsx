@@ -6,7 +6,7 @@ import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { useLatestRequest } from '@/shared/lib/useLatestRequest'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
-import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
+import { useSharedAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
@@ -50,7 +50,7 @@ export function BookingsPage() {
   const { openNewContract, createdVersion } = useNewContract()
   const life = useContractLifecycle(() => void load(page))
   const { openPrint, printSheet } = useContractPrint()
-  const { counts: attention } = useAttentionSignals(true)
+  const { counts: attention } = useSharedAttentionSignals()
 
   const chips = useMemo(
     () => [

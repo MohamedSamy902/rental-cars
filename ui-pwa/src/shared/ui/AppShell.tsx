@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { useTheme } from '@/shared/theme/ThemeContext'
 import { useNewContract } from '@/shared/contracts/newContractContext'
-import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
+import { AttentionProvider, useSharedAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import { useRouteScrollMemory } from '@/shared/lib/useRouteScrollMemory'
 import { AttentionDot } from './AttentionDot'
 import { BrandLogo } from './BrandLogo'
@@ -67,6 +67,15 @@ const RAIL_KEY = 'rpm.shell.rail'
 const WA_URL = 'https://wa.me/201150100104'
 
 export function AppShell() {
+  const { user } = useAuth()
+  return (
+    <AttentionProvider enabled={Boolean(user)}>
+      <AppShellInner />
+    </AttentionProvider>
+  )
+}
+
+function AppShellInner() {
   const { user, logout, can, featureEnabled } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { openNewContract } = useNewContract()
@@ -77,10 +86,7 @@ export function AppShell() {
   const [drawer, setDrawer] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [unread, setUnread] = useState(0)
-  const { byPath: attentionByPath, counts: attentionCounts } = useAttentionSignals(
-    Boolean(user),
-    location.pathname,
-  )
+  const { byPath: attentionByPath, counts: attentionCounts } = useSharedAttentionSignals()
 
   const visibleRail = railNav.filter((item) => {
     if (item.feature && !featureEnabled(item.feature)) return false

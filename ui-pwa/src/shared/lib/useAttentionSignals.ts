@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/shared/api/client'
 import { resolveAttentionTone, type AttentionTone } from '@/shared/ui/AttentionDot'
 
@@ -147,7 +147,7 @@ const NAV_PATHS = [
   '/owners',
 ] as const
 
-export function useAttentionSignals(enabled: boolean, refreshKey?: string) {
+export function useAttentionSignals(enabled: boolean) {
   const [counts, setCounts] = useState<AttentionCounts>(EMPTY)
 
   useEffect(() => {
@@ -191,7 +191,7 @@ export function useAttentionSignals(enabled: boolean, refreshKey?: string) {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener(ATTENTION_INVALIDATE_EVENT, onInvalidate)
     }
-  }, [enabled, refreshKey])
+  }, [enabled])
 
   const byPath = useMemo(() => {
     const out: Record<string, NavAttention> = {}
@@ -203,4 +203,21 @@ export function useAttentionSignals(enabled: boolean, refreshKey?: string) {
   }, [counts])
 
   return { counts, byPath }
+}
+
+type AttentionValue = ReturnType<typeof useAttentionSignals>
+
+const AttentionContext = createContext<AttentionValue | null>(null)
+
+/** One shared /attention poll for the whole shell — pages read context only. */
+export function AttentionProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
+  const value = useAttentionSignals(enabled)
+  return createElement(AttentionContext.Provider, { value }, children)
+}
+
+/** Prefer this inside AppShell tree so Bookings/Customers/Owners do not re-poll. */
+export function useSharedAttentionSignals(): AttentionValue {
+  const ctx = useContext(AttentionContext)
+  if (ctx) return ctx
+  return { counts: EMPTY, byPath: {} }
 }

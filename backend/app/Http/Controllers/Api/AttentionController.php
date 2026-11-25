@@ -14,7 +14,6 @@ use App\Models\WorkOrder;
 use App\Services\Fleet\VehicleOwnerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -29,33 +28,53 @@ class AttentionController extends Controller
         $user = $request->user();
 
         $canContracts = (bool) $user?->hasPermission('contracts.view');
-        $overdueReturns = $canContracts ? Contract::query()
-            ->where('status', 'active')
-            ->where('planned_ends_at', '<', now())
-            ->count() : null;
+        $overdueReturns = null;
+        $pendingApprovals = null;
+        $returningToday = null;
+        $pickupsToday = null;
 
-        $pendingApprovals = $canContracts ? Contract::query()->where('status', 'pending')->count() : null;
+        if ($canContracts) {
+            $now = now()->toDateTimeString();
+            $todayStart = now()->startOfDay()->toDateTimeString();
+            $tomorrowStart = now()->copy()->addDay()->startOfDay()->toDateTimeString();
 
-        $returningToday = $canContracts ? Contract::query()
-            ->where('status', 'active')
-            ->whereDate('planned_ends_at', today())
-            ->where('planned_ends_at', '>=', now())
-            ->count() : null;
+            // One scan for the four contract counters (same predicates as before).
+            $c = Contract::query()
+                ->toBase()
+                ->selectRaw(
+                    'SUM(CASE WHEN status = ? AND planned_ends_at < ? THEN 1 ELSE 0 END) as overdue_returns,
+                    SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending_approvals,
+                    SUM(CASE WHEN status = ? AND planned_ends_at >= ? AND planned_ends_at < ? THEN 1 ELSE 0 END) as returning_today,
+                    SUM(CASE WHEN status = ? AND starts_at >= ? AND starts_at < ? THEN 1 ELSE 0 END) as pickups_today',
+                    [
+                        'active', $now,
+                        'pending',
+                        'active', $now, $tomorrowStart,
+                        'approved', $todayStart, $tomorrowStart,
+                    ]
+                )
+                ->first();
 
-        $pickupsToday = $canContracts ? Contract::query()
-            ->where('status', 'approved')
-            ->whereDate('starts_at', today())
-            ->count() : null;
+            $overdueReturns = (int) ($c->overdue_returns ?? 0);
+            $pendingApprovals = (int) ($c->pending_approvals ?? 0);
+            $returningToday = (int) ($c->returning_today ?? 0);
+            $pickupsToday = (int) ($c->pickups_today ?? 0);
+        }
 
         $canMaintenance = (bool) $user?->hasPermission('maintenance.view');
-        $blockingWorkOrders = $canMaintenance ? WorkOrder::query()
-            ->where('puts_in_maintenance', true)
-            ->whereIn('status', ['open', 'in_progress'])
-            ->count() : null;
-
-        $openWorkOrders = $canMaintenance ? WorkOrder::query()
-            ->whereIn('status', ['open', 'in_progress'])
-            ->count() : null;
+        $blockingWorkOrders = null;
+        $openWorkOrders = null;
+        if ($canMaintenance) {
+            $wo = WorkOrder::query()
+                ->toBase()
+                ->selectRaw(
+                    "SUM(CASE WHEN status IN ('open', 'in_progress') AND puts_in_maintenance = 1 THEN 1 ELSE 0 END) as blocking_work_orders,
+                    SUM(CASE WHEN status IN ('open', 'in_progress') THEN 1 ELSE 0 END) as open_work_orders"
+                )
+                ->first();
+            $blockingWorkOrders = (int) ($wo->blocking_work_orders ?? 0);
+            $openWorkOrders = (int) ($wo->open_work_orders ?? 0);
+        }
 
         $openViolations = $user?->hasPermission('violations.view') ? Violation::query()
             ->whereNotIn('status', ['paid', 'confirmed'])

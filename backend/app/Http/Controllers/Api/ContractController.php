@@ -38,6 +38,11 @@ class ContractController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        // Calendar needs only schedule fields — skip progress/ledger/dossier-weight payload.
+        if ($request->string('view')->toString() === 'calendar') {
+            return $this->calendarIndex($request);
+        }
+
         $q = Contract::query()->with([
             'customer',
             'vehicle',
@@ -117,7 +122,61 @@ class ContractController extends Controller
             return VehicleOwnerVisibility::redactEmbedded(NestedCustomerRedactor::contract($arr, $user), $user);
         })->all();
 
-        $today = now()->toDateString();
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'total' => $rows->total(),
+            ],
+            'summary' => $this->contractsSummary(),
+        ]);
+    }
+
+    /**
+     * Lightweight schedule feed for CalendarPage (same visible fields, no progress/ledger).
+     */
+    private function calendarIndex(Request $request): JsonResponse
+    {
+        $q = Contract::query()
+            ->with([
+                'customer:id,full_name',
+                'vehicle:id,brand,model,plate',
+            ])
+            ->whereIn('status', ['pending', 'approved', 'active'])
+            ->latest('id');
+
+        $user = $request->user();
+        if ($user && $user->role?->name === 'sales' && ! $user->hasPermission('contracts.approve')) {
+            $q->where('sales_user_id', $user->id);
+        }
+        if ($vehicleId = $request->integer('vehicle_id')) {
+            $q->where('vehicle_id', $vehicleId);
+        }
+
+        $perPage = PaginationInput::perPage($request, 200, PaginationInput::MAX_PER_PAGE);
+        $page = PaginationInput::page($request);
+        $rows = $q->paginate($perPage, [
+            'id', 'number', 'status', 'starts_at', 'planned_ends_at', 'customer_id', 'vehicle_id',
+        ], 'page', $page);
+
+        $data = collect($rows->items())->map(function (Contract $c) {
+            return [
+                'id' => $c->id,
+                'number' => $c->number,
+                'status' => $c->status,
+                'starts_at' => $c->starts_at?->toIso8601String(),
+                'planned_ends_at' => $c->planned_ends_at?->toIso8601String(),
+                'customer' => $c->customer ? [
+                    'full_name' => $c->customer->full_name,
+                ] : null,
+                'vehicle' => $c->vehicle ? [
+                    'brand' => $c->vehicle->brand,
+                    'model' => $c->vehicle->model,
+                    'plate' => $c->vehicle->plate,
+                ] : null,
+            ];
+        })->all();
 
         return response()->json([
             'data' => $data,
@@ -126,24 +185,54 @@ class ContractController extends Controller
                 'last_page' => $rows->lastPage(),
                 'total' => $rows->total(),
             ],
-            'summary' => [
-                'total' => Contract::query()->count(),
-                'pending' => Contract::query()->where('status', 'pending')->count(),
-                'approved' => Contract::query()->where('status', 'approved')->count(),
-                'active' => Contract::query()->where('status', 'active')->count(),
-                'completed' => Contract::query()->where('status', 'completed')->count(),
-                'cancelled' => Contract::query()->where('status', 'cancelled')->count(),
-                'upcoming' => Contract::query()
-                    ->whereIn('status', ['pending', 'approved'])
-                    ->where('starts_at', '>', now()->endOfDay())
-                    ->count(),
-                'handover_today' => Contract::query()
-                    ->whereIn('status', ['pending', 'approved'])
-                    ->whereDate('starts_at', $today)
-                    ->count(),
-                'with_balance' => $this->countWithOutstandingBalance(),
-            ],
         ]);
+    }
+
+    /**
+     * Single aggregated summary (same keys/values as the former 9 separate COUNT queries).
+     *
+     * @return array<string, int>
+     */
+    private function contractsSummary(): array
+    {
+        $endOfDay = now()->endOfDay()->toDateTimeString();
+        $todayStart = now()->startOfDay()->toDateTimeString();
+        $tomorrowStart = now()->copy()->addDay()->startOfDay()->toDateTimeString();
+
+        $row = Contract::query()
+            ->toBase()
+            ->selectRaw(
+                'COUNT(*) as total,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as cancelled,
+                SUM(CASE WHEN status IN (?, ?) AND starts_at > ? THEN 1 ELSE 0 END) as upcoming,
+                SUM(CASE WHEN status IN (?, ?) AND starts_at >= ? AND starts_at < ? THEN 1 ELSE 0 END) as handover_today',
+                [
+                    'pending',
+                    'approved',
+                    'active',
+                    'completed',
+                    'cancelled',
+                    'pending', 'approved', $endOfDay,
+                    'pending', 'approved', $todayStart, $tomorrowStart,
+                ]
+            )
+            ->first();
+
+        return [
+            'total' => (int) ($row->total ?? 0),
+            'pending' => (int) ($row->pending ?? 0),
+            'approved' => (int) ($row->approved ?? 0),
+            'active' => (int) ($row->active ?? 0),
+            'completed' => (int) ($row->completed ?? 0),
+            'cancelled' => (int) ($row->cancelled ?? 0),
+            'upcoming' => (int) ($row->upcoming ?? 0),
+            'handover_today' => (int) ($row->handover_today ?? 0),
+            'with_balance' => $this->countWithOutstandingBalance(),
+        ];
     }
 
     /**

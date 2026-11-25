@@ -153,7 +153,7 @@ export function HrPage() {
             .catch(() => { setAssignments([]) }),
         )
         tasks.push(
-          api<{ data: PettyCashAccount[] }>('/petty-cash?per_page=200')
+          api<{ data: PettyCashAccount[] }>('/petty-cash?per_page=100')
             .then((res) => {
               const map: Record<number, PettyCashAccount> = {}
               for (const row of res.data || []) {

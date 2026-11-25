@@ -356,9 +356,9 @@ function SwipeCard<T>({ row, index, columns, label, onRowClick, actions = [] }: 
       ) : null}
       <motion.article
         className={`rpm-dt-card ${onRowClick ? 'is-clickable' : ''}`.trim()}
-        initial={{ opacity: 0, y: 8 }}
+        initial={index < 6 ? { opacity: 0, y: 6 } : false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.24, delay: Math.min(index, 8) * 0.035, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: index < 6 ? 0.2 : 0, delay: index < 6 ? index * 0.03 : 0, ease: [0.22, 1, 0.36, 1] }}
         drag={canSwipe ? 'x' : false}
         dragDirectionLock
         dragConstraints={{ left: 0, right: 0 }}

@@ -8,7 +8,7 @@ import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
 import { NationalityField } from '@/shared/forms/NationalityField'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useLatestRequest } from '@/shared/lib/useLatestRequest'
-import { useAttentionSignals } from '@/shared/lib/useAttentionSignals'
+import { useSharedAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import {
   PageHeader, FilterBar, Button, StatusPill, Sheet, Fab, DetailList, DataTable, TextField, TextAreaField,
   MediaUpload, useToast, SkeletonBlock, ErrorState, IconEye, IconEdit, IconClipboard, PhoneActions,
@@ -77,7 +77,7 @@ export function CustomersPage() {
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [blacklistReason, setBlacklistReason] = useState('')
-  const { counts: attention } = useAttentionSignals(true)
+  const { counts: attention } = useSharedAttentionSignals()
 
   const chips = useMemo(
     () => [
