@@ -8,9 +8,10 @@ type Props = {
   onApprove: () => void
   onAction: (kind: Exclude<ActionKind, null>) => void
   onPrint: (kind?: PrintDocKind) => void
+  onShareInvoice?: () => void
 }
 
-export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }: Props) {
+export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint, onShareInvoice }: Props) {
   const { can } = useAuth()
   const canApprove = can('contracts.approve')
   const canUpdate = can('contracts.update')
@@ -66,6 +67,9 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint }
         <div className="cd-print-actions" role="group" aria-label="طباعة المستندات">
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('contract')}>طباعة العقد</Button>
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('invoice')}>الفاتورة</Button>
+          {onShareInvoice && b.customer?.phone?.trim() ? (
+            <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={onShareInvoice}>واتساب الفاتورة</Button>
+          ) : null}
           <Button type="button" size="sm" variant="secondary" className="cd-print-actions__btn" onClick={() => onPrint('receipt')}>إقرار استلام سيارة</Button>
         </div>
       ) : null}

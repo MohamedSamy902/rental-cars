@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AttentionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CollaborationController;
 use App\Http\Controllers\Api\ContractController;
+use App\Http\Controllers\Api\ContractInvoiceShareController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentTemplateController;
@@ -47,6 +48,9 @@ Route::get('/public/media/{medium}/file', [ViolationShareController::class, 'pub
 Route::get('/public/violations/share', [ViolationShareController::class, 'publicShare'])
     ->middleware(['signed:relative', 'throttle:60,1'])
     ->name('public.violations.share');
+Route::get('/public/contracts/invoice', [ContractInvoiceShareController::class, 'publicShare'])
+    ->middleware(['signed:relative', 'throttle:60,1'])
+    ->name('public.contracts.invoice');
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -203,6 +207,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/contracts/{contract}/deposit/deduct', [ContractController::class, 'deductDeposit'])->middleware('permission:deposits.settle');
     Route::post('/contracts/{contract}/deposit/return', [ContractController::class, 'returnDeposit'])->middleware('permission:deposits.settle');
     Route::get('/contracts/{contract}/print', [ContractController::class, 'printData'])->middleware('permission:contracts.print');
+    Route::post('/contracts/{contract}/invoice/share', [ContractInvoiceShareController::class, 'prepare'])
+        ->middleware('permission:contracts.print');
     Route::delete('/contracts/{contract}', [ContractController::class, 'destroy'])->middleware('integrator');
 
     Route::get('/showroom', [OperationsController::class, 'showroom'])

@@ -10,7 +10,7 @@ import { useSharedAttentionSignals } from '@/shared/lib/useAttentionSignals'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Fab, DataTable, RentalProgressBar,
-  ErrorState, IconClipboard, IconAlert, IconCheck, IconKey, PhoneActions,
+  ErrorState, IconClipboard, IconAlert, IconCheck, IconKey, PhoneActions, useToast,
   type DataColumn,
 } from '@/shared/ui'
 import { useNewContract } from '@/shared/contracts/newContractContext'
@@ -20,6 +20,7 @@ import {
 import { ContractActionSheet } from '@/shared/contracts/ContractActionSheet'
 import { useContractLifecycle } from '@/shared/contracts/useContractLifecycle'
 import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
+import { shareContractInvoiceWhatsApp } from '@/shared/contracts/shareContractInvoice'
 import './pages.css'
 
 const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed', 'with_balance', 'cancelled'] as const
@@ -50,7 +51,20 @@ export function BookingsPage() {
   const { openNewContract, createdVersion } = useNewContract()
   const life = useContractLifecycle(() => void load(page))
   const { openPrint, printSheet } = useContractPrint()
+  const toast = useToast()
   const { counts: attention } = useSharedAttentionSignals()
+
+  async function shareInvoice(b: Contract) {
+    const result = await shareContractInvoiceWhatsApp({
+      contractId: b.id,
+      phone: b.customer?.phone,
+    })
+    if (result.ok) {
+      toast.success('تم فتح واتساب بالفاتورة مع رابط يفتح بدون تسجيل دخول.')
+    } else {
+      toast.error(result.error)
+    }
+  }
 
   const chips = useMemo(
     () => [
@@ -315,6 +329,7 @@ export function BookingsPage() {
               approve: () => void life.approve(b.id),
               openAction: (kind) => void life.openAction(kind, b),
               print: (kind = 'contract') => openPrint(b.id, kind),
+              shareInvoice: () => void shareInvoice(b),
               softDelete: () => void life.softDelete(b.id),
               can,
               isIntegrator,
