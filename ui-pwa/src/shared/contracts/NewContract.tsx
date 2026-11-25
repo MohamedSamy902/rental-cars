@@ -58,6 +58,26 @@ function estimatePeriodRent(days: number, daily: number, halfMonthly: number, mo
   return days * daily
 }
 
+/** عكس packRent تقريباً: من إيجار المدة → سعر وحدة الشريحة المجمّد. */
+function unitRateFromPeriodRent(days: number, tier: 'daily' | 'half_monthly' | 'monthly', periodRent: number): number {
+  if (days < 1 || periodRent < 1) return 0
+  if (tier === 'daily') return Math.max(1, Math.round(periodRent / days))
+  if (tier === 'half_monthly') {
+    return Math.max(1, Math.round((periodRent * HALF_MONTH_UNIT_DAYS) / days))
+  }
+  return Math.max(1, Math.round((periodRent * MONTH_UNIT_DAYS) / days))
+}
+
+function tierBasisHint(tier: 'daily' | 'half_monthly' | 'monthly', unitRate: number, days: number): string {
+  if (tier === 'daily') {
+    return `لمدة ${days} يوم (شريحة يومي ١–١٠) · محسوب من السعر اليومي ${formatMoney(unitRate)}`
+  }
+  if (tier === 'half_monthly') {
+    return `لمدة ${days} يوم (شريحة نص شهري ١١–٢٠) · محسوب من سعر نص الشهر ${formatMoney(unitRate)} · يوم الزيادة = ÷ ${HALF_MONTH_UNIT_DAYS}`
+  }
+  return `لمدة ${days} يوم (شريحة شهري ٢١+) · محسوب من السعر الشهري ${formatMoney(unitRate)} · يوم الزيادة = ÷ ${MONTH_UNIT_DAYS}`
+}
+
 const emptyForm = {
   customer_id: '', vehicle_id: '', starts_at: '', planned_ends_at: '',
   daily_rate: '', half_monthly_rate: '', monthly_rate: '',
@@ -113,6 +133,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
   const [accessoryIds, setAccessoryIds] = useState<number[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [lockedVehicleId, setLockedVehicleId] = useState<number | undefined>()
+  const [periodRentDraft, setPeriodRentDraft] = useState<string | null>(null)
 
   const loadVehicles = useCallback(async (starts?: string, ends?: string, preferredId?: number) => {
     const params = new URLSearchParams()
@@ -192,6 +213,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     setErrors({})
     setNewCustomer(emptyCustomer)
     setAccessoryIds([])
+    setPeriodRentDraft(null)
     setLockedVehicleId(opts?.vehicleId)
     setForm({
       ...emptyForm,
@@ -407,6 +429,55 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
     )
   }, [estimatedDays, form.daily_rate, form.half_monthly_rate, form.monthly_rate])
 
+  const tierUnitRate = useMemo(() => {
+    if (rentTier === 'half_monthly') {
+      const half = Number(form.half_monthly_rate || 0)
+      const daily = Number(form.daily_rate || 0)
+      return half > 0 ? half : Math.round(daily * HALF_MONTHLY_FACTOR)
+    }
+    if (rentTier === 'monthly') {
+      const monthly = Number(form.monthly_rate || 0)
+      const daily = Number(form.daily_rate || 0)
+      return monthly > 0 ? monthly : Math.round(daily * MONTHLY_FACTOR)
+    }
+    return Number(form.daily_rate || 0)
+  }, [rentTier, form.daily_rate, form.half_monthly_rate, form.monthly_rate])
+
+  // حقل «إيجار المدة» يعرض المحسوب؛ مسودة أثناء الكتابة حتى لا تقفز القيمة مع كل رقم.
+  useEffect(() => {
+    setPeriodRentDraft(null)
+  }, [estimatedDays, form.vehicle_id, rentTier])
+
+  const periodRentFieldValue = periodRentDraft ?? (rentEstimate > 0 ? String(rentEstimate) : '')
+  const periodRentFieldError =
+    rentTier === 'daily'
+      ? errors.daily_rate
+      : rentTier === 'half_monthly'
+        ? errors.half_monthly_rate
+        : errors.monthly_rate
+
+  function applyPeriodRentEdit(raw: string) {
+    setPeriodRentDraft(raw)
+    const period = Number(raw)
+    if (!Number.isFinite(period) || period < 0 || estimatedDays < 1) return
+    const unit = unitRateFromPeriodRent(estimatedDays, rentTier, period)
+    if (unit < 1 && period > 0) return
+    if (rentTier === 'daily') {
+      setForm({
+        ...form,
+        daily_rate: String(unit),
+        half_monthly_rate: unit > 0 ? String(Math.round(unit * HALF_MONTHLY_FACTOR)) : form.half_monthly_rate,
+        monthly_rate: unit > 0 ? String(Math.round(unit * MONTHLY_FACTOR)) : form.monthly_rate,
+      })
+      return
+    }
+    if (rentTier === 'half_monthly') {
+      setForm({ ...form, half_monthly_rate: String(unit) })
+      return
+    }
+    setForm({ ...form, monthly_rate: String(unit) })
+  }
+
   const prepaidKmEstimate = Math.max(0, Number(form.prepaid_excess_km || 0))
   const prepaidAmountEstimate = prepaidKmEstimate * Math.max(0, Number(form.excess_km_rate || 0))
   const deliveryFee = form.has_delivery_service ? Math.max(0, Number(form.delivery_service_fee || 0)) : 0
@@ -545,46 +616,16 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
 
           {estimatedDays < 1 ? (
             <p className="muted" style={{ gridColumn: '1 / -1' }}>
-              حدد بداية ونهاية الحجز أولاً لعرض سعر الشريحة المناسبة للمدة.
+              حدد بداية ونهاية الحجز أولاً لعرض إيجار المدة حسب شريحة التسعير.
             </p>
-          ) : rentTier === 'daily' ? (
-            <MoneyField
-              label="السعر اليومي"
-              required
-              value={form.daily_rate}
-              error={errors.daily_rate}
-              onChange={(e) => {
-                const daily = Number(e.target.value || 0)
-                setForm({
-                  ...form,
-                  daily_rate: e.target.value,
-                  half_monthly_rate: Number.isFinite(daily) && daily > 0
-                    ? String(Math.round(daily * HALF_MONTHLY_FACTOR))
-                    : form.half_monthly_rate,
-                  monthly_rate: Number.isFinite(daily) && daily > 0
-                    ? String(Math.round(daily * MONTHLY_FACTOR))
-                    : form.monthly_rate,
-                })
-              }}
-              hint={`لمدة ${estimatedDays} يوم (شريحة يومي ١–١٠ أيام)`}
-            />
-          ) : rentTier === 'half_monthly' ? (
-            <MoneyField
-              label="سعر نص الشهر (١٥ يوماً)"
-              required
-              value={form.half_monthly_rate}
-              error={errors.half_monthly_rate}
-              onChange={(e) => setForm({ ...form, half_monthly_rate: e.target.value })}
-              hint={`لمدة ${estimatedDays} يوم (شريحة نص شهري ١١–٢٠) · يوم الزيادة = السعر ÷ ${HALF_MONTH_UNIT_DAYS}`}
-            />
           ) : (
             <MoneyField
-              label="السعر الشهري (٣٠ يوماً)"
+              label="إيجار المدة"
               required
-              value={form.monthly_rate}
-              error={errors.monthly_rate}
-              onChange={(e) => setForm({ ...form, monthly_rate: e.target.value })}
-              hint={`لمدة ${estimatedDays} يوم (شريحة شهري ٢١ فأكثر) · يوم الزيادة = السعر ÷ ${MONTH_UNIT_DAYS}`}
+              value={periodRentFieldValue}
+              error={periodRentFieldError}
+              onChange={(e) => applyPeriodRentEdit(e.target.value)}
+              hint={tierBasisHint(rentTier, tierUnitRate, estimatedDays)}
             />
           )}
           <MoneyField
