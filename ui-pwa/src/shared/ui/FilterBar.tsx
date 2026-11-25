@@ -7,6 +7,8 @@ type Chip = {
   label: string
   attention?: AttentionTone | null
   attentionLabel?: string
+  /** Numeric badge (e.g. contracts with deferred balance) — preferred over a bare attention dot when set */
+  count?: number | null
 }
 
 type Props = {
@@ -53,7 +55,14 @@ export function FilterBar({
           >
             <span className="rpm-attention-inline">
               {chip.label}
-              {chip.attention ? (
+              {chip.count != null && chip.count > 0 ? (
+                <span
+                  className="rpm-chip__count"
+                  aria-label={chip.attentionLabel || `${chip.count}`}
+                >
+                  {chip.count}
+                </span>
+              ) : chip.attention ? (
                 <AttentionDot
                   tone={chip.attention}
                   placement="inline"

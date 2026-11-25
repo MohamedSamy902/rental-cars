@@ -93,9 +93,9 @@ export function BookingsPage() {
       { id: 'completed', label: 'تم الاستلام' },
       {
         id: 'with_balance',
-        label: 'عليها فلوس',
-        attention: summary.with_balance > 0 ? ('warning' as const) : null,
-        attentionLabel: 'عقود بمتبقي على العميل',
+        label: 'فلوس متأجلة',
+        count: summary.with_balance > 0 ? summary.with_balance : null,
+        attentionLabel: `${summary.with_balance} عقد بمتبقي على العميل`,
       },
       { id: 'cancelled', label: 'تم الإلغاء' },
     ],
