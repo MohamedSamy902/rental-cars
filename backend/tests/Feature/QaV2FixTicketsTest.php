@@ -344,7 +344,9 @@ class QaV2FixTicketsTest extends TestCase
             ]],
         ])->assertCreated()->json('data');
 
-        $this->assertSame(40, (int) $wo['parts_cost']);
+        // قائمة/رد الصيانة بلا مبالغ — التكلفة تُحفظ في أمر الشغل للحسابات فقط.
+        $this->assertArrayNotHasKey('parts_cost', $wo);
+        $this->assertSame(40, (int) \App\Models\WorkOrder::query()->findOrFail($wo['id'])->parts_cost);
 
         $invCredit = (int) JournalLine::query()
             ->whereHas('account', fn ($q) => $q->where('code', '1400'))
