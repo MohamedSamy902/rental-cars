@@ -1,0 +1,20 @@
+.rpm-maint-vehicle__error {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--danger, #b91c1c) 12%, transparent);
+  color: var(--danger, #b91c1c);
+  font-weight: 600;
+}
+
+.rpm-maint-vehicle__oil-tag {
+  display: inline-block;
+  margin-inline-start: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  vertical-align: middle;
+}

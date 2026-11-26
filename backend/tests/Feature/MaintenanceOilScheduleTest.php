@@ -183,4 +183,34 @@ class MaintenanceOilScheduleTest extends TestCase
         $this->assertContains($this->vehicle->id, $ids);
         $this->assertNotContains($other->id, $ids);
     }
+
+    public function test_oil_view_can_filter_single_vehicle(): void
+    {
+        $order = WorkOrder::query()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'opened_on' => '2026-09-01',
+            'opened_at' => '2026-09-01 10:00:00',
+            'odometer' => 45000,
+            'status' => 'closed',
+            'puts_in_maintenance' => false,
+            'parts_cost' => 0,
+            'labor_cost' => 0,
+            'next_service_on' => now()->addMonths(1)->toDateString(),
+        ]);
+        WorkOrderLine::query()->create([
+            'work_order_id' => $order->id,
+            'description' => 'زيت موتور',
+            'part_source' => 'purchase',
+            'quantity' => 1,
+            'unit_price' => 0,
+        ]);
+
+        $data = $this->getJson('/api/work-orders?view=oil&tab=oil&vehicle_id='.$this->vehicle->id)
+            ->assertOk()
+            ->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame($this->vehicle->id, (int) $data[0]['vehicle_id']);
+        $this->assertSame('2026-09-01', $data[0]['last_oil_change_on']);
+    }
 }
