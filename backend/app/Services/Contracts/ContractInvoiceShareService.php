@@ -142,6 +142,11 @@ class ContractInvoiceShareService
         $printFooterHtml = $printFooter !== ''
             ? '<p class="inv-print-footer">'.e($printFooter).'</p>'
             : '';
+        $authorName = e((string) config('rpm.platform_author_name', 'محمد سامي'));
+        $authorWa = e((string) config('rpm.platform_whatsapp_url', 'https://wa.me/201150100104'));
+        $creditHtml = '<aside class="inv-credit">تم الإنشاء بواسطة '
+            .'<a href="'.$authorWa.'" target="_blank" rel="noopener noreferrer">'.$authorName.'</a>'
+            .'</aside>';
 
         $customerName = e((string) ($customer?->full_name ?? '—'));
         $customerPhone = e((string) ($customer?->phone ?? '—'));
@@ -237,7 +242,7 @@ class ContractInvoiceShareService
       box-shadow:var(--shadow);
       overflow:hidden;
     }
-    .rpm-invoice-v2{ padding:22px 18px 20px; }
+    .rpm-invoice-v3{ padding:22px 18px 16px; }
     .inv-head{
       display:flex; flex-wrap:wrap; justify-content:space-between; gap:18px;
       align-items:flex-start;
@@ -354,9 +359,17 @@ class ContractInvoiceShareService
       font-size:.75rem; color:var(--muted);
     }
     .inv-print-footer{ margin-top:8px; font-size:.75rem; color:var(--muted); text-align:center; }
+    .inv-credit{
+      margin-top:16px; padding-top:12px; border-top:1px solid var(--line);
+      text-align:center; font-size:.78rem; color:var(--muted);
+    }
+    .inv-credit a{
+      color:var(--navy); font-weight:700; text-decoration:none;
+      border-bottom:1px solid rgba(11,31,58,.28);
+    }
     @media (max-width:640px){
       body{ padding:10px 8px 22px; }
-      .rpm-invoice-v2{ padding:16px 12px 14px; }
+      .rpm-invoice-v3{ padding:16px 12px 12px; }
       .inv-brand img{ width:52px; height:52px; }
       .inv-title-block h1{ font-size:1.3rem; }
       .inv-cards{ grid-template-columns:1fr; }
@@ -378,7 +391,7 @@ class ContractInvoiceShareService
     @media print{
       body{ background:#fff; padding:0; }
       .sheet{ box-shadow:none; border:0; border-radius:0; }
-      .rpm-invoice-v2{ padding:0; }
+      .rpm-invoice-v3{ padding:0; }
       .inv-finance-table thead{ display:table-header-group; }
       .inv-finance-table, .inv-finance-table tbody, .inv-finance-table tr, .inv-finance-table td{
         display:table; width:auto;
@@ -391,16 +404,17 @@ class ContractInvoiceShareService
 </head>
 <body>
   <div class="sheet">
-<article class="rpm-invoice-v2">
+<article class="rpm-invoice-v3">
   <header class="inv-head">
     <div class="inv-brand">
       <img src="{$logoEsc}" alt="{$centerEsc}" />
       <div class="inv-brand-text">
         <strong>{$centerEsc}</strong>
-        <span>RENT A CAR</span>
+        <span>تأجير سيارات</span>
       </div>
     </div>
     <div class="inv-title-block">
+      <p class="inv-kicker" style="margin:0 0 2px;font-size:.78rem;color:var(--muted);font-weight:500;">ملخص اتفاق الإيجار</p>
       <h1>فاتورة</h1>
       <div class="inv-meta">
         <div class="inv-meta-row"><span class="lbl">رقم الفاتورة</span><span class="val" dir="ltr">{$invNo}</span></div>
@@ -526,9 +540,10 @@ class ContractInvoiceShareService
 
   <div class="inv-foot">
     <span>{$centerEsc}</span>
-    <span>ملخص اتفاق الإيجار</span>
+    <span>صفحة ١ من ١</span>
   </div>
   {$printFooterHtml}
+  {$creditHtml}
 </article>
   </div>
 </body>

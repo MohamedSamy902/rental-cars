@@ -136,8 +136,11 @@ class ContractInvoiceShareTest extends TestCase
             ->assertSee('عميل فاتورة', false)
             ->assertSee('INV-INV-100', false)
             ->assertSee('كورولا', false)
-            ->assertSee('rpm-invoice-v2', false)
+            ->assertSee('rpm-invoice-v3', false)
             ->assertSee('5,600', false)
+            ->assertSee('تم الإنشاء بواسطة', false)
+            ->assertSee('محمد سامي', false)
+            ->assertSee('wa.me/201150100104', false)
             ->assertDontSee('فاتورة مؤقتة عبر واتساب', false)
             ->assertDontSee('صالحة', false)
             ->assertDontSee('share-banner', false);
