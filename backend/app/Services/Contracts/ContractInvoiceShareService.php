@@ -243,44 +243,47 @@ class ContractInvoiceShareService
       overflow:hidden;
     }
     .rpm-invoice-v3{ padding:22px 18px 16px; }
-    .inv-head{
+    .inv-banner{
       display:flex; flex-wrap:wrap; justify-content:space-between; gap:18px;
       align-items:flex-start;
-      padding-bottom:18px;
-      border-bottom:1px solid var(--line);
+      margin:0 0 18px; padding:16px 16px 14px;
+      border-radius:16px;
+      background:linear-gradient(135deg,#0b1f3a 0%,#16365f 55%,#1e3a5f 100%);
+      color:#fff;
     }
     .inv-brand{ display:flex; align-items:center; gap:12px; min-width:0; }
     .inv-brand img{
       width:64px; height:64px; object-fit:contain;
       border-radius:16px; background:#fff;
-      border:1px solid var(--line);
+      border:1px solid rgba(255,255,255,.28);
       padding:6px;
     }
     .inv-brand-text{ display:flex; flex-direction:column; gap:4px; min-width:0; }
     .inv-brand-text strong{
-      font-size:1.05rem; font-weight:700; color:var(--navy);
+      font-size:1.05rem; font-weight:700; color:#fff;
       letter-spacing:-.01em;
     }
     .inv-brand-text span{
       display:inline-flex; align-self:flex-start;
       font-size:.72rem; font-weight:700; letter-spacing:.08em;
-      color:var(--accent); background:var(--accent-soft);
+      color:#fff; background:rgba(185,28,28,.92);
       border-radius:999px; padding:3px 10px;
     }
     .inv-title-block{ text-align:start; min-width:min(100%, 240px); }
+    .inv-kicker{ margin:0 0 2px; font-size:.78rem; color:rgba(255,255,255,.78); font-weight:500; }
     .inv-title-block h1{
-      margin:0 0 10px; font-size:1.55rem; font-weight:700;
-      color:var(--ink); letter-spacing:-.02em;
+      margin:0 0 10px; font-size:1.65rem; font-weight:700;
+      color:#fff; letter-spacing:-.02em;
     }
     .inv-meta{ display:grid; gap:6px; }
     .inv-meta-row{
       display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline;
       font-size:.9rem;
     }
-    .inv-meta-row .lbl{ color:var(--muted); font-weight:500; }
+    .inv-meta-row .lbl{ color:rgba(255,255,255,.72); font-weight:500; }
     .inv-meta-row .val{
-      font-weight:700; font-variant-numeric:tabular-nums;
-      background:#f8fafc; border:1px solid var(--line);
+      font-weight:700; font-variant-numeric:tabular-nums; color:#0b1f3a;
+      background:#fff; border:0;
       border-radius:999px; padding:2px 10px;
     }
     .inv-section{ margin-top:18px; }
@@ -360,12 +363,13 @@ class ContractInvoiceShareService
     }
     .inv-print-footer{ margin-top:8px; font-size:.75rem; color:var(--muted); text-align:center; }
     .inv-credit{
-      margin-top:16px; padding-top:12px; border-top:1px solid var(--line);
-      text-align:center; font-size:.78rem; color:var(--muted);
+      margin-top:16px; padding:10px 12px;
+      border:1px solid var(--line); border-radius:12px; background:#f8fafc;
+      text-align:center; font-size:.82rem; color:var(--muted);
     }
     .inv-credit a{
-      color:var(--navy); font-weight:700; text-decoration:none;
-      border-bottom:1px solid rgba(11,31,58,.28);
+      color:#0b1f3a; font-weight:800; text-decoration:none;
+      border-bottom:2px solid rgba(185,28,28,.45);
     }
     @media (max-width:640px){
       body{ padding:10px 8px 22px; }
@@ -404,17 +408,17 @@ class ContractInvoiceShareService
 </head>
 <body>
   <div class="sheet">
-<article class="rpm-invoice-v3">
-  <header class="inv-head">
+<article class="rpm-invoice-v3" data-invoice-skin="v3-2026-11">
+  <header class="inv-banner">
     <div class="inv-brand">
       <img src="{$logoEsc}" alt="{$centerEsc}" />
       <div class="inv-brand-text">
         <strong>{$centerEsc}</strong>
-        <span>تأجير سيارات</span>
+        <span>تأجير سيارات · فاتورة داخلية</span>
       </div>
     </div>
     <div class="inv-title-block">
-      <p class="inv-kicker" style="margin:0 0 2px;font-size:.78rem;color:var(--muted);font-weight:500;">ملخص اتفاق الإيجار</p>
+      <p class="inv-kicker">ملخص اتفاق الإيجار</p>
       <h1>فاتورة</h1>
       <div class="inv-meta">
         <div class="inv-meta-row"><span class="lbl">رقم الفاتورة</span><span class="val" dir="ltr">{$invNo}</span></div>
