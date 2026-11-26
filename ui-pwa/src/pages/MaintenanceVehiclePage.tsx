@@ -48,8 +48,9 @@ const statusLabel: Record<string, string> = {
   open: 'مفتوح', in_progress: 'قيد التنفيذ', closed: 'مغلق', cancelled: 'ملغى',
 }
 
-const DetailTabs = ['all', 'oil', 'open', 'closed'] as const
+const DetailTabs = ['upcoming', 'all', 'oil', 'open', 'closed'] as const
 const LIST_PER_PAGE = 20
+const HISTORY_PER_PAGE = 50
 
 type LocationState = {
   from?: string
@@ -80,10 +81,12 @@ export function MaintenanceVehiclePage() {
   const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [chip, setChip] = useQueryTab({ allowed: DetailTabs, defaultValue: 'all' })
+  const [chip, setChip] = useQueryTab({ allowed: DetailTabs, defaultValue: 'upcoming' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [upcomingCount, setUpcomingCount] = useState(0)
+  const [historyTotal, setHistoryTotal] = useState(0)
 
   const oilSummary = useMemo(() => {
     const oilOrders = rows.filter((r) => r.has_oil_change)
@@ -145,31 +148,28 @@ export function MaintenanceVehiclePage() {
     setLoading(true)
     setError('')
     try {
+      const perPage = chip === 'all' || chip === 'closed' ? HISTORY_PER_PAGE : LIST_PER_PAGE
       const qs = new URLSearchParams()
       qs.set('vehicle_id', String(vehicleId))
       qs.set('page', String(nextPage))
-      qs.set('per_page', String(LIST_PER_PAGE))
+      qs.set('per_page', String(perPage))
       if (chip === 'open' || chip === 'closed') qs.set('status', chip)
+      if (chip === 'upcoming') qs.set('due_soon', '1')
+      if (chip === 'oil') qs.set('has_oil', '1')
       if (search.trim()) qs.set('search', search.trim())
-      // تبويب الزيت: صفحة أكبر ثم تصفية has_oil_change (البند في الـ API)
-      if (chip === 'oil') {
-        qs.set('per_page', '100')
-        qs.set('page', '1')
-      }
 
       const res = await api<{ data: WorkOrder[]; meta?: PageMeta }>(`/work-orders?${qs}`)
-      let data = res.data || []
-      if (chip === 'oil') {
-        data = data.filter((r) => r.has_oil_change)
-      }
+      const data = res.data || []
       setRows(data)
       setMeta({
-        current_page: chip === 'oil' ? 1 : (res.meta?.current_page ?? nextPage),
-        last_page: chip === 'oil' ? 1 : (res.meta?.last_page ?? 1),
-        total: chip === 'oil' ? data.length : (res.meta?.total ?? data.length),
-        per_page: chip === 'oil' ? data.length || LIST_PER_PAGE : (res.meta?.per_page ?? LIST_PER_PAGE),
+        current_page: res.meta?.current_page ?? nextPage,
+        last_page: res.meta?.last_page ?? 1,
+        total: res.meta?.total ?? data.length,
+        per_page: res.meta?.per_page ?? perPage,
       })
-      if (chip !== 'oil') setPage(res.meta?.current_page ?? nextPage)
+      setPage(res.meta?.current_page ?? nextPage)
+      if (chip === 'upcoming') setUpcomingCount(res.meta?.total ?? data.length)
+      if (chip === 'all') setHistoryTotal(res.meta?.total ?? data.length)
 
       const fromWo = data[0]?.vehicle
       if (fromWo) {
@@ -194,8 +194,24 @@ export function MaintenanceVehiclePage() {
     }
   }
 
+  /** عدّادات التبويبات — صيانة قادمة + إجمالي السجل بدون تغيير التبويب الحالي */
+  async function loadTabCounts() {
+    if (!Number.isFinite(vehicleId) || vehicleId < 1) return
+    try {
+      const [due, all] = await Promise.all([
+        api<{ meta?: PageMeta }>(`/work-orders?vehicle_id=${vehicleId}&due_soon=1&per_page=1`),
+        api<{ meta?: PageMeta }>(`/work-orders?vehicle_id=${vehicleId}&per_page=1`),
+      ])
+      setUpcomingCount(due.meta?.total ?? 0)
+      setHistoryTotal(all.meta?.total ?? 0)
+    } catch {
+      /* غير حرج للعرض */
+    }
+  }
+
   useEffect(() => {
     void loadVehicleBasics()
+    void loadTabCounts()
   }, [vehicleId])
 
   useEffect(() => {
@@ -209,6 +225,7 @@ export function MaintenanceVehiclePage() {
       toast.success('تم إغلاق أمر الصيانة.')
       await loadOrders(page)
       await loadVehicleBasics()
+      await loadTabCounts()
     } catch (e) {
       toast.error((e as ApiError).message)
     }
@@ -216,7 +233,20 @@ export function MaintenanceVehiclePage() {
 
   const chips = useMemo(
     () => [
-      { id: 'all', label: 'كل الصيانات' },
+      {
+        id: 'upcoming',
+        label: 'صيانة قادمة',
+        count: upcomingCount > 0 ? upcomingCount : null,
+        attention: upcomingCount > 0 || oilSummary.due ? ('critical' as const) : null,
+        attentionLabel: upcomingCount > 0
+          ? `${upcomingCount} صيانة مستحقة قريباً`
+          : (oilSummary.due ? 'زيت مستحق قريباً' : null),
+      },
+      {
+        id: 'all',
+        label: 'السجل الكامل',
+        count: historyTotal > 0 ? historyTotal : null,
+      },
       { id: 'oil', label: 'تغيير الزيت' },
       {
         id: 'open',
@@ -224,9 +254,9 @@ export function MaintenanceVehiclePage() {
         attention: oilSummary.openCount > 0 ? ('critical' as const) : null,
         attentionLabel: `${oilSummary.openCount} أمر مفتوح`,
       },
-      { id: 'closed', label: 'مغلق' },
+      { id: 'closed', label: 'السجل القديم' },
     ],
-    [oilSummary.openCount],
+    [oilSummary.openCount, oilSummary.due, upcomingCount, historyTotal],
   )
 
   const columns: DataColumn<WorkOrder>[] = [
@@ -295,7 +325,7 @@ export function MaintenanceVehiclePage() {
       <BackNavButton to="/maintenance" label="رجوع للصيانة" />
       <PageHeader
         title={vehicleTitle(vehicle)}
-        subtitle="كل أوامر الصيانة لهذه العربية — زيت وبنود أخرى"
+        subtitle="الصيانات الجاية · السجل الكامل والقديم · زيت وبنود كبيرة وصغيرة"
         action={canCreate ? <Button onClick={() => setSheetOpen(true)}>صيانة جديدة</Button> : undefined}
         mobileFab={canCreate}
       />
@@ -324,9 +354,16 @@ export function MaintenanceVehiclePage() {
             icon: <IconAlert size={16} />,
           },
           {
+            id: 'upcoming',
+            label: 'صيانات قادمة',
+            value: upcomingCount,
+            tone: upcomingCount > 0 ? 'danger' : 'success',
+            icon: <IconAlert size={16} />,
+          },
+          {
             id: 'orders',
-            label: 'أوامر مسجّلة',
-            value: meta.total,
+            label: 'السجل الكامل',
+            value: historyTotal || meta.total,
             tone: 'info',
             icon: <IconWrench size={16} />,
           },
@@ -353,7 +390,13 @@ export function MaintenanceVehiclePage() {
       {loading && rows.length === 0 ? <SkeletonBlock rows={5} /> : null}
 
       <DataTable
-        label="سجل صيانات العربية"
+        label={
+          chip === 'upcoming' ? 'الصيانات الجاية لهذه العربية'
+            : chip === 'closed' ? 'السجل القديم (مغلق)'
+              : chip === 'oil' ? 'سجل تغيير الزيت'
+                : chip === 'open' ? 'أوامر مفتوحة'
+                  : 'السجل الكامل — كل الصيانات'
+        }
         rows={rows}
         columns={columns}
         rowKey={(r) => r.id}
@@ -364,13 +407,21 @@ export function MaintenanceVehiclePage() {
             ? [{ id: 'close', label: 'إغلاق أمر الشغل', icon: <IconCheck size={16} />, onSelect: () => void closeOrder(r.id) }]
             : []
         }
-        emptyTitle="لا صيانات على هذه العربية"
-        emptyDescription="سجّل أمر شغل لأي بند — زيت أو غيره — من زر صيانة جديدة."
-        serverPagination={chip === 'oil' ? undefined : {
+        emptyTitle={
+          chip === 'upcoming' ? 'ما فيش صيانة قادمة مستحقة'
+            : chip === 'closed' ? 'ما فيش سجل قديم مغلق'
+              : 'لا صيانات على هذه العربية'
+        }
+        emptyDescription={
+          chip === 'upcoming'
+            ? 'لما يقرب موعد أو عداد الصيانة التالية (خلال ٧ أيام أو ٢٬٠٠٠ كم) هتظهر هنا.'
+            : 'سجّل أمر شغل لأي بند — زيت أو غيره — من زر صيانة جديدة.'
+        }
+        serverPagination={{
           page: meta.current_page,
           lastPage: meta.last_page,
           total: meta.total,
-          perPage: LIST_PER_PAGE,
+          perPage: chip === 'all' || chip === 'closed' ? HISTORY_PER_PAGE : LIST_PER_PAGE,
           onPageChange: setPage,
         }}
       />
@@ -382,6 +433,7 @@ export function MaintenanceVehiclePage() {
           setSheetOpen(false)
           void loadOrders(1)
           void loadVehicleBasics()
+          void loadTabCounts()
           setPage(1)
         }}
         vehicle={vehicle ? {

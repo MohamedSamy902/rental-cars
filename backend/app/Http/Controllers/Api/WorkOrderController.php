@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WorkOrder;
+use App\Models\Vehicle;
 use App\Services\Maintenance\MaintenanceOilScheduleService;
 use App\Services\Maintenance\WorkOrderService;
+use App\Services\Notifications\DueNotificationService;
 use App\Support\MaintenanceContractLabel;
 use App\Support\PaginationInput;
 use App\Support\VehicleOwnerVisibility;
@@ -34,8 +36,33 @@ class WorkOrderController extends Controller
                 $q->where('status', $status);
             }
         }
-        if ($vehicleId = $request->integer('vehicle_id')) {
+        $vehicleId = $request->integer('vehicle_id');
+        if ($vehicleId) {
             $q->where('vehicle_id', $vehicleId);
+        }
+        // صفحة صيانات العربية: أوامر ذات صيانة تالية مستحقة (≤٧ أيام أو ضمن ٢٬٠٠٠ كم)
+        if ($request->boolean('due_soon') && $vehicleId) {
+            $vehicle = Vehicle::query()->find($vehicleId, ['id', 'odometer']);
+            $deadline = now()->addDays(7)->toDateString();
+            $odoCap = $vehicle
+                ? (int) ($vehicle->odometer ?? 0) + DueNotificationService::LEAD_KM
+                : null;
+            $q->where(function ($qq) use ($deadline, $odoCap) {
+                $qq->where(function ($d) use ($deadline) {
+                    $d->whereNotNull('next_service_on')
+                        ->whereDate('next_service_on', '<=', $deadline);
+                });
+                if ($odoCap !== null) {
+                    $qq->orWhere(function ($o) use ($odoCap) {
+                        $o->whereNotNull('next_service_odometer')
+                            ->where('next_service_odometer', '<=', $odoCap);
+                    });
+                }
+            });
+        }
+        if ($request->boolean('has_oil')) {
+            $oil = MaintenanceOilScheduleService::OIL_ITEM;
+            $q->whereHas('lines', fn ($l) => $l->where('description', 'like', "%{$oil}%"));
         }
         if ($search = trim($request->string('search')->toString())) {
             $q->where(function ($qq) use ($search) {
