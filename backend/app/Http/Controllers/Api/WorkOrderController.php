@@ -258,10 +258,28 @@ class WorkOrderController extends Controller
     }
 
     /**
+     * استجابة إنشاء/إغلاق أمر شغل — بنود الخطوط للمخزون/العهدة، بلا totals مالية في JSON.
+     * قائمة الصيانة التشغيلية تستخدم presentMaintenance.
+     *
      * @return array<string, mixed>
      */
     private function present(WorkOrder $order, Request $request): array
     {
-        return $this->presentMaintenance($order->loadMissing(['vehicle', 'lines']), $request);
+        $order->loadMissing(['vehicle', 'lines']);
+        $payload = $this->presentMaintenance($order, $request);
+        $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
+        $payload['lines'] = $order->lines->map(function ($line) use ($canContracts) {
+            return [
+                'id' => (int) $line->id,
+                'work_order_id' => (int) $line->work_order_id,
+                'description' => MaintenanceContractLabel::present($line->description, $canContracts),
+                'part_source' => $line->part_source,
+                'inventory_item_id' => $line->inventory_item_id !== null ? (int) $line->inventory_item_id : null,
+                'quantity' => (int) $line->quantity,
+                'unit_price' => (int) $line->unit_price,
+            ];
+        })->values()->all();
+
+        return VehicleOwnerVisibility::redactEmbedded($payload, $request->user());
     }
 }
