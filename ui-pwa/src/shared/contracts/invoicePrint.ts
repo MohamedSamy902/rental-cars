@@ -59,6 +59,14 @@ type InvoiceContract = {
     amount: number
     direction: string
   }>
+  /** مخالفات العقد — تُحدَّث مع كل طباعة/مشاركة */
+  violations?: Array<{
+    id?: number
+    amount: number
+    occurred_at?: string | null
+    status?: string | null
+    location?: string | null
+  }>
 }
 
 type InvoiceTenant = {
@@ -126,9 +134,18 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
   const damage = Number(c.damage_fee ?? 0)
   const delivery = Number(c.delivery_service_fee ?? 0)
   const discount = Number(c.discount ?? 0)
-  const total = c.final_total != null
+  const violations = c.violations || []
+  const isViolationBillable = (status?: string | null) => {
+    const s = String(status || '').toLowerCase()
+    return s !== 'confirmed' && s !== 'paid'
+  }
+  const violationsBillable = violations
+    .filter((v) => isViolationBillable(v.status))
+    .reduce((s, v) => s + Number(v.amount || 0), 0)
+  const contractCharges = c.final_total != null
     ? Number(c.final_total)
     : Math.max(0, rent + prepaidAmt + excessAmt + other + damage + delivery - discount)
+  const total = contractCharges + violationsBillable
   const paidIn = (c.payments || []).filter((p) => p.direction === 'in').reduce((s, p) => s + Number(p.amount || 0), 0)
   const paidOut = (c.payments || []).filter((p) => p.direction === 'out').reduce((s, p) => s + Number(p.amount || 0), 0)
   const paidNet = paidIn - paidOut
@@ -178,6 +195,22 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
         <td class="num"></td>
         <td class="num"></td>
       </tr>`
+
+  const violationRows = violations.map((v, idx) => {
+    const billable = isViolationBillable(v.status)
+    const dateLabel = v.occurred_at ? formatDate(v.occurred_at) : '—'
+    const loc = (v.location || '').trim()
+    const desc = `مخالفة مرورية #${idx + 1} · ${dateLabel}${billable ? '' : ' · مسدد'}${loc ? ` · ${loc}` : ''}`
+    const amountCell = billable
+      ? moneyOrBlank(Number(v.amount || 0))
+      : `— (${moneyOrBlank(Number(v.amount || 0))} مسدد)`
+    return `<tr>
+        <td class="desc">${esc(desc)}</td>
+        <td class="num">1</td>
+        <td class="num">—</td>
+        <td class="num">${amountCell}</td>
+      </tr>`
+  }).join('')
 
   return `
 <article class="rpm-invoice-v1">
@@ -281,6 +314,7 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
         </tr>
         ${deliveryRow}
         ${otherRow}
+        ${violationRows}
         <tr class="totals">
           <td colspan="3">المبلغ الإجمالي / Total Amount</td>
           <td class="num"><strong>${moneyOrBlank(total)}</strong></td>
@@ -296,6 +330,9 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
       </tbody>
     </table>
     <p class="inv-note">ملاحظة: التأمين المؤقت خارج إجمالي الإيجار ويُسوَّى عند الاستلام.</p>
+    ${violations.length > 0
+      ? '<p class="inv-note">المخالفات الظاهرة تُحدَّث تلقائياً عند تسجيل مخالفة جديدة على العقد. المسدَّد منها لا يُضاف للمتبقي.</p>'
+      : ''}
   </section>
 
   <section class="inv-terms">
