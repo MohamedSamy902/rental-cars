@@ -23,7 +23,7 @@ import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
 import { shareContractInvoiceWhatsApp } from '@/shared/contracts/shareContractInvoice'
 import './pages.css'
 
-const BookingsPageTabs = ['all', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed', 'with_balance', 'cancelled'] as const
+const BookingsPageTabs = ['all', 'overdue_handover', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed', 'with_balance', 'cancelled'] as const
 
 type PageMeta = { current_page: number; last_page: number; total: number }
 const LIST_PER_PAGE = 20
@@ -41,7 +41,7 @@ export function BookingsPage() {
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
   const [summary, setSummary] = useState({
-    total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0, handover_today: 0, with_balance: 0,
+    total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0, handover_today: 0, overdue_handover: 0, with_balance: 0,
   })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: BookingsPageTabs, defaultValue: 'all' })
@@ -69,6 +69,13 @@ export function BookingsPage() {
   const chips = useMemo(
     () => [
       { id: 'all', label: 'الكل' },
+      {
+        id: 'overdue_handover',
+        label: 'متأخر',
+        count: summary.overdue_handover > 0 ? summary.overdue_handover : null,
+        attention: summary.overdue_handover > 0 ? ('critical' as const) : null,
+        attentionLabel: 'معاد التسليم فات والعميل لسه ما استلمش',
+      },
       {
         id: 'handover_today',
         label: 'تسليم العربية',
@@ -113,7 +120,7 @@ export function BookingsPage() {
       },
       { id: 'cancelled', label: 'تم الإلغاء' },
     ],
-    [summary.pending, summary.upcoming, summary.handover_today, summary.with_balance, attention.pickups_today, attention.overdue_returns, attention.returning_today],
+    [summary.pending, summary.upcoming, summary.handover_today, summary.overdue_handover, summary.with_balance, attention.pickups_today, attention.overdue_returns, attention.returning_today],
   )
 
   async function load(nextPage = page) {
@@ -125,7 +132,7 @@ export function BookingsPage() {
       qs.set('page', String(nextPage))
       qs.set('per_page', String(LIST_PER_PAGE))
       if (search.trim()) qs.set('search', search.trim())
-      if (chip === 'upcoming' || chip === 'handover_today' || chip === 'with_balance') {
+      if (chip === 'upcoming' || chip === 'handover_today' || chip === 'overdue_handover' || chip === 'with_balance') {
         qs.set('tab', chip)
       } else if (chip !== 'all') {
         qs.set('status', chip)
@@ -147,6 +154,7 @@ export function BookingsPage() {
         completed: res.summary.completed ?? 0,
         upcoming: res.summary.upcoming ?? 0,
         handover_today: res.summary.handover_today ?? 0,
+        overdue_handover: res.summary.overdue_handover ?? 0,
         with_balance: res.summary.with_balance ?? 0,
       })
     } catch (e) {

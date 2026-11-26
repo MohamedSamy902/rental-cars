@@ -230,7 +230,81 @@ class ClientFinalPolishesTest extends TestCase
     {
         $this->getJson('/api/contracts?tab=upcoming')->assertOk();
         $this->getJson('/api/contracts?tab=handover_today')->assertOk()
-            ->assertJsonStructure(['summary' => ['upcoming', 'handover_today']]);
+            ->assertJsonStructure(['summary' => ['upcoming', 'handover_today', 'overdue_handover']]);
+        $this->getJson('/api/contracts?tab=overdue_handover')->assertOk()
+            ->assertJsonStructure(['summary' => ['overdue_handover'], 'data']);
+    }
+
+    public function test_overdue_handover_tab_lists_past_starts_not_yet_handed_over(): void
+    {
+        $customer = Customer::query()->create([
+            'full_name' => 'عميل متأخر',
+            'phone' => '01009998877',
+            'birth_date' => '1990-01-01',
+            'license_number' => 'LIC-LATE',
+            'license_expires_on' => now()->addYears(2)->toDateString(),
+            'status' => 'active',
+        ]);
+        $vehicle = Vehicle::query()->create([
+            'code' => 'LATE-1',
+            'plate' => 'ل ت 1001',
+            'brand' => 'هيونداي',
+            'model' => 'النترا',
+            'year' => 2023,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 500,
+            'default_deposit' => 1000,
+            'is_active' => true,
+        ]);
+
+        $overdue = Contract::query()->create([
+            'number' => 'C-LATE-1',
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'approved',
+            'starts_at' => now()->subHours(3),
+            'planned_ends_at' => now()->addDays(3),
+            'approved_days' => 3,
+            'frozen_daily_rate' => 500,
+            'frozen_agreed_deposit' => 1000,
+        ]);
+        Contract::query()->create([
+            'number' => 'C-FUTURE-1',
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'approved',
+            'starts_at' => now()->addDays(2),
+            'planned_ends_at' => now()->addDays(5),
+            'approved_days' => 3,
+            'frozen_daily_rate' => 500,
+            'frozen_agreed_deposit' => 1000,
+        ]);
+        Contract::query()->create([
+            'number' => 'C-ACTIVE-1',
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'active',
+            'starts_at' => now()->subDays(1),
+            'planned_ends_at' => now()->addDays(2),
+            'approved_days' => 3,
+            'frozen_daily_rate' => 500,
+            'frozen_agreed_deposit' => 1000,
+        ]);
+
+        $res = $this->getJson('/api/contracts?tab=overdue_handover&per_page=50')->assertOk()->json();
+        $ids = collect($res['data'])->pluck('id')->all();
+        $this->assertContains($overdue->id, $ids);
+        $this->assertNotContains(
+            Contract::query()->where('number', 'C-FUTURE-1')->value('id'),
+            $ids
+        );
+        $this->assertNotContains(
+            Contract::query()->where('number', 'C-ACTIVE-1')->value('id'),
+            $ids
+        );
+        $this->assertGreaterThanOrEqual(1, (int) ($res['summary']['overdue_handover'] ?? 0));
     }
 
     public function test_recommend_has_no_weights_or_scores(): void

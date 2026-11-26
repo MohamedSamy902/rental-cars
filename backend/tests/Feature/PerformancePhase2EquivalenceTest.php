@@ -71,6 +71,14 @@ class PerformancePhase2EquivalenceTest extends TestCase
             Contract::query()->whereIn('status', ['pending', 'approved'])->whereDate('starts_at', now()->toDateString())->count(),
             (int) $res['handover_today']
         );
+        $this->assertSame(
+            Contract::query()
+                ->whereIn('status', ['pending', 'approved'])
+                ->whereNotNull('starts_at')
+                ->where('starts_at', '<=', now())
+                ->count(),
+            (int) $res['overdue_handover']
+        );
     }
 
     public function test_calendar_view_is_light_without_progress_or_ledger(): void
