@@ -240,7 +240,7 @@ export function MaintenanceVehiclePage() {
         attention: upcomingCount > 0 || oilSummary.due ? ('critical' as const) : null,
         attentionLabel: upcomingCount > 0
           ? `${upcomingCount} صيانة مستحقة قريباً`
-          : (oilSummary.due ? 'زيت مستحق قريباً' : null),
+          : (oilSummary.due ? 'زيت مستحق قريباً' : undefined),
       },
       {
         id: 'all',
