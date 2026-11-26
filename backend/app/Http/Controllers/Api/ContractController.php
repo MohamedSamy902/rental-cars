@@ -582,11 +582,27 @@ class ContractController extends Controller
             ->values()
             ->all();
 
+        $violations = Violation::query()
+            ->where('contract_id', $contract->id)
+            ->orderBy('occurred_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Violation $v) => [
+                'id' => $v->id,
+                'amount' => (int) $v->amount,
+                'occurred_at' => $v->occurred_at?->toDateString(),
+                'status' => (string) $v->status,
+                'location' => $v->location,
+            ])
+            ->values()
+            ->all();
+
         $payload = VehicleOwnerVisibility::redactEmbedded(
             NestedCustomerRedactor::contract($contract->toArray(), $request->user()),
             $request->user(),
         );
         $payload['payments'] = $payments;
+        $payload['violations'] = $violations;
         // Ensure print consumers always see a stable document number.
         $payload['number'] = $contract->number ?: ('C-'.$contract->id);
 

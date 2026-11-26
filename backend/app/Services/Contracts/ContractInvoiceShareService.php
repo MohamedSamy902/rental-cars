@@ -5,12 +5,14 @@ namespace App\Services\Contracts;
 use App\Models\Contract;
 use App\Models\Payment;
 use App\Models\TenantSetting;
+use App\Models\Violation;
 use App\Services\Media\PublicMediaLinkService;
 use App\Support\CivilDate;
 use App\Support\DepositCurrency;
 use App\Support\PublicAppUrl;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 /**
  * تجهيز فاتورة داخلية عامة موقّعة للمشاركة عبر واتساب (مثل بيان المخالفات).
@@ -73,6 +75,10 @@ class ContractInvoiceShareService
         ];
         if ($contract->vehicle) {
             $lines[] = 'العربية: '.trim($contract->vehicle->brand.' '.$contract->vehicle->model).' · '.$contract->vehicle->plate;
+        }
+        if ($totals['violations_count'] > 0) {
+            $lines[] = 'مخالفات: '.$totals['violations_count']
+                .' · '.$this->moneyPlain($totals['violations_billable']).' ج.م.';
         }
         $lines[] = 'الإجمالي: '.$this->moneyPlain($totals['total']).' ج.م.';
         if ($totals['paid_net'] > 0) {
@@ -172,6 +178,10 @@ class ContractInvoiceShareService
             .($damage > 0 ? ' · أضرار' : '')
             .($otherLabel !== '' ? ' · '.e($otherLabel) : '');
         $otherAmt = ($other > 0 || $damage > 0) ? e($this->moneyPlain($other + $damage)) : '—';
+        $violationRowsHtml = $this->violationRowsHtml($totals['violations']);
+        $violationsNote = $totals['violations_count'] > 0
+            ? '<p class="inv-note">المخالفات الظاهرة تُحدَّث تلقائياً عند تسجيل مخالفة جديدة على العقد. المسدَّد منها لا يُضاف للمتبقي.</p>'
+            : '';
         $totalCell = e($this->moneyPlain($totals['total']));
         $paidCell = e($this->moneyPlain($totals['paid_net']));
         $remainingCell = e($this->moneyPlain($totals['remaining']));
@@ -476,6 +486,7 @@ class ContractInvoiceShareService
             <td class="num" data-label="السعر">—</td>
             <td class="num" data-label="الإجمالي">{$otherAmt}</td>
           </tr>
+          {$violationRowsHtml}
           <tr class="totals">
             <td class="desc" colspan="3">المبلغ الإجمالي</td>
             <td class="num" data-label="الإجمالي"><strong>{$totalCell}</strong></td>
@@ -492,6 +503,7 @@ class ContractInvoiceShareService
       </table>
     </div>
     <p class="inv-note">التأمين المؤقت خارج إجمالي الإيجار ويُسوَّى عند الاستلام.</p>
+    {$violationsNote}
   </section>
 
   <section class="inv-terms">
@@ -547,14 +559,28 @@ HTML;
     }
 
     /**
-     * @return array{rent: int, total: int, paid_net: int, remaining: int}
+     * @return array{
+     *   rent: int,
+     *   contract_charges: int,
+     *   violations: Collection<int, Violation>,
+     *   violations_count: int,
+     *   violations_billable: int,
+     *   total: int,
+     *   paid_net: int,
+     *   remaining: int
+     * }
      */
     private function totals(Contract $contract): array
     {
         $rent = $this->ledgerMath->trustStoredPeriodRent($contract)
             ? (int) $contract->period_rent
             : $this->ledgerMath->livePeriodRent($contract);
-        $total = $this->ledgerMath->chargeTotal($contract);
+        $contractCharges = $this->ledgerMath->chargeTotal($contract);
+        $violations = $this->contractViolations($contract);
+        $violationsBillable = (int) $violations
+            ->filter(fn (Violation $v) => $this->isViolationBillable($v))
+            ->sum(fn (Violation $v) => (int) $v->amount);
+        $total = $contractCharges + $violationsBillable;
 
         $payments = Payment::query()
             ->where('link_type', 'contract')
@@ -567,10 +593,69 @@ HTML;
 
         return [
             'rent' => $rent,
+            'contract_charges' => $contractCharges,
+            'violations' => $violations,
+            'violations_count' => $violations->count(),
+            'violations_billable' => $violationsBillable,
             'total' => $total,
             'paid_net' => $paidNet,
             'remaining' => $remaining,
         ];
+    }
+
+    /**
+     * @return Collection<int, Violation>
+     */
+    private function contractViolations(Contract $contract): Collection
+    {
+        return Violation::query()
+            ->where('contract_id', $contract->id)
+            ->orderBy('occurred_at')
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function isViolationBillable(Violation $violation): bool
+    {
+        return ! in_array((string) $violation->status, ['confirmed', 'paid'], true);
+    }
+
+    /**
+     * @param  Collection<int, Violation>  $violations
+     */
+    private function violationRowsHtml(Collection $violations): string
+    {
+        if ($violations->isEmpty()) {
+            return '';
+        }
+
+        $html = '';
+        foreach ($violations as $index => $violation) {
+            $n = $index + 1;
+            $date = $violation->occurred_at
+                ? CivilDate::formatDisplay($violation->occurred_at->timezone(config('app.timezone')))
+                : '—';
+            $amount = (int) $violation->amount;
+            $billable = $this->isViolationBillable($violation);
+            $statusHint = $billable ? '' : ' · مسدد';
+            $location = trim((string) ($violation->location ?? ''));
+            $desc = 'مخالفة مرورية #'.$n.' · '.$date.$statusHint
+                .($location !== '' ? ' · '.$location : '');
+            $amountCell = $billable
+                ? e($this->moneyPlain($amount))
+                : '— <span style="color:var(--muted);font-weight:500">('.e($this->moneyPlain($amount)).' مسدد)</span>';
+            $descEsc = e($desc);
+            $html .= <<<HTML
+          <tr>
+            <td class="desc">{$descEsc}</td>
+            <td class="num" data-label="الكمية">1</td>
+            <td class="num" data-label="السعر">—</td>
+            <td class="num" data-label="الإجمالي">{$amountCell}</td>
+          </tr>
+HTML;
+        }
+
+        return $html;
     }
 
     private function rentalDays(Contract $contract): int

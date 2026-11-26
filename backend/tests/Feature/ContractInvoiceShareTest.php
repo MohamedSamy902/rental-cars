@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\TenantSetting;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\Violation;
 use App\Services\Accounting\AccountingService;
 use App\Services\Media\PublicMediaLinkService;
 use App\Support\PermissionCatalog;
@@ -172,6 +173,51 @@ class ContractInvoiceShareTest extends TestCase
 
         $this->get($this->pathAndQuery($url))
             ->assertForbidden();
+    }
+
+    public function test_public_invoice_includes_open_violations_in_total(): void
+    {
+        Violation::query()->create([
+            'vehicle_id' => $this->contract->vehicle_id,
+            'customer_id' => $this->contract->customer_id,
+            'contract_id' => $this->contract->id,
+            'occurred_at' => now()->subDay(),
+            'amount' => 450,
+            'status' => 'assigned',
+            'location' => 'القاهرة',
+            'created_by' => $this->admin->id,
+        ]);
+        Violation::query()->create([
+            'vehicle_id' => $this->contract->vehicle_id,
+            'customer_id' => $this->contract->customer_id,
+            'contract_id' => $this->contract->id,
+            'occurred_at' => now()->subDays(2),
+            'amount' => 200,
+            'status' => 'confirmed',
+            'confirmed_at' => now()->subDay(),
+            'confirmed_by' => $this->admin->id,
+            'created_by' => $this->admin->id,
+        ]);
+
+        Sanctum::actingAs($this->admin);
+        $share = $this->postJson('/api/contracts/'.$this->contract->id.'/invoice/share')->assertOk();
+        $message = (string) $share->json('data.message_text');
+        // rent 5600 + open violation 450 = 6050; paid 2000 → remaining 4050
+        $this->assertStringContainsString('6,050', $message);
+        $this->assertStringContainsString('مخالفات: 2', $message);
+        $this->assertStringContainsString('450', $message);
+
+        $ttl = app(\App\Services\Contracts\ContractInvoiceShareService::class)
+            ->invoiceShareTtlDays($this->contract);
+        $url = app(PublicMediaLinkService::class)->temporaryContractInvoiceShareUrl($this->contract->id, $ttl);
+
+        $this->get($this->pathAndQuery($url))
+            ->assertOk()
+            ->assertSee('مخالفة مرورية', false)
+            ->assertSee('450', false)
+            ->assertSee('مسدد', false)
+            ->assertSee('6,050', false)
+            ->assertSee('القاهرة', false);
     }
 
     private function pathAndQuery(string $absoluteUrl): string
