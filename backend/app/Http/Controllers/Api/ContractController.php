@@ -72,10 +72,18 @@ class ContractController extends Controller
                 $q->whereIn('status', ['pending', 'approved'])
                     ->whereDate('starts_at', now()->toDateString());
             } elseif ($tab === 'overdue_handover') {
-                // معاد التسليم فات والعربية لسه ما اتسلّمتش للعميل.
-                $q->whereIn('status', ['pending', 'approved'])
-                    ->whereNotNull('starts_at')
-                    ->where('starts_at', '<=', now());
+                // متأخر = (١) معاد التسليم فات ولسه ما اتسلّمتش · أو (٢) عقد نشط فات موعد الاستلام.
+                $q->where(function ($qq) {
+                    $qq->where(function ($handover) {
+                        $handover->whereIn('status', ['pending', 'approved'])
+                            ->whereNotNull('starts_at')
+                            ->where('starts_at', '<=', now());
+                    })->orWhere(function ($ret) {
+                        $ret->where('status', 'active')
+                            ->whereNotNull('planned_ends_at')
+                            ->where('planned_ends_at', '<', now());
+                    });
+                });
             } elseif ($tab === 'with_balance') {
                 $this->scopeWithOutstandingBalance($q);
             }
@@ -337,7 +345,10 @@ class ContractController extends Controller
                     SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as cancelled,
                     SUM(CASE WHEN status IN (?, ?) AND starts_at > ? THEN 1 ELSE 0 END) as upcoming,
                     SUM(CASE WHEN status IN (?, ?) AND starts_at >= ? AND starts_at < ? THEN 1 ELSE 0 END) as handover_today,
-                    SUM(CASE WHEN status IN (?, ?) AND starts_at IS NOT NULL AND starts_at <= ? THEN 1 ELSE 0 END) as overdue_handover',
+                    SUM(CASE WHEN (
+                        (status IN (?, ?) AND starts_at IS NOT NULL AND starts_at <= ?)
+                        OR (status = ? AND planned_ends_at IS NOT NULL AND planned_ends_at < ?)
+                    ) THEN 1 ELSE 0 END) as overdue_handover',
                     [
                         'pending',
                         'approved',
@@ -347,6 +358,7 @@ class ContractController extends Controller
                         'pending', 'approved', $endOfDay,
                         'pending', 'approved', $todayStart, $tomorrowStart,
                         'pending', 'approved', $now,
+                        'active', $now,
                     ]
                 )
                 ->first();
