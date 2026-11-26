@@ -212,154 +212,147 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
       </tr>`
   }).join('')
 
+  const PLATFORM_AUTHOR = 'محمد سامي'
+  const PLATFORM_WA = 'https://wa.me/201150100104'
+
   return `
-<article class="rpm-invoice-v1">
+<article class="rpm-invoice-v3">
   <header class="inv-head">
     <div class="inv-brand">
       <img src="${esc(logo)}" alt="${esc(brand)}" />
       <div class="inv-brand-text">
         <strong>${esc(brand)}</strong>
-        <span>RENT A CAR</span>
+        <span>تأجير سيارات</span>
       </div>
     </div>
     <div class="inv-title-block">
-      <h1>INVOICE / فاتورة</h1>
+      <p class="inv-kicker">ملخص اتفاق الإيجار</p>
+      <h1>فاتورة</h1>
       <div class="inv-meta">
-        <div><span class="lbl">Invoice # / رقم الفاتورة:</span> <span class="val" dir="ltr">${esc(invNo)}</span></div>
-        <div><span class="lbl">Date / التاريخ:</span> <span class="val" dir="ltr">${esc(invDate)}</span></div>
-        <div><span class="lbl">Agreement # / رقم العقد:</span> <span class="val" dir="ltr">${esc(c.number)}</span></div>
+        <div><span class="lbl">رقم الفاتورة</span><span class="val" dir="ltr">${esc(invNo)}</span></div>
+        <div><span class="lbl">التاريخ</span><span class="val" dir="ltr">${esc(invDate)}</span></div>
+        <div><span class="lbl">رقم العقد</span><span class="val" dir="ltr">${esc(c.number)}</span></div>
       </div>
     </div>
   </header>
 
   <section class="inv-section">
-    <div class="inv-section-title">بيانات المستأجر / Tenant Details</div>
-    <table class="inv-grid">
-      <tr>
-        <th>اسم المستأجر:</th><td>${esc(customer?.full_name || '')}</td>
-        <th>سجل تجاري:</th><td dir="ltr">${esc(tenant.print_commercial_register || '')}</td>
-      </tr>
-      <tr>
-        <th>رقم الهاتف:</th><td dir="ltr">${esc(customer?.phone || '')}</td>
-        <th>الجنسية:</th><td>${esc(nationalityOf(customer))}</td>
-      </tr>
-      <tr>
-        <th>بطاقة ضريبية / قومي:</th><td dir="ltr">${esc(customer?.national_id || customer?.passport_number || tenant.print_tax_info || '')}</td>
-        <th>تاريخ انتهائها:</th><td dir="ltr">${esc(dash(customer?.national_id_expires_on || customer?.license_expires_on || ''))}</td>
-      </tr>
-      <tr>
-        <th>العنوان:</th><td colspan="3">${esc(customer?.address || '')}</td>
-      </tr>
-    </table>
+    <h2 class="inv-section-title">بيانات المستأجر</h2>
+    <div class="inv-cards">
+      <div class="inv-card"><span class="k">الاسم</span><span class="v">${esc(customer?.full_name || '—')}</span></div>
+      <div class="inv-card"><span class="k">الهاتف</span><span class="v" dir="ltr">${esc(customer?.phone || '—')}</span></div>
+      <div class="inv-card"><span class="k">قومي / جواز</span><span class="v" dir="ltr">${esc(customer?.national_id || customer?.passport_number || tenant.print_tax_info || '—')}</span></div>
+      <div class="inv-card"><span class="k">الجنسية</span><span class="v">${esc(nationalityOf(customer) || '—')}</span></div>
+      <div class="inv-card"><span class="k">انتهاء الهوية / الرخصة</span><span class="v" dir="ltr">${esc(dash(customer?.national_id_expires_on || customer?.license_expires_on || '') || '—')}</span></div>
+      <div class="inv-card"><span class="k">سجل تجاري</span><span class="v" dir="ltr">${esc(tenant.print_commercial_register || '—')}</span></div>
+      <div class="inv-card wide"><span class="k">العنوان</span><span class="v">${esc(customer?.address || '—')}</span></div>
+    </div>
   </section>
 
   <section class="inv-section">
-    <div class="inv-section-title">بيانات السيارة / Vehicle Details</div>
-    <table class="inv-grid">
-      <tr>
-        <th>نوع السيارة / الموديل:</th><td>${esc(vehicleName)}</td>
-        <th>سنة الصنع:</th><td dir="ltr">${esc(dash(vehicle?.year ?? ''))}</td>
-      </tr>
-      <tr>
-        <th>رقم اللوحة:</th><td>${esc(vehicle?.plate || '')}</td>
-        <th>اللون:</th><td>${esc(vehicle?.color || '')}</td>
-      </tr>
-      <tr>
-        <th>تاريخ الخروج:</th><td dir="ltr">${esc(whenLabel(outAt))}</td>
-        <th>عداد الخروج (كم):</th><td dir="ltr">${odoOut != null ? esc(formatNumber(Number(odoOut))) : ''}</td>
-      </tr>
-      <tr>
-        <th>تاريخ الدخول:</th><td dir="ltr">${esc(whenLabel(inAt))}</td>
-        <th>عداد الدخول (كم):</th><td dir="ltr">${odoIn != null ? esc(formatNumber(Number(odoIn))) : ''}</td>
-      </tr>
-    </table>
+    <h2 class="inv-section-title">بيانات السيارة</h2>
+    <div class="inv-cards">
+      <div class="inv-card"><span class="k">النوع / الموديل</span><span class="v">${esc(vehicleName || '—')}</span></div>
+      <div class="inv-card"><span class="k">سنة الصنع</span><span class="v" dir="ltr">${esc(dash(vehicle?.year ?? '') || '—')}</span></div>
+      <div class="inv-card"><span class="k">اللوحة</span><span class="v">${esc(vehicle?.plate || '—')}</span></div>
+      <div class="inv-card"><span class="k">اللون</span><span class="v">${esc(vehicle?.color || '—')}</span></div>
+      <div class="inv-card"><span class="k">تاريخ الخروج</span><span class="v" dir="ltr">${esc(whenLabel(outAt) || '—')}</span></div>
+      <div class="inv-card"><span class="k">عداد الخروج</span><span class="v" dir="ltr">${odoOut != null ? esc(formatNumber(Number(odoOut))) + ' كم' : '—'}</span></div>
+      <div class="inv-card"><span class="k">تاريخ الدخول</span><span class="v" dir="ltr">${esc(whenLabel(inAt) || '—')}</span></div>
+      <div class="inv-card"><span class="k">عداد الدخول</span><span class="v" dir="ltr">${odoIn != null ? esc(formatNumber(Number(odoIn))) + ' كم' : '—'}</span></div>
+    </div>
   </section>
 
   <section class="inv-section inv-finance">
-    <div class="inv-section-title">تفاصيل الحساب المالية / Financial Summary</div>
-    <div class="inv-watermark" aria-hidden="true">${esc(brand)}</div>
-    <table class="inv-finance-table">
-      <thead>
-        <tr>
-          <th>البيان / Description</th>
-          <th>الكمية / الأيام</th>
-          <th>السعر اليومي</th>
-          <th>الإجمالي</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="desc">إيجار سيارة (Rental Days)</td>
-          <td class="num">${days || ''}</td>
-          <td class="num">${daily ? moneyOrBlank(daily) : ''}</td>
-          <td class="num">${moneyOrBlank(rent)}</td>
-        </tr>
-        <tr>
-          <td class="desc">تأمين مؤقت (Insurance Deposit)</td>
-          <td class="num">${deposit ? '1' : ''}</td>
-          <td class="num">—</td>
-          <td class="num">${deposit ? formatDepositAmount(deposit, c.frozen_deposit_currency) : ''}</td>
-        </tr>
-        <tr>
-          <td class="desc">كم زيادة مدفوعة مقدماً (Prepaid Extra KM)</td>
-          <td class="num">${prepaidQty || ''}</td>
-          <td class="num">—</td>
-          <td class="num">${prepaidAmt ? moneyOrBlank(prepaidAmt) : ''}</td>
-        </tr>
-        <tr>
-          <td class="desc">زيادة إضافية عند الاستلام (Extra KM beyond prepaid)</td>
-          <td class="num">${excessQty || ''}</td>
-          <td class="num">—</td>
-          <td class="num">${excessAmt ? moneyOrBlank(excessAmt) : ''}</td>
-        </tr>
-        ${deliveryRow}
-        ${otherRow}
-        ${violationRows}
-        <tr class="totals">
-          <td colspan="3">المبلغ الإجمالي / Total Amount</td>
-          <td class="num"><strong>${moneyOrBlank(total)}</strong></td>
-        </tr>
-        <tr class="totals">
-          <td colspan="3">المبلغ المدفوع / Amount Paid</td>
-          <td class="num">${paidNet ? moneyOrBlank(paidNet) : ''}</td>
-        </tr>
-        <tr class="totals">
-          <td colspan="3">المتبقي / Remaining Balance</td>
-          <td class="num"><strong>${moneyOrBlank(remaining)}</strong></td>
-        </tr>
-      </tbody>
-    </table>
-    <p class="inv-note">ملاحظة: التأمين المؤقت خارج إجمالي الإيجار ويُسوَّى عند الاستلام.</p>
+    <h2 class="inv-section-title">تفاصيل الحساب</h2>
+    <div class="inv-finance-wrap">
+      <table class="inv-finance-table">
+        <thead>
+          <tr>
+            <th>البيان</th>
+            <th>الكمية / الأيام</th>
+            <th>السعر</th>
+            <th>الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="desc">إيجار السيارة</td>
+            <td class="num">${days || '—'}</td>
+            <td class="num">${daily ? moneyOrBlank(daily) : '—'}</td>
+            <td class="num">${moneyOrBlank(rent)}</td>
+          </tr>
+          <tr>
+            <td class="desc">تأمين مؤقت</td>
+            <td class="num">${deposit ? '1' : '—'}</td>
+            <td class="num">—</td>
+            <td class="num">${deposit ? formatDepositAmount(deposit, c.frozen_deposit_currency) : '—'}</td>
+          </tr>
+          <tr>
+            <td class="desc">كم زيادة مدفوعة مقدماً</td>
+            <td class="num">${prepaidQty || '—'}</td>
+            <td class="num">—</td>
+            <td class="num">${prepaidAmt ? moneyOrBlank(prepaidAmt) : '—'}</td>
+          </tr>
+          <tr>
+            <td class="desc">زيادة كم عند الاستلام</td>
+            <td class="num">${excessQty || '—'}</td>
+            <td class="num">—</td>
+            <td class="num">${excessAmt ? moneyOrBlank(excessAmt) : '—'}</td>
+          </tr>
+          ${deliveryRow}
+          ${otherRow}
+          ${violationRows}
+          <tr class="totals">
+            <td colspan="3">المبلغ الإجمالي</td>
+            <td class="num"><strong>${moneyOrBlank(total)}</strong></td>
+          </tr>
+          <tr class="totals">
+            <td colspan="3">المبلغ المدفوع</td>
+            <td class="num">${paidNet ? moneyOrBlank(paidNet) : '—'}</td>
+          </tr>
+          <tr class="totals balance">
+            <td colspan="3">المتبقي</td>
+            <td class="num"><strong>${moneyOrBlank(remaining)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="inv-note">التأمين المؤقت خارج إجمالي الإيجار ويُسوَّى عند الاستلام.</p>
     ${violations.length > 0
       ? '<p class="inv-note">المخالفات الظاهرة تُحدَّث تلقائياً عند تسجيل مخالفة جديدة على العقد. المسدَّد منها لا يُضاف للمتبقي.</p>'
       : ''}
   </section>
 
   <section class="inv-terms">
-    <h3>الشروط والأحكام العامة:</h3>
+    <h3>الشروط والأحكام</h3>
     <ol>
       <li>يتعهد المستأجر بإعادة السيارة بنفس الحالة التي استلمها عليها وفي الوقت المحدد بالعقد.</li>
-      <li>المستأجر مسؤول عن كافة المخالفات المرورية التي تسجل على السيارة خلال فترة الإيجار.</li>
-      <li>يمنع استخدام السيارة في غير الأغراض المخصصة لها أو قيادتها من غير الأشخاص المصرح لهم.</li>
+      <li>المستأجر مسؤول عن كافة المخالفات المرورية التي تُسجَّل على السيارة خلال فترة الإيجار.</li>
+      <li>يمنع استخدام السيارة في غير الأغراض المخصصة لها أو قيادتها من غير الأشخاص المصرّح لهم.</li>
     </ol>
   </section>
 
   <footer class="inv-sign">
-    <div>
-      <strong>توقيع المستأجر / Tenant Signature</strong>
+    <div class="box">
+      <strong>توقيع المستأجر</strong>
       <div class="sign-line"></div>
     </div>
-    <div>
-      <strong>توقيع المستلم / المعرض / Authorized Signature</strong>
+    <div class="box">
+      <strong>توقيع المعرض / المفوض</strong>
       <div class="sign-line"></div>
     </div>
   </footer>
 
   <div class="inv-foot">
-    <span>Page 1 of 1</span>
-    <span>${esc(brand)} - Official Receipt &amp; Agreement Summary</span>
+    <span>${esc(brand)}</span>
+    <span>صفحة ١ من ١</span>
   </div>
   ${tenant.print_footer ? `<p class="inv-print-footer">${esc(tenant.print_footer)}</p>` : ''}
+  <aside class="inv-credit">
+    تم الإنشاء بواسطة
+    <a href="${PLATFORM_WA}" target="_blank" rel="noopener noreferrer">${PLATFORM_AUTHOR}</a>
+  </aside>
 </article>`
 }
 
@@ -367,93 +360,141 @@ export function shellInvoiceHtml(body: string, title = 'فاتورة'): string {
   const trimmed = body.trim()
   if (/^<!doctype/i.test(trimmed) || /<html[\s>]/i.test(trimmed)) return trimmed
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
-  @page { size: A4; margin: 10mm 9mm; }
+  @page { size: A4; margin: 11mm 10mm; }
   * { box-sizing: border-box; }
   html{ margin:0; }
   body{
-    margin:0; padding:0; background:#fff; color:#111;
-    font-family: Tahoma,'Segoe UI',Arial,sans-serif;
-    font-size: 11px; line-height: 1.45;
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    margin:0; padding:0; background:#fff; color:#0f172a;
+    font-family:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",Arial,sans-serif;
+    font-size:12px; line-height:1.5;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
   }
   @media screen{
     html, body{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
-    body{ --rpm-preview-scale:1; }
+    body{ --rpm-preview-scale:1; background:#eef2f7; padding:16px 10px; }
     .rpm-preview-root{
       transform: scale(var(--rpm-preview-scale));
       transform-origin: top center;
       width: 100%;
+      max-width: 210mm;
+      margin: 0 auto;
+      background:#fff;
+      border-radius:18px;
+      box-shadow:0 18px 48px rgba(15,23,42,.08);
+      padding:18px 16px 14px;
     }
   }
-  .rpm-invoice-v1{ --inv-navy:#0b1f3a; --inv-red:#c40000; width:100%; max-width:192mm; margin:0 auto; }
+  .rpm-invoice-v3{
+    --inv-ink:#0f172a; --inv-muted:#64748b; --inv-line:#e2e8f0;
+    --inv-navy:#0b1f3a; --inv-accent:#b91c1c; --inv-soft:#f8fafc;
+    width:100%; max-width:192mm; margin:0 auto;
+  }
   @media print{
-    .rpm-preview-root{ transform:none !important; width:100% !important; }
-    .rpm-invoice-v1{ max-width:100%; width:100%; margin:0; }
+    body{ background:#fff; padding:0; }
+    .rpm-preview-root{ transform:none !important; width:100% !important; max-width:none; margin:0; box-shadow:none; border-radius:0; padding:0; }
+    .rpm-invoice-v3{ max-width:100%; width:100%; margin:0; }
   }
   .inv-head{
-    display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
-    margin-bottom:10px; border-bottom:2px solid var(--inv-navy); padding-bottom:8px;
-    direction: ltr; /* logo left · title right — matches paper invoice */
+    display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
+    margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--inv-line);
   }
-  .inv-brand{ display:flex; align-items:center; gap:10px; }
-  .inv-title-block, .inv-meta, .inv-meta .lbl { direction: rtl; text-align: right; }
-  .inv-brand img{ width:64px; height:auto; object-fit:contain; }
-  .inv-brand-text{ display:flex; flex-direction:column; line-height:1.15; }
-  .inv-brand-text strong{ font-size:15px; color:var(--inv-navy); }
-  .inv-brand-text span{ font-size:11px; color:var(--inv-red); font-weight:800; letter-spacing:.06em; border-bottom:2px solid var(--inv-red); padding-bottom:1px; width:max-content; }
+  .inv-brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .inv-brand img{
+    width:58px; height:58px; object-fit:contain; border-radius:14px;
+    border:1px solid var(--inv-line); background:#fff; padding:5px;
+  }
+  .inv-brand-text{ display:flex; flex-direction:column; gap:4px; }
+  .inv-brand-text strong{ font-size:15px; font-weight:700; color:var(--inv-navy); }
+  .inv-brand-text span{
+    align-self:flex-start; font-size:10px; font-weight:700; letter-spacing:.04em;
+    color:var(--inv-accent); background:#fef2f2; border-radius:999px; padding:2px 9px;
+  }
   .inv-title-block{ text-align:start; min-width:42%; }
-  .inv-title-block h1{ margin:0 0 6px; font-size:22px; color:#111; letter-spacing:.02em; }
-  .inv-meta{ font-size:11px; }
-  .inv-meta > div{ margin:2px 0; display:flex; gap:6px; flex-wrap:wrap; }
-  .inv-meta .lbl{ color:#333; font-weight:700; }
-  .inv-meta .val{ border-bottom:1px dotted #333; min-width:7em; padding:0 4px; font-weight:800; }
-  .inv-section{ margin:10px 0; }
+  .inv-kicker{ margin:0 0 2px; font-size:11px; color:var(--inv-muted); font-weight:500; }
+  .inv-title-block h1{ margin:0 0 8px; font-size:26px; font-weight:700; letter-spacing:-.02em; color:var(--inv-ink); }
+  .inv-meta{ display:grid; gap:5px; font-size:11px; }
+  .inv-meta > div{ display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
+  .inv-meta .lbl{ color:var(--inv-muted); font-weight:500; }
+  .inv-meta .val{
+    font-weight:700; font-variant-numeric:tabular-nums;
+    background:var(--inv-soft); border:1px solid var(--inv-line);
+    border-radius:999px; padding:1px 9px;
+  }
+  .inv-section{ margin:14px 0; }
   .inv-section-title{
-    background: var(--inv-navy); color:#fff; font-weight:800; font-size:12px;
-    padding:5px 10px; text-align:center;
+    display:flex; align-items:center; gap:8px;
+    margin:0 0 10px; font-size:13px; font-weight:700; color:var(--inv-navy);
   }
-  .inv-grid{ width:100%; border-collapse:collapse; table-layout:fixed; }
-  .inv-grid th, .inv-grid td{
-    border:1px solid #222; padding:5px 7px; vertical-align:top; font-size:11px;
+  .inv-section-title::before{
+    content:""; width:7px; height:7px; border-radius:999px; background:var(--inv-accent);
+    box-shadow:0 0 0 3px #fef2f2;
   }
-  .inv-grid th{ width:18%; background:#f3f5f8; font-weight:800; white-space:nowrap; }
-  .inv-finance{ position:relative; }
-  .inv-watermark{
-    position:absolute; inset:28% 10% 18%;
-    display:flex; align-items:center; justify-content:center;
-    font-size:42px; font-weight:900; color:rgba(11,31,58,.06);
-    pointer-events:none; transform:rotate(-18deg); letter-spacing:.04em;
+  .inv-cards{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .inv-card{
+    background:var(--inv-soft); border:1px solid var(--inv-line);
+    border-radius:12px; padding:9px 11px;
   }
-  .inv-finance-table{ width:100%; border-collapse:collapse; position:relative; z-index:1; }
-  .inv-finance-table th, .inv-finance-table td{
-    border:1px solid #222; padding:6px 7px; font-size:11px;
+  .inv-card.wide{ grid-column:1 / -1; }
+  .inv-card .k{ display:block; font-size:10px; color:var(--inv-muted); margin-bottom:2px; font-weight:500; }
+  .inv-card .v{ display:block; font-weight:600; font-size:12px; word-break:break-word; font-variant-numeric:tabular-nums; }
+  .inv-finance-wrap{
+    border:1px solid var(--inv-line); border-radius:14px; overflow:hidden; background:#fff;
   }
-  .inv-finance-table thead th{ background:var(--inv-navy); color:#fff; font-weight:800; }
+  .inv-finance-table{ width:100%; border-collapse:collapse; }
+  .inv-finance-table thead th{
+    background:linear-gradient(180deg,#0b1f3a 0%,#123056 100%);
+    color:#fff; font-weight:600; font-size:11px; padding:9px 10px; text-align:start;
+  }
+  .inv-finance-table td{
+    padding:9px 10px; border-top:1px solid var(--inv-line); font-size:11.5px; vertical-align:middle;
+  }
+  .inv-finance-table tbody tr:nth-child(even) td{ background:#fbfdff; }
   .inv-finance-table .desc{ text-align:start; }
-  .inv-finance-table .num{ text-align:center; font-variant-numeric:tabular-nums; width:18%; }
-  .inv-finance-table tr.totals td{ background:#f7f8fa; font-weight:700; }
-  .inv-note{ margin:6px 0 0; font-size:10px; color:#555; }
+  .inv-finance-table .num{ text-align:center; font-variant-numeric:tabular-nums; font-weight:600; width:18%; }
+  .inv-finance-table tr.totals td{ background:#f1f5f9; font-weight:700; }
+  .inv-finance-table tr.balance td{ background:#fef2f2; }
+  .inv-note{ margin:8px 2px 0; font-size:10.5px; color:var(--inv-muted); }
   .inv-terms{
-    margin-top:12px; background:#f2f2f2; border:1px solid #cfcfcf; border-radius:4px; padding:8px 12px;
+    margin-top:14px; background:var(--inv-soft); border:1px solid var(--inv-line);
+    border-radius:12px; padding:11px 13px;
   }
-  .inv-terms h3{ margin:0 0 6px; font-size:12px; }
-  .inv-terms ol{ margin:0; padding-inline-start:1.3rem; }
-  .inv-terms li{ margin:3px 0; }
-  .inv-sign{
-    display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:22px;
+  .inv-terms h3{ margin:0 0 6px; font-size:12.5px; color:var(--inv-navy); }
+  .inv-terms ol{ margin:0; padding-inline-start:1.2rem; color:#334155; }
+  .inv-terms li{ margin:4px 0; }
+  .inv-sign{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px; }
+  .inv-sign .box{
+    border:1px dashed #cbd5e1; border-radius:12px; padding:12px; min-height:78px;
   }
-  .inv-sign strong{ display:block; margin-bottom:28px; font-size:11px; }
-  .sign-line{ border-bottom:1px solid #333; height:1px; }
+  .inv-sign strong{ display:block; margin-bottom:28px; font-size:11px; color:var(--inv-muted); font-weight:600; }
+  .sign-line{ border-bottom:1px solid #94a3b8; height:1px; margin-top:auto; }
   .inv-foot{
     display:flex; justify-content:space-between; gap:12px; margin-top:16px;
-    font-size:10px; color:#444; border-top:1px solid #ddd; padding-top:6px;
+    font-size:10.5px; color:var(--inv-muted); border-top:1px solid var(--inv-line); padding-top:8px;
   }
-  .inv-print-footer{ margin-top:6px; font-size:10px; color:#666; text-align:center; }
+  .inv-print-footer{ margin-top:6px; font-size:10px; color:var(--inv-muted); text-align:center; }
+  .inv-credit{
+    margin-top:14px; padding-top:10px; border-top:1px solid var(--inv-line);
+    text-align:center; font-size:10.5px; color:var(--inv-muted); letter-spacing:.01em;
+  }
+  .inv-credit a{
+    color:var(--inv-navy); font-weight:700; text-decoration:none;
+    border-bottom:1px solid rgba(11,31,58,.25);
+  }
+  @media (max-width:640px){
+    .inv-cards{ grid-template-columns:1fr; }
+    .inv-sign{ grid-template-columns:1fr; }
+  }
   @media print{ body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style></head><body><div class="rpm-preview-root">${body}</div></body></html>`
 }
 
 export function isInvoiceBody(html: string): boolean {
-  return html.includes('rpm-invoice-v1') || html.includes('INVOICE / فاتورة')
+  return html.includes('rpm-invoice-v3')
+    || html.includes('rpm-invoice-v1')
+    || html.includes('INVOICE / فاتورة')
+    || html.includes('rpm-invoice-v2')
 }
