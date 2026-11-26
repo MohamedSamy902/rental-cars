@@ -64,9 +64,9 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
       .then((data) => {
         if (cancelled) return
         const full = renderDoc(kind, data)
-        const body = extractPrintableBody(full)
+        // الفاتورة تُبنى كاملة من الكود الحي — احفظ المستند كما هو لتفادي فقدان الستايل في المعاينة
         setPayload(data)
-        setBodyHtml(body)
+        setBodyHtml(kind === 'invoice' ? full : extractPrintableBody(full))
       })
       .catch((e) => {
         if (!cancelled) toast.error((e as ApiError).message || 'تعذّر تجهيز مستند الطباعة.')
@@ -85,7 +85,11 @@ export function ContractPrintSheet({ open, contractId, kind = 'contract', onClos
   }, [kind, payload])
 
   const previewHtml = payload
-    ? wrapEditedPrintHtml(kind, title, bodyHtml)
+    ? (
+      kind === 'invoice' && (/^<!doctype/i.test(bodyHtml.trim()) || /<html[\s>]/i.test(bodyHtml.trim()))
+        ? bodyHtml
+        : wrapEditedPrintHtml(kind, title, bodyHtml)
+    )
     : ''
 
   const fitPreviewToFrame = useCallback(() => {

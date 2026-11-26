@@ -216,13 +216,13 @@ export function buildInvoiceBody(tenant: InvoiceTenant, c: InvoiceContract): str
   const PLATFORM_WA = 'https://wa.me/201150100104'
 
   return `
-<article class="rpm-invoice-v3">
-  <header class="inv-head">
+<article class="rpm-invoice-v3" data-invoice-skin="v3-2026-11">
+  <header class="inv-banner">
     <div class="inv-brand">
       <img src="${esc(logo)}" alt="${esc(brand)}" />
       <div class="inv-brand-text">
         <strong>${esc(brand)}</strong>
-        <span>تأجير سيارات</span>
+        <span>تأجير سيارات · فاتورة داخلية</span>
       </div>
     </div>
     <div class="inv-title-block">
@@ -398,30 +398,33 @@ export function shellInvoiceHtml(body: string, title = 'فاتورة'): string {
     .rpm-preview-root{ transform:none !important; width:100% !important; max-width:none; margin:0; box-shadow:none; border-radius:0; padding:0; }
     .rpm-invoice-v3{ max-width:100%; width:100%; margin:0; }
   }
-  .inv-head{
+  .inv-banner{
     display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
-    margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--inv-line);
+    margin:0 0 18px; padding:16px 16px 14px;
+    border-radius:16px;
+    background:linear-gradient(135deg,#0b1f3a 0%,#16365f 55%,#1e3a5f 100%);
+    color:#fff;
   }
   .inv-brand{ display:flex; align-items:center; gap:12px; min-width:0; }
   .inv-brand img{
     width:58px; height:58px; object-fit:contain; border-radius:14px;
-    border:1px solid var(--inv-line); background:#fff; padding:5px;
+    border:1px solid rgba(255,255,255,.28); background:#fff; padding:5px;
   }
   .inv-brand-text{ display:flex; flex-direction:column; gap:4px; }
-  .inv-brand-text strong{ font-size:15px; font-weight:700; color:var(--inv-navy); }
+  .inv-brand-text strong{ font-size:15px; font-weight:700; color:#fff; }
   .inv-brand-text span{
     align-self:flex-start; font-size:10px; font-weight:700; letter-spacing:.04em;
-    color:var(--inv-accent); background:#fef2f2; border-radius:999px; padding:2px 9px;
+    color:#fff; background:rgba(185,28,28,.92); border-radius:999px; padding:2px 9px;
   }
   .inv-title-block{ text-align:start; min-width:42%; }
-  .inv-kicker{ margin:0 0 2px; font-size:11px; color:var(--inv-muted); font-weight:500; }
-  .inv-title-block h1{ margin:0 0 8px; font-size:26px; font-weight:700; letter-spacing:-.02em; color:var(--inv-ink); }
+  .inv-kicker{ margin:0 0 2px; font-size:11px; color:rgba(255,255,255,.78); font-weight:500; }
+  .inv-title-block h1{ margin:0 0 8px; font-size:28px; font-weight:700; letter-spacing:-.02em; color:#fff; }
   .inv-meta{ display:grid; gap:5px; font-size:11px; }
   .inv-meta > div{ display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
-  .inv-meta .lbl{ color:var(--inv-muted); font-weight:500; }
+  .inv-meta .lbl{ color:rgba(255,255,255,.72); font-weight:500; }
   .inv-meta .val{
-    font-weight:700; font-variant-numeric:tabular-nums;
-    background:var(--inv-soft); border:1px solid var(--inv-line);
+    font-weight:700; font-variant-numeric:tabular-nums; color:#0b1f3a;
+    background:#fff; border:0;
     border-radius:999px; padding:1px 9px;
   }
   .inv-section{ margin:14px 0; }
@@ -477,12 +480,13 @@ export function shellInvoiceHtml(body: string, title = 'فاتورة'): string {
   }
   .inv-print-footer{ margin-top:6px; font-size:10px; color:var(--inv-muted); text-align:center; }
   .inv-credit{
-    margin-top:14px; padding-top:10px; border-top:1px solid var(--inv-line);
-    text-align:center; font-size:10.5px; color:var(--inv-muted); letter-spacing:.01em;
+    margin-top:16px; padding:10px 12px;
+    border:1px solid var(--inv-line); border-radius:12px; background:#f8fafc;
+    text-align:center; font-size:11px; color:var(--inv-muted); letter-spacing:.01em;
   }
   .inv-credit a{
-    color:var(--inv-navy); font-weight:700; text-decoration:none;
-    border-bottom:1px solid rgba(11,31,58,.25);
+    color:#0b1f3a; font-weight:800; text-decoration:none;
+    border-bottom:2px solid rgba(185,28,28,.45);
   }
   @media (max-width:640px){
     .inv-cards{ grid-template-columns:1fr; }
