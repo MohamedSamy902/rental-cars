@@ -567,9 +567,11 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 ### أوامر الشغل
 | Method | Path |
 |--------|------|
-| GET | `/work-orders?status=` |
+| GET | `/work-orders?status=&search=&vehicle_id=&view=oil&tab=oil\|upcoming` | قائمة أوامر (بلا مبالغ) أو جدول زيت لكل عربية (`view=oil`) |
 | POST | `/work-orders` | فتح |
 | POST | `/work-orders/{id}/close` | إغلاق + FIFO |
+
+`view=oil` / `tab=oil|upcoming`: صف لكل عربية نشطة · `last_oil_change_on` · `next_oil_on` · `next_oil_odometer` · `oil_due_soon` · `summary.oil_due_soon` / `with_oil_history`. قائمة الأوامر تُرجع `items[]` و`has_oil_change` بلا `parts_cost`/`labor_cost`.
 
 **POST work-order** — بنود جاهزة في الواجهة (زيت موتور · فلتر زيت موتور · زيت فتيس · فلتر زيت فتيس · فلتر هوا · فلتر تكيف · فلتر بنزين · بيوجوهات · سير مجموعه · إطارات أو كاوتش) مع بند حر. تسجيل أول صيانة قادمة = `baseline: true` (أو `puts_in_maintenance: false` + `notes` أساس) + أسطر `purchase` بـ`unit_price: 0` بلا عهدة. أمر عادي: مصدر تمويل إلزامي (`stock` مع صنف، أو `purchase` من عهدة بمبلغ > ٠).
 

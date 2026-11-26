@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WorkOrder;
+use App\Services\Maintenance\MaintenanceOilScheduleService;
 use App\Services\Maintenance\WorkOrderService;
 use App\Support\MaintenanceContractLabel;
 use App\Support\PaginationInput;
@@ -13,29 +14,68 @@ use Illuminate\Http\Request;
 
 class WorkOrderController extends Controller
 {
-    public function __construct(private readonly WorkOrderService $service) {}
+    public function __construct(
+        private readonly WorkOrderService $service,
+        private readonly MaintenanceOilScheduleService $oilSchedule,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $q = WorkOrder::query()->with(['vehicle', 'lines'])->latest('id');
+        $view = $request->string('view')->toString();
+        if ($view === 'oil' || in_array($request->string('tab')->toString(), ['oil', 'upcoming'], true)) {
+            return response()->json($this->oilSchedule->paginate($request));
+        }
+
+        $q = WorkOrder::query()->with(['vehicle:id,brand,model,plate,code,odometer', 'lines'])->latest('id');
         if ($status = $request->string('status')->toString()) {
-            $q->where('status', $status);
+            if ($status === 'open') {
+                $q->whereIn('status', ['open', 'in_progress']);
+            } else {
+                $q->where('status', $status);
+            }
         }
         if ($vehicleId = $request->integer('vehicle_id')) {
             $q->where('vehicle_id', $vehicleId);
         }
-        $perPage = PaginationInput::perPage($request, 50, PaginationInput::MAX_PER_PAGE);
+        if ($search = trim($request->string('search')->toString())) {
+            $q->where(function ($qq) use ($search) {
+                $qq->where('workshop', 'like', "%{$search}%")
+                    ->orWhereHas('vehicle', function ($v) use ($search) {
+                        $v->where('plate', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%")
+                            ->orWhere('brand', 'like', "%{$search}%")
+                            ->orWhere('model', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('lines', function ($l) use ($search) {
+                        $l->where('description', 'like', "%{$search}%");
+                    });
+            });
+        }
+        $perPage = PaginationInput::perPage($request, 20, PaginationInput::MAX_PER_PAGE);
         $page = PaginationInput::page($request);
-        $rows = $q->paginate($perPage, ['*'], 'page', $page);
+        $rows = $q->paginate($perPage, [
+            'id', 'vehicle_id', 'workshop', 'opened_on', 'opened_at', 'closed_on', 'odometer',
+            'status', 'puts_in_maintenance', 'notes', 'next_service_on', 'next_service_odometer',
+        ], 'page', $page);
+
+        $oilSummary = $this->oilSchedule->summary();
 
         return response()->json([
-            'data' => collect($rows->items())->map(fn (WorkOrder $order) => $this->present($order, $request))->values(),
-            'meta' => ['total' => $rows->total()],
+            'data' => collect($rows->items())->map(fn (WorkOrder $order) => $this->presentMaintenance($order, $request))->values(),
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'total' => $rows->total(),
+                'per_page' => $rows->perPage(),
+            ],
             'summary' => [
-                'open' => WorkOrder::query()->whereIn('status', ['open', 'in_progress'])->count(),
+                'open' => $oilSummary['open'],
                 'open_only' => WorkOrder::query()->where('status', 'open')->count(),
                 'in_progress' => WorkOrder::query()->where('status', 'in_progress')->count(),
-                'closed' => WorkOrder::query()->where('status', 'closed')->count(),
+                'closed' => $oilSummary['closed'],
+                'vehicles' => $oilSummary['vehicles'],
+                'with_oil_history' => $oilSummary['with_oil_history'],
+                'oil_due_soon' => $oilSummary['oil_due_soon'],
             ],
         ]);
     }
@@ -174,23 +214,54 @@ class WorkOrderController extends Controller
     }
 
     /**
+     * قائمة/تفاصيل الصيانة للمشغّلين — بلا مبالغ مالية (صلاحية الصيانة فقط).
+     *
+     * @return array<string, mixed>
+     */
+    private function presentMaintenance(WorkOrder $order, Request $request): array
+    {
+        $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
+        $items = $order->relationLoaded('lines')
+            ? $order->lines->map(fn ($line) => MaintenanceContractLabel::present($line->description, $canContracts))->filter()->values()->all()
+            : [];
+
+        $payload = [
+            'id' => (int) $order->id,
+            'vehicle_id' => (int) $order->vehicle_id,
+            'status' => $order->status,
+            'workshop' => MaintenanceContractLabel::present($order->workshop, $canContracts),
+            'opened_on' => $order->opened_on?->toDateString(),
+            'opened_at' => $order->opened_at?->toIso8601String(),
+            'closed_on' => $order->closed_on?->toDateString(),
+            'odometer' => $order->odometer !== null ? (int) $order->odometer : null,
+            'puts_in_maintenance' => (bool) $order->puts_in_maintenance,
+            'notes' => MaintenanceContractLabel::present($order->notes, $canContracts),
+            'next_service_on' => $order->next_service_on?->toDateString(),
+            'next_service_odometer' => $order->next_service_odometer !== null
+                ? (int) $order->next_service_odometer
+                : null,
+            'items' => $items,
+            'has_oil_change' => collect($items)->contains(
+                fn ($label) => is_string($label) && str_contains($label, MaintenanceOilScheduleService::OIL_ITEM)
+            ),
+            'vehicle' => $order->vehicle ? [
+                'id' => (int) $order->vehicle->id,
+                'brand' => $order->vehicle->brand,
+                'model' => $order->vehicle->model,
+                'plate' => $order->vehicle->plate,
+                'code' => $order->vehicle->code,
+                'odometer' => (int) ($order->vehicle->odometer ?? 0),
+            ] : null,
+        ];
+
+        return VehicleOwnerVisibility::redactEmbedded($payload, $request->user());
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function present(WorkOrder $order, Request $request): array
     {
-        $canContracts = (bool) $request->user()?->hasPermission('contracts.view');
-        $payload = $order->toArray();
-        $payload['workshop'] = MaintenanceContractLabel::present($payload['workshop'] ?? null, $canContracts);
-        $payload['notes'] = MaintenanceContractLabel::present($payload['notes'] ?? null, $canContracts);
-        if (isset($payload['lines']) && is_array($payload['lines'])) {
-            foreach ($payload['lines'] as $index => $line) {
-                if (is_array($line)) {
-                    $line['description'] = MaintenanceContractLabel::present($line['description'] ?? null, $canContracts);
-                    $payload['lines'][$index] = $line;
-                }
-            }
-        }
-
-        return VehicleOwnerVisibility::redactEmbedded($payload, $request->user());
+        return $this->presentMaintenance($order->loadMissing(['vehicle', 'lines']), $request);
     }
 }

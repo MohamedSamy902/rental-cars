@@ -342,9 +342,11 @@ class QaV4FixTicketsTest extends TestCase
 
         $row = collect($this->getJson('/api/work-orders?per_page=50')->assertOk()->json('data'))
             ->firstWhere('id', $order->id);
-        $this->assertSame(520, (int) $row['parts_cost']);
-        $this->assertSame(360, (int) $row['lines_parts_total']);
-        $this->assertSame(160, (int) $row['parts_cost_other']);
+        $this->assertNotNull($row);
+        $this->assertArrayNotHasKey('parts_cost', $row);
+        $this->assertArrayNotHasKey('labor_cost', $row);
+        $this->assertSame(520, (int) $order->fresh()->parts_cost);
+        $this->assertSame(360, (int) $order->lines()->get()->sum(fn ($l) => (int) $l->quantity * (int) $l->unit_price));
 
         $this->postJson('/api/work-orders/'.$order->id.'/close')->assertStatus(422);
         $this->assertSame(520, (int) $order->fresh()->parts_cost);
