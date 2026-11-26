@@ -74,7 +74,7 @@ export function BookingsPage() {
         label: 'متأخر',
         count: summary.overdue_handover > 0 ? summary.overdue_handover : null,
         attention: summary.overdue_handover > 0 ? ('critical' as const) : null,
-        attentionLabel: 'معاد التسليم فات والعميل لسه ما استلمش',
+        attentionLabel: 'تسليم فائت أو استلام متأخر عن الموعد',
       },
       {
         id: 'handover_today',

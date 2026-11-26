@@ -259,7 +259,7 @@ class ClientFinalPolishesTest extends TestCase
             'is_active' => true,
         ]);
 
-        $overdue = Contract::query()->create([
+        $overdueHandover = Contract::query()->create([
             'number' => 'C-LATE-1',
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
@@ -267,6 +267,17 @@ class ClientFinalPolishesTest extends TestCase
             'starts_at' => now()->subHours(3),
             'planned_ends_at' => now()->addDays(3),
             'approved_days' => 3,
+            'frozen_daily_rate' => 500,
+            'frozen_agreed_deposit' => 1000,
+        ]);
+        $overdueReturn = Contract::query()->create([
+            'number' => 'C-LATE-RET-1',
+            'customer_id' => $customer->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'active',
+            'starts_at' => now()->subDays(5),
+            'planned_ends_at' => now()->subDay(),
+            'approved_days' => 4,
             'frozen_daily_rate' => 500,
             'frozen_agreed_deposit' => 1000,
         ]);
@@ -295,16 +306,18 @@ class ClientFinalPolishesTest extends TestCase
 
         $res = $this->getJson('/api/contracts?tab=overdue_handover&per_page=50')->assertOk()->json();
         $ids = collect($res['data'])->pluck('id')->all();
-        $this->assertContains($overdue->id, $ids);
+        $this->assertContains($overdueHandover->id, $ids);
+        $this->assertContains($overdueReturn->id, $ids, 'عقد نشط فات موعد استلامه يظهر في متأخر');
         $this->assertNotContains(
             Contract::query()->where('number', 'C-FUTURE-1')->value('id'),
             $ids
         );
         $this->assertNotContains(
             Contract::query()->where('number', 'C-ACTIVE-1')->value('id'),
-            $ids
+            $ids,
+            'عقد نشط لسه ما خلصش مدته مش متأخر'
         );
-        $this->assertGreaterThanOrEqual(1, (int) ($res['summary']['overdue_handover'] ?? 0));
+        $this->assertGreaterThanOrEqual(2, (int) ($res['summary']['overdue_handover'] ?? 0));
     }
 
     public function test_recommend_has_no_weights_or_scores(): void
