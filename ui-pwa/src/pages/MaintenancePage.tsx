@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api, type ApiError } from '@/shared/api/client'
 import { formatDate, formatNumber } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import { useAuth } from '@/shared/auth/AuthContext'
 import {
-  PageHeader, MetricCardGrid, FilterBar, Button, Fab, DataTable, StatusPill, Sheet, useToast,
+  PageHeader, MetricCardGrid, FilterBar, Button, Fab, DataTable, StatusPill, useToast,
   IconCheck, IconWrench, IconAlert, IconCar, type DataColumn,
 } from '@/shared/ui'
 import { WorkOrderSheet } from '@/shared/forms/WorkOrderSheet'
@@ -59,6 +60,8 @@ const isOilTab = (tab: string) => tab === 'oil' || tab === 'upcoming'
 
 export function MaintenancePage() {
   const toast = useToast()
+  const navigate = useNavigate()
+  const location = useLocation()
   const { can } = useAuth()
   const canCreate = can('maintenance.create')
   const canClose = can('maintenance.close')
@@ -73,9 +76,6 @@ export function MaintenancePage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: MaintenancePageTabs, defaultValue: 'oil' })
-  const [historyVehicle, setHistoryVehicle] = useState<OilRow | null>(null)
-  const [historyOrders, setHistoryOrders] = useState<WorkOrder[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
   const [lockedVehicle, setLockedVehicle] = useState<{ id: number; label: string; odometer?: number } | undefined>()
 
   async function load(nextPage = page) {
@@ -149,18 +149,43 @@ export function MaintenancePage() {
     [summary.open, summary.oil_due_soon],
   )
 
-  async function openHistory(row: OilRow) {
-    setHistoryVehicle(row)
-    setHistoryLoading(true)
-    try {
-      const res = await api<{ data: WorkOrder[] }>(`/work-orders?vehicle_id=${row.vehicle_id}&per_page=50`)
-      setHistoryOrders(res.data)
-    } catch (e) {
-      toast.error((e as ApiError).message)
-      setHistoryOrders([])
-    } finally {
-      setHistoryLoading(false)
-    }
+  function openVehicleMaintenance(row: OilRow) {
+    navigate(`/maintenance/vehicles/${row.vehicle_id}`, {
+      state: {
+        from: `${location.pathname}${location.search}`,
+        vehicle: {
+          id: row.vehicle_id,
+          brand: row.brand,
+          model: row.model,
+          plate: row.plate,
+          code: row.code,
+          odometer: row.odometer,
+          last_oil_change_on: row.last_oil_change_on,
+          next_oil_on: row.next_oil_on,
+          next_oil_odometer: row.next_oil_odometer,
+          oil_due_soon: row.oil_due_soon,
+        },
+      },
+    })
+  }
+
+  function openVehicleFromOrder(order: WorkOrder) {
+    const vid = order.vehicle?.id
+    if (!vid) return
+    navigate(`/maintenance/vehicles/${vid}`, {
+      state: {
+        from: `${location.pathname}${location.search}`,
+        vehicle: order.vehicle
+          ? {
+              id: order.vehicle.id,
+              brand: order.vehicle.brand,
+              model: order.vehicle.model,
+              plate: order.vehicle.plate,
+              odometer: order.vehicle.odometer,
+            }
+          : undefined,
+      },
+    })
   }
 
   function openNewForVehicle(row?: OilRow) {
@@ -181,7 +206,6 @@ export function MaintenancePage() {
       await api(`/work-orders/${id}/close`, { method: 'POST' })
       toast.success('تم إغلاق أمر الصيانة.')
       await load(page)
-      if (historyVehicle) await openHistory(historyVehicle)
     } catch (e) {
       toast.error((e as ApiError).message)
     }
@@ -295,7 +319,7 @@ export function MaintenancePage() {
     <div className="rpm-stack rpm-maint-page">
       <PageHeader
         title="الصيانة"
-        subtitle="آخر تغيير زيت · الصيانة القادمة · سجل أوامر الشغل"
+        subtitle="آخر تغيير زيت · وافتح صفحة العربية لكل الصيانات"
         action={canCreate ? <Button onClick={() => openNewForVehicle()}>صيانة جديدة</Button> : undefined}
         mobileFab={canCreate}
       />
@@ -357,9 +381,9 @@ export function MaintenancePage() {
           rowKey={(r) => r.vehicle_id}
           rowLabel={(r) => `${r.brand} ${r.model} · ${r.plate}`}
           loading={loading}
-          onRowClick={(r) => void openHistory(r)}
+          onRowClick={(r) => openVehicleMaintenance(r)}
           rowActions={(r) => [
-            { id: 'history', label: 'سجل الصيانات', icon: <IconWrench size={16} />, onSelect: () => void openHistory(r) },
+            { id: 'history', label: 'كل صيانات العربية', icon: <IconWrench size={16} />, onSelect: () => openVehicleMaintenance(r) },
             ...(canCreate
               ? [{ id: 'new', label: 'صيانة جديدة', icon: <IconCheck size={16} />, onSelect: () => openNewForVehicle(r) }]
               : []),
@@ -382,11 +406,15 @@ export function MaintenancePage() {
           rowKey={(r) => r.id}
           rowLabel={(r) => `أمر شغل · ${r.vehicle?.plate ?? ''}`}
           loading={loading}
-          rowActions={(r) =>
-            canClose && r.status !== 'closed'
+          onRowClick={(r) => openVehicleFromOrder(r)}
+          rowActions={(r) => [
+            ...(r.vehicle?.id
+              ? [{ id: 'vehicle', label: 'كل صيانات العربية', icon: <IconWrench size={16} />, onSelect: () => openVehicleFromOrder(r) }]
+              : []),
+            ...(canClose && r.status !== 'closed'
               ? [{ id: 'close', label: 'إغلاق أمر الشغل', icon: <IconCheck size={16} />, onSelect: () => void closeOrder(r.id) }]
-              : []
-          }
+              : []),
+          ]}
           emptyTitle="لا توجد أوامر شغل"
           emptyDescription="افتح أمر شغل لتسجيل بنود الصيانة وموعد الزيت القادم."
           serverPagination={{
@@ -398,86 +426,6 @@ export function MaintenancePage() {
           }}
         />
       )}
-
-      <Sheet
-        open={Boolean(historyVehicle)}
-        title={historyVehicle ? `صيانات · ${historyVehicle.brand} ${historyVehicle.model}` : 'صيانات'}
-        onClose={() => { setHistoryVehicle(null); setHistoryOrders([]) }}
-        closeLabel="إغلاق"
-        footer={canCreate && historyVehicle ? (
-          <Button onClick={() => {
-            const v = historyVehicle
-            setHistoryVehicle(null)
-            openNewForVehicle(v)
-          }}
-          >
-            صيانة جديدة لهذه العربية
-          </Button>
-        ) : undefined}
-      >
-        {historyVehicle ? (
-          <div className="rpm-maint-history">
-            <div className="rpm-maint-history__oil">
-              <div>
-                <span className="k">آخر تغيير زيت</span>
-                <strong className="v">
-                  {historyVehicle.last_oil_change_on
-                    ? formatDate(historyVehicle.last_oil_change_on)
-                    : 'لا يوجد بعد'}
-                </strong>
-              </div>
-              <div>
-                <span className="k">القادم</span>
-                <strong className="v" dir="ltr">
-                  {historyVehicle.next_oil_on
-                    ? formatDate(historyVehicle.next_oil_on)
-                    : historyVehicle.next_oil_odometer != null
-                      ? `${formatNumber(historyVehicle.next_oil_odometer)} كم`
-                      : '—'}
-                </strong>
-              </div>
-              <div>
-                <span className="k">العداد الحالي</span>
-                <strong className="v" dir="ltr">{formatNumber(historyVehicle.odometer)} كم</strong>
-              </div>
-            </div>
-            {historyLoading ? (
-              <p className="muted">جاري تحميل السجل…</p>
-            ) : historyOrders.length === 0 ? (
-              <p className="muted">لا صيانات مسجّلة على هذه العربية بعد.</p>
-            ) : (
-              <ul className="rpm-maint-history__list">
-                {historyOrders.map((o) => (
-                  <li key={o.id} className="rpm-maint-history__item">
-                    <div className="rpm-maint-history__head">
-                      <StatusPill
-                        status={o.status === 'closed' ? 'completed' : 'maintenance'}
-                        label={statusLabel[o.status] || o.status}
-                      />
-                      <span dir="ltr">{o.opened_on ? formatDate(o.opened_on) : '—'}</span>
-                      {o.has_oil_change ? <span className="rpm-maint-history__oil-tag">زيت موتور</span> : null}
-                    </div>
-                    <p className="rpm-maint-history__items">
-                      {(o.items && o.items.length > 0) ? o.items.join(' · ') : (o.workshop || 'أمر صيانة')}
-                    </p>
-                    <p className="rpm-maint-history__next">
-                      التالية:{' '}
-                      {o.next_service_on
-                        ? formatDate(o.next_service_on)
-                        : o.next_service_odometer != null
-                          ? `${formatNumber(o.next_service_odometer)} كم`
-                          : '—'}
-                    </p>
-                    {canClose && o.status !== 'closed' ? (
-                      <Button size="sm" variant="secondary" onClick={() => void closeOrder(o.id)}>إغلاق الأمر</Button>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ) : null}
-      </Sheet>
 
       <WorkOrderSheet
         open={sheetOpen}

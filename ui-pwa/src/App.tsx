@@ -16,6 +16,7 @@ const ContractDetailPage = lazy(() => import('@/pages/ContractDetailPage').then(
 const MonthLedgerPage = lazy(() => import('@/pages/MonthLedgerPage').then((m) => ({ default: m.MonthLedgerPage })))
 const CalendarPage = lazy(() => import('@/pages/CalendarPage').then((m) => ({ default: m.CalendarPage })))
 const MaintenancePage = lazy(() => import('@/pages/MaintenancePage').then((m) => ({ default: m.MaintenancePage })))
+const MaintenanceVehiclePage = lazy(() => import('@/pages/MaintenanceVehiclePage').then((m) => ({ default: m.MaintenanceVehiclePage })))
 const CustomersPage = lazy(() => import('@/pages/CustomersPage').then((m) => ({ default: m.CustomersPage })))
 const InventoryPage = lazy(() => import('@/pages/InventoryPage').then((m) => ({ default: m.InventoryPage })))
 const ViolationsPage = lazy(() => import('@/pages/ViolationsPage').then((m) => ({ default: m.ViolationsPage })))
@@ -92,6 +93,7 @@ export default function App() {
                 <Route path="contracts/:id" element={<Suspense fallback={<PageFallback />}><ContractDetailPage /></Suspense>} />
                 <Route path="calendar" element={<Suspense fallback={<PageFallback />}><CalendarPage /></Suspense>} />
                 <Route path="maintenance" element={<Suspense fallback={<PageFallback />}><MaintenancePage /></Suspense>} />
+                <Route path="maintenance/vehicles/:id" element={<Suspense fallback={<PageFallback />}><MaintenanceVehiclePage /></Suspense>} />
                 <Route path="inventory" element={<Suspense fallback={<PageFallback />}><InventoryPage /></Suspense>} />
                 <Route path="customers" element={<Suspense fallback={<PageFallback />}><CustomersPage /></Suspense>} />
                 <Route path="customers/:id" element={<Suspense fallback={<PageFallback />}><CustomerDetailPage /></Suspense>} />

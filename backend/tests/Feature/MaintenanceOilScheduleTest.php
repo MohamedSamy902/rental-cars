@@ -183,4 +183,134 @@ class MaintenanceOilScheduleTest extends TestCase
         $this->assertContains($this->vehicle->id, $ids);
         $this->assertNotContains($other->id, $ids);
     }
+
+    public function test_oil_view_can_filter_single_vehicle(): void
+    {
+        $order = WorkOrder::query()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'opened_on' => '2026-09-01',
+            'opened_at' => '2026-09-01 10:00:00',
+            'odometer' => 45000,
+            'status' => 'closed',
+            'puts_in_maintenance' => false,
+            'parts_cost' => 0,
+            'labor_cost' => 0,
+            'next_service_on' => now()->addMonths(1)->toDateString(),
+        ]);
+        WorkOrderLine::query()->create([
+            'work_order_id' => $order->id,
+            'description' => 'زيت موتور',
+            'part_source' => 'purchase',
+            'quantity' => 1,
+            'unit_price' => 0,
+        ]);
+
+        $data = $this->getJson('/api/work-orders?view=oil&tab=oil&vehicle_id='.$this->vehicle->id)
+            ->assertOk()
+            ->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame($this->vehicle->id, (int) $data[0]['vehicle_id']);
+        $this->assertSame('2026-09-01', $data[0]['last_oil_change_on']);
+    }
+
+    public function test_vehicle_due_soon_lists_upcoming_work_orders(): void
+    {
+        $due = WorkOrder::query()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'opened_on' => '2026-10-01',
+            'opened_at' => '2026-10-01 10:00:00',
+            'odometer' => 49000,
+            'status' => 'closed',
+            'puts_in_maintenance' => false,
+            'parts_cost' => 0,
+            'labor_cost' => 0,
+            'next_service_on' => now()->addDays(2)->toDateString(),
+        ]);
+        WorkOrderLine::query()->create([
+            'work_order_id' => $due->id,
+            'description' => 'فلتر هوا',
+            'part_source' => 'purchase',
+            'quantity' => 1,
+            'unit_price' => 0,
+        ]);
+
+        $later = WorkOrder::query()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'opened_on' => '2026-09-01',
+            'opened_at' => '2026-09-01 10:00:00',
+            'odometer' => 47000,
+            'status' => 'closed',
+            'puts_in_maintenance' => false,
+            'parts_cost' => 0,
+            'labor_cost' => 0,
+            'next_service_on' => now()->addMonths(4)->toDateString(),
+        ]);
+        WorkOrderLine::query()->create([
+            'work_order_id' => $later->id,
+            'description' => 'إطارات',
+            'part_source' => 'purchase',
+            'quantity' => 1,
+            'unit_price' => 0,
+        ]);
+
+        $ids = collect(
+            $this->getJson('/api/work-orders?vehicle_id='.$this->vehicle->id.'&due_soon=1&per_page=50')
+                ->assertOk()
+                ->json('data')
+        )->pluck('id')->all();
+
+        $this->assertContains($due->id, $ids);
+        $this->assertNotContains($later->id, $ids);
+    }
+
+    public function test_has_oil_filters_motor_oil_work_orders(): void
+    {
+        $oil = WorkOrder::query()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'opened_on' => '2026-08-01',
+            'opened_at' => '2026-08-01 10:00:00',
+            'odometer' => 45000,
+            'status' => 'closed',
+            'puts_in_maintenance' => false,
+            'parts_cost' => 0,
+            'labor_cost' => 0,
+            'next_service_on' => now()->addMonths(1)->toDateString(),
+        ]);
+        WorkOrderLine::query()->create([
+            'work_order_id' => $oil->id,
+            'description' => 'زيت موتور',
+            'part_source' => 'purchase',
+            'quantity' => 1,
+            'unit_price' => 0,
+        ]);
+
+        $other = WorkOrder::query()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'opened_on' => '2026-07-01',
+            'opened_at' => '2026-07-01 10:00:00',
+            'odometer' => 43000,
+            'status' => 'closed',
+            'puts_in_maintenance' => false,
+            'parts_cost' => 0,
+            'labor_cost' => 0,
+            'next_service_odometer' => 55000,
+        ]);
+        WorkOrderLine::query()->create([
+            'work_order_id' => $other->id,
+            'description' => 'فلتر تكيف',
+            'part_source' => 'purchase',
+            'quantity' => 1,
+            'unit_price' => 0,
+        ]);
+
+        $ids = collect(
+            $this->getJson('/api/work-orders?vehicle_id='.$this->vehicle->id.'&has_oil=1&per_page=50')
+                ->assertOk()
+                ->json('data')
+        )->pluck('id')->all();
+
+        $this->assertContains($oil->id, $ids);
+        $this->assertNotContains($other->id, $ids);
+    }
 }

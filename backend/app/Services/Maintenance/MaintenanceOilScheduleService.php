@@ -38,6 +38,10 @@ class MaintenanceOilScheduleService
             ->orderBy('plate')
             ->orderBy('id');
 
+        if ($vehicleId = $request->integer('vehicle_id')) {
+            $q->where('id', $vehicleId);
+        }
+
         if ($search !== '') {
             $q->where(function (Builder $qq) use ($search) {
                 $qq->where('plate', 'like', "%{$search}%")
