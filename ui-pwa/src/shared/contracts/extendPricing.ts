@@ -77,14 +77,19 @@ export function addDaysIso(iso: string, days: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-export function extendPriceHint(basis: RentBasis, days: number, unitRate: number): string {
-  if (basis === 'daily') {
-    return `إيجار المدة الكامل لـ ${days} يوم (شريحة يومي) · من ${formatMoney(unitRate)}/يوم — يمكن تعديل المبلغ الكامل`
-  }
-  if (basis === 'half_monthly') {
-    return `إيجار المدة الكامل لـ ${days} يوم (شريحة نص شهري) · من ${formatMoney(unitRate)} لنص الشهر — يمكن تعديل المبلغ الكامل`
-  }
-  return `إيجار المدة الكامل لـ ${days} يوم (شريحة شهري) · من ${formatMoney(unitRate)} للشهر — يمكن تعديل المبلغ الكامل`
+export function extendPriceHint(
+  basis: RentBasis,
+  extensionDays: number,
+  unitRate: number,
+  previousRent: number,
+  extensionRent: number,
+): string {
+  const total = previousRent + extensionRent
+  const tier =
+    basis === 'daily' ? 'يومي'
+      : basis === 'half_monthly' ? 'نص شهري'
+        : 'شهري'
+  return `إيجار التمديد فقط لـ ${extensionDays} يوم (${tier} · ${formatMoney(unitRate)}) — السابق ${formatMoney(previousRent)} يبقى · الإجمالي ${formatMoney(total)}`
 }
 
 export function unitRateForBasis(

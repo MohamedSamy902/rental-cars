@@ -289,17 +289,17 @@ class ContractLifecycleTest extends TestCase
         $newEnd = now()->addDays(10)->toIso8601String();
         $extend = $this->postJson("/api/contracts/{$sourceId}/extend", [
             'planned_ends_at' => $newEnd,
-            'period_rent' => 11000,
+            'period_rent' => 8000,
         ])->assertOk();
 
         $this->assertSame($sourceId, (int) $extend->json('data.id'));
         $this->assertSame('active', $extend->json('data.status'));
-        $this->assertSame($frozenRate, (int) $extend->json('data.frozen_daily_rate'));
         $this->assertNull($extend->json('data.extended_from_contract_id'));
         $this->assertIsArray($extend->json('data.extension_history'));
         $this->assertCount(1, $extend->json('data.extension_history'));
         $this->assertGreaterThan(2, (int) $extend->json('data.approved_days'));
-        $this->assertSame(11000, (int) $extend->json('data.extension_history.0.period_rent'));
+        $this->assertSame(8000, (int) $extend->json('data.extension_history.0.extension_rent'));
+        $this->assertGreaterThan(8000, (int) $extend->json('data.extension_history.0.period_rent'));
 
         $this->getJson("/api/contracts/{$sourceId}")
             ->assertOk()
@@ -339,12 +339,13 @@ class ContractLifecycleTest extends TestCase
         // ٩ → ١٢ يوماً: المجموع دخل عتبة نص شهري لكن الإضافة ٣ أيام فقط → يبقى يومي
         $extend = $this->postJson("/api/contracts/{$id}/extend", [
             'extension_days' => 3,
-            'period_rent' => 12000,
+            'period_rent' => 3000,
         ])->assertOk();
 
         $this->assertSame('daily', $extend->json('data.rent_basis'));
         $this->assertSame(1000, (int) $extend->json('data.frozen_daily_rate'));
         $this->assertGreaterThanOrEqual(11, (int) $extend->json('data.approved_days'));
+        $this->assertSame(3000, (int) $extend->json('data.extension_history.0.extension_rent'));
     }
 
     public function test_extend_upgrades_to_monthly_when_added_span_is_full_month(): void
@@ -379,11 +380,14 @@ class ContractLifecycleTest extends TestCase
         // ١٥ + ٣٠ = ٤٥: المدة المضافة شهر كامل → شهري
         $extend = $this->postJson("/api/contracts/{$id}/extend", [
             'extension_days' => 30,
-            'period_rent' => 33000,
+            'period_rent' => 22000,
         ])->assertOk();
 
         $this->assertSame('monthly', $extend->json('data.rent_basis'));
-        $this->assertSame(22000, (int) $extend->json('data.frozen_monthly_rate'));
+        // سابق ١٥×نص شهري ١٥٠٠٠ + تمديد ٢٢٠٠٠ = ٣٧٠٠٠ على ٤٥ يوماً شهري
+        $this->assertSame(24667, (int) $extend->json('data.frozen_monthly_rate'));
+        $this->assertSame(22000, (int) $extend->json('data.extension_history.0.extension_rent'));
+        $this->assertSame(15000, (int) $extend->json('data.extension_history.0.previous_period_rent'));
     }
 
     public function test_extend_rejects_completed_contract(): void

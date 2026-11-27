@@ -66,26 +66,25 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
   const extensionDaysNum = Math.max(0, Number(form.extension_days || 0))
   const extendPreview = useMemo(() => {
     if (!selected || extensionDaysNum < 1) {
-      return { newEnd: '', newDays: 0, basis: 'daily' as const, estimate: 0, unit: 0 }
+      return {
+        newEnd: '', newDays: 0, basis: 'daily' as const,
+        estimate: 0, unit: 0, previousRent: 0,
+      }
     }
     const newEnd = addDaysIso(selected.planned_ends_at, extensionDaysNum)
     const newDays = countDaysBetween(selected.starts_at, newEnd)
     const basis = resolveBasisAfterExtension(selected.rent_basis, previousDays, newDays)
     const daily = selected.frozen_daily_rate || 0
-    const estimate = estimatePeriodRentWithBasis(
-      newDays,
-      basis,
-      daily,
-      selected.frozen_half_monthly_rate,
-      selected.frozen_monthly_rate,
-    )
-    const unit = unitRateForBasis(
-      basis,
-      daily,
-      selected.frozen_half_monthly_rate,
-      selected.frozen_monthly_rate,
-    )
-    return { newEnd, newDays, basis, estimate, unit }
+    const half = selected.frozen_half_monthly_rate
+    const monthly = selected.frozen_monthly_rate
+    const previousBasis = resolveBasisAfterExtension(selected.rent_basis, previousDays, previousDays)
+    const previousRent = previousDays > 0
+      ? estimatePeriodRentWithBasis(previousDays, previousBasis, daily, half, monthly)
+      : 0
+    // إيجار مدة التمديد فقط (ليس إجمالي العقد)
+    const estimate = estimatePeriodRentWithBasis(extensionDaysNum, basis, daily, half, monthly)
+    const unit = unitRateForBasis(basis, daily, half, monthly)
+    return { newEnd, newDays, basis, estimate, unit, previousRent }
   }, [selected, extensionDaysNum, previousDays])
 
   const periodRentValue = form.period_rent
@@ -98,9 +97,9 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
     const basis = selected
       ? resolveBasisAfterExtension(selected.rent_basis, previousDays, newDays)
       : 'daily'
-    const estimate = selected && newDays > 0
+    const estimate = selected && days > 0
       ? estimatePeriodRentWithBasis(
-          newDays,
+          days,
           basis,
           selected.frozen_daily_rate || 0,
           selected.frozen_half_monthly_rate,
@@ -151,7 +150,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
         ) : null}
         {action === 'extend' ? (
           <p className="muted" style={{ margin: 0, gridColumn: '1 / -1' }}>
-            تمديد داخل نفس العقد فقط — بلا عقد جديد وبلا استلام/تسليم. أدخل مدة التمديد ثم راجع إيجار المدة الكامل (قابل للتعديل).
+            تمديد داخل نفس العقد — بلا عقد جديد وبلا استلام/تسليم. أدخل مدة التمديد وسعر مدة التمديد فقط؛ إيجار المدة السابقة يبقى كما هو ويُجمع عليه.
           </p>
         ) : null}
         {action === 'handover' || action === 'swap' ? (
@@ -309,15 +308,21 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             />
             {extendPreview.newDays > 0 ? (
               <MoneyField
-                label="إيجار المدة"
+                label="إيجار مدة التمديد"
                 required
                 value={periodRentValue}
                 onChange={(e) => patch({ period_rent: e.target.value })}
-                hint={extendPriceHint(extendPreview.basis, extendPreview.newDays, extendPreview.unit)}
+                hint={extendPriceHint(
+                  extendPreview.basis,
+                  extensionDaysNum,
+                  extendPreview.unit,
+                  extendPreview.previousRent,
+                  Number(periodRentValue || 0),
+                )}
               />
             ) : (
               <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
-                أدخل عدد أيام التمديد لعرض إيجار المدة الكامل تلقائياً.
+                أدخل عدد أيام التمديد لعرض إيجار مدة التمديد فقط تلقائياً.
               </p>
             )}
           </>
