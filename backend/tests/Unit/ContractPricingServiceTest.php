@@ -130,17 +130,30 @@ class ContractPricingServiceTest extends TestCase
         $this->assertSame('monthly', $this->pricing->resolveRentBasisFromDays(60));
     }
 
-    public function test_period_rent_uses_day_tiers_not_stored_basis(): void
+    public function test_period_rent_honors_stored_basis_when_provided(): void
     {
-        // ١–١٠ يومي حتى لو طُلب أساس قديم weekly
+        // weekly قديم → نص شهري حتى مع ١٠ أيام
         $this->assertSame(10000, $this->pricing->periodRent(10, 'weekly', 1000, 15000, 22000));
-        // ١١–٢٠ نص شهري (وحدة ١٥ يوماً)
+        // أساس daily صريح يبقى يومياً حتى لو الأيام في شريحة أعلى
         $this->assertSame(15000, $this->pricing->periodRent(15, 'daily', 1000, 15000, 22000));
+        // بلا أساس → من الأيام (١٨ → نص شهري)
         $this->assertSame(18000, $this->pricing->periodRent(18, null, 1000, 15000, 22000));
-        // ٢١+ شهري (وحدة ٣٠ يوماً)
-        $this->assertSame(22000, $this->pricing->periodRent(30, 'half_monthly', 1000, 15000, 22000));
+        // أساس نص شهري صريح على ٣٠ يوماً = وحدتان × ١٥
+        $this->assertSame(30000, $this->pricing->periodRent(30, 'half_monthly', 1000, 15000, 22000));
         $this->assertSame(23467, $this->pricing->periodRent(32, null, 1000, 15000, 22000));
         $this->assertSame(44000, $this->pricing->periodRent(60, null, 1000, 15000, 22000));
+    }
+
+    public function test_extension_keeps_basis_unless_added_span_is_full_higher_tier(): void
+    {
+        // أيام قليلة على عقد يومي — لا ترقية رغم تجاوز عتبة ١١ للمجموع
+        $this->assertSame('daily', $this->pricing->resolveRentBasisAfterExtension('daily', 9, 12));
+        // ١٥ يوماً ثم إضافة شهر → شهري
+        $this->assertSame('monthly', $this->pricing->resolveRentBasisAfterExtension('half_monthly', 15, 45));
+        // ١٥ + ١٠ أيام — المجموع ٢٥ كان سيصبح شهرياً لكن الإضافة ليست فترة كاملة → يثبت نص شهري
+        $this->assertSame('half_monthly', $this->pricing->resolveRentBasisAfterExtension('half_monthly', 15, 25));
+        // إضافة ١١+ على يومي → نص شهري
+        $this->assertSame('half_monthly', $this->pricing->resolveRentBasisAfterExtension('daily', 5, 20));
     }
 
     public function test_normalize_maps_legacy_weekly_to_half_monthly(): void

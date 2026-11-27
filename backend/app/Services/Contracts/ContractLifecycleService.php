@@ -1054,13 +1054,26 @@ class ContractLifecycleService
                 $locked->id,
             );
 
+            $threshold = $this->fractionDayThreshold();
             $previousDays = (int) ($locked->approved_days ?? 0);
+            if ($previousDays < 1) {
+                $previousDays = $this->pricing->countRentalDays(
+                    $locked->starts_at,
+                    $currentEnd,
+                    $threshold,
+                );
+            }
             $newDays = $this->pricing->countRentalDays(
                 $locked->starts_at,
                 $newEnd,
-                $this->fractionDayThreshold(),
+                $threshold,
             );
-            $rentBasis = $this->pricing->resolveRentBasisFromDays($newDays);
+            // ن٫١٨: تثبيت الشريحة إلا إذا المدة المضافة وحدها فترة كاملة أعلى.
+            $rentBasis = $this->pricing->resolveRentBasisAfterExtension(
+                $locked->rent_basis !== null ? (string) $locked->rent_basis : null,
+                $previousDays,
+                $newDays,
+            );
             $allowedKm = $this->pricing->allowedKilometers(
                 (int) $locked->frozen_daily_km_allowance,
                 $newDays,

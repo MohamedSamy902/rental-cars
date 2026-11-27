@@ -52,12 +52,55 @@ class ContractPricingService
     }
 
     /**
+     * ترتيب الشرائح للترقية عند التمديد (لا تخفيض).
+     */
+    public function basisRank(string $basis): int
+    {
+        return match ($this->normalizeRentBasis($basis)) {
+            self::BASIS_MONTHLY => 2,
+            self::BASIS_HALF_MONTHLY => 1,
+            default => 0,
+        };
+    }
+
+    /**
+     * @return self::BASIS_*
+     */
+    public function higherRentBasis(string $a, string $b): string
+    {
+        return $this->basisRank($a) >= $this->basisRank($b)
+            ? $this->normalizeRentBasis($a)
+            : $this->normalizeRentBasis($b);
+    }
+
+    /**
+     * ن٫١٨: شريحة العقد تثبت؛ تُرقّى فقط إن كانت **المدة المضافة وحدها** فترة كاملة أعلى
+     * (١١+ → نص شهري · ٢١+ → شهري). أيام قليلة لا تغيّر الشريحة حتى لو المجموع دخل عتبة أعلى.
+     *
+     * @return self::BASIS_*
+     */
+    public function resolveRentBasisAfterExtension(?string $previousBasis, int $previousDays, int $newDays): string
+    {
+        $previousDays = max(0, $previousDays);
+        $newDays = max(0, $newDays);
+        $current = ($previousBasis !== null && $previousBasis !== '')
+            ? $this->normalizeRentBasis($previousBasis)
+            : $this->resolveRentBasisFromDays(max(1, $previousDays));
+        $addedDays = max(0, $newDays - $previousDays);
+        if ($addedDays < 1) {
+            return $current;
+        }
+
+        return $this->higherRentBasis($current, $this->resolveRentBasisFromDays($addedDays));
+    }
+
+    /**
      * إيجار المدة حسب شريحة الأيام والأسعار المجمّدة:
      * - daily: أيام × اليومي
      * - half_monthly: وحدات ١٥ يوماً × نص الشهري + أيام زيادة × (نص الشهري ÷ ١٥)
      * - monthly: وحدات ٣٠ يوماً × الشهري + أيام زيادة × (الشهري ÷ ٣٠)
      *
-     * إن لم يُمرَّر $basis تُستنتج الشريحة من عدد الأيام.
+     * إن وُجد $basis يُحترم (ن٫١٨ تثبيت شريحة التمديد). وإلا تُستنتج من الأيام.
      */
     public function periodRent(
         int $days,
@@ -73,9 +116,6 @@ class ContractPricingService
         $basis = $basis !== null && $basis !== ''
             ? $this->normalizeRentBasis($basis)
             : $this->resolveRentBasisFromDays($days);
-
-        // عند الحساب الفعلي نفضّل الشريحة من الأيام حتى لو تغيّرت المدة عن المخطط.
-        $basis = $this->resolveRentBasisFromDays($days);
 
         return match ($basis) {
             self::BASIS_HALF_MONTHLY => $this->unitPackRent(

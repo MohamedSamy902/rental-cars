@@ -433,7 +433,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 ```json
 { "planned_ends_at": "2026-11-10T10:00:00" }
 ```
-يطيل نهاية **نفس** العقد المعتمد/النشط (بلا عقد جديد). يُحدَّث `approved_days`/`allowed_km`/`rent_basis` ويُلحق سجل في `extension_history`. `starts_at` إن وُجد يُتجاهل.
+يطيل نهاية **نفس** العقد المعتمد/النشط (بلا عقد جديد). يُحدَّث `approved_days`/`allowed_km`. `rent_basis` يثبت إلا إن كانت المدة المضافة وحدها فترة كاملة أعلى (١١+/٢١+). يُلحق سجل في `extension_history`. `starts_at` إن وُجد يُتجاهل.
 
 ### POST …/swap
 ```json

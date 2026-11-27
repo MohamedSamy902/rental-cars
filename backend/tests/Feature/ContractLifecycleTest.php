@@ -305,6 +305,83 @@ class ContractLifecycleTest extends TestCase
             ->assertJsonPath('data.id', $sourceId);
     }
 
+    public function test_extend_keeps_daily_basis_when_only_few_days_added(): void
+    {
+        $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(9)->toIso8601String(),
+            'daily_rate' => 1000,
+            'half_monthly_rate' => 15000,
+            'monthly_rate' => 22000,
+            'deposit' => 2000,
+            'balance_due_on' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+        $id = (int) $create->json('data.id');
+        $this->assertSame('daily', $create->json('data.rent_basis'));
+
+        $this->postJson("/api/contracts/{$id}/approve")->assertOk();
+        $this->postJson("/api/contracts/{$id}/deposit", [
+            'method' => 'cash',
+            'receipt_number' => 'R-TIER',
+        ])->assertCreated();
+        $signature = 'sig-'.str_repeat('tier-ok-', 5);
+        $this->postJson("/api/contracts/{$id}/handover", [
+            'odometer_out' => 10000,
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        // ٩ → ١٢ يوماً: المجموع دخل عتبة نص شهري لكن الإضافة ٣ أيام فقط → يبقى يومي
+        $extend = $this->postJson("/api/contracts/{$id}/extend", [
+            'planned_ends_at' => now()->addDays(12)->toIso8601String(),
+        ])->assertOk();
+
+        $this->assertSame('daily', $extend->json('data.rent_basis'));
+        $this->assertSame(1000, (int) $extend->json('data.frozen_daily_rate'));
+        $this->assertGreaterThanOrEqual(11, (int) $extend->json('data.approved_days'));
+    }
+
+    public function test_extend_upgrades_to_monthly_when_added_span_is_full_month(): void
+    {
+        $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(15)->toIso8601String(),
+            'daily_rate' => 1000,
+            'half_monthly_rate' => 15000,
+            'monthly_rate' => 22000,
+            'deposit' => 2000,
+            'balance_due_on' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+        $id = (int) $create->json('data.id');
+        $this->assertSame('half_monthly', $create->json('data.rent_basis'));
+
+        $this->postJson("/api/contracts/{$id}/approve")->assertOk();
+        $this->postJson("/api/contracts/{$id}/deposit", [
+            'method' => 'cash',
+            'receipt_number' => 'R-MON',
+        ])->assertCreated();
+        $signature = 'sig-'.str_repeat('month-ok', 5);
+        $this->postJson("/api/contracts/{$id}/handover", [
+            'odometer_out' => 10000,
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        // ١٥ + ٣٠ = ٤٥: المدة المضافة شهر كامل → شهري
+        $extend = $this->postJson("/api/contracts/{$id}/extend", [
+            'planned_ends_at' => now()->addDays(45)->toIso8601String(),
+        ])->assertOk();
+
+        $this->assertSame('monthly', $extend->json('data.rent_basis'));
+        $this->assertSame(22000, (int) $extend->json('data.frozen_monthly_rate'));
+    }
+
     public function test_extend_rejects_completed_contract(): void
     {
         $create = $this->postJson('/api/contracts', [
