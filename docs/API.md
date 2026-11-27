@@ -338,7 +338,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/contracts/{id}/handover` | → `active` + فحص تسليم |
 | POST | `/contracts/{id}/return` | → `completed` + إجمالي نهائي |
 | POST | `/contracts/{id}/cancel` | → `cancelled` (قبل التسليم) |
-| POST | `/contracts/{id}/extend` | عقد تمديد جديد |
+| POST | `/contracts/{id}/extend` | تمديد المدة داخل نفس العقد |
 | POST | `/contracts/{id}/swap` | إغلاق قديم + عقد بديل |
 | POST | `/contracts/{id}/deposit` | قبض تأمين |
 | POST | `/contracts/{id}/deposit/deduct` | خصم من التأمين |
@@ -431,9 +431,9 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 ### POST …/extend
 ```json
-{ "planned_ends_at": "2026-11-10T10:00:00", "starts_at": null }
+{ "extension_days": 30, "period_rent": 45000 }
 ```
-ينشئ **عقداً جديداً** مربوطاً بالأصل.
+أو `{ "planned_ends_at": "…", "period_rent": 45000 }`. يطيل **نفس** العقد (بلا عقد جديد). `period_rent` = إيجار المدة **الكامل** بعد التمديد (يُعكس على `frozen_*` للشريحة). `rent_basis` يثبت إلا إن المدة المضافة وحدها فترة كاملة أعلى. سجل في `extension_history`.
 
 ### POST …/swap
 ```json

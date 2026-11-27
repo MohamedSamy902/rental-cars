@@ -51,9 +51,6 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint, 
           {canSwap ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('swap')}>تبديل عطل</Button> : null}
         </>
       ) : null}
-      {b.status === 'completed' && canExtend ? (
-        <Button type="button" size="sm" variant="secondary" onClick={() => onAction('extend')}>تمديد</Button>
-      ) : null}
       {showCollect ? (
         <Button type="button" size="sm" variant="secondary" onClick={() => onAction('collect')}>تسديد</Button>
       ) : null}

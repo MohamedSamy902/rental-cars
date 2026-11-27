@@ -94,6 +94,16 @@ export type Contract = {
   payments?: ContractPayment[]
   documents?: ContractDoc[]
   related?: RelatedContract[]
+  extension_history?: Array<{
+    extended_at?: string | null
+    previous_planned_ends_at?: string | null
+    planned_ends_at?: string | null
+    previous_approved_days?: number | null
+    approved_days?: number | null
+    previous_rent_basis?: string | null
+    rent_basis?: string | null
+    by_user_id?: number | null
+  }>
   timeline?: TimelineItem[]
   open_violations?: Array<{
     id: number
@@ -140,7 +150,7 @@ export const actionTitle: Record<Exclude<ActionKind, null>, string> = {
   handover: 'تسليم العربية',
   return: 'استلام / إنهاء مبكر',
   cancel: 'إلغاء العقد',
-  extend: 'تمديد (عقد جديد)',
+  extend: 'تمديد العقد',
   swap: 'تبديل بسبب عطل',
   deposit: 'قبض التأمين النقدي',
   deduct: 'خصم من التأمين',
@@ -227,7 +237,7 @@ export function contractMenu(
   ) {
     items.push({ id: 'collect', label: 'تحصيل متبقي', icon: <IconWallet size={16} />, onSelect: () => handlers.openAction('collect') })
   }
-  if ((b.status === 'approved' || b.status === 'active' || b.status === 'completed') && can('contracts_extend.execute')) {
+  if ((b.status === 'approved' || b.status === 'active') && can('contracts_extend.execute')) {
     items.push({ id: 'extend', label: 'تمديد', icon: <IconCalendar size={16} />, onSelect: () => handlers.openAction('extend') })
   }
   if (b.status === 'active' && can('contracts_swap.execute')) {

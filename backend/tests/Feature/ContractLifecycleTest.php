@@ -259,7 +259,7 @@ class ContractLifecycleTest extends TestCase
         ])->assertStatus(422);
     }
 
-    public function test_extend_active_contract_can_be_approved_and_handed_over(): void
+    public function test_extend_active_contract_updates_same_row_with_history(): void
     {
         $create = $this->postJson('/api/contracts', [
             'payment_amount' => 1,
@@ -273,6 +273,7 @@ class ContractLifecycleTest extends TestCase
             'balance_due_on' => now()->addDays(5)->toDateString(),
         ])->assertCreated();
         $sourceId = (int) $create->json('data.id');
+        $frozenRate = (int) $create->json('data.frozen_daily_rate');
 
         $this->postJson("/api/contracts/{$sourceId}/approve")->assertOk();
         $this->postJson("/api/contracts/{$sourceId}/deposit", [
@@ -285,27 +286,107 @@ class ContractLifecycleTest extends TestCase
             'signature_data' => $signature,
         ])->assertOk()->assertJsonPath('data.status', 'active');
 
+        $newEnd = now()->addDays(10)->toIso8601String();
         $extend = $this->postJson("/api/contracts/{$sourceId}/extend", [
-            'planned_ends_at' => now()->addDays(10)->toIso8601String(),
-        ])->assertCreated();
-        $extId = (int) $extend->json('data.id');
-        $this->assertSame($sourceId, (int) $extend->json('data.extended_from_contract_id'));
+            'planned_ends_at' => $newEnd,
+            'period_rent' => 11000,
+        ])->assertOk();
 
-        $this->postJson("/api/contracts/{$extId}/approve")
-            ->assertOk()
-            ->assertJsonPath('data.status', 'approved');
-
-        $this->postJson("/api/contracts/{$extId}/handover", [
-            'odometer_out' => 10250,
-            'signature_data' => $signature,
-        ])->assertOk()->assertJsonPath('data.status', 'active');
+        $this->assertSame($sourceId, (int) $extend->json('data.id'));
+        $this->assertSame('active', $extend->json('data.status'));
+        $this->assertSame($frozenRate, (int) $extend->json('data.frozen_daily_rate'));
+        $this->assertNull($extend->json('data.extended_from_contract_id'));
+        $this->assertIsArray($extend->json('data.extension_history'));
+        $this->assertCount(1, $extend->json('data.extension_history'));
+        $this->assertGreaterThan(2, (int) $extend->json('data.approved_days'));
+        $this->assertSame(11000, (int) $extend->json('data.extension_history.0.period_rent'));
 
         $this->getJson("/api/contracts/{$sourceId}")
             ->assertOk()
-            ->assertJsonPath('data.status', 'completed');
+            ->assertJsonPath('data.status', 'active')
+            ->assertJsonPath('data.id', $sourceId);
     }
 
-    public function test_early_return_completes_and_keeps_pending_extension(): void
+    public function test_extend_keeps_daily_basis_when_only_few_days_added(): void
+    {
+        $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(9)->toIso8601String(),
+            'daily_rate' => 1000,
+            'half_monthly_rate' => 15000,
+            'monthly_rate' => 22000,
+            'deposit' => 2000,
+            'balance_due_on' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+        $id = (int) $create->json('data.id');
+        $this->assertSame('daily', $create->json('data.rent_basis'));
+
+        $this->postJson("/api/contracts/{$id}/approve")->assertOk();
+        $this->postJson("/api/contracts/{$id}/deposit", [
+            'method' => 'cash',
+            'receipt_number' => 'R-TIER',
+        ])->assertCreated();
+        $signature = 'sig-'.str_repeat('tier-ok-', 5);
+        $this->postJson("/api/contracts/{$id}/handover", [
+            'odometer_out' => 10000,
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        // ٩ → ١٢ يوماً: المجموع دخل عتبة نص شهري لكن الإضافة ٣ أيام فقط → يبقى يومي
+        $extend = $this->postJson("/api/contracts/{$id}/extend", [
+            'extension_days' => 3,
+            'period_rent' => 12000,
+        ])->assertOk();
+
+        $this->assertSame('daily', $extend->json('data.rent_basis'));
+        $this->assertSame(1000, (int) $extend->json('data.frozen_daily_rate'));
+        $this->assertGreaterThanOrEqual(11, (int) $extend->json('data.approved_days'));
+    }
+
+    public function test_extend_upgrades_to_monthly_when_added_span_is_full_month(): void
+    {
+        $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(15)->toIso8601String(),
+            'daily_rate' => 1000,
+            'half_monthly_rate' => 15000,
+            'monthly_rate' => 22000,
+            'deposit' => 2000,
+            'balance_due_on' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+        $id = (int) $create->json('data.id');
+        $this->assertSame('half_monthly', $create->json('data.rent_basis'));
+
+        $this->postJson("/api/contracts/{$id}/approve")->assertOk();
+        $this->postJson("/api/contracts/{$id}/deposit", [
+            'method' => 'cash',
+            'receipt_number' => 'R-MON',
+        ])->assertCreated();
+        $signature = 'sig-'.str_repeat('month-ok', 5);
+        $this->postJson("/api/contracts/{$id}/handover", [
+            'odometer_out' => 10000,
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        // ١٥ + ٣٠ = ٤٥: المدة المضافة شهر كامل → شهري
+        $extend = $this->postJson("/api/contracts/{$id}/extend", [
+            'extension_days' => 30,
+            'period_rent' => 33000,
+        ])->assertOk();
+
+        $this->assertSame('monthly', $extend->json('data.rent_basis'));
+        $this->assertSame(22000, (int) $extend->json('data.frozen_monthly_rate'));
+    }
+
+    public function test_extend_rejects_completed_contract(): void
     {
         $create = $this->postJson('/api/contracts', [
             'payment_amount' => 1,
@@ -330,17 +411,14 @@ class ContractLifecycleTest extends TestCase
             'signature_data' => $signature,
         ])->assertOk();
 
-        $extId = (int) $this->postJson("/api/contracts/{$sourceId}/extend", [
-            'planned_ends_at' => now()->addDays(12)->toIso8601String(),
-        ])->assertCreated()->json('data.id');
-
         $this->postJson("/api/contracts/{$sourceId}/return", [
             'odometer_in' => 10150,
             'signature_data' => $signature,
         ])->assertOk()->assertJsonPath('data.status', 'completed');
 
-        $this->getJson("/api/contracts/{$extId}")
-            ->assertOk()
-            ->assertJsonPath('data.status', 'pending');
+        $this->postJson("/api/contracts/{$sourceId}/extend", [
+            'extension_days' => 7,
+            'period_rent' => 10000,
+        ])->assertStatus(422);
     }
 }

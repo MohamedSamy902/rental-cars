@@ -716,12 +716,12 @@ class ContractController extends Controller
     {
         $this->authorize('view', $contract);
         try {
-            $created = $this->lifecycle->extend($contract, $request->validated(), $request->user()?->id);
+            $updated = $this->lifecycle->extend($contract, $request->validated(), $request->user()?->id);
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->presentContract($created), 'message' => 'تم إنشاء عقد التمديد.'], 201);
+        return response()->json(['data' => $this->presentContract($updated), 'message' => 'تم تمديد العقد.']);
     }
 
     public function swap(Request $request, Contract $contract): JsonResponse
