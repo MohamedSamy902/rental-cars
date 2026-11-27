@@ -433,7 +433,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 ```json
 { "extension_days": 30, "period_rent": 45000 }
 ```
-أو `{ "planned_ends_at": "…", "period_rent": 45000 }`. يطيل **نفس** العقد (بلا عقد جديد). `period_rent` = إيجار المدة **الكامل** بعد التمديد (يُعكس على `frozen_*` للشريحة). `rent_basis` يثبت إلا إن المدة المضافة وحدها فترة كاملة أعلى. سجل في `extension_history`.
+أو `{ "planned_ends_at": "…", "period_rent": 22000 }`. يطيل **نفس** العقد (بلا عقد جديد). `period_rent` = إيجار **مدة التمديد فقط**؛ إيجار المدة السابقة يبقى ويُجمع عليه ثم يُعكس الإجمالي على `frozen_*`. `rent_basis` يثبت إلا إن المدة المضافة وحدها فترة كاملة أعلى. سجل في `extension_history`.
 
 ### POST …/swap
 ```json

@@ -1021,7 +1021,7 @@ class ContractLifecycleService
 
     /**
      * ن٫١٨: تمديد داخل نفس العقد (معتمد أو نشط) — يطيل planned_ends_at فقط.
-     * لا عقد جديد · لا موافقة/تسليم/استلام · إيجار المدة الكامل يُمرَّر ويُعكس على frozen_* للشريحة.
+     * period_rent = إيجار **مدة التمديد فقط**؛ إيجار المدة السابقة يبقى ويُجمع عليه ثم يُعكس الإجمالي على frozen_*.
      *
      * @param  array{planned_ends_at?: string, extension_days?: int, period_rent: int|string, starts_at?: string}  $data
      */
@@ -1051,9 +1051,9 @@ class ContractLifecycleService
                 throw new DomainException('نهاية التمديد يجب أن تكون بعد النهاية الحالية للعقد.');
             }
 
-            $periodRent = (int) ($data['period_rent'] ?? 0);
-            if ($periodRent < 1) {
-                throw new DomainException('إيجار المدة مطلوب ويجب أن يكون أكبر من صفر.');
+            $extensionRent = (int) ($data['period_rent'] ?? 0);
+            if ($extensionRent < 1) {
+                throw new DomainException('إيجار مدة التمديد مطلوب ويجب أن يكون أكبر من صفر.');
             }
 
             /** @var Vehicle $vehicle */
@@ -1081,15 +1081,28 @@ class ContractLifecycleService
                 $threshold,
             );
             $previousBasis = $locked->rent_basis !== null ? (string) $locked->rent_basis : null;
+            $normalizedPreviousBasis = $previousBasis !== null && $previousBasis !== ''
+                ? $this->pricing->normalizeRentBasis($previousBasis)
+                : $this->pricing->resolveRentBasisFromDays(max(1, $previousDays));
             // ن٫١٨: تثبيت الشريحة إلا إذا المدة المضافة وحدها فترة كاملة أعلى.
             $rentBasis = $this->pricing->resolveRentBasisAfterExtension(
                 $previousBasis,
                 $previousDays,
                 $newDays,
             );
-            $unitRate = $this->pricing->unitRateFromPeriodRent($newDays, $rentBasis, $periodRent);
+
+            // إيجار المدة السابقة يبقى كما هو؛ المُدخل = إيجار التمديد فقط.
+            $previousRent = $this->pricing->periodRent(
+                $previousDays,
+                $normalizedPreviousBasis,
+                (int) $locked->frozen_daily_rate,
+                $locked->frozen_half_monthly_rate !== null ? (int) $locked->frozen_half_monthly_rate : null,
+                $locked->frozen_monthly_rate !== null ? (int) $locked->frozen_monthly_rate : null,
+            );
+            $totalRent = $previousRent + $extensionRent;
+            $unitRate = $this->pricing->unitRateFromPeriodRent($newDays, $rentBasis, $totalRent);
             if ($unitRate < 1) {
-                throw new DomainException('تعذّر استنتاج سعر الشريحة من إيجار المدة.');
+                throw new DomainException('تعذّر استنتاج سعر الشريحة من إيجار التمديد.');
             }
 
             $ratePatch = match ($rentBasis) {
@@ -1103,17 +1116,20 @@ class ContractLifecycleService
                 $newDays,
             );
 
+            $addedDays = max(0, $newDays - $previousDays);
             $history = is_array($locked->extension_history) ? $locked->extension_history : [];
             $history[] = [
                 'extended_at' => now()->toIso8601String(),
                 'previous_planned_ends_at' => $currentEnd->toIso8601String(),
                 'planned_ends_at' => $newEnd->toIso8601String(),
-                'extension_days' => max(0, $newDays - $previousDays),
+                'extension_days' => $addedDays,
                 'previous_approved_days' => $previousDays,
                 'approved_days' => $newDays,
                 'previous_rent_basis' => $previousBasis,
                 'rent_basis' => $rentBasis,
-                'period_rent' => $periodRent,
+                'previous_period_rent' => $previousRent,
+                'extension_rent' => $extensionRent,
+                'period_rent' => $totalRent,
                 'unit_rate' => $unitRate,
                 'by_user_id' => $userId,
             ];
@@ -1124,7 +1140,7 @@ class ContractLifecycleService
                 'rent_basis' => $rentBasis,
                 'allowed_km' => $allowedKm,
                 'extension_history' => $history,
-                // قبل الإقفال الإيجار يُحسب حيّاً من الأسعار المجمّدة بعد عكس إيجار المدة.
+                // قبل الإقفال الإيجار يُحسب حيّاً من الأسعار المجمّدة بعد عكس (قديم + تمديد).
                 'period_rent' => null,
                 ...$ratePatch,
             ])->save();
@@ -1138,12 +1154,14 @@ class ContractLifecycleService
                     'planned_ends_at' => $currentEnd->toIso8601String(),
                     'approved_days' => $previousDays,
                     'rent_basis' => $previousBasis,
+                    'period_rent' => $previousRent,
                 ],
                 'after' => [
                     'planned_ends_at' => $newEnd->toIso8601String(),
                     'approved_days' => $newDays,
                     'rent_basis' => $rentBasis,
-                    'period_rent' => $periodRent,
+                    'extension_rent' => $extensionRent,
+                    'period_rent' => $totalRent,
                     'allowed_km' => $allowedKm,
                     ...$ratePatch,
                 ],
@@ -1151,7 +1169,7 @@ class ContractLifecycleService
 
             $this->notifyLifecycle(
                 'تم تمديد العقد',
-                "العقد {$locked->number}: النهاية أصبحت {$newEnd->format('Y-m-d H:i')} ({$newDays} يوماً) · إيجار المدة {$periodRent}.",
+                "العقد {$locked->number}: النهاية أصبحت {$newEnd->format('Y-m-d H:i')} ({$newDays} يوماً) · تمديد {$extensionRent} + سابق {$previousRent}.",
                 $locked,
                 $userId,
             );

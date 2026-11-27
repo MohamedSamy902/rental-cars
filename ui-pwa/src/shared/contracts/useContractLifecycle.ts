@@ -144,7 +144,7 @@ export function useContractLifecycle(onMutated?: () => void) {
         return
       }
       if (!Number.isFinite(rent) || rent < 1) {
-        toast.error('أدخل إيجار المدة الكامل')
+        toast.error('أدخل إيجار مدة التمديد فقط')
         return
       }
     }

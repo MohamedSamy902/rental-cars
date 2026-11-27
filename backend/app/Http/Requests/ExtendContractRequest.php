@@ -78,7 +78,7 @@ class ExtendContractRequest extends FormRequest
         return [
             'planned_ends_at' => 'نهاية التمديد',
             'extension_days' => 'مدة التمديد',
-            'period_rent' => 'إيجار المدة',
+            'period_rent' => 'إيجار مدة التمديد',
             'starts_at' => 'بداية التمديد',
         ];
     }
@@ -94,9 +94,9 @@ class ExtendContractRequest extends FormRequest
             'extension_days.integer' => 'مدة التمديد يجب أن تكون عدداً صحيحاً.',
             'extension_days.min' => 'مدة التمديد يوم واحد على الأقل.',
             'extension_days.max' => 'مدة التمديد خارج النطاق المسموح.',
-            'period_rent.required' => 'إيجار المدة مطلوب.',
-            'period_rent.integer' => 'إيجار المدة يجب أن يكون عدداً صحيحاً.',
-            'period_rent.min' => 'إيجار المدة يجب أن يكون أكبر من صفر.',
+            'period_rent.required' => 'إيجار مدة التمديد مطلوب.',
+            'period_rent.integer' => 'إيجار مدة التمديد يجب أن يكون عدداً صحيحاً.',
+            'period_rent.min' => 'إيجار مدة التمديد يجب أن يكون أكبر من صفر.',
             'starts_at.date' => 'بداية التمديد غير صالحة.',
         ];
     }
