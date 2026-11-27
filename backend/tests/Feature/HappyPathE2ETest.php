@@ -307,6 +307,7 @@ class HappyPathE2ETest extends TestCase
         $extendEnds = now()->addDays(3)->addDays(4)->toIso8601String();
         $extended = $this->postJson("/api/contracts/{$contractId}/extend", [
             'planned_ends_at' => $extendEnds,
+            'period_rent' => 8400,
         ])->assertOk();
         $this->assertSame($contractId, (int) $extended->json('data.id'));
         $this->assertSame('active', $extended->json('data.status'));

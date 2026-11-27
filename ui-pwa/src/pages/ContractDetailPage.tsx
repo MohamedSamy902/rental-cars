@@ -496,7 +496,7 @@ export function ContractDetailPage() {
         saving={life.saving}
         form={life.actionForm}
         onChange={life.setActionForm}
-        onConfirm={() => void life.runAction()}
+        onConfirm={(override) => void life.runAction(override)}
         onClose={life.closeAction}
       />
     </div>

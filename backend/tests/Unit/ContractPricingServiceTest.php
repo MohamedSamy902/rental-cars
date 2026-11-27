@@ -144,6 +144,13 @@ class ContractPricingServiceTest extends TestCase
         $this->assertSame(44000, $this->pricing->periodRent(60, null, 1000, 15000, 22000));
     }
 
+    public function test_unit_rate_from_period_rent_inverse(): void
+    {
+        $this->assertSame(1000, $this->pricing->unitRateFromPeriodRent(10, 'daily', 10000));
+        $this->assertSame(15000, $this->pricing->unitRateFromPeriodRent(15, 'half_monthly', 15000));
+        $this->assertSame(22000, $this->pricing->unitRateFromPeriodRent(30, 'monthly', 22000));
+    }
+
     public function test_extension_keeps_basis_unless_added_span_is_full_higher_tier(): void
     {
         // أيام قليلة على عقد يومي — لا ترقية رغم تجاوز عتبة ١١ للمجموع

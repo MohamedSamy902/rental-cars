@@ -165,6 +165,28 @@ class ContractPricingService
     }
 
     /**
+     * عكس periodRent تقريباً: من إيجار المدة الكامل → سعر وحدة الشريحة المجمّد.
+     */
+    public function unitRateFromPeriodRent(int $days, string $basis, int $periodRent): int
+    {
+        $days = max(0, $days);
+        $periodRent = max(0, $periodRent);
+        if ($days < 1 || $periodRent < 1) {
+            return 0;
+        }
+
+        $basis = $this->normalizeRentBasis($basis);
+        if ($basis === self::BASIS_HALF_MONTHLY) {
+            return max(1, (int) round(($periodRent * self::HALF_MONTH_UNIT_DAYS) / $days));
+        }
+        if ($basis === self::BASIS_MONTHLY) {
+            return max(1, (int) round(($periodRent * self::MONTH_UNIT_DAYS) / $days));
+        }
+
+        return max(1, (int) round($periodRent / $days));
+    }
+
+    /**
      * Full rental days without auto-billing an extra day for a fractional
      * remainder past the start hour. Optional threshold (hours): when the
      * remainder exceeds it, one extra day is added (tenant setting).

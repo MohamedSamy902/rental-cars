@@ -289,6 +289,7 @@ class ContractLifecycleTest extends TestCase
         $newEnd = now()->addDays(10)->toIso8601String();
         $extend = $this->postJson("/api/contracts/{$sourceId}/extend", [
             'planned_ends_at' => $newEnd,
+            'period_rent' => 11000,
         ])->assertOk();
 
         $this->assertSame($sourceId, (int) $extend->json('data.id'));
@@ -298,6 +299,7 @@ class ContractLifecycleTest extends TestCase
         $this->assertIsArray($extend->json('data.extension_history'));
         $this->assertCount(1, $extend->json('data.extension_history'));
         $this->assertGreaterThan(2, (int) $extend->json('data.approved_days'));
+        $this->assertSame(11000, (int) $extend->json('data.extension_history.0.period_rent'));
 
         $this->getJson("/api/contracts/{$sourceId}")
             ->assertOk()
@@ -336,7 +338,8 @@ class ContractLifecycleTest extends TestCase
 
         // ٩ → ١٢ يوماً: المجموع دخل عتبة نص شهري لكن الإضافة ٣ أيام فقط → يبقى يومي
         $extend = $this->postJson("/api/contracts/{$id}/extend", [
-            'planned_ends_at' => now()->addDays(12)->toIso8601String(),
+            'extension_days' => 3,
+            'period_rent' => 12000,
         ])->assertOk();
 
         $this->assertSame('daily', $extend->json('data.rent_basis'));
@@ -375,7 +378,8 @@ class ContractLifecycleTest extends TestCase
 
         // ١٥ + ٣٠ = ٤٥: المدة المضافة شهر كامل → شهري
         $extend = $this->postJson("/api/contracts/{$id}/extend", [
-            'planned_ends_at' => now()->addDays(45)->toIso8601String(),
+            'extension_days' => 30,
+            'period_rent' => 33000,
         ])->assertOk();
 
         $this->assertSame('monthly', $extend->json('data.rent_basis'));
@@ -413,7 +417,8 @@ class ContractLifecycleTest extends TestCase
         ])->assertOk()->assertJsonPath('data.status', 'completed');
 
         $this->postJson("/api/contracts/{$sourceId}/extend", [
-            'planned_ends_at' => now()->addDays(12)->toIso8601String(),
+            'extension_days' => 7,
+            'period_rent' => 10000,
         ])->assertStatus(422);
     }
 }

@@ -20,7 +20,7 @@ class ExtendContractRequest extends FormRequest
      */
     protected function digitKeys(): array
     {
-        return ['planned_ends_at'];
+        return ['planned_ends_at', 'extension_days', 'period_rent'];
     }
 
     /**
@@ -29,7 +29,9 @@ class ExtendContractRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'planned_ends_at' => ['required', 'date', 'before:2100-01-01'],
+            'planned_ends_at' => ['nullable', 'date', 'before:2100-01-01'],
+            'extension_days' => ['nullable', 'integer', 'min:1', 'max:3660'],
+            'period_rent' => ['required', 'integer', 'min:1'],
             // يُتجاهل في الخدمة (التمديد داخل نفس العقد يحافظ على starts_at الأصلية).
             'starts_at' => ['nullable', 'date'],
         ];
@@ -38,7 +40,17 @@ class ExtendContractRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            $days = $this->input('extension_days');
             $ends = $this->input('planned_ends_at');
+            if (! $days && ! $ends) {
+                $validator->errors()->add(
+                    'extension_days',
+                    'أدخل مدة التمديد بالأيام أو تاريخ النهاية الجديدة.',
+                );
+
+                return;
+            }
+
             if (! $ends) {
                 return;
             }
@@ -65,6 +77,8 @@ class ExtendContractRequest extends FormRequest
     {
         return [
             'planned_ends_at' => 'نهاية التمديد',
+            'extension_days' => 'مدة التمديد',
+            'period_rent' => 'إيجار المدة',
             'starts_at' => 'بداية التمديد',
         ];
     }
@@ -75,9 +89,14 @@ class ExtendContractRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'planned_ends_at.required' => 'نهاية التمديد مطلوبة.',
             'planned_ends_at.date' => 'نهاية التمديد غير صالحة.',
             'planned_ends_at.before' => 'نهاية التمديد خارج النطاق المسموح.',
+            'extension_days.integer' => 'مدة التمديد يجب أن تكون عدداً صحيحاً.',
+            'extension_days.min' => 'مدة التمديد يوم واحد على الأقل.',
+            'extension_days.max' => 'مدة التمديد خارج النطاق المسموح.',
+            'period_rent.required' => 'إيجار المدة مطلوب.',
+            'period_rent.integer' => 'إيجار المدة يجب أن يكون عدداً صحيحاً.',
+            'period_rent.min' => 'إيجار المدة يجب أن يكون أكبر من صفر.',
             'starts_at.date' => 'بداية التمديد غير صالحة.',
         ];
     }

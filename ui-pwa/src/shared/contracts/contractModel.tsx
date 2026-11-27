@@ -150,7 +150,7 @@ export const actionTitle: Record<Exclude<ActionKind, null>, string> = {
   handover: 'تسليم العربية',
   return: 'استلام / إنهاء مبكر',
   cancel: 'إلغاء العقد',
-  extend: 'تمديد المدة',
+  extend: 'تمديد العقد',
   swap: 'تبديل بسبب عطل',
   deposit: 'قبض التأمين النقدي',
   deduct: 'خصم من التأمين',

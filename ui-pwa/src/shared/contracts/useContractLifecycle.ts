@@ -5,6 +5,7 @@ import { type ActionKind, type Contract, type VehicleOption } from './contractMo
 
 const emptyForm = {
   odometer_out: '', odometer_in: '', damage_fee: '', reason: '', planned_ends_at: '',
+  extension_days: '', period_rent: '',
   replacement_vehicle_id: '', method: 'cash', receipt_number: '',
   notes: '', damage_position: '', damage_description: '',
   damage_photo_path: '', deduct_amount: '', deduct_reason: '',
@@ -35,6 +36,7 @@ export function useContractLifecycle(onMutated?: () => void) {
     if (
       kind === 'return'
       || kind === 'collect'
+      || kind === 'extend'
       || (kind === 'handover' && (contract.ledger?.balance === undefined))
     ) {
       try {
@@ -112,23 +114,37 @@ export function useContractLifecycle(onMutated?: () => void) {
     }
   }
 
-  async function runAction() {
+  async function runAction(formOverride?: Partial<typeof emptyForm>) {
     if (!selected || !action) return
+    const form = formOverride ? { ...actionForm, ...formOverride } : actionForm
+    if (formOverride) setActionForm(form)
 
     if (action === 'handover') {
-      const paid = actionForm.payment_amount ? Number(actionForm.payment_amount) : 0
+      const paid = form.payment_amount ? Number(form.payment_amount) : 0
       const total = Number(selected.final_total || selected.ledger?.contract_total || 0)
       const left = Math.max(0, total - paid)
-      if (paid > 0 && left > 0 && !actionForm.balance_due_on) {
+      if (paid > 0 && left > 0 && !form.balance_due_on) {
         toast.error('حدد تاريخ تحصيل باقي المبلغ')
         return
       }
     }
     if (action === 'collect') {
-      const paid = Number(actionForm.payment_amount || 0)
+      const paid = Number(form.payment_amount || 0)
       const remaining = Number(selected.ledger?.balance || 0)
-      if (paid > 0 && paid < remaining && !actionForm.balance_due_on) {
+      if (paid > 0 && paid < remaining && !form.balance_due_on) {
         toast.error('حدد تاريخ تحصيل الباقي التالي')
+        return
+      }
+    }
+    if (action === 'extend') {
+      const days = Number(form.extension_days || 0)
+      const rent = Number(form.period_rent || 0)
+      if (!Number.isFinite(days) || days < 1) {
+        toast.error('أدخل مدة التمديد بالأيام')
+        return
+      }
+      if (!Number.isFinite(rent) || rent < 1) {
+        toast.error('أدخل إيجار المدة الكامل')
         return
       }
     }
@@ -139,55 +155,59 @@ export function useContractLifecycle(onMutated?: () => void) {
         await api(`/contracts/${selected.id}/handover`, {
           method: 'POST',
           json: {
-            odometer_out: Number(actionForm.odometer_out),
-            notes: actionForm.notes || undefined,
-            payment_amount: actionForm.payment_amount ? Number(actionForm.payment_amount) : undefined,
-            payment_method: actionForm.payment_method || 'cash',
-            balance_due_on: actionForm.balance_due_on || undefined,
+            odometer_out: Number(form.odometer_out),
+            notes: form.notes || undefined,
+            payment_amount: form.payment_amount ? Number(form.payment_amount) : undefined,
+            payment_method: form.payment_method || 'cash',
+            balance_due_on: form.balance_due_on || undefined,
           },
         })
         toast.success('تم التسليم وتفعيل العقد.')
       } else if (action === 'return') {
-        const damages = actionForm.damage_position && actionForm.damage_description
+        const damages = form.damage_position && form.damage_description
           ? [{
-              position: actionForm.damage_position,
-              description: actionForm.damage_description,
-              photo_path: actionForm.damage_photo_path || undefined,
+              position: form.damage_position,
+              description: form.damage_description,
+              photo_path: form.damage_photo_path || undefined,
             }]
           : []
         await api(`/contracts/${selected.id}/return`, {
           method: 'POST',
           json: {
-            odometer_in: Number(actionForm.odometer_in),
-            damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
-            notes: actionForm.notes || undefined,
+            odometer_in: Number(form.odometer_in),
+            damage_fee: form.damage_fee ? Number(form.damage_fee) : 0,
+            notes: form.notes || undefined,
             damages,
           },
         })
         toast.success('تم الاستلام وإقفال الإجمالي.')
       } else if (action === 'cancel') {
-        await api(`/contracts/${selected.id}/cancel`, { method: 'POST', json: { reason: actionForm.reason } })
+        await api(`/contracts/${selected.id}/cancel`, { method: 'POST', json: { reason: form.reason } })
         toast.success('تم إلغاء العقد.')
       } else if (action === 'extend') {
         await api(`/contracts/${selected.id}/extend`, {
           method: 'POST',
-          json: { planned_ends_at: actionForm.planned_ends_at },
+          json: {
+            extension_days: Number(form.extension_days),
+            period_rent: Math.round(Number(form.period_rent)),
+            planned_ends_at: form.planned_ends_at || undefined,
+          },
         })
         toast.success('تم تمديد العقد.')
       } else if (action === 'swap') {
         await api(`/contracts/${selected.id}/swap`, {
           method: 'POST',
           json: {
-            replacement_vehicle_id: Number(actionForm.replacement_vehicle_id),
-            odometer_in: Number(actionForm.odometer_in),
-            odometer_out: Number(actionForm.odometer_out),
-            damage_fee: actionForm.damage_fee ? Number(actionForm.damage_fee) : 0,
-            notes: actionForm.notes || undefined,
-            damages: actionForm.damage_position
+            replacement_vehicle_id: Number(form.replacement_vehicle_id),
+            odometer_in: Number(form.odometer_in),
+            odometer_out: Number(form.odometer_out),
+            damage_fee: form.damage_fee ? Number(form.damage_fee) : 0,
+            notes: form.notes || undefined,
+            damages: form.damage_position
               ? [{
-                  position: actionForm.damage_position,
-                  description: actionForm.damage_description || actionForm.damage_position,
-                  photo_path: actionForm.damage_photo_path || null,
+                  position: form.damage_position,
+                  description: form.damage_description || form.damage_position,
+                  photo_path: form.damage_photo_path || null,
                 }]
               : [],
           },
@@ -197,8 +217,8 @@ export function useContractLifecycle(onMutated?: () => void) {
         await api(`/contracts/${selected.id}/deposit`, {
           method: 'POST',
           json: {
-            method: actionForm.method,
-            receipt_number: actionForm.receipt_number,
+            method: form.method,
+            receipt_number: form.receipt_number,
             amount: selected.frozen_agreed_deposit,
           },
         })
@@ -206,26 +226,26 @@ export function useContractLifecycle(onMutated?: () => void) {
       } else if (action === 'deduct') {
         await api(`/contracts/${selected.id}/deposit/deduct`, {
           method: 'POST',
-          json: { amount: Number(actionForm.deduct_amount), reason: actionForm.deduct_reason },
+          json: { amount: Number(form.deduct_amount), reason: form.deduct_reason },
         })
         toast.success('تم خصم المبلغ من التأمين.')
       } else if (action === 'refund') {
         await api(`/contracts/${selected.id}/deposit/return`, {
           method: 'POST',
-          json: { method: actionForm.method, receipt_number: actionForm.receipt_number },
+          json: { method: form.method, receipt_number: form.receipt_number },
         })
         toast.success('تم رد متبقي التأمين.')
       } else if (action === 'collect') {
         await api('/accounting/payments', {
           method: 'POST',
           json: {
-            amount: Number(actionForm.payment_amount),
-            method: actionForm.payment_method || 'cash',
+            amount: Number(form.payment_amount),
+            method: form.payment_method || 'cash',
             direction: 'in',
             link_type: 'contract',
             link_id: selected.id,
-            notes: actionForm.notes || undefined,
-            balance_due_on: actionForm.balance_due_on || undefined,
+            notes: form.notes || undefined,
+            balance_due_on: form.balance_due_on || undefined,
           },
         })
         toast.success('تم تسجيل التحصيل.')

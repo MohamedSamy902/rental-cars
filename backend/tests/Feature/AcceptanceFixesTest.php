@@ -78,6 +78,7 @@ class AcceptanceFixesTest extends TestCase
 
         $extension = $this->life->extend($active->fresh(), [
             'planned_ends_at' => now()->addDays(4)->format('Y-m-d H:i:s'),
+            'period_rent' => 8000,
         ], $this->admin->id);
 
         $this->assertSame($active->id, $extension->id);

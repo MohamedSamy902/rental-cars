@@ -1,9 +1,17 @@
+import { useMemo } from 'react'
 import {
   Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, MediaUpload, DateField,
 } from '@/shared/ui'
-import { civilDateOnly } from '@/shared/lib/dates'
-import { formatDate, formatDepositAmount, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatDepositAmount, formatMoney } from '@/shared/lib/format'
 import { actionTitle, type ActionKind, type Contract, type VehicleOption } from './contractModel'
+import {
+  addDaysIso,
+  countDaysBetween,
+  estimatePeriodRentWithBasis,
+  extendPriceHint,
+  resolveBasisAfterExtension,
+  unitRateForBasis,
+} from './extendPricing'
 
 type Form = {
   odometer_out: string
@@ -11,6 +19,8 @@ type Form = {
   damage_fee: string
   reason: string
   planned_ends_at: string
+  extension_days: string
+  period_rent: string
   replacement_vehicle_id: string
   method: string
   receipt_number: string
@@ -32,7 +42,7 @@ type Props = {
   saving: boolean
   form: Form
   onChange: (next: Form) => void
-  onConfirm: () => void
+  onConfirm: (override?: Partial<Form>) => void
   onClose: () => void
 }
 
@@ -47,6 +57,64 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
       )
     : 0
 
+  const previousDays = useMemo(() => {
+    if (!selected) return 0
+    if (selected.approved_days && selected.approved_days > 0) return selected.approved_days
+    return countDaysBetween(selected.starts_at, selected.planned_ends_at)
+  }, [selected])
+
+  const extensionDaysNum = Math.max(0, Number(form.extension_days || 0))
+  const extendPreview = useMemo(() => {
+    if (!selected || extensionDaysNum < 1) {
+      return { newEnd: '', newDays: 0, basis: 'daily' as const, estimate: 0, unit: 0 }
+    }
+    const newEnd = addDaysIso(selected.planned_ends_at, extensionDaysNum)
+    const newDays = countDaysBetween(selected.starts_at, newEnd)
+    const basis = resolveBasisAfterExtension(selected.rent_basis, previousDays, newDays)
+    const daily = selected.frozen_daily_rate || 0
+    const estimate = estimatePeriodRentWithBasis(
+      newDays,
+      basis,
+      daily,
+      selected.frozen_half_monthly_rate,
+      selected.frozen_monthly_rate,
+    )
+    const unit = unitRateForBasis(
+      basis,
+      daily,
+      selected.frozen_half_monthly_rate,
+      selected.frozen_monthly_rate,
+    )
+    return { newEnd, newDays, basis, estimate, unit }
+  }, [selected, extensionDaysNum, previousDays])
+
+  const periodRentValue = form.period_rent
+    || (extendPreview.estimate > 0 ? String(extendPreview.estimate) : '')
+
+  function patchExtensionDays(raw: string) {
+    const days = Math.max(0, Number(raw || 0))
+    const newEnd = selected && days > 0 ? addDaysIso(selected.planned_ends_at, days) : ''
+    const newDays = selected && newEnd ? countDaysBetween(selected.starts_at, newEnd) : 0
+    const basis = selected
+      ? resolveBasisAfterExtension(selected.rent_basis, previousDays, newDays)
+      : 'daily'
+    const estimate = selected && newDays > 0
+      ? estimatePeriodRentWithBasis(
+          newDays,
+          basis,
+          selected.frozen_daily_rate || 0,
+          selected.frozen_half_monthly_rate,
+          selected.frozen_monthly_rate,
+        )
+      : 0
+    onChange({
+      ...form,
+      extension_days: raw,
+      planned_ends_at: newEnd,
+      period_rent: estimate > 0 ? String(estimate) : '',
+    })
+  }
+
   return (
     <Sheet
       open={!!action && !!selected}
@@ -54,7 +122,23 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
       onClose={onClose}
       footer={
         <>
-          <Button loading={saving} onClick={onConfirm}>تأكيد</Button>
+          <Button
+            loading={saving}
+            onClick={() => {
+              if (action === 'extend') {
+                const rent = Number(periodRentValue || 0)
+                onConfirm({
+                  period_rent: rent > 0 ? String(Math.round(rent)) : form.period_rent,
+                  planned_ends_at: form.planned_ends_at || extendPreview.newEnd,
+                  extension_days: form.extension_days,
+                })
+                return
+              }
+              onConfirm()
+            }}
+          >
+            تأكيد
+          </Button>
           <Button variant="secondary" onClick={onClose}>إغلاق</Button>
         </>
       }
@@ -67,7 +151,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
         ) : null}
         {action === 'extend' ? (
           <p className="muted" style={{ margin: 0, gridColumn: '1 / -1' }}>
-            يطيل نهاية هذا العقد فقط — العربية تبقى مع العميل بلا استلام/تسليم. الأسعار المجمّدة لا تتغيّر؛ شريحة التسعير تثبت إلا إذا كانت المدة المضافة وحدها فترة كاملة أعلى (شهر كامل مثلاً). يظهر التمديد في سجل العقد.
+            تمديد داخل نفس العقد فقط — بلا عقد جديد وبلا استلام/تسليم. أدخل مدة التمديد ثم راجع إيجار المدة الكامل (قابل للتعديل).
           </p>
         ) : null}
         {action === 'handover' || action === 'swap' ? (
@@ -210,17 +294,33 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
         {action === 'cancel' ? (
           <TextAreaField label="سبب الإلغاء" required value={form.reason} onChange={(e) => patch({ reason: e.target.value })} />
         ) : null}
-        {action === 'extend' ? (
-          <TextField
-            label="تاريخ نهاية التمديد"
-            required
-            type="date"
-            value={civilDateOnly(form.planned_ends_at)}
-            onChange={(e) => {
-              const date = e.target.value
-              patch({ planned_ends_at: date ? `${date}T00:00` : '' })
-            }}
-          />
+        {action === 'extend' && selected ? (
+          <>
+            <NumberField
+              label="مدة التمديد (أيام)"
+              required
+              value={form.extension_days}
+              onChange={(e) => patchExtensionDays(e.target.value)}
+              hint={
+                extendPreview.newEnd
+                  ? `النهاية الحالية ${formatDate(selected.planned_ends_at)} → ${formatDateTime(extendPreview.newEnd)} · إجمالي ${extendPreview.newDays} يوماً`
+                  : `النهاية الحالية ${formatDate(selected.planned_ends_at)}`
+              }
+            />
+            {extendPreview.newDays > 0 ? (
+              <MoneyField
+                label="إيجار المدة"
+                required
+                value={periodRentValue}
+                onChange={(e) => patch({ period_rent: e.target.value })}
+                hint={extendPriceHint(extendPreview.basis, extendPreview.newDays, extendPreview.unit)}
+              />
+            ) : (
+              <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+                أدخل عدد أيام التمديد لعرض إيجار المدة الكامل تلقائياً.
+              </p>
+            )}
+          </>
         ) : null}
         {action === 'swap' ? (
           <SelectField

@@ -431,9 +431,9 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 ### POST …/extend
 ```json
-{ "planned_ends_at": "2026-11-10T10:00:00" }
+{ "extension_days": 30, "period_rent": 45000 }
 ```
-يطيل نهاية **نفس** العقد المعتمد/النشط (بلا عقد جديد). يُحدَّث `approved_days`/`allowed_km`. `rent_basis` يثبت إلا إن كانت المدة المضافة وحدها فترة كاملة أعلى (١١+/٢١+). يُلحق سجل في `extension_history`. `starts_at` إن وُجد يُتجاهل.
+أو `{ "planned_ends_at": "…", "period_rent": 45000 }`. يطيل **نفس** العقد (بلا عقد جديد). `period_rent` = إيجار المدة **الكامل** بعد التمديد (يُعكس على `frozen_*` للشريحة). `rent_basis` يثبت إلا إن المدة المضافة وحدها فترة كاملة أعلى. سجل في `extension_history`.
 
 ### POST …/swap
 ```json
