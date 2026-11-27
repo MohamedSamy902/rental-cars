@@ -8,7 +8,8 @@ import { useNewContract } from '@/shared/contracts/newContractContext'
 import { statusLabel } from '@/shared/contracts/contractModel'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MediaUpload,
-  useToast, SkeletonBlock, ErrorState, StatusPill, PhoneActions,
+  useToast, SkeletonBlock, ErrorState, StatusPill, PhoneActions, MetricCardGrid,
+  IconCash, IconKey, IconTrend, IconWallet,
 } from '@/shared/ui'
 import './pages.css'
 
@@ -18,8 +19,15 @@ type ContractRow = {
   status: string
   starts_at?: string | null
   planned_ends_at?: string | null
+  actual_ends_at?: string | null
   daily_rate?: number
   deposit?: number
+  period_rent?: number
+  final_total?: number
+  total?: number
+  paid?: number
+  remaining?: number
+  balance_due_on?: string | null
   vehicle?: { brand: string; model: string; plate: string } | null
 }
 
@@ -31,6 +39,23 @@ type ViolationRow = {
   location?: string
   vehicle?: { brand: string; model: string; plate: string }
   contract?: { id: number; code: string } | null
+}
+
+type CustomerAccounts = {
+  contracts_total: number
+  payments_in: number
+  open_receivable: number
+  credit_balance: number
+}
+
+type CreditLedgerRow = {
+  id: number
+  direction: string
+  amount: number
+  reason?: string | null
+  contract_id?: number | null
+  moved_at?: string | null
+  notes?: string | null
 }
 
 type Customer = {
@@ -55,8 +80,25 @@ type Customer = {
   status: string
   notes?: string | null
   blacklist_reason?: string | null
+  credit_balance?: number
+  accounts?: CustomerAccounts
+  credit_ledger?: CreditLedgerRow[]
   contracts?: ContractRow[]
   violations?: ViolationRow[]
+}
+
+function creditReasonLabel(reason?: string | null) {
+  if (reason === 'contract_payment') return 'سداد عقد من الرصيد'
+  if (reason === 'overpayment') return 'زيادة دفع'
+  if (reason === 'deposit_refund') return 'رد تأمين'
+  if (reason === 'manual') return 'يدوي'
+  return reason || 'حركة رصيد'
+}
+
+function creditDirectionLabel(direction: string) {
+  if (direction === 'credit') return 'إضافة'
+  if (direction === 'debit') return 'خصم'
+  return direction
 }
 
 const emptyForm = {
@@ -176,11 +218,18 @@ export function CustomerDetailPage() {
     />
   )
 
+  const accounts: CustomerAccounts = customer.accounts ?? {
+    contracts_total: 0,
+    payments_in: 0,
+    open_receivable: 0,
+    credit_balance: customer.credit_balance ?? 0,
+  }
+
   return (
     <div className="rpm-stack">
       <PageHeader
         title={customer.full_name}
-        subtitle="ملف العميل · العقود · المخالفات · المستندات"
+        subtitle="ملف العميل · الحسابات · العقود · المخالفات · المستندات"
         action={
           <>
             <BackNavButton to="/customers" label="رجوع للعملاء" />
@@ -193,6 +242,44 @@ export function CustomerDetailPage() {
             )}
           </>
         }
+      />
+
+      <MetricCardGrid
+        label="حسابات العميل"
+        mobile="wrap"
+        items={[
+          {
+            id: 'contracts_total',
+            label: 'إجمالي العقود',
+            value: accounts.contracts_total,
+            format: 'money',
+            icon: <IconCash size={16} />,
+          },
+          {
+            id: 'payments_in',
+            label: 'المدفوع',
+            value: accounts.payments_in,
+            format: 'money',
+            tone: 'success',
+            icon: <IconWallet size={16} />,
+          },
+          {
+            id: 'open_receivable',
+            label: 'ذمم مفتوحة',
+            value: accounts.open_receivable,
+            format: 'money',
+            tone: accounts.open_receivable > 0 ? 'warning' : 'success',
+            icon: <IconTrend size={16} />,
+          },
+          {
+            id: 'credit_balance',
+            label: 'رصيد دائن',
+            value: accounts.credit_balance,
+            format: 'money',
+            tone: 'info',
+            icon: <IconKey size={16} />,
+          },
+        ]}
       />
 
       <DetailList
@@ -232,18 +319,56 @@ export function CustomerDetailPage() {
         </div>
         {(customer.contracts || []).length === 0 ? <p className="muted">لا عقود بعد.</p> : (
           <div className="rpm-card-list">
-            {(customer.contracts || []).map((c) => (
-              <article key={c.id} className="rpm-card">
+            {(customer.contracts || []).map((c) => {
+              const total = c.total ?? c.final_total ?? c.period_rent ?? 0
+              const paid = c.paid ?? 0
+              const remaining = c.remaining ?? Math.max(0, total - paid)
+              return (
+                <article key={c.id} className="rpm-card">
+                  <div className="rpm-card__row">
+                    <strong><Link to={`/contracts/${c.id}`}>{c.code}</Link></strong>
+                    <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
+                  </div>
+                  <p className="muted">
+                    {c.vehicle ? `${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}` : '—'}
+                    {' · '}
+                    {formatDate(c.starts_at)} → {formatDate(c.planned_ends_at || c.actual_ends_at)}
+                    {c.daily_rate != null ? ` · ${formatMoney(c.daily_rate)}/يوم` : ''}
+                  </p>
+                  <div className="rpm-card__row">
+                    <span className="muted">الإجمالي <strong className="tabular-nums">{formatMoney(total)}</strong></span>
+                    <span className="muted">مدفوع <strong className="tabular-nums">{formatMoney(paid)}</strong></span>
+                    <span className="muted">متبقي <strong className="tabular-nums">{formatMoney(remaining)}</strong></span>
+                  </div>
+                  {c.balance_due_on ? (
+                    <p className="muted">استحقاق المتبقي {formatDate(c.balance_due_on)}</p>
+                  ) : null}
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="rpm-panel">
+        <div className="rpm-panel__head"><h3>سجل الرصيد الدائن</h3></div>
+        {(customer.credit_ledger || []).length === 0 ? <p className="muted">لا حركات رصيد دائن.</p> : (
+          <div className="rpm-card-list">
+            {(customer.credit_ledger || []).map((m) => (
+              <article key={m.id} className="rpm-card">
                 <div className="rpm-card__row">
-                  <strong><Link to={`/contracts/${c.id}`}>{c.code}</Link></strong>
-                  <StatusPill status={c.status} label={statusLabel[c.status] || c.status} />
+                  <strong className="tabular-nums">{formatMoney(m.amount)}</strong>
+                  <StatusPill
+                    status={m.direction === 'credit' ? 'active' : 'cancelled'}
+                    label={creditDirectionLabel(m.direction)}
+                  />
                 </div>
                 <p className="muted">
-                  {c.vehicle ? `${c.vehicle.brand} ${c.vehicle.model} · ${c.vehicle.plate}` : '—'}
-                  {' · '}
-                  {formatDate(c.starts_at)} → {formatDate(c.planned_ends_at)}
-                  {c.daily_rate != null ? ` · ${formatMoney(c.daily_rate)}/يوم` : ''}
+                  {creditReasonLabel(m.reason)}
+                  {m.contract_id ? ` · عقد #${m.contract_id}` : ''}
+                  {m.moved_at ? ` · ${formatDate(m.moved_at)}` : ''}
                 </p>
+                {m.notes ? <p className="muted">{m.notes}</p> : null}
               </article>
             ))}
           </div>

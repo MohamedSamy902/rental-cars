@@ -302,9 +302,14 @@ Query شائع: `?per_page=50&page=1&search=...`
 |--------|------|
 | GET | `/customers` | `?search=&status=active|blacklist&per_page=` |
 | POST | `/customers` | تسجيل |
-| GET | `/customers/{customer}` | |
+| GET | `/customers/{customer}` | ملف + عقود بأرصدة + `accounts` + `credit_ledger` |
 | PUT | `/customers/{customer}` | تعديل / قائمة سوداء |
 | DELETE | `/customers/{customer}` | أرشفة ناعمة |
+
+**GET `/customers/{customer}` extras**
+- `data.contracts[]`: `total` · `paid` · `remaining` · `final_total` · `period_rent` · `balance_due_on` (بالإضافة للكود/الحالة/العربية/التواريخ)
+- `data.accounts`: `contracts_total` · `payments_in` · `open_receivable` · `credit_balance`
+- `data.credit_ledger[]` / جذر `credit_ledger`: حركات الرصيد الدائن (`direction` · `amount` · `reason` · `moved_at`)
 
 **POST Body**
 `full_name`, `phone` (مصر أو دولي E.164 مثل `+9665…`), `nationality`, `birth_date`, `license_number`, `license_expires_on`  

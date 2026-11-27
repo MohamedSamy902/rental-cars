@@ -380,7 +380,7 @@ class QaV2FixTicketsTest extends TestCase
         $this->getJson("/api/customers/{$customer->id}")
             ->assertOk()
             ->assertJsonPath('data.id', $customer->id)
-            ->assertJsonStructure(['data' => ['contracts', 'violations']]);
+            ->assertJsonStructure(['data' => ['contracts', 'violations', 'accounts', 'credit_ledger']]);
     }
 
     public function test_b13_statement_shows_live_contract_charges(): void
@@ -402,6 +402,41 @@ class QaV2FixTicketsTest extends TestCase
         $this->assertSame(200, (int) $row['total']);
         $this->assertSame(26, (int) $row['paid']);
         $this->assertSame(174, (int) $row['remaining']);
+    }
+
+    public function test_b14_customer_detail_includes_contract_accounts(): void
+    {
+        [$customer, $vehicle] = $this->party('B14');
+        $id = $this->approvedContract($customer, $vehicle, 100, '2026-08-01T00:00:00+02:00', '2026-08-03T00:00:00+02:00');
+
+        $this->postJson('/api/accounting/payments', [
+            'amount' => 40,
+            'method' => 'نقدي',
+            'direction' => 'in',
+            'link_type' => 'contract',
+            'link_id' => $id,
+        ])->assertCreated();
+
+        $payload = $this->getJson("/api/customers/{$customer->id}")
+            ->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    'accounts' => ['contracts_total', 'payments_in', 'open_receivable', 'credit_balance'],
+                    'contracts' => [['id', 'total', 'paid', 'remaining']],
+                    'credit_ledger',
+                ],
+            ])
+            ->json('data');
+
+        $row = collect($payload['contracts'])->firstWhere('id', $id);
+        $this->assertNotNull($row);
+        $this->assertSame(200, (int) $row['total']);
+        // payment_amount=1 at create + 40 extra payment
+        $this->assertSame(41, (int) $row['paid']);
+        $this->assertSame(159, (int) $row['remaining']);
+        $this->assertSame(200, (int) $payload['accounts']['contracts_total']);
+        $this->assertSame(41, (int) $payload['accounts']['payments_in']);
+        $this->assertSame(159, (int) $payload['accounts']['open_receivable']);
     }
 
     /** @return array{0: Customer, 1: Vehicle} */

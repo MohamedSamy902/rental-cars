@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\Customer;
+use App\Models\CustomerCreditMovement;
 use App\Models\Violation;
+use App\Services\Contracts\ContractLedgerMath;
 use App\Services\Customers\CustomerCreditService;
 use App\Support\PaginationInput;
 use DomainException;
@@ -15,7 +17,10 @@ use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
-    public function __construct(private readonly CustomerCreditService $credits) {}
+    public function __construct(
+        private readonly CustomerCreditService $credits,
+        private readonly ContractLedgerMath $ledgerMath,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -90,7 +95,17 @@ class CustomerController extends Controller
             ->values();
 
         $payload = $this->presentCustomer($customer, $canViewNid);
-        $payload['contracts'] = $customer->contracts->map(function ($c) {
+
+        $contractsTotal = 0;
+        $paymentsIn = 0;
+        $payload['contracts'] = $customer->contracts->map(function ($c) use (&$contractsTotal, &$paymentsIn) {
+            $ledger = $this->ledgerMath->forContract($c);
+            $total = (int) $ledger['total'];
+            $paid = max(0, (int) $ledger['paid']);
+            $remaining = (int) $ledger['balance'];
+            $contractsTotal += $total;
+            $paymentsIn += $paid;
+
             return [
                 'id' => $c->id,
                 'code' => $c->number,
@@ -101,14 +116,40 @@ class CustomerController extends Controller
                 'actual_ends_at' => optional($c->actual_ends_at)?->toDateString(),
                 'daily_rate' => $c->frozen_daily_rate,
                 'deposit' => $c->frozen_agreed_deposit,
+                'period_rent' => (int) ($c->period_rent ?: 0),
+                'final_total' => (int) ($c->final_total ?: 0),
+                'total' => $total,
+                'paid' => $paid,
+                'remaining' => $remaining,
+                'balance_due_on' => optional($c->balance_due_on)?->toDateString(),
                 'vehicle' => $c->vehicle,
             ];
         })->values();
+
+        $creditLedger = collect($this->credits->ledger($customer))->map(function (CustomerCreditMovement $m) {
+            return [
+                'id' => $m->id,
+                'direction' => $m->direction,
+                'amount' => (int) $m->amount,
+                'reason' => $m->reason,
+                'contract_id' => $m->contract_id,
+                'moved_at' => optional($m->moved_at)?->toIso8601String(),
+                'notes' => $m->notes,
+            ];
+        })->values();
+
+        $payload['accounts'] = [
+            'contracts_total' => $contractsTotal,
+            'payments_in' => $paymentsIn,
+            'open_receivable' => max(0, $contractsTotal - $paymentsIn),
+            'credit_balance' => (int) $customer->credit_balance,
+        ];
+        $payload['credit_ledger'] = $creditLedger;
         $payload['violations'] = $violations;
 
         return response()->json([
             'data' => $payload,
-            'credit_ledger' => $this->credits->ledger($customer),
+            'credit_ledger' => $creditLedger,
         ]);
     }
 
