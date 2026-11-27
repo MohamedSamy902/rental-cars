@@ -338,7 +338,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/contracts/{id}/handover` | → `active` + فحص تسليم |
 | POST | `/contracts/{id}/return` | → `completed` + إجمالي نهائي |
 | POST | `/contracts/{id}/cancel` | → `cancelled` (قبل التسليم) |
-| POST | `/contracts/{id}/extend` | عقد تمديد جديد |
+| POST | `/contracts/{id}/extend` | تمديد المدة داخل نفس العقد |
 | POST | `/contracts/{id}/swap` | إغلاق قديم + عقد بديل |
 | POST | `/contracts/{id}/deposit` | قبض تأمين |
 | POST | `/contracts/{id}/deposit/deduct` | خصم من التأمين |
@@ -431,9 +431,9 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 ### POST …/extend
 ```json
-{ "planned_ends_at": "2026-11-10T10:00:00", "starts_at": null }
+{ "planned_ends_at": "2026-11-10T10:00:00" }
 ```
-ينشئ **عقداً جديداً** مربوطاً بالأصل.
+يطيل نهاية **نفس** العقد المعتمد/النشط (بلا عقد جديد). يُحدَّث `approved_days`/`allowed_km`/`rent_basis` ويُلحق سجل في `extension_history`. `starts_at` إن وُجد يُتجاهل.
 
 ### POST …/swap
 ```json

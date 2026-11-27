@@ -24,8 +24,8 @@ class Contract extends Model
         'excess_km_amount', 'period_rent', 'discount', 'damage_fee', 'other_fees',
         'other_fees_description', 'has_delivery_service', 'delivery_service_fee',
         'delivery_service_notes', 'final_total', 'extended_from_contract_id',
-        'swapped_from_contract_id', 'swap_reason', 'sales_user_id', 'cancel_reason',
-        'notes', 'balance_due_on', 'accessories_json', 'branch_id',
+        'extension_history', 'swapped_from_contract_id', 'swap_reason', 'sales_user_id',
+        'cancel_reason', 'notes', 'balance_due_on', 'accessories_json', 'branch_id',
     ];
 
     protected function casts(): array
@@ -45,6 +45,7 @@ class Contract extends Model
             'include_vehicle_value_obligation' => 'boolean',
             'delivery_service_fee' => 'integer',
             'accessories_json' => 'array',
+            'extension_history' => 'array',
         ];
     }
 

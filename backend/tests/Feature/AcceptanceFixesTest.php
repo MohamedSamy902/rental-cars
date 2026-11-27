@@ -77,12 +77,12 @@ class AcceptanceFixesTest extends TestCase
         }
 
         $extension = $this->life->extend($active->fresh(), [
-            'starts_at' => $active->planned_ends_at->format('Y-m-d H:i:s'),
             'planned_ends_at' => now()->addDays(4)->format('Y-m-d H:i:s'),
         ], $this->admin->id);
 
-        $this->assertSame('pending', $extension->status);
-        $this->assertSame($active->id, $extension->extended_from_contract_id);
+        $this->assertSame($active->id, $extension->id);
+        $this->assertSame('active', $extension->status);
+        $this->assertNotEmpty($extension->extension_history);
     }
 
     public function test_cancel_rechecks_status_inside_the_lock(): void

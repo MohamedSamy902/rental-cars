@@ -20,7 +20,7 @@ class ExtendContractRequest extends FormRequest
      */
     protected function digitKeys(): array
     {
-        return ['planned_ends_at', 'starts_at'];
+        return ['planned_ends_at'];
     }
 
     /**
@@ -30,6 +30,7 @@ class ExtendContractRequest extends FormRequest
     {
         return [
             'planned_ends_at' => ['required', 'date', 'before:2100-01-01'],
+            // يُتجاهل في الخدمة (التمديد داخل نفس العقد يحافظ على starts_at الأصلية).
             'starts_at' => ['nullable', 'date'],
         ];
     }
@@ -37,26 +38,21 @@ class ExtendContractRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
-            $starts = $this->input('starts_at');
             $ends = $this->input('planned_ends_at');
-
             if (! $ends) {
                 return;
             }
 
-            if (! $starts) {
-                $contract = $this->route('contract');
-                $starts = $contract?->planned_ends_at?->format('Y-m-d H:i:s');
-            }
-
-            if (! $starts) {
+            $contract = $this->route('contract');
+            $currentEnd = $contract?->planned_ends_at?->format('Y-m-d H:i:s');
+            if (! $currentEnd) {
                 return;
             }
 
-            if (strtotime((string) $ends) <= strtotime((string) $starts)) {
+            if (strtotime((string) $ends) <= strtotime((string) $currentEnd)) {
                 $validator->errors()->add(
                     'planned_ends_at',
-                    'يجب أن يكون وقت النهاية المخطط بعد وقت البداية.',
+                    'يجب أن تكون نهاية التمديد بعد النهاية الحالية للعقد.',
                 );
             }
         });

@@ -303,15 +303,16 @@ class HappyPathE2ETest extends TestCase
             ],
         ])->assertOk()->assertJsonPath('data.status', 'active');
 
-        // Extend → new contract from planned end
+        // Extend → same active contract, longer planned end
         $extendEnds = now()->addDays(3)->addDays(4)->toIso8601String();
         $extended = $this->postJson("/api/contracts/{$contractId}/extend", [
             'planned_ends_at' => $extendEnds,
-        ])->assertCreated();
-        $extId = (int) $extended->json('data.id');
-        $this->assertNotSame($contractId, $extId);
+        ])->assertOk();
+        $this->assertSame($contractId, (int) $extended->json('data.id'));
+        $this->assertSame('active', $extended->json('data.status'));
         $this->assertSame($vehicleA->id, (int) $extended->json('data.vehicle_id'));
         $this->assertSame(1200, (int) $extended->json('data.frozen_daily_rate'));
+        $this->assertCount(1, $extended->json('data.extension_history'));
 
         // Swap mid-active contract onto vehicle B
         $swapped = $this->postJson("/api/contracts/{$contractId}/swap", [
@@ -381,7 +382,7 @@ class HappyPathE2ETest extends TestCase
         // Technician still blocked from approve/cancel even after scenario exists
         Sanctum::actingAs($this->technician);
         $this->postJson("/api/contracts/{$pendingId}/approve")->assertStatus(403);
-        $this->postJson("/api/contracts/{$extId}/cancel", ['reason' => 'محاولة غير مصرح بها'])->assertStatus(403);
+        $this->postJson("/api/contracts/{$contractId}/cancel", ['reason' => 'محاولة غير مصرح بها'])->assertStatus(403);
     }
 
     public function test_demo_seeder_leaves_inspectable_happy_path_state(): void

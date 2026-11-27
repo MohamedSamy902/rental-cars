@@ -173,7 +173,7 @@ export function useContractLifecycle(onMutated?: () => void) {
           method: 'POST',
           json: { planned_ends_at: actionForm.planned_ends_at },
         })
-        toast.success('تم إنشاء عقد التمديد.')
+        toast.success('تم تمديد العقد.')
       } else if (action === 'swap') {
         await api(`/contracts/${selected.id}/swap`, {
           method: 'POST',

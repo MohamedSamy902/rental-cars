@@ -100,6 +100,7 @@ export function ContractDetailPage() {
   const payments = row.payments ?? []
   const documents = row.documents ?? []
   const related = row.related ?? []
+  const extensions = row.extension_history ?? []
   const timeline = row.timeline ?? []
   const canEditVehicleValue = can('contracts.update')
     && (row.status === 'pending' || row.status === 'approved')
@@ -264,6 +265,14 @@ export function ContractDetailPage() {
             { label: 'العربية', value: vehicleLabel, wide: true },
             { label: 'البداية', value: formatDate(row.starts_at) },
             { label: 'النهاية المخططة', value: formatDate(row.planned_ends_at) },
+            {
+              label: 'أيام معتمدة',
+              value: row.approved_days != null ? formatNumber(row.approved_days) : '—',
+            },
+            {
+              label: 'تمديدات',
+              value: extensions.length > 0 ? `${formatNumber(extensions.length)} تمديد` : 'لا يوجد',
+            },
             { label: 'النهاية الفعلية', value: row.actual_ends_at ? formatDate(row.actual_ends_at) : '—' },
             { label: 'التأمين المتفق', value: formatDepositAmount(row.frozen_agreed_deposit || 0, row.frozen_deposit_currency) },
             {
@@ -425,6 +434,30 @@ export function ContractDetailPage() {
           </div>
         )}
       </section>
+
+      {extensions.length > 0 ? (
+        <section className="rpm-panel">
+          <div className="rpm-panel__head"><h3>سجل التمديدات</h3></div>
+          <div className="rpm-dense-list">
+            {extensions.map((ext, idx) => (
+              <div key={`${ext.extended_at || 'ext'}-${idx}`} className="rpm-dense-row">
+                <div>
+                  <strong>
+                    تمديد #{idx + 1}
+                    {ext.approved_days != null ? ` · ${formatNumber(ext.approved_days)} يوماً` : ''}
+                  </strong>
+                  <p className="muted">
+                    من {ext.previous_planned_ends_at ? formatDateTime(ext.previous_planned_ends_at) : '—'}
+                    {' → '}
+                    {ext.planned_ends_at ? formatDateTime(ext.planned_ends_at) : '—'}
+                    {ext.extended_at ? ` · ${formatDateTime(ext.extended_at)}` : ''}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {related.length ? (
         <section className="rpm-panel">

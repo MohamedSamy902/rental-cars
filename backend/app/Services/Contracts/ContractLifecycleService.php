@@ -1020,44 +1020,100 @@ class ContractLifecycleService
     }
 
     /**
-     * Extension = brand-new signed contract (RSD 3.19).
+     * ن٫١٨: تمديد داخل نفس العقد (معتمد أو نشط) — يطيل planned_ends_at فقط.
+     * لا عقد جديد · لا موافقة/تسليم/استلام · الأسعار المجمّدة تبقى · سجل في extension_history.
      *
      * @param  array{planned_ends_at: string, starts_at?: string}  $data
      */
     public function extend(Contract $source, array $data, ?int $userId = null): Contract
     {
-        if ($source->status === 'completed') {
-            throw new DomainException('العقد مُقفل — لا يمكن التمديد.');
-        }
         if (! in_array($source->status, ['approved', 'active'], true)) {
-            throw new DomainException('لا يمكن التمديد من هذه الحالة.');
+            throw new DomainException('التمديد متاح للعقد المعتمد أو النشط فقط.');
         }
 
-        $starts = $data['starts_at'] ?? $source->planned_ends_at->format('Y-m-d H:i:s');
+        return DB::transaction(function () use ($source, $data, $userId) {
+            /** @var Contract $locked */
+            $locked = Contract::query()->whereKey($source->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($locked->status, ['approved', 'active'], true)) {
+                throw new DomainException('التمديد متاح للعقد المعتمد أو النشط فقط.');
+            }
 
-        return $this->create([
-            'customer_id' => $source->customer_id,
-            'vehicle_id' => $source->vehicle_id,
-            'guarantor_customer_id' => $source->guarantor_customer_id,
-            'starts_at' => $starts,
-            'planned_ends_at' => $data['planned_ends_at'],
-            'daily_rate' => $source->frozen_daily_rate,
-            'half_monthly_rate' => $source->frozen_half_monthly_rate,
-            'monthly_rate' => $source->frozen_monthly_rate,
-            'daily_km_allowance' => $source->frozen_daily_km_allowance,
-            'excess_km_rate' => $source->frozen_excess_km_rate,
-            'deposit' => $source->frozen_agreed_deposit,
-            'deposit_currency' => $source->frozen_deposit_currency,
-            'operating_insurance_fee' => $source->frozen_operating_insurance_fee,
-            'include_vehicle_value_obligation' => (bool) $source->include_vehicle_value_obligation,
-            'vehicle_value_text' => $source->frozen_vehicle_value_text,
-            'min_days' => $source->frozen_min_days ?? $source->min_days,
-            'has_delivery_service' => (bool) $source->has_delivery_service,
-            'delivery_service_fee' => (int) ($source->delivery_service_fee ?? 0),
-            'delivery_service_notes' => $source->delivery_service_notes,
-            'notes' => trim(($source->notes ? $source->notes."\n" : '').'تمديد من '.$source->number),
-            'extended_from_contract_id' => $source->id,
-        ], $userId, true);
+            $newEnd = Carbon::parse($data['planned_ends_at']);
+            $currentEnd = Carbon::parse($locked->planned_ends_at);
+            if ($newEnd <= $currentEnd) {
+                throw new DomainException('نهاية التمديد يجب أن تكون بعد النهاية الحالية للعقد.');
+            }
+
+            /** @var Vehicle $vehicle */
+            $vehicle = Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
+            $this->assertOwnerAgreementCoversRental($vehicle, $newEnd);
+            $this->assertNoOverlap(
+                (int) $locked->vehicle_id,
+                $locked->starts_at,
+                $newEnd,
+                $locked->id,
+            );
+
+            $previousDays = (int) ($locked->approved_days ?? 0);
+            $newDays = $this->pricing->countRentalDays(
+                $locked->starts_at,
+                $newEnd,
+                $this->fractionDayThreshold(),
+            );
+            $rentBasis = $this->pricing->resolveRentBasisFromDays($newDays);
+            $allowedKm = $this->pricing->allowedKilometers(
+                (int) $locked->frozen_daily_km_allowance,
+                $newDays,
+            );
+
+            $history = is_array($locked->extension_history) ? $locked->extension_history : [];
+            $history[] = [
+                'extended_at' => now()->toIso8601String(),
+                'previous_planned_ends_at' => $currentEnd->toIso8601String(),
+                'planned_ends_at' => $newEnd->toIso8601String(),
+                'previous_approved_days' => $previousDays,
+                'approved_days' => $newDays,
+                'previous_rent_basis' => $locked->rent_basis,
+                'rent_basis' => $rentBasis,
+                'by_user_id' => $userId,
+            ];
+
+            $locked->fill([
+                'planned_ends_at' => $newEnd,
+                'approved_days' => $newDays,
+                'rent_basis' => $rentBasis,
+                'allowed_km' => $allowedKm,
+                'extension_history' => $history,
+                // قبل الإقفال الإيجار يُحسب حيّاً — امسح قيمة مخزّنة قديمة إن وُجدت بالخطأ.
+                'period_rent' => null,
+            ])->save();
+
+            AuditLog::query()->create([
+                'user_id' => $userId,
+                'action' => 'extended',
+                'record_type' => Contract::class,
+                'record_id' => $locked->id,
+                'before' => [
+                    'planned_ends_at' => $currentEnd->toIso8601String(),
+                    'approved_days' => $previousDays,
+                ],
+                'after' => [
+                    'planned_ends_at' => $newEnd->toIso8601String(),
+                    'approved_days' => $newDays,
+                    'rent_basis' => $rentBasis,
+                    'allowed_km' => $allowedKm,
+                ],
+            ]);
+
+            $this->notifyLifecycle(
+                'تم تمديد العقد',
+                "العقد {$locked->number}: النهاية أصبحت {$newEnd->format('Y-m-d H:i')} ({$newDays} يوماً).",
+                $locked,
+                $userId,
+            );
+
+            return $locked->fresh(['customer', 'vehicle', 'deposit']);
+        });
     }
 
     /**
@@ -1391,7 +1447,7 @@ class ContractLifecycleService
         if ($ignoreId) {
             $q->where('id', '!=', $ignoreId);
         }
-        // ن٫٨ / ن٫١٨: التمديد يتجاهل العقد المصدر حتى يبقى التمديد المتلاصق ممكناً (إنشاء · موافقة · تسليم).
+        // تراث ن٫١٨ القديم: عقود تمديد قديمة مربوطة بـ extended_from تتجاهل المصدر عند التداخل.
         if ($ignoreExtendedFromId) {
             $q->where('id', '!=', $ignoreExtendedFromId);
         }

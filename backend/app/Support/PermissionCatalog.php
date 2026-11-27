@@ -15,7 +15,7 @@ class PermissionCatalog
         $modules = [
             'vehicles' => ['السيارات', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'archive' => 'أرشفة', 'print' => 'طباعة', 'export' => 'تصدير']],
             'contracts' => ['العقود', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'approve' => 'اعتماد', 'print' => 'طباعة', 'export' => 'تصدير']],
-            'contracts_extend' => ['تمديد بعقد جديد', ['execute' => 'تنفيذ']],
+            'contracts_extend' => ['تمديد العقد', ['execute' => 'تنفيذ']],
             'contracts_swap' => ['تبديل بسبب عطل', ['execute' => 'تنفيذ']],
             'contracts_cancel' => ['إلغاء عقد', ['approve' => 'اعتماد إلغاء']],
             'customers' => ['العملاء', ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'export' => 'تصدير']],
@@ -75,7 +75,7 @@ class PermissionCatalog
         return match ($module) {
             'vehicles' => 'السيارات',
             'contracts' => 'العقود',
-            'contracts_extend' => 'تمديد بعقد جديد',
+            'contracts_extend' => 'تمديد العقد',
             'contracts_swap' => 'تبديل بسبب عطل',
             'contracts_cancel' => 'إلغاء عقد',
             'customers' => 'العملاء',

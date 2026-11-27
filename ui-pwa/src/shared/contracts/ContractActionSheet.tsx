@@ -67,7 +67,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
         ) : null}
         {action === 'extend' ? (
           <p className="muted" style={{ margin: 0, gridColumn: '1 / -1' }}>
-            يُنشأ عقد تمديد جديد. وافق عليه ثم عند التسليم يُقفل العقد السابق تلقائياً ويكمل التأجير على نفس العربية.
+            يطيل نهاية هذا العقد فقط — العربية تبقى مع العميل بلا استلام/تسليم جديد، والأسعار المجمّدة لا تتغيّر. يظهر التمديد في سجل العقد.
           </p>
         ) : null}
         {action === 'handover' || action === 'swap' ? (
