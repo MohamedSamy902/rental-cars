@@ -258,4 +258,89 @@ class ContractLifecycleTest extends TestCase
             'planned_ends_at' => '2026-11-07T10:00:00',
         ])->assertStatus(422);
     }
+
+    public function test_extend_active_contract_can_be_approved_and_handed_over(): void
+    {
+        $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->subDay()->toIso8601String(),
+            'planned_ends_at' => now()->addDays(2)->toIso8601String(),
+            'daily_rate' => 1000,
+            'deposit' => 2000,
+            'balance_due_on' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+        $sourceId = (int) $create->json('data.id');
+
+        $this->postJson("/api/contracts/{$sourceId}/approve")->assertOk();
+        $this->postJson("/api/contracts/{$sourceId}/deposit", [
+            'method' => 'cash',
+            'receipt_number' => 'R-EXT',
+        ])->assertCreated();
+        $signature = 'sig-'.str_repeat('extend-ok-', 5);
+        $this->postJson("/api/contracts/{$sourceId}/handover", [
+            'odometer_out' => 10000,
+            'signature_data' => $signature,
+        ])->assertOk()->assertJsonPath('data.status', 'active');
+
+        $extend = $this->postJson("/api/contracts/{$sourceId}/extend", [
+            'planned_ends_at' => now()->addDays(10)->toIso8601String(),
+        ])->assertCreated();
+        $extId = (int) $extend->json('data.id');
+        $this->assertSame($sourceId, (int) $extend->json('data.extended_from_contract_id'));
+
+        $this->postJson("/api/contracts/{$extId}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved');
+
+        $this->postJson("/api/contracts/{$extId}/handover", [
+            'odometer_out' => 10250,
+            'signature_data' => $signature,
+        ])->assertOk()->assertJsonPath('data.status', 'active');
+
+        $this->getJson("/api/contracts/{$sourceId}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'completed');
+    }
+
+    public function test_early_return_completes_and_keeps_pending_extension(): void
+    {
+        $create = $this->postJson('/api/contracts', [
+            'payment_amount' => 1,
+            'payment_method' => 'cash',
+            'customer_id' => $this->customer->id,
+            'vehicle_id' => $this->vehicle->id,
+            'starts_at' => now()->subDays(2)->toIso8601String(),
+            'planned_ends_at' => now()->addDays(5)->toIso8601String(),
+            'daily_rate' => 1000,
+            'deposit' => 2000,
+            'balance_due_on' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+        $sourceId = (int) $create->json('data.id');
+        $this->postJson("/api/contracts/{$sourceId}/approve")->assertOk();
+        $this->postJson("/api/contracts/{$sourceId}/deposit", [
+            'method' => 'cash',
+            'receipt_number' => 'R-EARLY',
+        ])->assertCreated();
+        $signature = 'sig-'.str_repeat('early-ret-', 5);
+        $this->postJson("/api/contracts/{$sourceId}/handover", [
+            'odometer_out' => 10000,
+            'signature_data' => $signature,
+        ])->assertOk();
+
+        $extId = (int) $this->postJson("/api/contracts/{$sourceId}/extend", [
+            'planned_ends_at' => now()->addDays(12)->toIso8601String(),
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson("/api/contracts/{$sourceId}/return", [
+            'odometer_in' => 10150,
+            'signature_data' => $signature,
+        ])->assertOk()->assertJsonPath('data.status', 'completed');
+
+        $this->getJson("/api/contracts/{$extId}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'pending');
+    }
 }

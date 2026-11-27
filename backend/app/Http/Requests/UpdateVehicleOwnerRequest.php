@@ -4,6 +4,8 @@ namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesDigits;
 use App\Rules\EgyptianPhone;
+use App\Support\DigitNormalizer;
+use App\Support\Phone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -22,6 +24,20 @@ class UpdateVehicleOwnerRequest extends FormRequest
     protected function digitKeys(): array
     {
         return ['phone', 'phone_alt', 'national_id'];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge(DigitNormalizer::fields($this->all(), $this->digitKeys()));
+        $merge = [];
+        foreach (['phone', 'phone_alt'] as $key) {
+            if ($this->exists($key) && is_string($this->input($key))) {
+                $merge[$key] = Phone::canonicalizeForStorage($this->input($key));
+            }
+        }
+        if ($merge !== []) {
+            $this->merge($merge);
+        }
     }
 
     /**

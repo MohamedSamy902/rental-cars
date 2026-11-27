@@ -45,7 +45,7 @@ export function ContractActionsBar({ contract: b, onApprove, onAction, onPrint, 
       ) : null}
       {b.status === 'active' ? (
         <>
-          {canUpdate ? <Button type="button" size="sm" className="cd-actions__primary" onClick={() => onAction('return')}>استلام</Button> : null}
+          {canUpdate ? <Button type="button" size="sm" className="cd-actions__primary" onClick={() => onAction('return')}>استلام / إنهاء مبكر</Button> : null}
           {!b.deposit && canDeposit ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('deposit')}>قبض تأمين</Button> : null}
           {canExtend ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('extend')}>تمديد</Button> : null}
           {canSwap ? <Button type="button" size="sm" variant="secondary" onClick={() => onAction('swap')}>تبديل عطل</Button> : null}
