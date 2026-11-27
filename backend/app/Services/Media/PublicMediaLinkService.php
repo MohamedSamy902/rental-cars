@@ -99,6 +99,22 @@ class PublicMediaLinkService
         return $this->toPublicAbsolute($relative);
     }
 
+    /** رابط بطاقة عربية عامة موقّعة (واتساب — أسعار + صور). */
+    public function temporaryVehicleShareUrl(int $vehicleId, ?int $ttlDays = null): string
+    {
+        $id = max(1, $vehicleId);
+        $days = max(1, $ttlDays ?? self::DEFAULT_TTL_DAYS);
+
+        $relative = URL::temporarySignedRoute(
+            'public.vehicles.share',
+            now()->addDays($days),
+            ['id' => $id],
+            absolute: false,
+        );
+
+        return $this->toPublicAbsolute($relative);
+    }
+
     public function assertMediaExists(int $mediaId): MediaFile
     {
         return MediaFile::query()->whereKey($mediaId)->firstOrFail();

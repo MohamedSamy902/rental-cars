@@ -251,6 +251,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية من نموذج العربية |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
+| POST | `/vehicles/{vehicle}/share` | نص واتساب + رابط بطاقة عامة موقّعة (أسعار · صور `vehicle_photos`) · صلاحية ١٤ يوماً |
+| GET | `/public/vehicles/share` | صفحة HTML عامة موقّعة بلا لوجين (`id` + `signature`) |
 | PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) · عند تغيير رخصة التسيير (تاريخ/صورة) تُؤرشف السابقة تلقائياً ثم تُكتب الجديدة |
 | DELETE | `/vehicles/{vehicle}` | أرشفة ناعمة (apiResource) |
 | POST | `/vehicles/{vehicle}/documents` | مستند (`type` · `document_number` · وش/ضهر · تواريخ) |

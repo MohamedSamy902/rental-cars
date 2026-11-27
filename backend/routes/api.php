@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CollaborationController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\ContractInvoiceShareController;
+use App\Http\Controllers\Api\VehicleShareController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentTemplateController;
@@ -51,6 +52,9 @@ Route::get('/public/violations/share', [ViolationShareController::class, 'public
 Route::get('/public/contracts/invoice', [ContractInvoiceShareController::class, 'publicShare'])
     ->middleware(['signed:relative', 'throttle:60,1'])
     ->name('public.contracts.invoice');
+Route::get('/public/vehicles/share', [VehicleShareController::class, 'publicShare'])
+    ->middleware(['signed:relative', 'throttle:60,1'])
+    ->name('public.vehicles.share');
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -143,6 +147,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->middleware('permission:vehicles.view|contracts.view|maintenance.view');
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('permission:vehicles.create');
     Route::get('/vehicles/{vehicle}/dossier', [VehicleController::class, 'dossier'])->middleware('permission:vehicles.view');
+    Route::post('/vehicles/{vehicle}/share', [VehicleShareController::class, 'prepare'])
+        ->middleware('permission:vehicles.view,showroom.run');
     Route::get('/vehicles/{vehicle}/owner-agreement/print', [VehicleController::class, 'ownerAgreementPrint'])
         ->middleware('permission:vehicles.view|vehicles.print|vehicles.update');
     Route::get('/vehicles/{vehicle}/custody-agreements', [VehicleCustodyAgreementController::class, 'index'])
