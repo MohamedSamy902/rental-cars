@@ -14,6 +14,7 @@ export { FieldShell, TextField, NumberField, MoneyField, TextAreaField, SelectFi
 export { PlateField, splitPlate, joinPlate } from './PlateField'
 export { SignatureField } from './SignatureField'
 export { MediaUpload } from './MediaUpload'
+export { AuthMediaImage } from './AuthMediaImage'
 export { RentalProgressBar } from './RentalProgressBar'
 export type { RentalProgress } from './RentalProgressBar'
 export type { MediaUploadResult } from './MediaUpload'
