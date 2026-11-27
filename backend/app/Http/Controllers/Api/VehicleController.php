@@ -212,10 +212,16 @@ class VehicleController extends Controller
         $data = $request->validated();
         $ownerInline = $data['owner_inline'] ?? null;
         $addonIds = $data['addon_ids'] ?? [];
-        unset($data['owner_inline'], $data['addon_ids']);
+        $photoMediaIds = array_key_exists('photo_media_ids', $data) ? ($data['photo_media_ids'] ?? []) : null;
+        unset($data['owner_inline'], $data['addon_ids'], $data['photo_media_ids']);
 
         try {
-            $vehicle = $this->vehicles->create($data, is_array($ownerInline) ? $ownerInline : null, is_array($addonIds) ? $addonIds : []);
+            $vehicle = $this->vehicles->create(
+                $data,
+                is_array($ownerInline) ? $ownerInline : null,
+                is_array($addonIds) ? $addonIds : [],
+                is_array($photoMediaIds) ? $photoMediaIds : null,
+            );
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -569,14 +575,20 @@ class VehicleController extends Controller
         try {
             $data = $request->validated();
             $addonIds = array_key_exists('addon_ids', $data) ? ($data['addon_ids'] ?? []) : null;
-            unset($data['addon_ids']);
+            $photoMediaIds = array_key_exists('photo_media_ids', $data) ? ($data['photo_media_ids'] ?? []) : null;
+            unset($data['addon_ids'], $data['photo_media_ids']);
             if (! $request->user()?->hasPermission('owners.view')) {
                 unset($data['owner_id'], $data['owner_since']);
                 if (! VehicleOwnerVisibility::canSeeAmount($request->user())) {
                     unset($data['owner_monthly_amount']);
                 }
             }
-            $vehicle = $this->vehicles->update($vehicle, $data, is_array($addonIds) ? $addonIds : null);
+            $vehicle = $this->vehicles->update(
+                $vehicle,
+                $data,
+                is_array($addonIds) ? $addonIds : null,
+                is_array($photoMediaIds) ? $photoMediaIds : null,
+            );
         } catch (DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

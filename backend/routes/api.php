@@ -63,7 +63,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/attention', AttentionController::class);
 
     Route::get('/media/limits', [MediaController::class, 'limits'])->middleware('permission:media.view|media.upload|customers.view|vehicles.view|contracts.view');
-    Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload|customers.create|customers.update|vehicles.update|contracts.update|violations.create|maintenance.create');
+    Route::post('/media', [MediaController::class, 'store'])->middleware('permission:media.upload|customers.create|customers.update|vehicles.create|vehicles.update|contracts.update|violations.create|maintenance.create');
     Route::get('/media/{medium}', [MediaController::class, 'show'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
     Route::get('/media/{medium}/file', [MediaController::class, 'file'])->middleware('permission:media.view|customers.view|vehicles.view|contracts.view');
     Route::delete('/media/{medium}', [MediaController::class, 'destroy'])->middleware('permission:media.delete|customers.update|vehicles.update|settings.update');

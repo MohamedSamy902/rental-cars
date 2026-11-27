@@ -7,7 +7,8 @@ import { NationalityField } from '@/shared/forms/NationalityField'
 import { BrandSelectField } from '@/shared/forms/BrandSelectField'
 import {
   Button, Sheet, TextField, NumberField, MoneyField, SelectField, TextAreaField, SwitchField,
-  MediaUpload, PlateField, splitPlate, useToast,
+  MediaUpload, MultiImageUpload, PlateField, splitPlate, useToast,
+  type MultiImageItem,
 } from '@/shared/ui'
 import { printHtmlDocument } from '@/utils/printHtml'
 import { shellOwnerAgreementHtml } from '@/shared/contracts/ownerAgreementPrint'
@@ -271,11 +272,13 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
   const [addons, setAddons] = useState<Addon[]>([])
   const [selectedAddons, setSelectedAddons] = useState<number[]>([])
   const [owners, setOwners] = useState<OwnerOption[]>([])
+  const [photos, setPhotos] = useState<MultiImageItem[]>([])
 
   useEffect(() => {
     if (!open) return
     setErrors({})
     setSelectedAddons([])
+    setPhotos([])
     const next = mode === 'edit' ? fromInitial(initial) : emptyForm()
     if (mode === 'edit' && initial) {
       const docs = (initial as VehicleFormInitial & {
@@ -304,6 +307,51 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       }
     }
     setForm(next)
+    if (mode === 'edit' && vehicleId) {
+      void api<{
+        data: {
+          media?: Array<{
+            id: number
+            kind: string
+            original_name: string
+            collection?: string | null
+            purpose?: string | null
+            mime_type?: string | null
+            url: string
+          }>
+        }
+      }>(`/vehicles/${vehicleId}/dossier`)
+        .then((res) => {
+          const media = res.data.media || []
+          const gallery = media
+            .filter((m) => {
+              const purpose = (m.purpose || '').toLowerCase()
+              const collection = (m.collection || '').toLowerCase()
+              if (['document', 'license', 'national_id', 'damage'].includes(purpose)) return false
+              if (collection === 'vehicle_docs') return false
+              if (collection === 'vehicle_photos' || purpose === 'photo' || purpose === 'primary' || purpose === 'gallery') {
+                return true
+              }
+              return m.kind === 'image' || (m.mime_type || '').startsWith('image/')
+            })
+            .slice()
+            .sort((a, b) => {
+              const ap = (a.purpose || '') === 'primary' ? 0 : 1
+              const bp = (b.purpose || '') === 'primary' ? 0 : 1
+              if (ap !== bp) return ap - bp
+              return a.id - b.id
+            })
+            .map((m) => ({
+              id: m.id,
+              path: `/media/${m.id}/file`,
+              original_name: m.original_name,
+              purpose: m.purpose,
+              url: m.url,
+            }))
+          setPhotos(gallery)
+        })
+        .catch(() => setPhotos([]))
+    }
     void api<{ data: { brands: Brand[]; addons: Addon[]; next_code: string } }>('/vehicles/catalogs')
       .then((res) => {
         const brandList = res.data.brands || []
@@ -332,7 +380,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
     void api<{ data: OwnerOption[] }>('/owners?active_only=1&per_page=100')
       .then((res) => setOwners(res.data))
       .catch(() => setOwners([]))
-  }, [open, mode, initial])
+  }, [open, mode, initial, vehicleId])
 
   function toggleAddon(id: number) {
     setSelectedAddons((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -415,6 +463,7 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
       const payload = corePayload()
 
       payload.addon_ids = selectedAddons
+      payload.photo_media_ids = photos.map((p) => p.id)
       payload.license = {
         has_license: form.has_license,
         document_number: form.has_license && form.license_number ? form.license_number : null,
@@ -734,6 +783,20 @@ export function VehicleFormSheet({ open, mode, vehicleId, initial, onClose, onSa
             })}
             {!addons.length ? <span className="muted">لا توجد بيانات إضافة بعد</span> : null}
           </div>
+        </div>
+
+        <div className="rpm-inline-box" style={{ margin: 0, gridColumn: '1 / -1' }}>
+          <p className="rpm-inline-box__title">صور العربية</p>
+          <MultiImageUpload
+            label="صور العرض"
+            value={photos}
+            onChange={setPhotos}
+            collection="vehicle_photos"
+            attachableType={vehicleId ? 'vehicle' : undefined}
+            attachableId={vehicleId}
+            max={12}
+            hint="يمكن اختيار أكثر من صورة دفعة واحدة · الأولى أساسية جنب اللوحة والباقي في معرض التفاصيل"
+          />
         </div>
 
         <div className="rpm-inline-box" style={{ margin: 0, gridColumn: '1 / -1' }}>
