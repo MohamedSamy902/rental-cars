@@ -8,6 +8,7 @@ use App\Rules\EgyptianPhone;
 use App\Rules\MediaReference;
 use App\Support\CivilDate;
 use App\Support\DigitNormalizer;
+use App\Support\Phone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -41,6 +42,15 @@ class StoreCustomerRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge(DigitNormalizer::fields($this->all(), $this->digitKeys()));
+        $merge = [];
+        foreach (['phone', 'phone_alt'] as $key) {
+            if ($this->exists($key) && is_string($this->input($key))) {
+                $merge[$key] = Phone::canonicalizeForStorage($this->input($key));
+            }
+        }
+        if ($merge !== []) {
+            $this->merge($merge);
+        }
         $this->normalizeNationalIdIssuedOn();
     }
 

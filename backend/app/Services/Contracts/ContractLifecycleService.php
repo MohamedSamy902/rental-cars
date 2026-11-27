@@ -311,6 +311,7 @@ class ContractLifecycleService
                 $locked->starts_at,
                 $locked->planned_ends_at,
                 $locked->id,
+                $locked->extended_from_contract_id !== null ? (int) $locked->extended_from_contract_id : null,
             );
 
             $days = $this->pricing->countRentalDays(
@@ -666,10 +667,35 @@ class ContractLifecycleService
             $vehicle = Vehicle::query()->whereKey($locked->vehicle_id)->lockForUpdate()->firstOrFail();
             $this->assertOwnerAgreementCoversRental($vehicle, $locked->planned_ends_at);
 
+            $sourceId = $locked->extended_from_contract_id !== null
+                ? (int) $locked->extended_from_contract_id
+                : null;
+
+            // تمديد متلاصق: اقفل العقد المصدر تلقائياً عند تسليم عقد التمديد (عداد الخروج = عداد عودة المصدر).
+            if ($sourceId) {
+                /** @var Contract|null $source */
+                $source = Contract::query()->whereKey($sourceId)->lockForUpdate()->first();
+                if ($source && $source->status === 'active') {
+                    $returnedAt = $locked->starts_at && $locked->starts_at->lte(now())
+                        ? $locked->starts_at
+                        : now();
+                    $this->completeOnReturn(
+                        $source,
+                        $odometerOut,
+                        $returnedAt,
+                        $userId,
+                        0,
+                        ['notes' => 'إقفال تلقائي عند تسليم عقد التمديد '.$locked->number],
+                    );
+                    $vehicle->refresh();
+                }
+            }
+
             $otherActive = Contract::query()
                 ->where('vehicle_id', $locked->vehicle_id)
                 ->where('status', 'active')
                 ->where('id', '!=', $locked->id)
+                ->when($sourceId, fn ($q) => $q->where('id', '!=', $sourceId))
                 ->lockForUpdate()
                 ->exists();
             if ($otherActive) {
@@ -681,6 +707,7 @@ class ContractLifecycleService
                 $locked->starts_at,
                 $locked->planned_ends_at,
                 $locked->id,
+                $sourceId,
             );
 
             if ($odometerOut < (int) $vehicle->odometer) {
@@ -867,13 +894,7 @@ class ContractLifecycleService
 
             Vehicle::query()->whereKey($locked->vehicle_id)->update(['odometer' => $odometerIn]);
 
-            Contract::query()
-                ->where('extended_from_contract_id', $locked->id)
-                ->where('status', 'pending')
-                ->update([
-                    'status' => 'cancelled',
-                    'cancel_reason' => 'أُلغي لارتباطه باستلام العقد '.$locked->number,
-                ]);
+            // لا تُلغى عقود التمديد المرتبطة — الاستلام المبكر/العادي يحرّر العربية ويُبقي التمديد للموافقة/التسليم.
 
             $this->accounting->postContractClose($locked->fresh(), $userId);
 
@@ -1359,11 +1380,20 @@ class ContractLifecycleService
         return $deposit->fresh('deductions');
     }
 
-    private function assertNoOverlap(int $vehicleId, mixed $startsAt, mixed $endsAt, ?int $ignoreId = null): void
-    {
+    private function assertNoOverlap(
+        int $vehicleId,
+        mixed $startsAt,
+        mixed $endsAt,
+        ?int $ignoreId = null,
+        ?int $ignoreExtendedFromId = null,
+    ): void {
         $q = Contract::query()->where('vehicle_id', $vehicleId);
         if ($ignoreId) {
             $q->where('id', '!=', $ignoreId);
+        }
+        // ن٫٨ / ن٫١٨: التمديد يتجاهل العقد المصدر حتى يبقى التمديد المتلاصق ممكناً (إنشاء · موافقة · تسليم).
+        if ($ignoreExtendedFromId) {
+            $q->where('id', '!=', $ignoreExtendedFromId);
         }
 
         $q->where(function ($outer) use ($startsAt, $endsAt) {

@@ -307,7 +307,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 | DELETE | `/customers/{customer}` | أرشفة ناعمة |
 
 **POST Body**
-`full_name`, `phone`, `nationality`, `birth_date`, `license_number`, `license_expires_on`  
+`full_name`, `phone` (مصر أو دولي E.164 مثل `+9665…`), `nationality`, `birth_date`, `license_number`, `license_expires_on`  
 اختياري: `phone_alt`, `email`, `national_id`, `national_id_issued_from`, `national_id_issued_on`, `national_id_expires_on`, `passport_number`, `passport_expires_on`, `address`, `notes`, `national_id_image_path`, `license_image_path`
 
 > `nationality` نص حر (أي جنسية مكتوبة، حد أقصى 80 حرفاً؛ الاقتراحات في الواجهة اختيارية فقط). `national_id` يقبل أي نص حر (رقم قومي مصري أو هوية أجنبية أو جواز) بحروف وأرقام بلا صيغة إلزامية.  

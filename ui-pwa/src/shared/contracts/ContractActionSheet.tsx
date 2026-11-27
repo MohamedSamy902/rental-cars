@@ -60,6 +60,16 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
       }
     >
       <div className="rpm-form-grid">
+        {action === 'return' ? (
+          <p className="muted" style={{ margin: 0, gridColumn: '1 / -1' }}>
+            إنهاء الإيجار (حتى لو مبكر بعد يوم أو يومين): يسجّل أيام التشغيل الفعلية ويقفل العقد ويرجع العربية للمتاح فوراً.
+          </p>
+        ) : null}
+        {action === 'extend' ? (
+          <p className="muted" style={{ margin: 0, gridColumn: '1 / -1' }}>
+            يُنشأ عقد تمديد جديد. وافق عليه ثم عند التسليم يُقفل العقد السابق تلقائياً ويكمل التأجير على نفس العربية.
+          </p>
+        ) : null}
         {action === 'handover' || action === 'swap' ? (
           <NumberField
             label={action === 'swap' ? 'عداد العربية البديلة (خروج)' : 'عداد الخروج'}

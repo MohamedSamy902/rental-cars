@@ -10,14 +10,15 @@ type Props = {
   className?: string
 }
 
-/** Normalize Egyptian / international numbers for tel: and WhatsApp. */
+/** Normalize Egyptian / international numbers for tel: and WhatsApp (E.164 digits). */
 export function normalizePhoneDigits(phone: string): string {
   const trimmed = phone.trim()
   if (!trimmed) return ''
   let digits = trimmed.replace(/[^\d+]/g, '')
   if (digits.startsWith('+')) digits = digits.slice(1)
   if (digits.startsWith('00')) digits = digits.slice(2)
-  if (digits.startsWith('0') && digits.length === 11) digits = `20${digits.slice(1)}`
+  // مصر فقط: 01[0125]xxxxxxxx → 20…
+  if (/^01[0125]\d{8}$/.test(digits)) digits = `20${digits.slice(1)}`
   return digits.replace(/\D/g, '')
 }
 

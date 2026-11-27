@@ -138,7 +138,7 @@ export const depositLabel: Record<string, { label: string; tone: 'success' | 'wa
 
 export const actionTitle: Record<Exclude<ActionKind, null>, string> = {
   handover: 'تسليم العربية',
-  return: 'استلام وإقفال',
+  return: 'استلام / إنهاء مبكر',
   cancel: 'إلغاء العقد',
   extend: 'تمديد (عقد جديد)',
   swap: 'تبديل بسبب عطل',
@@ -216,7 +216,7 @@ export function contractMenu(
     items.push({ id: 'handover', label: 'تسليم', icon: <IconKey size={16} />, onSelect: () => handlers.openAction('handover') })
   }
   if (b.status === 'active' && can('contracts.update')) {
-    items.push({ id: 'return', label: 'استلام وإقفال', icon: <IconReturn size={16} />, onSelect: () => handlers.openAction('return') })
+    items.push({ id: 'return', label: 'استلام / إنهاء مبكر', icon: <IconReturn size={16} />, onSelect: () => handlers.openAction('return') })
   }
   if ((b.status === 'approved' || b.status === 'active') && !b.deposit && can('deposits.collect')) {
     items.push({ id: 'deposit', label: 'قبض تأمين', icon: <IconCash size={16} />, onSelect: () => handlers.openAction('deposit') })
