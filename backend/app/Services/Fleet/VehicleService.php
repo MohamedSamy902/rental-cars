@@ -3,6 +3,7 @@
 namespace App\Services\Fleet;
 
 use App\Models\DocumentTemplate;
+use App\Models\MediaFile;
 use App\Models\PrintSnapshot;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -27,10 +28,11 @@ class VehicleService
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>|null  $ownerInline
      * @param  list<int|array<string, mixed>>  $addonIds
+     * @param  list<int>|null  $photoMediaIds
      */
-    public function create(array $data, ?array $ownerInline = null, array $addonIds = []): Vehicle
+    public function create(array $data, ?array $ownerInline = null, array $addonIds = [], ?array $photoMediaIds = null): Vehicle
     {
-        return DB::transaction(function () use ($data, $ownerInline, $addonIds) {
+        return DB::transaction(function () use ($data, $ownerInline, $addonIds, $photoMediaIds) {
             if (! empty($ownerInline['full_name'])) {
                 $owner = VehicleOwner::query()->create([
                     'full_name' => $ownerInline['full_name'],
@@ -72,6 +74,7 @@ class VehicleService
                 $data['rental_priority'],
                 $data['owner_inline'],
                 $data['addon_ids'],
+                $data['photo_media_ids'],
                 $data['plate_letters'],
                 $data['plate_numbers'],
                 $data['license'],
@@ -85,6 +88,9 @@ class VehicleService
 
             $this->attachAddons($vehicle, $addonIds);
             $this->syncLicenseDocument($vehicle, is_array($license) ? $license : null);
+            if ($photoMediaIds !== null) {
+                $this->syncVehiclePhotos($vehicle, $photoMediaIds);
+            }
 
             $vehicle = $vehicle->load(['owner', 'accessories', 'documents']);
             $this->syncOwnerAgreementSnapshot($vehicle);
@@ -96,10 +102,11 @@ class VehicleService
     /**
      * @param  array<string, mixed>  $data
      * @param  list<int>|null  $addonIds  when non-null, sync catalog add-ons onto vehicle accessories
+     * @param  list<int>|null  $photoMediaIds  when non-null, attach/order gallery photos
      */
-    public function update(Vehicle $vehicle, array $data, ?array $addonIds = null): Vehicle
+    public function update(Vehicle $vehicle, array $data, ?array $addonIds = null, ?array $photoMediaIds = null): Vehicle
     {
-        return DB::transaction(function () use ($vehicle, $data, $addonIds) {
+        return DB::transaction(function () use ($vehicle, $data, $addonIds, $photoMediaIds) {
             if (array_key_exists('plate', $data) || isset($data['plate_letters']) || isset($data['plate_numbers'])) {
                 $data['plate'] = $this->normalizePlate(array_merge(
                     ['plate' => $vehicle->plate, 'plate_letters' => null, 'plate_numbers' => null],
@@ -135,6 +142,7 @@ class VehicleService
                 $data['plate_numbers'],
                 $data['owner_inline'],
                 $data['addon_ids'],
+                $data['photo_media_ids'],
                 $data['rental_priority'],
                 $data['license'],
             );
@@ -148,12 +156,91 @@ class VehicleService
             if (is_array($license)) {
                 $this->syncLicenseDocument($vehicle, $license);
             }
+            if ($photoMediaIds !== null) {
+                $this->syncVehiclePhotos($vehicle, $photoMediaIds);
+            }
 
             $vehicle = $vehicle->fresh(['owner', 'accessories', 'documents']);
             $this->syncOwnerAgreementSnapshot($vehicle);
 
             return $vehicle;
         });
+    }
+
+    /**
+     * Bind gallery photos to the vehicle. First id becomes purpose=primary.
+     * Soft-deletes vehicle_photos previously on this vehicle that are absent from $mediaIds.
+     *
+     * @param  list<int>  $mediaIds
+     */
+    public function syncVehiclePhotos(Vehicle $vehicle, array $mediaIds): void
+    {
+        $ids = [];
+        foreach ($mediaIds as $raw) {
+            $id = (int) $raw;
+            if ($id > 0 && ! in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
+        }
+
+        $keep = $ids === [] ? [0] : $ids;
+        MediaFile::query()
+            ->where('attachable_type', Vehicle::class)
+            ->where('attachable_id', $vehicle->id)
+            ->where(function ($q) {
+                $q->where('collection', 'vehicle_photos')
+                    ->orWhereIn('purpose', ['photo', 'primary', 'gallery'])
+                    ->orWhere(function ($qq) {
+                        $qq->where('kind', 'image')
+                            ->where(function ($q3) {
+                                $q3->whereNull('purpose')
+                                    ->orWhereNotIn('purpose', ['document', 'license', 'national_id', 'damage']);
+                            })
+                            ->where(function ($q3) {
+                                $q3->whereNull('collection')
+                                    ->orWhere('collection', '!=', 'vehicle_docs');
+                            });
+                    });
+            })
+            ->whereNotIn('id', $keep)
+            ->get()
+            ->each(function (MediaFile $m) {
+                $m->delete();
+            });
+
+        if ($ids === []) {
+            return;
+        }
+
+        $rows = MediaFile::query()->whereIn('id', $ids)->get()->keyBy('id');
+        foreach ($ids as $index => $id) {
+            /** @var MediaFile|null $media */
+            $media = $rows->get($id);
+            if (! $media) {
+                throw new DomainException('ملف صورة غير موجود.');
+            }
+            if ($media->attachable_id
+                && $media->attachable_type === Vehicle::class
+                && (int) $media->attachable_id !== (int) $vehicle->id) {
+                throw new DomainException('الصورة مربوطة بعربية أخرى.');
+            }
+            if ($media->attachable_id
+                && $media->attachable_type
+                && $media->attachable_type !== Vehicle::class) {
+                throw new DomainException('الملف مربوط بكيان آخر ولا يمكن استخدامه كصورة عربية.');
+            }
+            if ($media->kind !== 'image' && ! str_starts_with((string) $media->mime_type, 'image/')) {
+                throw new DomainException('يُسمح بصور فقط لمعرض العربية.');
+            }
+
+            $media->fill([
+                'attachable_type' => Vehicle::class,
+                'attachable_id' => $vehicle->id,
+                'collection' => 'vehicle_photos',
+                'purpose' => $index === 0 ? 'primary' : 'photo',
+            ]);
+            $media->save();
+        }
     }
 
     /**

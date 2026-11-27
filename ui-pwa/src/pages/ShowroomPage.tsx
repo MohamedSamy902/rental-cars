@@ -3,8 +3,8 @@ import { api, type ApiError } from '@/shared/api/client'
 import { useNewContract } from '@/shared/contracts/newContractContext'
 import { formatMoney, formatDate } from '@/shared/lib/format'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
-import { openWhatsAppText, vehicleWhatsAppText } from '@/shared/lib/whatsappShare'
-import { PageHeader, EmptyState, SkeletonBlock, ErrorState, StatusPill, Button } from '@/shared/ui'
+import { shareVehicleWhatsApp, shareVehicleWhatsAppError } from '@/shared/lib/shareVehicleWhatsApp'
+import { PageHeader, EmptyState, SkeletonBlock, ErrorState, StatusPill, Button, useToast } from '@/shared/ui'
 import './pages.css'
 import './ShowroomPage.css'
 
@@ -32,9 +32,8 @@ const ShowroomPageTabs = ['all', 'available', 'busy'] as const
 
 export function ShowroomPage() {
   const { openNewContract } = useNewContract()
+  const toast = useToast()
   const [center, setCenter] = useState('')
-  const [centerPhone, setCenterPhone] = useState('')
-  const [minDays, setMinDays] = useState(5)
   const [rows, setRows] = useState<ShowroomVehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -53,9 +52,6 @@ export function ShowroomPage() {
         }
       }>('/showroom')
       setCenter(res.data.center_name || 'المعرض')
-      setCenterPhone(res.data.center_phone || '')
-      const min = Number(res.data.min_rental_days)
-      setMinDays(Number.isFinite(min) && min > 0 ? min : 5)
       setRows(res.data.vehicles || [])
     } catch (e) {
       setError((e as ApiError).message)
@@ -77,11 +73,13 @@ export function ShowroomPage() {
   }, [rows, chip])
 
   function shareWhatsApp(v: ShowroomVehicle) {
-    openWhatsAppText(vehicleWhatsAppText(v, {
-      centerName: center || 'شركة آر بي إم للتأجير',
-      phone: centerPhone,
-      minDays,
-    }))
+    void (async () => {
+      try {
+        await shareVehicleWhatsApp(v.id)
+      } catch (e) {
+        toast.error(shareVehicleWhatsAppError(e))
+      }
+    })()
   }
 
   return (

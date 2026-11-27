@@ -6,7 +6,7 @@ import { pinScrollForNavigation, readScrollY, routeScrollKey } from '@/shared/li
 import { api, type ApiError } from '@/shared/api/client'
 import { addCivilDays, todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
-import { openWhatsAppText, vehicleWhatsAppText } from '@/shared/lib/whatsappShare'
+import { shareVehicleWhatsApp, shareVehicleWhatsAppError } from '@/shared/lib/shareVehicleWhatsApp'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Badge, Fab, DataTable,
@@ -485,33 +485,11 @@ export function VehiclesPage() {
     }
   }
 
-  async function shareVehicleWhatsApp(v: Vehicle) {
+  async function shareVehicleOnWhatsApp(v: Vehicle) {
     try {
-      const res = await api<{
-        data: {
-          center_name?: string
-          operational?: { print_phone?: string; default_min_days?: number; showroom_min_rental_days?: number }
-        }
-      }>('/settings/tenant')
-      const ops = res.data.operational || {}
-      const min = Number(ops.default_min_days ?? ops.showroom_min_rental_days)
-      openWhatsAppText(vehicleWhatsAppText({
-        brand: v.brand,
-        model: v.model,
-        year: v.year,
-        category: v.category,
-        fuel_type: v.fuel_type,
-        transmission: v.transmission,
-        daily_rate: v.daily_rate,
-        half_monthly_rate: v.half_monthly_rate ?? Math.round(v.daily_rate * 15),
-        monthly_rate: v.monthly_rate ?? Math.round(v.daily_rate * 22),
-      }, {
-        centerName: res.data.center_name || 'شركة آر بي إم للتأجير',
-        phone: String(ops.print_phone || ''),
-        minDays: Number.isFinite(min) && min > 0 ? min : 5,
-      }))
+      await shareVehicleWhatsApp(v.id)
     } catch (e) {
-      toast.error((e as ApiError).message || 'تعذّر تجهيز مشاركة واتساب.')
+      toast.error(shareVehicleWhatsAppError(e))
     }
   }
 
@@ -519,7 +497,7 @@ export function VehiclesPage() {
     const items: MenuItem[] = [
       { id: 'open', label: 'فتح الملف الكامل', icon: <IconEye size={16} />, onSelect: () => openVehicle(v.id) },
       { id: 'edit', label: 'تعديل بيانات العربية', icon: <IconEdit size={16} />, onSelect: () => void openEdit(v) },
-      { id: 'whatsapp', label: 'مشاركة واتساب', icon: <IconClipboard size={16} />, onSelect: () => void shareVehicleWhatsApp(v) },
+      { id: 'whatsapp', label: 'مشاركة واتساب', icon: <IconClipboard size={16} />, onSelect: () => void shareVehicleOnWhatsApp(v) },
     ]
     if (chip === 'sim_recharge' || v.tracker_sim_number) {
       items.push({

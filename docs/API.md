@@ -251,6 +251,8 @@ Query شائع: `?per_page=50&page=1&search=...`
 | POST | `/vehicles/brands` | إضافة ماركة للقائمة الرئيسية من نموذج العربية |
 | POST | `/vehicles` | إضافة (كود تلقائي · لوحة مقسومة · مالك مضمّن اختياري) |
 | GET | `/vehicles/{vehicle}` | تفاصيل + accessories + documents |
+| POST | `/vehicles/{vehicle}/share` | نص واتساب + رابط بطاقة عامة موقّعة (أسعار · صور `vehicle_photos`) · صلاحية ١٤ يوماً |
+| GET | `/public/vehicles/share` | صفحة HTML عامة موقّعة بلا لوجين (`id` + `signature`) |
 | PUT | `/vehicles/{vehicle}` | تعديل (الكود الداخلي غير قابل للتغيير) · عند تغيير رخصة التسيير (تاريخ/صورة) تُؤرشف السابقة تلقائياً ثم تُكتب الجديدة |
 | DELETE | `/vehicles/{vehicle}` | أرشفة ناعمة (apiResource) |
 | POST | `/vehicles/{vehicle}/documents` | مستند (`type` · `document_number` · وش/ضهر · تواريخ) |
@@ -263,7 +265,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 **POST /vehicles — حقول أساسية**
 `plate_letters` + `plate_numbers` (أو `plate` موحّد للتوافق) · `brand` · `model` · `year` · `category` · `fuel_type` · `odometer` · `daily_rate` · `default_deposit` · **`chassis_number` (مطلوب)**  
 الكود: يُولَّد تلقائياً إن لم يُرسل.  
-اختياري: `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_inline{full_name,phone,nationality,national_id,id_front_path,id_back_path,…}`, `addon_ids[]`, `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}` — عند ربط مالك تُرجع الاستجابة أيضاً `owner_agreement` (عقد إدارة وتشغيل متعدد الصفحات مملوء ببيانات الشركة/المالك/العربية) للطباعة. `GET /vehicles/{id}/owner-agreement/print`  
+اختياري: `engine_number`, `tracker_*`, `color`, `transmission`, `notes`, `is_active`, `owner_id`, `owner_monthly_amount`, `owner_agreement_starts_on`, `owner_agreement_ends_on`, `owner_inline{full_name,phone,nationality,national_id,id_front_path,id_back_path,…}`, `addon_ids[]`, `photo_media_ids[]` (حتى ١٢ · صور معرض `vehicle_photos`)، `license{has_license,document_number,issued_on,expires_on,file_path,file_path_back,notes}` — عند ربط مالك تُرجع الاستجابة أيضاً `owner_agreement` (عقد إدارة وتشغيل متعدد الصفحات مملوء ببيانات الشركة/المالك/العربية) للطباعة. `GET /vehicles/{id}/owner-agreement/print`  
 `owner_inline`: عند الإنشاء المضمّن يلزم الهاتف + الرقم القومي + وش/ضهر البطاقة.  
 **ملغى:** `rental_priority` · قائمة الانتظار · `fuel_level` في الفحص.
 
@@ -669,10 +671,12 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 
 **POST حقول**
 - `file` (مطلوب) — صورة: jpeg/png/webp/gif ≤ ٥ ميجا · فيديو: mp4/webm/mov ≤ ٥٠ ميجا
-- `collection` — مثل `customers_id` · `vehicle_docs` · `inspection_damage` · `general`
-- `purpose` — `national_id` · `license` · `document` · `damage` · …
+- `collection` — مثل `customers_id` · `vehicle_docs` · `vehicle_photos` · `inspection_damage` · `general`
+- `purpose` — `national_id` · `license` · `document` · `damage` · `primary` · `photo` · …
 - `attachable_type` — `customer` · `vehicle` · `contract` · `inspection`
 - `attachable_id` — رقم الكيان (اختياري)
+
+عند **إضافة/تعديل عربية**: يُقبل `photo_media_ids` (مصفوفة حتى ١٢ معرّف ميديا) لربط صور المعرض؛ الأولى `purpose=primary` والباقي `photo`. الصور المرفوعة قبل الحفظ بلا `attachable` تُربط عند الإنشاء.
 
 **استجابة مختصرة**
 ```json

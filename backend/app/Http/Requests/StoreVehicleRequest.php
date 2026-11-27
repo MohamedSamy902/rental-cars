@@ -112,6 +112,8 @@ class StoreVehicleRequest extends FormRequest
             'owner_inline.notes' => ['nullable', 'string'],
             'addon_ids' => ['nullable', 'array'],
             'addon_ids.*' => ['integer', 'exists:vehicle_addon_catalog,id'],
+            'photo_media_ids' => ['nullable', 'array', 'max:12'],
+            'photo_media_ids.*' => ['integer', 'exists:media_files,id'],
             'license' => ['nullable', 'array'],
             'license.has_license' => ['nullable', 'boolean'],
             'license.document_number' => ['nullable', 'string', 'max:80'],

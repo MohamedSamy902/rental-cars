@@ -8,11 +8,11 @@ import { api, type ApiError } from '@/shared/api/client'
 import { civilDateOnly, nowLocalDateTimeValue, todayCivilIso } from '@/shared/lib/dates'
 import { useAuth } from '@/shared/auth/AuthContext'
 import { formatDate, formatMoney, formatNumber } from '@/shared/lib/format'
-import { openWhatsAppText, vehicleWhatsAppText } from '@/shared/lib/whatsappShare'
+import { shareVehicleWhatsApp, shareVehicleWhatsAppError } from '@/shared/lib/shareVehicleWhatsApp'
 import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   Button, BackNavButton, StatusPill, Sheet, AttentionDot,
-  TextField, NumberField, SelectField, TextAreaField, SwitchField, MediaUpload,
+  TextField, NumberField, SelectField, TextAreaField, SwitchField, MediaUpload, AuthMediaImage,
   DateField,
   useToast, SkeletonBlock, ErrorState, QrCode, PhoneActions,
   type AttentionTone,
@@ -184,6 +184,7 @@ type Dossier = {
     original_name: string
     collection?: string | null
     purpose?: string | null
+    mime_type?: string | null
     url: string
   }>
   owner_dues: Array<{ id: number; year_month: string; amount: number }>
@@ -245,6 +246,36 @@ type Dossier = {
     documents?: number
     lost_revenue?: number
   }
+}
+
+type VehicleMedia = Dossier['media'][number]
+
+const DOC_MEDIA_PURPOSES = new Set(['document', 'license', 'national_id', 'damage'])
+
+function isVehicleGalleryPhoto(m: VehicleMedia): boolean {
+  const purpose = (m.purpose || '').toLowerCase()
+  const collection = (m.collection || '').toLowerCase()
+  if (DOC_MEDIA_PURPOSES.has(purpose)) return false
+  if (collection === 'vehicle_docs') return false
+  if (collection === 'vehicle_photos' || purpose === 'photo' || purpose === 'primary' || purpose === 'gallery') {
+    return true
+  }
+  return m.kind === 'image' || (m.mime_type || '').startsWith('image/')
+}
+
+function splitVehiclePhotos(media: VehicleMedia[]): { primary: VehicleMedia | null; gallery: VehicleMedia[] } {
+  const photos = media
+    .filter(isVehicleGalleryPhoto)
+    .slice()
+    .sort((a, b) => {
+      const ap = (a.purpose || '') === 'primary' ? 0 : 1
+      const bp = (b.purpose || '') === 'primary' ? 0 : 1
+      if (ap !== bp) return ap - bp
+      return a.id - b.id
+    })
+  if (photos.length === 0) return { primary: null, gallery: [] }
+  const [primary, ...gallery] = photos
+  return { primary, gallery }
 }
 
 type TabId = 'overview' | 'accessories' | 'bookings' | 'maintenance' | 'expenses' | 'docs' | 'owner'
@@ -744,6 +775,10 @@ export function VehicleDetailPage() {
   const v = dossier.vehicle
   const accessories = v.accessories || []
   const ownerInitial = (v.owner?.full_name || 'م').trim().charAt(0)
+  const { primary: primaryPhoto, gallery: galleryPhotos } = splitVehiclePhotos(dossier.media)
+  const vehiclePhotos = primaryPhoto ? [primaryPhoto, ...galleryPhotos] : []
+  const docMedia = dossier.media.filter((m) => !isVehicleGalleryPhoto(m))
+  const nextPhotoPurpose = primaryPhoto ? 'photo' : 'primary'
 
   const openMaintenance = dossier.work_orders.filter((w) => ['open', 'in_progress'].includes(String(w.status))).length
   const activeBookings = dossier.contracts.filter((c) => ['pending', 'approved', 'active'].includes(String(c.status))).length
@@ -771,7 +806,7 @@ export function VehicleDetailPage() {
       attentionLabel: openMaintenance > 0 ? 'أوامر شغل مفتوحة' : 'دخل ضائع من التوقف',
     },
     { id: 'expenses', label: 'المصروفات', count: dossier.expenses.length },
-    { id: 'docs', label: 'المستندات', count: (v.documents?.length || 0) + dossier.totals.media },
+    { id: 'docs', label: 'المستندات', count: (v.documents?.length || 0) + docMedia.length },
     { id: 'owner', label: 'المالك' },
   ]
 
@@ -1319,11 +1354,11 @@ export function VehicleDetailPage() {
 
       <div className="vd-panel__head" style={{ marginTop: '0.5rem' }}>
         <h2>المرفقات والوسائط</h2>
-        <p>{dossier.totals.media} ملف</p>
+        <p>{docMedia.length} ملف · صور العربية تُعرض أعلى الصفحة</p>
       </div>
-      {dossier.media.length === 0 ? <Empty>لا مرفقات مرفوعة</Empty> : (
+      {docMedia.length === 0 ? <Empty>لا مرفقات مستندات مرفوعة</Empty> : (
         <div className="vd-media">
-          {dossier.media.map((m) => (
+          {docMedia.map((m) => (
             <a key={m.id} href={m.url} target="_blank" rel="noreferrer">
               <strong>{m.original_name}</strong>
               <span>{m.kind} · {m.purpose || m.collection || '—'}</span>
@@ -1333,7 +1368,7 @@ export function VehicleDetailPage() {
       )}
       <div className="vd-form-block vd-no-print">
         <MediaUpload
-          label="رفع مرفق للعربية"
+          label="رفع مرفق مستند للعربية"
           value={null}
           collection="vehicle_docs"
           purpose="document"
@@ -1343,6 +1378,47 @@ export function VehicleDetailPage() {
           onChange={() => { void load() }}
         />
       </div>
+    </section>
+  )
+
+  const photosPanel = (
+    <section className="vd-panel vd-photos" key="photos" aria-label="صور العربية">
+      <div className="vd-panel__head">
+        <h2>صور العربية</h2>
+        <p>
+          {vehiclePhotos.length === 0
+            ? 'ارفع صورة أساسية تظهر جنب اللوحة'
+            : `${vehiclePhotos.length} صورة · الأساسية جنب اللوحة والباقي هنا`}
+        </p>
+      </div>
+      {galleryPhotos.length === 0 ? (
+        <Empty>{primaryPhoto ? 'لا صور إضافية بعد — الأساسية ظاهرة جنب اللوحة' : 'لا صور مرفوعة لهذه العربية'}</Empty>
+      ) : (
+        <div className="vd-photos__grid">
+          {galleryPhotos.map((m) => (
+            <figure key={m.id} className="vd-photo-card">
+              <AuthMediaImage src={m.url} alt={m.original_name} className="vd-photo-card__img" />
+              <figcaption className="vd-photo-card__cap">{m.original_name}</figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+      {canUpdateVehicle ? (
+        <div className="vd-form-block vd-no-print">
+          <MediaUpload
+            label={primaryPhoto ? 'إضافة صورة للعربية' : 'رفع الصورة الأساسية'}
+            value={null}
+            collection="vehicle_photos"
+            purpose={nextPhotoPurpose}
+            accept="image"
+            capture="environment"
+            attachableType="vehicle"
+            attachableId={v.id}
+            hint={primaryPhoto ? 'تُضاف لمعرض الصور تحت اللوحة' : 'تظهر جنب رقم اللوحة'}
+            onChange={() => { void load() }}
+          />
+        </div>
+      ) : null}
     </section>
   )
 
@@ -1629,31 +1705,9 @@ export function VehicleDetailPage() {
               onClick={() => {
                 void (async () => {
                   try {
-                    const res = await api<{
-                      data: {
-                        center_name?: string
-                        operational?: { print_phone?: string; default_min_days?: number; showroom_min_rental_days?: number }
-                      }
-                    }>('/settings/tenant')
-                    const ops = res.data.operational || {}
-                    const min = Number(ops.default_min_days ?? ops.showroom_min_rental_days)
-                    openWhatsAppText(vehicleWhatsAppText({
-                      brand: v.brand,
-                      model: v.model,
-                      year: v.year,
-                      category: v.category,
-                      fuel_type: v.fuel_type,
-                      transmission: v.transmission,
-                      daily_rate: v.daily_rate,
-                      half_monthly_rate: v.half_monthly_rate ?? Math.round(v.daily_rate * 15),
-                      monthly_rate: v.monthly_rate ?? Math.round(v.daily_rate * 22),
-                    }, {
-                      centerName: res.data.center_name || 'شركة آر بي إم للتأجير',
-                      phone: String(ops.print_phone || ''),
-                      minDays: Number.isFinite(min) && min > 0 ? min : 5,
-                    }))
+                    await shareVehicleWhatsApp(v.id)
                   } catch (e) {
-                    toast.error((e as ApiError).message || 'تعذّر تجهيز مشاركة واتساب.')
+                    toast.error(shareVehicleWhatsAppError(e))
                   }
                 })()
               }}
@@ -1679,9 +1733,20 @@ export function VehicleDetailPage() {
               <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
               <span className="vd-code">{v.code}</span>
             </div>
-            <div className="vd-plate" aria-label={`لوحة ${v.plate}`}>
-              <div className="vd-plate__band">EGYPT · RPM</div>
-              <p className="vd-plate__num">{v.plate}</p>
+            <div className="vd-plate-row">
+              {primaryPhoto ? (
+                <div className="vd-hero-photo" aria-label="الصورة الأساسية للعربية">
+                  <AuthMediaImage src={primaryPhoto.url} alt={primaryPhoto.original_name} className="vd-hero-photo__img" />
+                </div>
+              ) : (
+                <div className="vd-hero-photo vd-hero-photo--empty" aria-hidden="true">
+                  بدون صورة
+                </div>
+              )}
+              <div className="vd-plate" aria-label={`لوحة ${v.plate}`}>
+                <div className="vd-plate__band">EGYPT · RPM</div>
+                <p className="vd-plate__num">{v.plate}</p>
+              </div>
             </div>
             <h1 className="vd-title">{v.brand} {v.model}</h1>
             <p className="vd-sub">{v.year}{v.color ? ` · ${v.color}` : ''}{v.transmission ? ` · ${v.transmission}` : ''}</p>
@@ -1721,8 +1786,10 @@ export function VehicleDetailPage() {
         <div className="vd-kpi"><span>الحجوزات</span><strong>{dossier.totals.contracts}</strong></div>
         <div className="vd-kpi"><span>الصيانة</span><strong>{dossier.totals.work_orders}</strong></div>
         <div className="vd-kpi"><span>المصروفات</span><strong>{formatMoney(dossier.totals.expenses_amount)}</strong></div>
-        <div className="vd-kpi"><span>المستلزمات</span><strong>{accessories.length}</strong><em>{dossier.totals.media} مرفق</em></div>
+        <div className="vd-kpi"><span>المستلزمات</span><strong>{accessories.length}</strong><em>{vehiclePhotos.length} صورة · {docMedia.length} مرفق</em></div>
       </div>
+
+      {photosPanel}
 
       <nav className="vd-tabs vd-no-print" aria-label="أقسام ملف العربية">
         {tabs.map((t) => (

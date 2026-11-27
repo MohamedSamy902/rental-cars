@@ -103,6 +103,8 @@ class UpdateVehicleRequest extends FormRequest
             'owner_agreement_ends_on' => ['nullable', 'date', 'required_with:owner_id', 'after_or_equal:owner_agreement_starts_on'],
             'addon_ids' => ['nullable', 'array'],
             'addon_ids.*' => ['integer', 'exists:vehicle_addon_catalog,id'],
+            'photo_media_ids' => ['nullable', 'array', 'max:12'],
+            'photo_media_ids.*' => ['integer', 'exists:media_files,id'],
             'license' => ['nullable', 'array'],
             'license.has_license' => ['nullable', 'boolean'],
             'license.document_number' => ['nullable', 'string', 'max:80'],
