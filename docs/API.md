@@ -102,6 +102,7 @@ Query شائع: `?per_page=50&page=1&search=...`
     "active_contracts": 1, "open_work_orders": 1,
     "open_violations": 0, "low_stock": 0
   },
+
   "tasks": [{ "id": 1, "title": "...", "subtitle": "...", "status": "active", "at": "..." }],
   "important_tasks": [
     {
@@ -138,7 +139,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 `fleet_prep.groups.maintenance` ليوم «اليوم» = كل أوامر الشغل المفتوحة/`in_progress`؛ للأيام التالية = المجدولة بـ `next_service_on`.
 
-صفوف `pickups` / `returns` وأعدادها تُحذف بلا `contracts.view`. `customer` و`customer_phone` يُصفَّران بلا `customers.view`. صلاحية العملاء وحدها لا تُظهر مواعيد العقود. عنوان صيانة «تبديل بسبب عطل» يُخفي رقم العقد بلا `contracts.view`. `kpis.returning_today` يكون `null` بلا `contracts.view`.
+صفوف `pickups` / `returns` وأعدادها تُحذف بلا `contracts.view`. `customer` و`customer_phone` يُصفَّران بلا `customers.view`. صلاحية العملاء وحدها لا تُظهر مواعيد العقود. عنوان صيانة «تبديل بسبب عطل» يُخفي رقم العقد بلا `contracts.view`. `kpis.returning_today` = عقود نشطة `planned_ends_at` ≤ نهاية اليوم (اليوم + متأخر) ويكون `null` بلا `contracts.view`.
 
 هوية المالك والمبلغ الشهري على العربية: الاسم/الهاتف/`owner_id` مع `owners.view`؛ المبلغ مع `owners.view` أو `reports.view` أو `accounting.view`. تاريخا عقد المالك يبقيان.
 
@@ -244,7 +245,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | وصف |
 |--------|------|-----|
-| GET | `/vehicles` | قائمة + summary — `status=sim_recharge` = كل العربيات بشريحة؛ `due_only=1&within_days=N` للمستحقة · `license_expiring` · `owner_agreement_expiring` · `tracker_sim_*` بما فيها `tracker_sim_last_recharge_amount` |
+| GET | `/vehicles` | قائمة + summary — `status=expiring&within_days=N` = نشطة `planned_ends_at` ≤ الآن+N يوماً **يشمل المتأخر** (الأقدم أولاً) · `sim_recharge` = كل العربيات بشريحة؛ `due_only=1&within_days=N` للمستحقة · `license_expiring` · `owner_agreement_expiring` · `tracker_sim_*` بما فيها `tracker_sim_last_recharge_amount` |
 | POST | `/vehicles/{id}/sim-recharge` | `{ amount, recharged_on?, next_recharge_on, notes? }` — يسجّل شحن الشريحة + سجل |
 | GET | `/vehicles/{id}/sim-recharges` | سجل شحنات الشريحة |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |

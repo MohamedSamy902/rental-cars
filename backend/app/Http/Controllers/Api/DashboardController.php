@@ -71,9 +71,11 @@ class DashboardController extends Controller
             ->get(['vehicle_id', 'status', 'planned_ends_at']);
         $activeIds = $coverage->where('status', 'active')->pluck('vehicle_id')->flip();
         $reservedIds = $coverage->where('status', 'approved')->pluck('vehicle_id')->flip();
+        // تحتاج استلام: عقود نشطة انتهى موعدها المخطط اليوم أو قبله (يشمل متأخر أمس…).
+        $endOfToday = now()->endOfDay();
         $returningToday = $canContracts
             ? $coverage->where('status', 'active')
-                ->filter(fn (Contract $c) => $c->planned_ends_at && $c->planned_ends_at->isToday())
+                ->filter(fn (Contract $c) => $c->planned_ends_at && $c->planned_ends_at->lte($endOfToday))
                 ->count()
             : null;
 

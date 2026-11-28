@@ -158,7 +158,7 @@ export function VehiclesPage() {
         id: 'expiring',
         label: 'تأجير قارب الانتهاء',
         attention: 'warning' as const,
-        attentionLabel: `خلال ${withinDays} يوم`,
+        attentionLabel: `متأخر + خلال ${withinDays} يوم`,
       },
       {
         id: 'license_expiring',
@@ -384,7 +384,11 @@ export function VehiclesPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
             <StatusPill status={v.status} label={statusLabel[v.status] || v.status} />
             {chip === 'expiring' && v.active_contract_ends_at ? (
-              <span className="rpm-table__sub">ينتهي {formatDate(v.active_contract_ends_at)}</span>
+              <span className="rpm-table__sub">
+                {new Date(v.active_contract_ends_at).getTime() < Date.now()
+                  ? `متأخر · كان ${formatDate(v.active_contract_ends_at)}`
+                  : `ينتهي ${formatDate(v.active_contract_ends_at)}`}
+              </span>
             ) : null}
             {chip === 'license_expiring' && v.license_expires_on ? (
               <span className="rpm-table__sub">الرخصة {formatDate(v.license_expires_on)}</span>

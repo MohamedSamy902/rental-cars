@@ -137,14 +137,21 @@ class VehicleController extends Controller
             } elseif ($status === 'reserved') {
                 $q->whereHas('contracts', fn ($c) => $c->where('status', 'approved'));
             } elseif ($status === 'expiring') {
+                // يشمل العقود المتأخرة عن الاستلام (قبل اليوم) + النافذة القادمة.
+                // المتأخرة تظهر أولاً بترتيب أقرب planned_ends_at.
                 $within = max(0, (int) $request->integer('within_days', 2));
-                $from = now()->startOfDay();
                 $until = now()->addDays($within)->endOfDay();
-                $q->whereHas('contracts', function ($c) use ($from, $until) {
+                $q->whereHas('contracts', function ($c) use ($until) {
                     $c->where('status', 'active')
-                        ->where('planned_ends_at', '>=', $from)
                         ->where('planned_ends_at', '<=', $until);
                 });
+                $q->reorder()->orderByRaw(
+                    '(select min(planned_ends_at) from contracts'
+                    .' where contracts.vehicle_id = vehicles.id'
+                    .' and contracts.status = ?'
+                    .' and contracts.deleted_at is null) asc',
+                    ['active']
+                );
             } elseif ($status === 'license_expiring') {
                 $within = max(0, (int) $request->integer('within_days', 30));
                 $until = now()->addDays($within)->toDateString();

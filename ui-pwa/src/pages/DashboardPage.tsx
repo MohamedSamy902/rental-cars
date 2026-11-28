@@ -500,15 +500,15 @@ export function DashboardPage() {
       href: '/bookings',
     },
     {
-      label: 'ترجع اليوم',
+      label: 'تحتاج إلى استلام',
       value: data.kpis.returning_today || 0,
       kind: 'number' as const,
-      badge: 'تحتاج استلام',
+      badge: 'اليوم + متأخر',
       badgeTone: 'warning' as BadgeTone,
       icon: <IconReturn size={16} />,
       tone: 'warn',
       spark: sparkFromValue(data.kpis.returning_today || 1, 3),
-      href: '/calendar',
+      href: '/vehicles?tab=expiring',
     },
     {
       label: 'إيراد متوقع',
@@ -537,7 +537,7 @@ export function DashboardPage() {
           <p className="db-hero__sub">
             لديك <strong className="tabular-nums">{formatNumber(openTasks)}</strong> مهام تحتاج متابعة
             و <strong className="tabular-nums">{formatNumber(data.kpis.returning_today || 0)}</strong>{' '}
-            عربية ترجع اليوم.
+            عربية تحتاج إلى استلام.
           </p>
         </div>
       </motion.header>
