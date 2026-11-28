@@ -337,7 +337,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | الحالة المتوقعة |
 |--------|------|------------------|
-| GET | `/contracts` | قائمة + summary + `ledger` مختصر — `?status=&search=&tab=upcoming\|handover_today\|overdue_handover\|with_balance` (`overdue_handover` = تسليم فائت أو استلام متأخر عن `planned_ends_at` · `with_balance` = متبقي على العميل) |
+| GET | `/contracts` | قائمة + summary + `ledger` مختصر — `?status=&search=&tab=upcoming\|handover_today\|overdue_handover\|due_receive\|with_balance` (`due_receive` = نشط يحتاج استلام: متأخر أو اليوم أو بكرة · مرتّب بالأقدم · `overdue_handover` = تسليم فائت أو استلام متأخر · `with_balance` = متبقي على العميل) |
 | POST | `/contracts` | إنشاء → `pending` |
 | GET | `/contracts/{id}` | تفاصيل + deposit + inspections |
 | POST | `/contracts/{id}/approve` | → `approved` + تثبيت أسعار |
