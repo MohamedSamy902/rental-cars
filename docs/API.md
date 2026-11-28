@@ -244,7 +244,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 
 | Method | Path | وصف |
 |--------|------|-----|
-| GET | `/vehicles` | قائمة + summary — `status=sim_recharge` = كل العربيات بشريحة؛ `due_only=1&within_days=N` للمستحقة · `license_expiring` · `owner_agreement_expiring` · `tracker_sim_*` بما فيها `tracker_sim_last_recharge_amount` |
+| GET | `/vehicles` | قائمة + summary — كل صف يتضمن `primary_photo_url` · `status=sim_recharge` = كل العربيات بشريحة؛ `due_only=1&within_days=N` للمستحقة · `license_expiring` · `owner_agreement_expiring` · `tracker_sim_*` بما فيها `tracker_sim_last_recharge_amount` |
 | POST | `/vehicles/{id}/sim-recharge` | `{ amount, recharged_on?, next_recharge_on, notes? }` — يسجّل شحن الشريحة + سجل |
 | GET | `/vehicles/{id}/sim-recharges` | سجل شحنات الشريحة |
 | GET | `/vehicles/catalogs` | ماركات + بيانات الإضافة + `next_code` |

@@ -82,4 +82,50 @@ class VehiclePhotosAttachTest extends TestCase
             'purpose' => 'photo',
         ]);
     }
+
+    public function test_vehicle_list_includes_primary_photo_url(): void
+    {
+        $vehicle = Vehicle::query()->create([
+            'code' => 'PH-LIST-1',
+            'plate' => 'س ص 1122',
+            'brand' => 'هيونداي',
+            'model' => 'إلنترا',
+            'year' => 2022,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 5000,
+            'daily_rate' => 900,
+            'default_deposit' => 1000,
+            'is_active' => true,
+        ]);
+        $primary = MediaFile::query()->create([
+            'disk' => 'local',
+            'path' => 'media/vehicle_photos/list-primary.png',
+            'original_name' => 'list-primary.png',
+            'mime_type' => 'image/png',
+            'kind' => 'image',
+            'collection' => 'vehicle_photos',
+            'purpose' => 'primary',
+            'size_bytes' => 12,
+            'attachable_type' => Vehicle::class,
+            'attachable_id' => $vehicle->id,
+        ]);
+        MediaFile::query()->create([
+            'disk' => 'local',
+            'path' => 'media/vehicle_photos/list-extra.png',
+            'original_name' => 'list-extra.png',
+            'mime_type' => 'image/png',
+            'kind' => 'image',
+            'collection' => 'vehicle_photos',
+            'purpose' => 'photo',
+            'size_bytes' => 12,
+            'attachable_type' => Vehicle::class,
+            'attachable_id' => $vehicle->id,
+        ]);
+
+        $row = collect($this->getJson('/api/vehicles?search=PH-LIST-1&per_page=20')->assertOk()->json('data'))
+            ->firstWhere('id', $vehicle->id);
+        $this->assertNotNull($row);
+        $this->assertSame(url('/api/media/'.$primary->id.'/file'), $row['primary_photo_url']);
+    }
 }

@@ -11,7 +11,7 @@ import { useQueryTab } from '@/shared/lib/useQueryTab'
 import {
   PageHeader, MetricCardGrid, FilterBar, Button, StatusPill, Badge, Fab, DataTable,
   useToast, ErrorState, IconEye, IconCalendar, IconClipboard, IconCar, IconCheck, IconKey, IconWrench, IconEdit,
-  Sheet, MoneyField, DateField, TextAreaField,
+  Sheet, MoneyField, DateField, TextAreaField, AuthMediaImage,
   type DataColumn, type MenuItem,
 } from '@/shared/ui'
 import { VehicleFormSheet } from '@/shared/forms/VehicleFormSheet'
@@ -72,6 +72,7 @@ type Vehicle = {
   owner?: OwnerOption | null
   active_contract_ends_at?: string | null
   license_expires_on?: string | null
+  primary_photo_url?: string | null
   accessories?: Array<{ id?: number; name?: string | null }> | null
   purchase_value_estimate?: number | null
   color?: string | null
@@ -80,6 +81,27 @@ type Vehicle = {
   engine_number?: string | null
   engine_capacity?: string | null
   seats?: number | null
+}
+
+function vehicleListPhoto(v: Vehicle) {
+  if (!v.primary_photo_url) {
+    return <span className="vh-list-photo is-empty" aria-hidden />
+  }
+  return (
+    <AuthMediaImage
+      src={v.primary_photo_url}
+      alt={`${v.brand} ${v.model}`}
+      className="vh-list-photo"
+    />
+  )
+}
+
+const photoColumn: DataColumn<Vehicle> = {
+  id: 'photo',
+  header: 'صورة',
+  cell: vehicleListPhoto,
+  mobile: 'thumb',
+  width: '4.25rem',
 }
 
 const statusLabel: Record<string, string> = {
@@ -250,6 +272,7 @@ export function VehiclesPage() {
   const columns: DataColumn<Vehicle>[] = useMemo(() => {
     if (chip === 'owner_agreement_expiring') {
       return [
+        photoColumn,
         {
           id: 'plate',
           header: 'رقم العربية',
@@ -293,6 +316,7 @@ export function VehiclesPage() {
 
     if (chip === 'sim_recharge') {
       return [
+        photoColumn,
         {
           id: 'plate',
           header: 'العربية',
@@ -350,6 +374,7 @@ export function VehiclesPage() {
     }
 
     return [
+      photoColumn,
       {
         id: 'vehicle',
         header: 'العربية',
