@@ -6,6 +6,7 @@ import {
 import { toApiDateTime, formatMoney, formatDepositAmount, DEFAULT_DEPOSIT_CURRENCY } from '@/shared/lib/format'
 import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
 import { NationalityField } from '@/shared/forms/NationalityField'
+import { vehicleSelectOption } from '@/shared/lib/vehicleSelect'
 import { NewContractContext, type NewContractOptions } from './newContractContext'
 
 type Customer = { id: number; full_name: string; phone: string }
@@ -21,6 +22,7 @@ type Vehicle = {
   default_deposit: number
   purchase_value_estimate?: number | null
   odometer?: number
+  primary_photo_url?: string | null
   accessories?: Accessory[]
 }
 
@@ -596,10 +598,7 @@ export function NewContractProvider({ children }: { children: ReactNode }) {
             hint={form.starts_at && form.planned_ends_at ? 'تُستبعد العربيات المحجوزة أو المؤجرة في نفس الفترة' : 'حدد فترة الحجز أولاً لتصفية المتاح'}
             options={[
               { value: '', label: vehicles.length ? 'اختر عربية…' : 'لا عربيات متاحة في هذه الفترة' },
-              ...vehicles.map((v) => ({
-                value: String(v.id),
-                label: `${v.brand} ${v.model} · ${v.plate}`,
-              })),
+              ...vehicles.map((v) => vehicleSelectOption(v)),
             ]}
             value={form.vehicle_id}
             error={errors.vehicle_id}

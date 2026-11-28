@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreVehicleOwnerRequest;
 use App\Http\Requests\UpdateVehicleOwnerRequest;
+use App\Models\MediaFile;
 use App\Models\OwnerPayout;
+use App\Models\Vehicle;
 use App\Models\VehicleOwner;
 use App\Services\Fleet\VehicleOwnerService;
 use App\Support\PaginationInput;
@@ -67,11 +69,14 @@ class VehicleOwnerController extends Controller
         // ملف المالك بلا ترحيل محاسبي (dues) — الصرف فقط + جدول عقد الإدارة الحي
         $payouts = $owner->payouts()->with('vehicle:id,code,plate')->orderByDesc('paid_on')->orderByDesc('id')->limit(50)->get();
         $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
+        $primaryPhotoUrls = $this->primaryPhotoUrlsByVehicle(
+            $owner->vehicles->pluck('id')->map(fn ($id) => (int) $id)->all(),
+        );
 
         return response()->json([
             'data' => [
                 ...$this->present($owner, $balance, $canViewNid),
-                'vehicles' => $owner->vehicles->map(function ($v) use ($balance) {
+                'vehicles' => $owner->vehicles->map(function ($v) use ($balance, $primaryPhotoUrls) {
                     $row = collect($balance['vehicles_breakdown'] ?? [])->firstWhere('vehicle_id', $v->id);
 
                     return [
@@ -80,6 +85,7 @@ class VehicleOwnerController extends Controller
                         'plate' => $v->plate,
                         'brand' => $v->brand,
                         'model' => $v->model,
+                        'primary_photo_url' => $primaryPhotoUrls[(int) $v->id] ?? null,
                         'owner_monthly_amount' => $v->owner_monthly_amount,
                         'owner_since' => $v->owner_since?->toDateString(),
                         'owner_agreement_starts_on' => $v->owner_agreement_starts_on?->toDateString(),
@@ -187,6 +193,39 @@ class VehicleOwnerController extends Controller
         }
 
         return response()->json(['data' => $q->limit(100)->get()]);
+    }
+
+    /**
+     * @param  list<int>  $vehicleIds
+     * @return array<int, string> vehicle_id => media file URL
+     */
+    private function primaryPhotoUrlsByVehicle(array $vehicleIds): array
+    {
+        if ($vehicleIds === []) {
+            return [];
+        }
+
+        $rows = MediaFile::query()
+            ->where('attachable_type', Vehicle::class)
+            ->whereIn('attachable_id', $vehicleIds)
+            ->where(function ($q) {
+                $q->where('collection', 'vehicle_photos')
+                    ->orWhereIn('purpose', ['photo', 'primary', 'gallery']);
+            })
+            ->orderByRaw("case when purpose = 'primary' then 0 else 1 end")
+            ->orderBy('id')
+            ->get(['id', 'attachable_id', 'purpose']);
+
+        $map = [];
+        foreach ($rows as $media) {
+            $vehicleId = (int) $media->attachable_id;
+            if (isset($map[$vehicleId])) {
+                continue;
+            }
+            $map[$vehicleId] = url('/api/media/'.$media->id.'/file');
+        }
+
+        return $map;
     }
 
     /**

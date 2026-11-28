@@ -11,6 +11,7 @@ import {
   Button, Sheet, SelectField, NumberField, MoneyField, TextField, SwitchField,
   DateField, DateTimeField, useToast, FieldShell,
 } from '@/shared/ui'
+import { vehicleSelectOption } from '@/shared/lib/vehicleSelect'
 import './WorkOrderSheet.css'
 
 type Props = {
@@ -23,7 +24,14 @@ type Props = {
   custodyEmployee?: { id: number; name?: string }
 }
 
-type VehicleOption = { id: number; brand: string; model: string; plate: string; odometer?: number }
+type VehicleOption = {
+  id: number
+  brand: string
+  model: string
+  plate: string
+  odometer?: number
+  primary_photo_url?: string | null
+}
 type Item = { id: number; name: string; code: string; remaining?: number; unit_cost?: number | null }
 type EmployeeOption = { id: number; name: string }
 
@@ -341,7 +349,7 @@ export function WorkOrderSheet({ open, onClose, onSaved, vehicle, custodyEmploye
             label="العربية"
             required
             error={fieldErrors.vehicle_id}
-            options={vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))}
+            options={vehicles.map((v) => vehicleSelectOption(v))}
             value={form.vehicle_id}
             onRemoteSearch={searchVehicles}
             remoteSearching={vehicleSearching}

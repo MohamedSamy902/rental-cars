@@ -780,7 +780,7 @@ KPIs: ذمم · مدفوعات · عقود · أسطول · إيجار حسب ا
 |--------|------|--------|
 | GET | `/owners` | `owners.view` |
 | POST | `/owners` | `owners.create` |
-| GET | `/owners/{id}` | `owners.view` — عربيات + استحقاقات + سحوبات + رصيد |
+| GET | `/owners/{id}` | `owners.view` — عربيات + استحقاقات + سحوبات + رصيد · كل عربية تتضمن `primary_photo_url` |
 | PUT | `/owners/{id}` | `owners.update` |
 | GET | `/owners/{id}/balance?month=YYYY-MM` | `owners.view` — قراءة فقط، بلا ترحيل |
 | POST | `/owners/{id}/accruals` | `owners.accrue` أو `owners.payout` — `{ "through": "YYYY-MM" }` اختياري. Idempotent. شهر مقفل = 422 بلا كتابة. المبلغ = أيام مدنية شاملة في الشهر ÷ أيام ذلك الشهر × الشهري؛ الشهر الكامل = الشهري تماماً. لا شهر جارٍ. لا إعادة كتابة لمستحق قائم |
@@ -857,7 +857,7 @@ password: password
 | GET/POST/DELETE | `/salary-advances` · `/salary-advances/{id}` | `hr.advances` — سلف الشهر تُخصم من المسودة |
 | POST | `/payroll/lines/{id}/payout` | صرف جزئي أو كامل بعد الاعتماد؛ المتبقي يُرحَّل |
 | GET/POST | `/employee-assignments` · `…/acknowledge` | `hr.custody` — تأكيد استلام الأدمن |
-| GET | `/vehicles/recommend` | العربيات المتاحة في الفترة (بلا أوزان/درجات) |
+| GET | `/vehicles/recommend` | العربيات المتاحة في الفترة (بلا أوزان/درجات) · كل صف يتضمن `primary_photo_url` |
 | GET/POST | `/vehicles/{id}/tires|batteries|downtime|consumables` | أصول المركبة ٦٫٩–٦٫١١ · ١٤٫١ |
 | GET/POST | `/vehicles/{id}/custody-agreements` · `…/{aid}/print` | عقد اعتماد مالك↔شركة · نسخة ثابتة قابلة للطباعة |
 | GET/POST | `/document-templates` · `/document-templates/preview` | قوالب العقد · إيصال الاستلام · **عقد الاعتماد** (`custody_agreement`) |

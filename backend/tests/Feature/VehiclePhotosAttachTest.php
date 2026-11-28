@@ -128,4 +128,38 @@ class VehiclePhotosAttachTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame(url('/api/media/'.$primary->id.'/file'), $row['primary_photo_url']);
     }
+
+    public function test_vehicle_recommend_includes_primary_photo_url(): void
+    {
+        $vehicle = Vehicle::query()->create([
+            'code' => 'PH-REC-1',
+            'plate' => 'س ص 3344',
+            'brand' => 'تويوتا',
+            'model' => 'كورولا',
+            'year' => 2023,
+            'category' => 'اقتصادي',
+            'fuel_type' => 'بنزين',
+            'odometer' => 1000,
+            'daily_rate' => 800,
+            'default_deposit' => 1000,
+            'is_active' => true,
+        ]);
+        $primary = MediaFile::query()->create([
+            'disk' => 'local',
+            'path' => 'media/vehicle_photos/rec-primary.png',
+            'original_name' => 'rec-primary.png',
+            'mime_type' => 'image/png',
+            'kind' => 'image',
+            'collection' => 'vehicle_photos',
+            'purpose' => 'primary',
+            'size_bytes' => 12,
+            'attachable_type' => Vehicle::class,
+            'attachable_id' => $vehicle->id,
+        ]);
+
+        $row = collect($this->getJson('/api/vehicles/recommend')->assertOk()->json('data'))
+            ->firstWhere('id', $vehicle->id);
+        $this->assertNotNull($row);
+        $this->assertSame(url('/api/media/'.$primary->id.'/file'), $row['primary_photo_url']);
+    }
 }
