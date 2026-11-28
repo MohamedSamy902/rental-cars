@@ -130,12 +130,7 @@ class InventoryService
     {
         $q = InventoryItem::query()->with('batches')->latest('id');
         if ($search !== null && trim($search) !== '') {
-            $term = '%'.trim($search).'%';
-            $q->where(function ($qq) use ($term) {
-                $qq->where('name', 'like', $term)
-                    ->orWhere('code', 'like', $term)
-                    ->orWhere('category', 'like', $term);
-            });
+            \App\Support\SmartSearch::constrain($q, ['name', 'code', 'category'], $search);
         }
         $rows = $q->paginate($perPage, ['*'], 'page', $page);
         $rows->setCollection($rows->getCollection()->map(fn (InventoryItem $item) => $this->presentItem($item)));

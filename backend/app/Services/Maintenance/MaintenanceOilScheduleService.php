@@ -43,12 +43,7 @@ class MaintenanceOilScheduleService
         }
 
         if ($search !== '') {
-            $q->where(function (Builder $qq) use ($search) {
-                $qq->where('plate', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('brand', 'like', "%{$search}%")
-                    ->orWhere('model', 'like', "%{$search}%");
-            });
+            \App\Support\SmartSearch::constrain($q, ['plate', 'code', 'brand', 'model'], $search);
         }
 
         if ($tab === 'upcoming') {

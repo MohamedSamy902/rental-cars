@@ -24,11 +24,7 @@ class StaffController extends Controller
         $q = User::query()->with(['role:id,name,label'])->tap($staffScope)->latest('id');
 
         if ($search = $request->string('search')->toString()) {
-            $q->where(function ($qq) use ($search) {
-                $qq->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
-            });
+            \App\Support\SmartSearch::constrain($q, ['name', 'email', 'phone'], $search);
         }
 
         if ($request->filled('active')) {

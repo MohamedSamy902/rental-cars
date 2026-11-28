@@ -91,13 +91,12 @@ class VehicleController extends Controller
         $q = Vehicle::query()->latest('id');
 
         if ($search = $request->string('search')->toString()) {
-            // بحث سيرفر على كل الأسطول (قبل الترقيم) — كود · لوحة · ماركة/موديل · مالك.
+            // بحث ذكي على كل الأسطول (قبل الترقيم) — كود · لوحة · ماركة/موديل · مالك.
             $q->where(function ($qq) use ($search) {
-                $qq->where('code', 'like', "%{$search}%")
-                    ->orWhere('plate', 'like', "%{$search}%")
-                    ->orWhere('brand', 'like', "%{$search}%")
-                    ->orWhere('model', 'like', "%{$search}%")
-                    ->orWhereHas('owner', fn ($o) => $o->where('full_name', 'like', "%{$search}%"));
+                \App\Support\SmartSearch::constrain($qq, ['code', 'plate', 'brand', 'model'], $search);
+                $qq->orWhereHas('owner', function ($o) use ($search) {
+                    \App\Support\SmartSearch::constrain($o, ['full_name'], $search);
+                });
             });
         }
 

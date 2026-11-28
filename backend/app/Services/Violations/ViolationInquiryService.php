@@ -50,16 +50,10 @@ class ViolationInquiryService
 
         if ($search = trim((string) $search)) {
             $q->where(function ($qq) use ($search) {
-                $qq->where('plate', 'like', "%{$search}%")
-                    ->orWhere('brand', 'like', "%{$search}%")
-                    ->orWhere('model', 'like', "%{$search}%")
-                    ->orWhere('category', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhereHas('owner', function ($o) use ($search) {
-                        $o->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%")
-                            ->orWhere('national_id', 'like', "%{$search}%");
-                    });
+                \App\Support\SmartSearch::constrain($qq, ['plate', 'brand', 'model', 'category', 'code'], $search);
+                $qq->orWhereHas('owner', function ($o) use ($search) {
+                    \App\Support\SmartSearch::constrain($o, ['full_name', 'phone', 'national_id'], $search);
+                });
             });
         }
 

@@ -22,11 +22,7 @@ class VehicleOwnerController extends Controller
         $q = VehicleOwner::query()->withCount('vehicles')->latest('id');
         $canViewNid = (bool) $request->user()?->hasPermission('sensitive.view_national_id');
         if ($search = $request->string('search')->toString()) {
-            $q->where(function ($qq) use ($search) {
-                $qq->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('national_id', 'like', "%{$search}%");
-            });
+            \App\Support\SmartSearch::constrain($q, ['full_name', 'phone', 'national_id'], $search);
         }
         if ($request->boolean('active_only', false)) {
             $q->where('is_active', true);
