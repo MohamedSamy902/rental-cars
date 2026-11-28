@@ -35,6 +35,7 @@ export function useContractLifecycle(onMutated?: () => void) {
     }
     if (
       kind === 'return'
+      || kind === 'swap'
       || kind === 'collect'
       || kind === 'extend'
       || (kind === 'handover' && (contract.ledger?.balance === undefined))

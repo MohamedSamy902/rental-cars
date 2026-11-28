@@ -339,7 +339,7 @@ Query شائع: `?per_page=50&page=1&search=...`
 |--------|------|------------------|
 | GET | `/contracts` | قائمة + summary + `ledger` مختصر — `?status=&search=&tab=upcoming\|handover_today\|overdue_handover\|with_balance` (`overdue_handover` = تسليم فائت أو استلام متأخر عن `planned_ends_at` · `with_balance` = متبقي على العميل) |
 | POST | `/contracts` | إنشاء → `pending` |
-| GET | `/contracts/{id}` | تفاصيل + deposit + inspections |
+| GET | `/contracts/{id}` | تفاصيل + deposit + inspections + `return_km_basis` (`prior_driven_km` · `segment_start_odometer`) لتقدير كيلو الزيادة عند الاستلام |
 | POST | `/contracts/{id}/approve` | → `approved` + تثبيت أسعار |
 | ~~POST `/contracts/{id}/pricing`~~ | **ملغى** — لا تعديل أسعار بعد الإنشاء |
 | POST | `/contracts/{id}/vehicle-value` | تحديث التزام ثمن العربية (نص حر) قبل التسليم · `contracts.update` |

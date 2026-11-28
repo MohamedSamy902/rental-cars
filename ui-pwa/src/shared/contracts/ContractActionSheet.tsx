@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import {
   Button, Sheet, TextField, SelectField, NumberField, MoneyField, TextAreaField, MediaUpload, DateField,
 } from '@/shared/ui'
-import { formatDate, formatDateTime, formatDepositAmount, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatDepositAmount, formatMoney, formatNumber } from '@/shared/lib/format'
 import { actionTitle, type ActionKind, type Contract, type VehicleOption } from './contractModel'
 import {
   addDaysIso,
@@ -12,6 +12,7 @@ import {
   resolveBasisAfterExtension,
   unitRateForBasis,
 } from './extendPricing'
+import { estimateReturnExcess, excessPreviewHint } from './returnExcessPreview'
 
 type Form = {
   odometer_out: string
@@ -90,6 +91,22 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
   const periodRentValue = form.period_rent
     || (extendPreview.estimate > 0 ? String(extendPreview.estimate) : '')
 
+  const excessPreview = useMemo(() => {
+    if ((action !== 'return' && action !== 'swap') || !selected) return null
+    const odo = Number(form.odometer_in)
+    if (!Number.isFinite(odo) || form.odometer_in === '') return null
+    return estimateReturnExcess({
+      odometerIn: odo,
+      startsAt: selected.starts_at,
+      odometerOut: selected.odometer_out,
+      dailyKmAllowance: selected.frozen_daily_km_allowance,
+      excessKmRate: selected.frozen_excess_km_rate,
+      prepaidExcessKm: selected.prepaid_excess_km,
+      minDays: selected.frozen_min_days ?? selected.min_days,
+      kmBasis: selected.return_km_basis,
+    })
+  }, [action, selected, form.odometer_in])
+
   function patchExtensionDays(raw: string) {
     const days = Math.max(0, Number(raw || 0))
     const newEnd = selected && days > 0 ? addDaysIso(selected.planned_ends_at, days) : ''
@@ -167,7 +184,50 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             required
             value={form.odometer_in}
             onChange={(e) => patch({ odometer_in: e.target.value })}
+            hint={
+              selected?.frozen_daily_km_allowance != null
+                ? `المسموح ${formatNumber(selected.frozen_daily_km_allowance)} كم/يوم · الزيادة ${formatMoney(selected.frozen_excess_km_rate || 0)}/كم`
+                : undefined
+            }
           />
+        ) : null}
+        {excessPreview ? (
+          <div
+            className="rpm-due-banner"
+            role="status"
+            style={{
+              gridColumn: '1 / -1',
+              padding: '0.85rem 1rem',
+              borderRadius: 'var(--radius-sm, 12px)',
+              background: excessPreview.fee > 0
+                ? 'var(--warning-soft)'
+                : 'var(--success-soft, color-mix(in srgb, var(--success) 12%, var(--surface)))',
+              color: excessPreview.fee > 0
+                ? 'var(--warning-ink)'
+                : 'var(--success-ink, var(--text))',
+              border: excessPreview.fee > 0
+                ? '1px solid color-mix(in srgb, var(--warning) 35%, var(--border))'
+                : '1px solid color-mix(in srgb, var(--success, #16a34a) 28%, var(--border))',
+              display: 'grid',
+              gap: '0.35rem',
+            }}
+          >
+            <strong>
+              {excessPreview.fee > 0 ? 'رسوم كيلو زيادة (تلقائي)' : 'كيلو الزيادة'}
+            </strong>
+            {excessPreview.fee > 0 ? (
+              <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>{formatMoney(excessPreview.fee)}</span>
+            ) : null}
+            <span className="muted" style={{ color: 'inherit', opacity: 0.9 }}>
+              {excessPreviewHint(excessPreview)}
+            </span>
+            {excessPreview.ok ? (
+              <span className="muted" style={{ color: 'inherit', opacity: 0.8, fontSize: '0.85rem' }}>
+                المقطوع {formatNumber(excessPreview.drivenKm)} كم · المسموح {formatNumber(excessPreview.allowedKm)} كم
+                {excessPreview.prepaidKm > 0 ? ` · مسبق ${formatNumber(excessPreview.prepaidKm)} كم` : ''}
+              </span>
+            ) : null}
+          </div>
         ) : null}
         {action === 'return' && (selected?.open_violations_total ?? 0) > 0 ? (
           <div
