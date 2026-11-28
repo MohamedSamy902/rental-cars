@@ -84,6 +84,14 @@ class ContractController extends Controller
                             ->where('planned_ends_at', '<', now());
                     });
                 });
+            } elseif ($tab === 'due_receive') {
+                // تحتاج استلام: نشط · متأخر أو ينتهي اليوم أو بكرة — الأقدم أولاً.
+                $q->where('status', 'active')
+                    ->whereNotNull('planned_ends_at')
+                    ->where('planned_ends_at', '<=', now()->copy()->addDay()->endOfDay())
+                    ->reorder()
+                    ->orderBy('planned_ends_at')
+                    ->orderBy('id');
             } elseif ($tab === 'with_balance') {
                 $this->scopeWithOutstandingBalance($q);
             }
@@ -333,6 +341,7 @@ class ContractController extends Controller
             $endOfDay = now()->endOfDay()->toDateTimeString();
             $todayStart = now()->startOfDay()->toDateTimeString();
             $tomorrowStart = now()->copy()->addDay()->startOfDay()->toDateTimeString();
+            $tomorrowEnd = now()->copy()->addDay()->endOfDay()->toDateTimeString();
 
             $row = Contract::query()
                 ->toBase()
@@ -348,7 +357,8 @@ class ContractController extends Controller
                     SUM(CASE WHEN (
                         (status IN (?, ?) AND starts_at IS NOT NULL AND starts_at <= ?)
                         OR (status = ? AND planned_ends_at IS NOT NULL AND planned_ends_at < ?)
-                    ) THEN 1 ELSE 0 END) as overdue_handover',
+                    ) THEN 1 ELSE 0 END) as overdue_handover,
+                    SUM(CASE WHEN status = ? AND planned_ends_at IS NOT NULL AND planned_ends_at <= ? THEN 1 ELSE 0 END) as due_receive',
                     [
                         'pending',
                         'approved',
@@ -359,6 +369,7 @@ class ContractController extends Controller
                         'pending', 'approved', $todayStart, $tomorrowStart,
                         'pending', 'approved', $now,
                         'active', $now,
+                        'active', $tomorrowEnd,
                     ]
                 )
                 ->first();
@@ -373,6 +384,7 @@ class ContractController extends Controller
                 'upcoming' => (int) ($row->upcoming ?? 0),
                 'handover_today' => (int) ($row->handover_today ?? 0),
                 'overdue_handover' => (int) ($row->overdue_handover ?? 0),
+                'due_receive' => (int) ($row->due_receive ?? 0),
                 'with_balance' => $this->countWithOutstandingBalance(),
             ];
         });

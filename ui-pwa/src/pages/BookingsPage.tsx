@@ -23,7 +23,30 @@ import { useContractPrint } from '@/shared/contracts/ContractPrintSheet'
 import { shareContractInvoiceWhatsApp } from '@/shared/contracts/shareContractInvoice'
 import './pages.css'
 
-const BookingsPageTabs = ['all', 'overdue_handover', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed', 'with_balance', 'cancelled'] as const
+const BookingsPageTabs = ['all', 'due_receive', 'overdue_handover', 'handover_today', 'upcoming', 'pending', 'approved', 'active', 'completed', 'with_balance', 'cancelled'] as const
+
+/** استعجال الاستلام لتاب «تحتاج استلام». */
+function receiveUrgency(plannedEndsAt?: string | null): 'overdue' | 'today' | 'tomorrow' | null {
+  if (!plannedEndsAt) return null
+  const end = new Date(plannedEndsAt)
+  if (Number.isNaN(end.getTime())) return null
+  const now = new Date()
+  if (end.getTime() < now.getTime()) return 'overdue'
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startTomorrow = new Date(startToday)
+  startTomorrow.setDate(startTomorrow.getDate() + 1)
+  const startDayAfter = new Date(startToday)
+  startDayAfter.setDate(startDayAfter.getDate() + 2)
+  if (end >= startToday && end < startTomorrow) return 'today'
+  if (end >= startTomorrow && end < startDayAfter) return 'tomorrow'
+  return null
+}
+
+const receiveUrgencyLabel: Record<'overdue' | 'today' | 'tomorrow', string> = {
+  overdue: 'متأخر',
+  today: 'اليوم',
+  tomorrow: 'بكرة',
+}
 
 type PageMeta = { current_page: number; last_page: number; total: number }
 const LIST_PER_PAGE = 20
@@ -41,7 +64,8 @@ export function BookingsPage() {
   const [page, setPage] = useState(1)
   const [meta, setMeta] = useState<PageMeta>({ current_page: 1, last_page: 1, total: 0 })
   const [summary, setSummary] = useState({
-    total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0, handover_today: 0, overdue_handover: 0, with_balance: 0,
+    total: 0, pending: 0, approved: 0, active: 0, completed: 0, upcoming: 0,
+    handover_today: 0, overdue_handover: 0, due_receive: 0, with_balance: 0,
   })
   const [search, setSearch] = useState('')
   const [chip, setChip] = useQueryTab({ allowed: BookingsPageTabs, defaultValue: 'all' })
@@ -69,6 +93,13 @@ export function BookingsPage() {
   const chips = useMemo(
     () => [
       { id: 'all', label: 'الكل' },
+      {
+        id: 'due_receive',
+        label: 'تحتاج استلام',
+        count: summary.due_receive > 0 ? summary.due_receive : null,
+        attention: summary.due_receive > 0 ? ('critical' as const) : null,
+        attentionLabel: 'متأخر · اليوم · بكرة',
+      },
       {
         id: 'overdue_handover',
         label: 'متأخر',
@@ -120,7 +151,7 @@ export function BookingsPage() {
       },
       { id: 'cancelled', label: 'تم الإلغاء' },
     ],
-    [summary.pending, summary.upcoming, summary.handover_today, summary.overdue_handover, summary.with_balance, attention.pickups_today, attention.overdue_returns, attention.returning_today],
+    [summary.pending, summary.upcoming, summary.handover_today, summary.overdue_handover, summary.due_receive, summary.with_balance, attention.pickups_today, attention.overdue_returns, attention.returning_today],
   )
 
   async function load(nextPage = page) {
@@ -132,7 +163,13 @@ export function BookingsPage() {
       qs.set('page', String(nextPage))
       qs.set('per_page', String(LIST_PER_PAGE))
       if (search.trim()) qs.set('search', search.trim())
-      if (chip === 'upcoming' || chip === 'handover_today' || chip === 'overdue_handover' || chip === 'with_balance') {
+      if (
+        chip === 'upcoming'
+        || chip === 'handover_today'
+        || chip === 'overdue_handover'
+        || chip === 'due_receive'
+        || chip === 'with_balance'
+      ) {
         qs.set('tab', chip)
       } else if (chip !== 'all') {
         qs.set('status', chip)
@@ -155,6 +192,7 @@ export function BookingsPage() {
         upcoming: res.summary.upcoming ?? 0,
         handover_today: res.summary.handover_today ?? 0,
         overdue_handover: res.summary.overdue_handover ?? 0,
+        due_receive: res.summary.due_receive ?? 0,
         with_balance: res.summary.with_balance ?? 0,
       })
     } catch (e) {
@@ -217,12 +255,21 @@ export function BookingsPage() {
     {
       id: 'period',
       header: 'الفترة',
-      cell: (b) => (
-        <>
-          <span className="rpm-table__primary">{formatDate(b.starts_at)}</span>
-          <span className="rpm-table__sub">حتى {formatDate(b.planned_ends_at)}</span>
-        </>
-      ),
+      cell: (b) => {
+        const urgency = chip === 'due_receive' ? receiveUrgency(b.planned_ends_at) : null
+        return (
+          <>
+            <span className="rpm-table__primary">{formatDate(b.starts_at)}</span>
+            <span className="rpm-table__sub">حتى {formatDate(b.planned_ends_at)}</span>
+            {urgency ? (
+              <StatusPill
+                status={urgency === 'overdue' ? 'cancelled' : urgency === 'today' ? 'pending' : 'approved'}
+                label={receiveUrgencyLabel[urgency]}
+              />
+            ) : null}
+          </>
+        )
+      },
       sortValue: (b) => b.starts_at,
     },
     {
