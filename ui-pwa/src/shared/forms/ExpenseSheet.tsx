@@ -6,6 +6,7 @@ import { formatDate } from '@/shared/lib/format'
 import {
   Button, Sheet, TextField, MoneyField, SelectField, TextAreaField, DateField, SwitchField, useToast,
 } from '@/shared/ui'
+import { vehicleSelectOption } from '@/shared/lib/vehicleSelect'
 
 export type ExpenseEditInitial = {
   id: number
@@ -36,7 +37,13 @@ type Props = {
   initial?: ExpenseEditInitial | null
 }
 
-type VehicleOption = { id: number; brand: string; model: string; plate: string }
+type VehicleOption = {
+  id: number
+  brand: string
+  model: string
+  plate: string
+  primary_photo_url?: string | null
+}
 type WorkOrderOption = { id: number; workshop?: string | null; status: string; opened_on?: string | null }
 type EmployeeOption = { id: number; name: string }
 
@@ -249,7 +256,7 @@ export function ExpenseSheet({ open, onClose, onSaved, vehicle, custodyEmployee,
             error={errors.vehicle_id}
             options={[
               { value: '', label: form.category === 'صيانة' ? 'اختر عربية…' : '— اختر عربية —' },
-              ...vehicles.map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` })),
+              ...vehicles.map((v) => vehicleSelectOption(v)),
             ]}
             onRemoteSearch={searchVehicles}
             remoteSearching={vehicleSearching}

@@ -28,6 +28,31 @@
   text-align: start;
 }
 
+.rpm-select-trigger__value.has-thumb {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.rpm-select-trigger__copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.rpm-select-trigger__thumb,
+.rpm-select-panel__thumb {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.55rem;
+  object-fit: cover;
+  background:
+    linear-gradient(145deg, var(--surface-2), color-mix(in srgb, var(--border) 55%, var(--surface)));
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
 .rpm-select-trigger__primary,
 .rpm-select-trigger__secondary {
   min-width: 0;
@@ -169,6 +194,16 @@
   text-align: start;
   cursor: pointer;
   transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.rpm-select-panel__option.has-thumb {
+  align-items: center;
+}
+
+.rpm-select-panel__option.has-thumb .rpm-select-panel__thumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.65rem;
 }
 
 .rpm-select-panel__check {

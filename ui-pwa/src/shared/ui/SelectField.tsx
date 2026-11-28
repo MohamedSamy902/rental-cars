@@ -11,16 +11,23 @@ import {
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { IconCheck, IconChevron, IconSearch } from './Icons'
+import { AuthMediaImage } from './AuthMediaImage'
 import './Field.css'
 import './SelectField.css'
 
-type Option = { value: string; label: string; description?: string }
+export type SelectOption = {
+  value: string
+  label: string
+  description?: string
+  /** صورة مصغّرة (مثل صورة العربية) — مسار ميديا محمي */
+  imageUrl?: string | null
+}
 
 type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'children'> & {
   label: string
   error?: string
   hint?: string
-  options: Option[]
+  options: SelectOption[]
   placeholder?: string
   searchable?: boolean
   searchPlaceholder?: string
@@ -189,7 +196,7 @@ export function SelectField({
     closePanel()
   }
 
-  function pick(opt: Option) {
+  function pick(opt: SelectOption) {
     emit(opt.value)
     closePanel()
     triggerRef.current?.focus()
@@ -349,13 +356,20 @@ export function SelectField({
                     role="option"
                     data-idx={idx}
                     aria-selected={isSelected}
-                    className={`rpm-select-panel__option ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''}`}
+                    className={`rpm-select-panel__option ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''} ${opt.imageUrl ? 'has-thumb' : ''}`}
                     onMouseEnter={() => setActiveIndex(idx)}
                     onClick={() => pick(opt)}
                   >
                     <span className="rpm-select-panel__check" aria-hidden>
                       {isSelected ? <IconCheck size={15} /> : null}
                     </span>
+                    {opt.imageUrl ? (
+                      <AuthMediaImage
+                        src={opt.imageUrl}
+                        alt=""
+                        className="rpm-select-panel__thumb"
+                      />
+                    ) : null}
                     <span className="rpm-select-panel__copy">
                       <span className="rpm-select-panel__text">{opt.label}</span>
                       {opt.description ? (
@@ -394,13 +408,22 @@ export function SelectField({
         onKeyDown={onTriggerKey}
         onBlur={onBlur as never}
       >
-        <span className="rpm-select-trigger__value">
+        <span className={`rpm-select-trigger__value ${selected?.imageUrl ? 'has-thumb' : ''}`}>
           {selected ? (
             <>
-              <span className="rpm-select-trigger__primary">{selected.label}</span>
-              {selected.description ? (
-                <span className="rpm-select-trigger__secondary">{selected.description}</span>
+              {selected.imageUrl ? (
+                <AuthMediaImage
+                  src={selected.imageUrl}
+                  alt=""
+                  className="rpm-select-trigger__thumb"
+                />
               ) : null}
+              <span className="rpm-select-trigger__copy">
+                <span className="rpm-select-trigger__primary">{selected.label}</span>
+                {selected.description ? (
+                  <span className="rpm-select-trigger__secondary">{selected.description}</span>
+                ) : null}
+              </span>
             </>
           ) : placeholder}
         </span>

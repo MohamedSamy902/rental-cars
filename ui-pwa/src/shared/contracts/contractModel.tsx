@@ -127,7 +127,16 @@ export type Contract = {
   } | null
 }
 
-export type VehicleOption = { id: number; brand: string; model: string; plate: string; daily_rate: number; default_deposit: number; odometer?: number }
+export type VehicleOption = {
+  id: number
+  brand: string
+  model: string
+  plate: string
+  daily_rate: number
+  default_deposit: number
+  odometer?: number
+  primary_photo_url?: string | null
+}
 
 export type ActionKind = 'handover' | 'return' | 'cancel' | 'extend' | 'swap' | 'deposit' | 'deduct' | 'refund' | 'collect' | null
 

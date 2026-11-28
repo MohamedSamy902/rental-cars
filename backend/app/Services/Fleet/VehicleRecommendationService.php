@@ -3,6 +3,7 @@
 namespace App\Services\Fleet;
 
 use App\Models\Contract;
+use App\Models\MediaFile;
 use App\Models\Vehicle;
 use Carbon\Carbon;
 
@@ -95,6 +96,46 @@ class VehicleRecommendationService
             ];
         }
 
+        $photoUrls = $this->primaryPhotoUrlsByVehicle(array_column($rows, 'id'));
+        foreach ($rows as &$row) {
+            $row['primary_photo_url'] = $photoUrls[(int) $row['id']] ?? null;
+        }
+        unset($row);
+
         return $rows;
+    }
+
+    /**
+     * @param  list<int|string>  $vehicleIds
+     * @return array<int, string>
+     */
+    private function primaryPhotoUrlsByVehicle(array $vehicleIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $vehicleIds)));
+        if ($ids === []) {
+            return [];
+        }
+
+        $mediaRows = MediaFile::query()
+            ->where('attachable_type', Vehicle::class)
+            ->whereIn('attachable_id', $ids)
+            ->where(function ($q) {
+                $q->where('collection', 'vehicle_photos')
+                    ->orWhereIn('purpose', ['photo', 'primary', 'gallery']);
+            })
+            ->orderByRaw("case when purpose = 'primary' then 0 else 1 end")
+            ->orderBy('id')
+            ->get(['id', 'attachable_id', 'purpose']);
+
+        $map = [];
+        foreach ($mediaRows as $media) {
+            $vehicleId = (int) $media->attachable_id;
+            if (isset($map[$vehicleId])) {
+                continue;
+            }
+            $map[$vehicleId] = url('/api/media/'.$media->id.'/file');
+        }
+
+        return $map;
     }
 }

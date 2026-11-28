@@ -6,6 +6,7 @@ import { todayCivilIso } from '@/shared/lib/dates'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { DEFAULT_NATIONALITY } from '@/shared/lib/nationalities'
 import { NationalityField } from '@/shared/forms/NationalityField'
+import { vehicleSelectOption } from '@/shared/lib/vehicleSelect'
 import {
   PageHeader, Button, BackNavButton, Sheet, DetailList, TextField, TextAreaField, MoneyField, SelectField, MediaUpload,
   SwitchField, useToast, SkeletonBlock, ErrorState, StatusPill, MetricCardGrid, IconCash, IconKey, IconTrend,
@@ -29,6 +30,7 @@ type OwnerVehicle = {
   plate: string
   brand: string
   model: string
+  primary_photo_url?: string | null
   owner_monthly_amount?: number | null
   owner_since?: string | null
   owner_agreement_starts_on?: string | null
@@ -379,7 +381,7 @@ export function OwnerDetailPage() {
             onChange={(e) => setPayoutForm({ ...payoutForm, vehicle_id: e.target.value })}
             options={[
               { value: '', label: '— عام —' },
-              ...(owner.vehicles || []).map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` })),
+              ...(owner.vehicles || []).map((v) => vehicleSelectOption(v)),
             ]}
           />
           <TextAreaField label="ملاحظات" value={payoutForm.notes} onChange={(e) => setPayoutForm({ ...payoutForm, notes: e.target.value })} />

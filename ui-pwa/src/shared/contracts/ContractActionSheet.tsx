@@ -4,6 +4,7 @@ import {
 } from '@/shared/ui'
 import { formatDate, formatDateTime, formatDepositAmount, formatMoney } from '@/shared/lib/format'
 import { actionTitle, type ActionKind, type Contract, type VehicleOption } from './contractModel'
+import { vehicleSelectOption } from '@/shared/lib/vehicleSelect'
 import {
   addDaysIso,
   countDaysBetween,
@@ -333,7 +334,7 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             required
             options={vehicles
               .filter((v) => v.id !== selected?.vehicle_id)
-              .map((v) => ({ value: String(v.id), label: `${v.brand} ${v.model} · ${v.plate}` }))}
+              .map((v) => vehicleSelectOption(v))}
             value={form.replacement_vehicle_id}
             onChange={(e) => patch({ replacement_vehicle_id: e.target.value })}
           />
