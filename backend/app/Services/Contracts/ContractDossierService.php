@@ -4,6 +4,7 @@ namespace App\Services\Contracts;
 
 use App\Models\AuditLog;
 use App\Models\Contract;
+use App\Models\ContractVehicleSwap;
 use App\Models\Customer;
 use App\Models\Inspection;
 use App\Models\MediaFile;
@@ -176,6 +177,7 @@ class ContractDossierService
             'timeline' => $timeline,
             'open_violations' => $openViolations,
             'open_violations_total' => $openViolationsTotal,
+            'return_km_basis' => $this->returnKmBasis($contract),
             'ledger' => [
                 'contract_total' => $total,
                 'paid' => $in,
@@ -186,6 +188,32 @@ class ContractDossierService
                 // متابعة تشغيلية فقط — لا يدخل إجمالي العقد المحاسبي
                 'violations_due' => $openViolationsTotal,
             ],
+        ];
+    }
+
+    /**
+     * أساس تقدير كيلو الزيادة عند الاستلام/التبديل — يطابق تراكم المقاطع في Lifecycle.
+     *
+     * @return array{prior_driven_km: int, segment_start_odometer: int}
+     */
+    private function returnKmBasis(Contract $contract): array
+    {
+        $swaps = ContractVehicleSwap::query()
+            ->where('contract_id', $contract->id)
+            ->orderBy('id')
+            ->get();
+
+        $priorDriven = 0;
+        foreach ($swaps as $swap) {
+            $priorDriven += $swap->drivenKm();
+        }
+
+        $lastSwap = $swaps->last();
+        $segmentStart = (int) ($lastSwap?->odometer_out ?? $contract->odometer_out ?? 0);
+
+        return [
+            'prior_driven_km' => $priorDriven,
+            'segment_start_odometer' => $segmentStart,
         ];
     }
 }

@@ -65,6 +65,8 @@ export type Contract = {
   prepaid_excess_km_amount?: number | null
   frozen_agreed_deposit?: number
   frozen_deposit_currency?: string | null
+  frozen_min_days?: number | null
+  min_days?: number | null
   excess_km?: number | null
   approved_days?: number
   odometer_out?: number
@@ -82,6 +84,11 @@ export type Contract = {
   frozen_vehicle_value_text?: string | null
   discount?: number
   excess_km_amount?: number
+  /** أساس تقدير كيلو الزيادة عند الاستلام (تبديلات + بداية المقطع الحالي) */
+  return_km_basis?: {
+    prior_driven_km?: number | null
+    segment_start_odometer?: number | null
+  } | null
   notes?: string | null
   balance_due_on?: string | null
   created_by?: string | null

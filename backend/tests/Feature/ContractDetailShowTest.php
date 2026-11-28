@@ -83,12 +83,15 @@ class ContractDetailShowTest extends TestCase
             ->assertJsonPath('data.number', 'C-DET-4')
             ->assertJsonPath('data.customer.full_name', 'عميل التفاصيل')
             ->assertJsonPath('data.vehicle.plate', 'د ت 11')
+            ->assertJsonPath('data.return_km_basis.prior_driven_km', 0)
+            ->assertJsonPath('data.return_km_basis.segment_start_odometer', 0)
             ->assertJsonStructure([
                 'data' => [
                     'payments',
                     'documents',
                     'related',
                     'timeline',
+                    'return_km_basis' => ['prior_driven_km', 'segment_start_odometer'],
                     'ledger' => ['contract_total', 'paid', 'balance', 'deposit_held'],
                     'progress',
                 ],
