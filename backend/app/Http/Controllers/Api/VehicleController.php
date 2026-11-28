@@ -198,9 +198,18 @@ class VehicleController extends Controller
 
         // One fleet snapshot for list rows + summary (same statusOnDate inputs as before).
         $availability = $this->fleetAvailabilityIndex();
+        $items = collect($rows->items());
+        $primaryPhotoUrls = $this->primaryPhotoUrlsByVehicle(
+            $items->pluck('id')->map(fn ($id) => (int) $id)->all()
+        );
 
-        $data = collect($rows->items())->map(function (Vehicle $v) use ($request, $availability) {
-            return $this->present($v, $request->user(), $availability);
+        $data = $items->map(function (Vehicle $v) use ($request, $availability, $primaryPhotoUrls) {
+            return $this->present(
+                $v,
+                $request->user(),
+                $availability,
+                $primaryPhotoUrls[(int) $v->id] ?? null,
+            );
         });
 
         return response()->json([
@@ -655,10 +664,43 @@ class VehicleController extends Controller
     }
 
     /**
+     * @param  list<int>  $vehicleIds
+     * @return array<int, string> vehicle_id => media file URL
+     */
+    private function primaryPhotoUrlsByVehicle(array $vehicleIds): array
+    {
+        if ($vehicleIds === []) {
+            return [];
+        }
+
+        $rows = MediaFile::query()
+            ->where('attachable_type', Vehicle::class)
+            ->whereIn('attachable_id', $vehicleIds)
+            ->where(function ($q) {
+                $q->where('collection', 'vehicle_photos')
+                    ->orWhereIn('purpose', ['photo', 'primary', 'gallery']);
+            })
+            ->orderByRaw("case when purpose = 'primary' then 0 else 1 end")
+            ->orderBy('id')
+            ->get(['id', 'attachable_id', 'purpose']);
+
+        $map = [];
+        foreach ($rows as $media) {
+            $vehicleId = (int) $media->attachable_id;
+            if (isset($map[$vehicleId])) {
+                continue;
+            }
+            $map[$vehicleId] = url('/api/media/'.$media->id.'/file');
+        }
+
+        return $map;
+    }
+
+    /**
      * @param  array{active: \Illuminate\Support\Collection, reserved: \Illuminate\Support\Collection, blocking_wo: \Illuminate\Support\Collection}|null  $availability
      * @return array<string, mixed>
      */
-    private function present(Vehicle $v, ?User $viewer = null, ?array $availability = null): array
+    private function present(Vehicle $v, ?User $viewer = null, ?array $availability = null, ?string $primaryPhotoUrl = null): array
     {
         $viewer ??= request()->user();
         $canOwners = VehicleOwnerVisibility::canSeeProfile($viewer);
@@ -688,6 +730,10 @@ class VehicleController extends Controller
                         ->whereIn('status', ['open', 'in_progress'])
                         ->exists(),
             ]);
+        }
+
+        if ($primaryPhotoUrl === null) {
+            $primaryPhotoUrl = $this->primaryPhotoUrlsByVehicle([(int) $v->id])[(int) $v->id] ?? null;
         }
 
         return [
@@ -740,6 +786,7 @@ class VehicleController extends Controller
             'notes' => $v->notes,
             'active_contract_ends_at' => $canContracts ? $this->activeContractEndsAt($v) : null,
             'license_expires_on' => $this->licenseExpiresOn($v),
+            'primary_photo_url' => $primaryPhotoUrl,
             'created_at' => $v->created_at?->toIso8601String(),
             'updated_at' => $v->updated_at?->toIso8601String(),
         ];

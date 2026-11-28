@@ -16,7 +16,7 @@ export type DataColumn<T> = {
   align?: 'start' | 'end' | 'center'
   width?: string
   /** Role of the column in the phone card. Defaults to a key-value field. */
-  mobile?: 'title' | 'subtitle' | 'badge' | 'field' | 'hidden'
+  mobile?: 'title' | 'subtitle' | 'badge' | 'field' | 'thumb' | 'hidden'
   /** Spans both columns of the phone card grid */
   wide?: boolean
 }
@@ -336,6 +336,7 @@ function SwipeCard<T>({ row, index, columns, label, onRowClick, actions = [] }: 
   const title = columns.find((c) => role(c) === 'title')
   const subtitle = columns.filter((c) => role(c) === 'subtitle')
   const badge = columns.find((c) => role(c) === 'badge')
+  const thumb = columns.find((c) => role(c) === 'thumb')
   const fields = columns.filter((c) => role(c) === 'field')
   const canSwipe = actions.length > 0
 
@@ -401,15 +402,24 @@ function SwipeCard<T>({ row, index, columns, label, onRowClick, actions = [] }: 
             ))}
           </div>
         ) : null}
-        {fields.length > 0 ? (
-          <dl className="rpm-dt-card__grid">
-            {fields.map((c) => (
-              <div key={c.id} className={`rpm-dt-card__field ${c.wide ? 'is-wide' : ''}`.trim()}>
-                <dt>{c.header}</dt>
-                <dd>{c.cell(row)}</dd>
+        {fields.length > 0 || thumb ? (
+          <div className={`rpm-dt-card__body ${thumb ? 'has-thumb' : ''}`.trim()}>
+            {fields.length > 0 ? (
+              <dl className="rpm-dt-card__grid">
+                {fields.map((c) => (
+                  <div key={c.id} className={`rpm-dt-card__field ${c.wide ? 'is-wide' : ''}`.trim()}>
+                    <dt>{c.header}</dt>
+                    <dd>{c.cell(row)}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+            {thumb ? (
+              <div className="rpm-dt-card__thumb" aria-hidden={!thumb.header}>
+                {thumb.cell(row)}
               </div>
-            ))}
-          </dl>
+            ) : null}
+          </div>
         ) : null}
       </motion.article>
     </div>
