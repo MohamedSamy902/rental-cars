@@ -26,11 +26,7 @@ class CustomerController extends Controller
     {
         $q = Customer::query()->latest('id');
         if ($search = $request->string('search')->toString()) {
-            $q->where(function ($qq) use ($search) {
-                $qq->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('national_id', 'like', "%{$search}%");
-            });
+            \App\Support\SmartSearch::constrain($q, ['full_name', 'phone', 'national_id'], $search);
         }
         if ($status = $request->string('status')->toString()) {
             $q->where('status', $status);

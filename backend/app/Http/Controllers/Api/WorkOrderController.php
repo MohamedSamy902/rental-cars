@@ -66,15 +66,12 @@ class WorkOrderController extends Controller
         }
         if ($search = trim($request->string('search')->toString())) {
             $q->where(function ($qq) use ($search) {
-                $qq->where('workshop', 'like', "%{$search}%")
-                    ->orWhereHas('vehicle', function ($v) use ($search) {
-                        $v->where('plate', 'like', "%{$search}%")
-                            ->orWhere('code', 'like', "%{$search}%")
-                            ->orWhere('brand', 'like', "%{$search}%")
-                            ->orWhere('model', 'like', "%{$search}%");
-                    })
+                \App\Support\SmartSearch::constrain($qq, ['workshop'], $search);
+                $qq->orWhereHas('vehicle', function ($v) use ($search) {
+                    \App\Support\SmartSearch::constrain($v, ['plate', 'code', 'brand', 'model'], $search);
+                })
                     ->orWhereHas('lines', function ($l) use ($search) {
-                        $l->where('description', 'like', "%{$search}%");
+                        \App\Support\SmartSearch::constrain($l, ['description'], $search);
                     });
             });
         }

@@ -20,10 +20,7 @@ class EmployeeController extends Controller
         $q = Employee::query()->latest('id');
 
         if ($search = $request->string('search')->toString()) {
-            $q->where(function ($qq) use ($search) {
-                $qq->where('name', 'like', "%{$search}%")
-                    ->orWhere('job_title', 'like', "%{$search}%");
-            });
+            \App\Support\SmartSearch::constrain($q, ['name', 'job_title'], $search);
         }
 
         if ($status = $request->string('status')->toString()) {

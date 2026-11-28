@@ -9,6 +9,7 @@ import {
   IconReceipt, IconSearch, IconSettings, IconStore, IconUserCog, IconUsers,
   IconWallet, IconWrench,
 } from './Icons'
+import { smartSearchIncludes } from '@/shared/lib/smartSearch'
 import { useIsMobile, useSheetDrag } from './useSheetDrag'
 import './CommandPalette.css'
 
@@ -79,7 +80,7 @@ function PaletteLayer({ onClose }: { onClose: () => void }) {
   const filtered = useMemo(() => {
     const needle = q.trim()
     if (!needle) return allowed
-    return allowed.filter((i) => i.label.includes(needle) || i.group.includes(needle))
+    return allowed.filter((i) => smartSearchIncludes(i.label, needle) || smartSearchIncludes(i.group, needle))
   }, [q, allowed])
 
   useEffect(() => {

@@ -89,18 +89,14 @@ class ContractController extends Controller
             }
         }
         if ($search = $request->string('search')->toString()) {
-            // بحث سيرفر على كل العقود (قبل الترقيم) — رقم · عميل · هاتف · لوحة/كود العربية.
+            // بحث ذكي على كل العقود (قبل الترقيم) — رقم · عميل · هاتف · لوحة/كود العربية.
             $q->where(function ($qq) use ($search) {
-                $qq->where('number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($c) use ($search) {
-                        $c->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%");
-                    })
+                \App\Support\SmartSearch::constrain($qq, ['number'], $search);
+                $qq->orWhereHas('customer', function ($c) use ($search) {
+                    \App\Support\SmartSearch::constrain($c, ['full_name', 'phone'], $search);
+                })
                     ->orWhereHas('vehicle', function ($v) use ($search) {
-                        $v->where('plate', 'like', "%{$search}%")
-                            ->orWhere('code', 'like', "%{$search}%")
-                            ->orWhere('brand', 'like', "%{$search}%")
-                            ->orWhere('model', 'like', "%{$search}%");
+                        \App\Support\SmartSearch::constrain($v, ['plate', 'code', 'brand', 'model'], $search);
                     });
             });
         }
