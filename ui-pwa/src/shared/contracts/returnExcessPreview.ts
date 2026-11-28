@@ -99,13 +99,13 @@ export function excessPreviewHint(p: ExcessPreview): string {
   if (!p.ok) return 'عداد العودة أقل من عداد الخروج الحالي.'
   if (p.billableExtraKm < 1) {
     if (p.excessKm > 0 && p.prepaidKm > 0) {
-      return `زيادة ${formatNumber(p.excessKm)} كم ضمن الباقة المسبقة (${formatNumber(p.prepaidKm)} كم) — بلا رسوم إضافية.`
+      return `فوق المسموح ${formatNumber(p.excessKm)} كم لكنها ضمن الباقة المسبقة (${formatNumber(p.prepaidKm)} كم) — بلا رسوم.`
     }
-    return `المقطوع ${formatNumber(p.drivenKm)} كم ضمن المسموح ${formatNumber(p.allowedKm)} كم (${formatNumber(p.days)} يوم).`
+    return `لا زيادة تُحاسب — المقطوع ${formatNumber(p.drivenKm)} كم ضمن المسموح ${formatNumber(p.allowedKm)} كم (${formatNumber(p.days)} يوم).`
   }
   return [
-    `زيادة ${formatNumber(p.excessKm)} كم`,
-    p.prepaidKm > 0 ? `بعد خصم ${formatNumber(p.prepaidKm)} كم مسبق` : null,
-    `المطلوب ${formatNumber(p.billableExtraKm)} كم × ${formatMoney(p.rate)} = ${formatMoney(p.fee)}`,
-  ].filter(Boolean).join(' · ')
+    `يُحاسب فقط ما فوق المسموح: ${formatNumber(p.billableExtraKm)} كم`,
+    p.prepaidKm > 0 ? `(بعد خصم ${formatNumber(p.prepaidKm)} كم مسبق من أصل زيادة ${formatNumber(p.excessKm)})` : null,
+    `× ${formatMoney(p.rate)} = ${formatMoney(p.fee)}`,
+  ].filter(Boolean).join(' ')
 }

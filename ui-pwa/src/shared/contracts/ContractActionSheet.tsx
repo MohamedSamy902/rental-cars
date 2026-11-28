@@ -213,7 +213,9 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             }}
           >
             <strong>
-              {excessPreview.fee > 0 ? 'رسوم كيلو زيادة (تلقائي)' : 'كيلو الزيادة'}
+              {excessPreview.fee > 0
+                ? 'رسوم الزيادة فقط (فوق المسموح)'
+                : 'لا رسوم كيلو زيادة'}
             </strong>
             {excessPreview.fee > 0 ? (
               <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>{formatMoney(excessPreview.fee)}</span>
@@ -224,7 +226,13 @@ export function ContractActionSheet({ action, selected, vehicles, saving, form, 
             {excessPreview.ok ? (
               <span className="muted" style={{ color: 'inherit', opacity: 0.8, fontSize: '0.85rem' }}>
                 المقطوع {formatNumber(excessPreview.drivenKm)} كم · المسموح {formatNumber(excessPreview.allowedKm)} كم
+                {excessPreview.excessKm > 0
+                  ? ` · الزيادة ${formatNumber(excessPreview.excessKm)} كم`
+                  : ''}
                 {excessPreview.prepaidKm > 0 ? ` · مسبق ${formatNumber(excessPreview.prepaidKm)} كم` : ''}
+                {excessPreview.fee > 0
+                  ? ` · المطلوب للتحصيل ${formatNumber(excessPreview.billableExtraKm)} كم فقط`
+                  : ''}
               </span>
             ) : null}
           </div>
